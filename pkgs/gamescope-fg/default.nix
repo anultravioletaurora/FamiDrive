@@ -124,13 +124,20 @@ writeShellApplication {
 
       # -applaunch only hands the game to the running Steam client and
       # returns. Wait for Steam's launcher (`reaper SteamLaunch AppId=N`),
-      # or for Steam to log that the launch failed. Five minutes, since
-      # Steam may update the game first.
+      # or for Steam to log that the launch failed.
+      #
+      # No overall time limit: Steam may be updating the game or processing
+      # its shaders. Found on the first box 2026-10-05: shader processing
+      # alone took up to 5 min 41 s, past the old five-minute limit, and
+      # ES-DE came back over a launch that was still going. The only limit
+      # is on silence: two minutes with no launch step logged and no game
+      # (Steam ignored the request, or the game died before its launcher
+      # was seen). Select + Start gives up at any time.
       pid=""
       retried=""
-      n=0
-      while [ "$n" -lt 600 ]; do
-        n=$((n + 1))
+      idle=0
+      last=""
+      while [ "$idle" -lt 240 ]; do
         pid=$(pgrep -o -f "SteamLaunch AppId=$appid( |$)" || true)
         [ -n "$pid" ] && break
         steps=$(since)
@@ -140,16 +147,27 @@ writeShellApplication {
           # carries on. Wait for the update, then ask once more.
           if [ -z "$retried" ] && grep -q DownloadingDepots <<< "$steps"; then
             retried=1
-            while [ "$n" -lt 600 ] && ! grep -qE '"StateFlags"[[:space:]]+"4"' "$manifest" 2>/dev/null; do
-              n=$((n + 1)); sleep 0.5
+            while ! grep -qE '"StateFlags"[[:space:]]+"4"' "$manifest" 2>/dev/null; do
+              sleep 0.5
             done
             seen=$(wc -l < "$log" 2>/dev/null || echo 0)
+            idle=0
+            last=""
             steam -applaunch "$appid"
             continue
           fi
           echo "gamescope-fg: Steam couldn't launch $appid; see $log" >&2
           base "$FRONTEND"
           exit 1
+        fi
+        # Steam is busy while its last step is a long one that hasn't
+        # finished: updating, processing shaders, or waiting on a prompt.
+        now=$(tail -n 1 <<< "$steps")
+        if [ "$now" != "$last" ]; then
+          last="$now"
+          idle=0
+        elif ! grep -qE "DownloadingDepots|ProcessingShaderCache|waiting for user response" <<< "$now"; then
+          idle=$((idle + 1))
         fi
         sleep 0.5
       done

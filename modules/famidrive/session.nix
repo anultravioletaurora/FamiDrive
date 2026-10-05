@@ -17,7 +17,7 @@ let
       # Proton pins and Steam Input, written while Steam isn't running
       # (pkgs/famidrive-steam-config).
       ${pkgs.famidrive-steam-config}/bin/famidrive-steam-config ${lib.escapeShellArg (builtins.toJSON {
-        inherit (cfg.steam) compatTools steamInput;
+        inherit (cfg.steam) compatTools steamInput steamInputGames;
       })} || echo "famidrive-session: couldn't apply Steam settings" >&2
       # Start Steam hidden up front. Otherwise the first `steam -applaunch`
       # brings up Steam's own client windows, which then fight the game
@@ -99,6 +99,18 @@ in
       pad itself, the same as every emulator does. Games installed during
       a session get it from the next one. On: Steam's own per-game
       choices are left alone.
+    '';
+  };
+
+  options.famidrive.steam.steamInputGames = mkOption {
+    type = types.listOf types.str;
+    default = [ ];
+    example = [ "Left 4 Dead 2" ];
+    description = ''
+      Games that keep Steam Input while `steamInput` is off, by name (as
+      Steam and ES-DE show it) or app id. For games whose own controller
+      support is missing or worse, such as Valve's older games, which
+      expect Steam Input.
     '';
   };
 

@@ -30,6 +30,9 @@ in
     # The RomM agent never deletes under roms/, so it won't fight this.
     famidrive.systems.media = {
       fullname = "Media";
+      # Art Book Next has no Jellyfin art; Kodi's media-center art is
+      # closest. Without it ES-DE falls back to the "pc" (IBM) logo.
+      theme = "kodi";
       extensions = [ ".jellyfin" ];
       command = lib.optionalString (cfg.media.jellyfin.server != null)
         "FAMIDRIVE_JELLYFIN_SERVER=${lib.escapeShellArg cfg.media.jellyfin.server} "

@@ -278,6 +278,9 @@ in
           fullname = "Minecraft";
           extensions = [ ".prism" ];
           command = ''${pkgs.prismlauncher}/bin/prismlauncher --launch "$(cat "$ROM")"'';
+          # Art Book Next has no Minecraft art; its generic "ports" art is
+          # closest. Without it ES-DE falls back to the "pc" (IBM) logo.
+          theme = "ports";
         };
       })
     ];

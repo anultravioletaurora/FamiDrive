@@ -101,36 +101,41 @@ Don't test it without being ready for a reboot.
 
 ### Left 4 Dead 2
 
-**Steam: 🟡 Playable.** Native (Source engine). Workshop content loads.
-Some on-screen controller prompts show "NOT BOUND" instead of a button.
-Probably the game showing Steam Input's action names when it can't match
-a binding to them. Not looked at yet.
+**Steam: 🟡 Playable, with Steam Input.** Native (Source engine).
+Workshop content loads.
+
+- **Steam Input on:** plays. Some on-screen controller prompts show
+  "NOT BOUND" instead of a button.
+- **Steam Input off:** worse. Controller support had to be turned on in
+  the game's options by hand, and even then shooting didn't work.
+
+Kept on Steam Input with `steam.steamInputGames = [ "Left 4 Dead 2" ]`.
+Valve's older games expect it.
 
 ### Rocket League
 
-**Steam: 🟡 Playable.**
+**Steam: ✅ Works, with Steam Input off.**
 
 - **Runs on:** Proton Experimental, pinned with `steam.compatTools`.
   Steam still picks the dead native Linux build and swaps the install to
   it (a 40 GB re-download to undo).
 - **Launching:** a Steam prompt to use Big Picture with a controller,
   then "processing Vulkan shaders", both visible. Then it launches.
-- **Controller: the 8BitDo wasn't seen in-game** with Steam Input on.
-  Select + Start still quit. Retest with Steam Input off (see
-  [Controllers in Steam games](#controllers-in-steam-games)).
+- **Controllers:** with Steam Input on, the 8BitDo wasn't seen at all.
+  With it off, every pad works, and split-screen with two works.
+- **Player order:** the Xbox controller became player 1, though the
+  8BitDo was connected first. Not looked at yet.
 
 ### Street Fighter 6
 
 **Steam: ✅ Works.** Proton (Steam's default).
 
 - **Controllers:** two players at once (the 8BitDo and an Xbox Wireless
-  Controller) mapped straight away with no setup. Steam Input was on and
-  gave the game two virtual pads.
+  Controller), each pad seen on its own, with Steam Input on and with it
+  off.
 - **Launching:** a long wait with Steam's own window on screen. That's
-  Steam processing shaders: about 2 minutes on the first launch. The
+  Steam processing shaders, about 2 minutes on the first launch. The
   game takes 106 GB on disk.
-- **First test:** it was started by mistake while Cyberpunk was
-  loading, and both ran at once. That launcher bug is fixed in `f2b8769`.
 
 **Other stores:** none known. Street Fighter 6 on PC is sold as Steam
 keys only, including on Humble; there's no GOG or DRM-free version.
@@ -157,14 +162,22 @@ keys only, including on Humble; there's no GOG or DRM-free version.
 ### Steam launches
 
 ES-DE only knows "a game is running" or "it isn't". Steam has many states
-in between, and today most of them look like a black screen:
+in between, and most of them look like a black screen or Steam's own
+window:
 
-- **Updating:** a game that needs an update first. Small updates are
-  waited for. Big ones look like a black screen for up to five minutes.
-- **Processing shaders:** Steam's own window, shown since `f2b8769`.
+- **Updating:** a game that needs an update first. Waited for, then the
+  launch is retried.
+- **Processing shaders:** Steam's own window. It took up to 5 min 41 s
+  (Left 4 Dead 2). Until the fix after `62db9af`, FamiDrive gave up after
+  five minutes and ES-DE came back over a launch that was still going;
+  that's why several games seemed to drop back to ES-DE. FamiDrive now
+  waits as long as Steam is still working, and only gives up after two
+  minutes with no progress at all. Select + Start gives up at any time.
+  Steam's "Allow background processing" (Settings → Downloads → Shader
+  Pre-Caching) should mean fewer of these waits at launch.
 - **Waiting for an answer:** a first-launch prompt such as "which
-  version?", a EULA or the controller prompt. Shown since `f2b8769`, but
-  these are desktop-style Steam windows, not made for a controller.
+  version?", a EULA or the controller prompt. Shown, but these are
+  desktop-style Steam windows, not made for a controller.
 - **Started, no window yet:** Cyberpunk takes about 37 s, a black screen
   meanwhile.
 
@@ -177,17 +190,19 @@ launch steps are in `~/.local/share/Steam/logs/console_log.txt`
 ### Controllers in Steam games
 
 Steam Input sits between the pad and a game: it hides the real pad and
-shows the game a virtual "Microsoft X-Box 360 pad" instead. With it on:
+shows the game a virtual "Microsoft X-Box 360 pad" instead.
 
-- **Street Fighter 6:** worked, two players with no setup.
-- **Rocket League:** saw nothing.
-- **Left 4 Dead 2:** "NOT BOUND" prompts.
+**Steam Input is off for every game by default** (`steam.steamInput =
+false`): each game reads the pad itself, the same as every emulator does.
+FamiDrive sets "Disable Steam Input" on each installed game at the start
+of each session. Games that do better with it are listed in
+`steam.steamInputGames`.
 
-**Steam Input is now off for every game by default**
-(`steam.steamInput = false`), as a baseline: each game reads the pad
-itself, the same as every emulator does. FamiDrive sets "Disable Steam
-Input" on each installed game at the start of each session. Every Steam
-result above was tested with it on and needs a retest.
+| Game | Steam Input on | Steam Input off |
+|---|---|---|
+| Left 4 Dead 2 | plays; some "NOT BOUND" prompts | no shooting: **kept on** |
+| Rocket League | no pad at all | works, split-screen too |
+| Street Fighter 6 | works, two players | works, two players |
 
 ### Measuring performance
 

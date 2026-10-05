@@ -6,7 +6,8 @@ Writes FamiDrive's Steam settings into Steam's own config files:
   a specific Steam Play compatibility tool"), into config.vdf's
   CompatToolMapping. A game is a name (as Steam shows it) or an app id.
 - steamInput: false turns Steam Input off for every installed game (the
-  per-game "Disable Steam Input"), in each Steam user's localconfig.vdf.
+  per-game "Disable Steam Input"), in each Steam user's localconfig.vdf,
+  except the games in steamInputGames (names or app ids), which get it on.
   true leaves Steam's own choice alone.
 
 Steam rewrites both files when it exits, so this only sticks while Steam
@@ -130,9 +131,11 @@ def set_compat_tools(wanted):
     vdf.save()
 
 
-def disable_steam_input(appids):
+def set_steam_input(wanted):
+    """wanted: {appid: "0" (off) or "2" (on)}."""
     # localconfig.vdf: UserLocalConfigStore > apps > <appid> >
-    # UseSteamControllerConfig. "0" is "Disable Steam Input".
+    # UseSteamControllerConfig. "0" is "Disable Steam Input". "2" is what
+    # the games Steam Input was working for had before FamiDrive.
     for path in STEAM.glob("userdata/*/config/localconfig.vdf"):
         vdf = Vdf(path)
         # Depth 1: the per-game settings. Deeper "apps" blocks are other things.
@@ -144,19 +147,18 @@ def disable_steam_input(appids):
         have = vdf.children(head, close)
         ind = vdf.indent(head)
         # Bottom up, so earlier indexes stay put.
-        for appid in sorted(appids, key=lambda a: -have[a][0] if a in have else 0):
+        for appid in sorted(wanted, key=lambda a: -have[a][0] if a in have else 0):
+            line = f'{ind}\t"UseSteamControllerConfig"\t\t"{wanted[appid]}"'
             if appid in have:
                 i, end = have[appid]
                 for j in range(i + 2, end):
                     if vdf.lines[j].strip().startswith('"UseSteamControllerConfig"'):
-                        vdf.lines[j] = f'{ind}\t"UseSteamControllerConfig"\t\t"0"'
+                        vdf.lines[j] = line
                         break
                 else:
-                    vdf.lines.insert(i + 2, f'{ind}\t"UseSteamControllerConfig"\t\t"0"')
+                    vdf.lines.insert(i + 2, line)
             else:
-                vdf.lines[head + 2:head + 2] = [f'{ind}"{appid}"', f"{ind}{{",
-                                                f'{ind}\t"UseSteamControllerConfig"\t\t"0"',
-                                                f"{ind}}}"]
+                vdf.lines[head + 2:head + 2] = [f'{ind}"{appid}"', f"{ind}{{", line, f"{ind}}}"]
         vdf.save()
 
 
@@ -164,21 +166,32 @@ def main():
     settings = json.loads(sys.argv[1])
     games = None
 
+    def appid(game):
+        """A game's app id from its name or id; None if not installed."""
+        nonlocal games
+        if game.isdigit():
+            return game
+        games = installed() if games is None else games
+        if game.lower() not in games:
+            log(f"{game!r} isn't installed; skipped")
+        return games.get(game.lower())
+
     wanted = {}
     for game, tool in settings.get("compatTools", {}).items():
-        if not game.isdigit():
-            games = installed() if games is None else games
-            if game.lower() not in games:
-                log(f"{game!r} isn't installed; skipped")
-                continue
-            game = games[game.lower()]
-        wanted[game] = tool
+        a = appid(game)
+        if a:
+            wanted[a] = tool
     if wanted:
         set_compat_tools(wanted)
 
     if settings.get("steamInput") is False:
         games = installed() if games is None else games
-        disable_steam_input(set(games.values()))
+        wanted = {a: "0" for a in games.values()}
+        for game in settings.get("steamInputGames", []):
+            a = appid(game)
+            if a:
+                wanted[a] = "2"
+        set_steam_input(wanted)
 
 
 if __name__ == "__main__":

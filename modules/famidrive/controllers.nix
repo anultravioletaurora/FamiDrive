@@ -1,5 +1,5 @@
-# Controllers (controllers.md). The ways out of a game, and what's plugged
-# into each GameCube port.
+# Controllers (controllers.md). The ways out of a game, what's plugged
+# into each GameCube port and Wii Remote slot, and face-button layout.
 #
 # Quitting: hold Select + Start on any pad (famidrive-quit, started by the
 # session). RetroArch also has its own menu on L3 + R3 (click both sticks).
@@ -15,6 +15,9 @@ let
   inherit (lib) mkOption types;
   cfg = config.famidrive;
   ports = cfg.controllers.gamecube.ports;
+  wii = cfg.controllers.wii;
+  wiiSource = { none = 0; emulated = 1; real = 2; };
+  anyReal = lib.elem "real" wii.remotes || wii.balanceBoard;
   byLabel = cfg.controllers.faceButtons == "labels";
 
   # Controllers FamiDrive knows by a short name: the name SDL (and so
@@ -110,6 +113,57 @@ in
     '';
   };
 
+  options.famidrive.controllers.wii = {
+    remotes = mkOption {
+      type = types.listOf (types.enum [ "real" "emulated" "none" ]);
+      default = [ "emulated" ];
+      example = [ "real" "real" "real" "real" ];
+      description = ''
+        What's in each Wii Remote slot in Dolphin, player 1 first. Slots
+        left off the end are empty. Each entry is one of:
+
+        - `"real"`: a first-party Wii Remote over Bluetooth. Dolphin keeps
+          looking for remotes, so pressing 1 + 2 (or the red sync button)
+          connects one at any time, also mid-game. Everything a remote
+          has works, including its speaker, Nunchuk and Classic
+          Controller.
+        - `"emulated"`: Dolphin's emulated Wii Remote, played with a modern
+          pad. Its bindings are still Dolphin's own, made in its controller
+          screens; FamiDrive doesn't set them yet.
+        - `"none"`: nothing in this slot.
+
+        Rebuilt on every switch, like the GameCube ports.
+      '';
+    };
+
+    balanceBoard = mkOption {
+      type = types.bool;
+      default = false;
+      description = ''
+        A real Wii Balance Board, connected like a real Wii Remote (the
+        sync button under its battery cover).
+      '';
+    };
+
+    speaker = mkOption {
+      type = types.bool;
+      default = true;
+      description = "Play game sounds through real Wii Remotes' speakers.";
+    };
+
+    bluetoothPassthrough = mkOption {
+      type = types.bool;
+      default = false;
+      description = ''
+        Hand a Bluetooth adapter to the emulated Wii entirely, as a real
+        Wii's Bluetooth chip. The most faithful way to use real remotes
+        (pairing is remembered, as on a Wii), but it needs an adapter
+        Dolphin supports, and that adapter is then of no use to anything
+        else on the box, so it should be a second one. Untested.
+      '';
+    };
+  };
+
   options.famidrive.controllers.gamecube.ports = mkOption {
     type = types.listOf types.str;
     default = [ "gamepad" ];
@@ -136,10 +190,14 @@ in
     assertions = [{
       assertion = lib.length ports <= 4;
       message = "famidrive.controllers.gamecube.ports: a GameCube has 4 ports.";
+    } {
+      assertion = lib.length wii.remotes <= 4;
+      message = "famidrive.controllers.wii.remotes: a Wii has 4 Wii Remote slots.";
     }];
 
-    # USB access to the GameCube adapter (Dolphin's udev rule).
-    services.udev.packages = lib.mkIf (lib.elem "adapter" ports) [ pkgs.dolphin-emu ];
+    # USB access to the GameCube adapter and to Bluetooth adapters for
+    # passthrough (Dolphin's udev rules).
+    services.udev.packages = lib.mkIf (lib.elem "adapter" ports || wii.bluetoothPassthrough) [ pkgs.dolphin-emu ];
 
     home-manager.users.${cfg.user} = { lib, ... }: {
       home.activation.famidriveControllers = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
@@ -158,6 +216,19 @@ in
               ${crudini} --set ${gcpad} GCPad${toString (i + 1)} ${q k} ${q v}
             '') padMapping)}
           '') 4)}
+
+        # Wii Remote slots. Sources: 0 nothing, 1 emulated, 2 real.
+        wiimote="$HOME/.config/dolphin-emu/WiimoteNew.ini"
+        touch "$wiimote"
+        ${lib.concatStrings (lib.genList (i: ''
+          ${crudini} --set "$wiimote" Wiimote${toString (i + 1)} Source ${toString wiiSource.${lib.elemAt (wii.remotes ++ lib.replicate 4 "none") i}}
+        '') 4)}
+        ${crudini} --set "$wiimote" BalanceBoard Source ${if wii.balanceBoard then "2" else "0"}
+        # Keep looking for real remotes, so one connects whenever 1 + 2 is
+        # pressed, not only at game start.
+        ${crudini} --set "$HOME/.config/dolphin-emu/Dolphin.ini" Core WiimoteContinuousScanning ${if anyReal then "True" else "False"}
+        ${crudini} --set "$HOME/.config/dolphin-emu/Dolphin.ini" Core WiimoteEnableSpeaker ${if wii.speaker then "True" else "False"}
+        ${crudini} --set "$HOME/.config/dolphin-emu/Dolphin.ini" BluetoothPassthrough Enabled ${if wii.bluetoothPassthrough then "True" else "False"}
 
         # Eden: rewrite the face buttons of every binding to a known pad,
         # whichever player it's on. Eden writes them the first time it sees
