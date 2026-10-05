@@ -115,10 +115,8 @@ a binding to them. Not looked at yet.
   it (a 40 GB re-download to undo).
 - **Launching:** a Steam prompt to use Big Picture with a controller,
   then "processing Vulkan shaders", both visible. Then it launches.
-- **Controller: the 8BitDo isn't seen in-game.** Select + Start still
-  quits. Steam Input is forced on for this game
-  (`UseSteamControllerConfig = 2`), a per-game override from before
-  FamiDrive. FamiDrive's design is to not use Steam Input at all (see
+- **Controller: the 8BitDo wasn't seen in-game** with Steam Input on.
+  Select + Start still quit. Retest with Steam Input off (see
   [Controllers in Steam games](#controllers-in-steam-games)).
 
 ### Street Fighter 6
@@ -179,19 +177,17 @@ launch steps are in `~/.local/share/Steam/logs/console_log.txt`
 ### Controllers in Steam games
 
 Steam Input sits between the pad and a game: it hides the real pad and
-shows the game a virtual "Microsoft X-Box 360 pad" instead.
+shows the game a virtual "Microsoft X-Box 360 pad" instead. With it on:
 
-- **Street Fighter 6:** worked through it, two players with no setup.
-- **Rocket League:** saw nothing. It's the one game with Steam Input
-  forced on by a per-game setting from before FamiDrive
-  (`UseSteamControllerConfig = 2` in Steam's `localconfig.vdf`).
-- **Left 4 Dead 2:** "NOT BOUND" prompts, possibly Steam Input related.
+- **Street Fighter 6:** worked, two players with no setup.
+- **Rocket League:** saw nothing.
+- **Left 4 Dead 2:** "NOT BOUND" prompts.
 
-So Steam Input isn't broken across the board, and turning it off
-everywhere isn't decided. Next test: turn it off for Rocket League (Steam
-Settings → the game → Properties → Controller). The original plan was to
-leave Steam Input out and let each game read the pad itself. That's still
-the fallback if more games behave like Rocket League.
+**Steam Input is now off for every game by default**
+(`steam.steamInput = false`), as a baseline: each game reads the pad
+itself, the same as every emulator does. FamiDrive sets "Disable Steam
+Input" on each installed game at the start of each session. Every Steam
+result above was tested with it on and needs a retest.
 
 ### Measuring performance
 

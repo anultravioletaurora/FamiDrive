@@ -62,6 +62,7 @@
         romm-agent = final.callPackage ./pkgs/romm-agent { };
         famidrive-generators = final.callPackage ./pkgs/famidrive-generators { };
         famidrive-quit = final.callPackage ./pkgs/famidrive-quit { };
+        famidrive-steam-config = final.callPackage ./pkgs/famidrive-steam-config { };
 
         # libmpv with SDL2 gamepad input compiled in. nixpkgs builds mpv
         # with sdl2Support = false, and without it the shim's gamepad
@@ -113,7 +114,7 @@
       };
 
       packages.${system} = {
-        inherit (pkgs) es-de gogdl-cli tcli xenia-netplay gamescope-fg romm-agent famidrive-generators famidrive-quit
+        inherit (pkgs) es-de gogdl-cli tcli xenia-netplay gamescope-fg romm-agent famidrive-generators famidrive-quit famidrive-steam-config
           mpv-gamepad jellyfin-mpv-shim;
       };
 
