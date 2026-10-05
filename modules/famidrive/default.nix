@@ -18,6 +18,7 @@ in
     ./endpoints.nix
     ./controllers.nix
     ./minecraft.nix
+    ./settings.nix
   ];
 
   options.famidrive = {

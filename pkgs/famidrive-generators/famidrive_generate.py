@@ -23,9 +23,6 @@ def steam(src):
         name = re.search(r'"name"\s+"([^"]+)"', text)
         if appid and name and not STEAM_TOOLS.match(name.group(1)):
             yield name.group(1), appid.group(1)
-    # Steam's own settings (Big Picture), for what FamiDrive leaves to
-    # Steam: per-game Proton version, launch options, downloads.
-    yield "Steam Settings", "bigpicture"
 
 
 def gog(src):
