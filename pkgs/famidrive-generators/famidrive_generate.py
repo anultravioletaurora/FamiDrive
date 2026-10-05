@@ -10,14 +10,22 @@ import sys
 from pathlib import Path
 
 
+# Steam installs its own tools as apps too. Found on the first box
+# 2026-10-05: Proton versions and the Linux runtimes showed up as games.
+STEAM_TOOLS = re.compile(r"^(Proton|Steam Linux Runtime|Steamworks Common Redistributables)\b")
+
+
 def steam(src):
     # steamapps/appmanifest_<appid>.acf: Valve KeyValues, "key" "value" pairs
     for acf in src.glob("appmanifest_*.acf"):
         text = acf.read_text(errors="replace")
         appid = re.search(r'"appid"\s+"(\d+)"', text)
         name = re.search(r'"name"\s+"([^"]+)"', text)
-        if appid and name:
+        if appid and name and not STEAM_TOOLS.match(name.group(1)):
             yield name.group(1), appid.group(1)
+    # Steam's own settings (Big Picture), for what FamiDrive leaves to
+    # Steam: per-game Proton version, launch options, downloads.
+    yield "Steam Settings", "bigpicture"
 
 
 def gog(src):

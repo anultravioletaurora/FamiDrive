@@ -19,6 +19,12 @@ let
   mkGenerator = lane: {
     services."famidrive-gen-${lane}" = {
       description = "Regenerate ES-DE placeholders for the ${lane} lane";
+      # Also once at boot, finished before the session starts: ES-DE only
+      # reads its folders at startup. Found on the first box 2026-10-05:
+      # with a tmpfs dataDir, ES-DE started 7 s before the path watch had
+      # written the Steam folder, so Steam was missing from the menu.
+      wantedBy = [ "display-manager.service" ];
+      before = [ "display-manager.service" ];
       serviceConfig = {
         Type = "oneshot";
         User = cfg.user;

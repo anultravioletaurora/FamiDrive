@@ -59,7 +59,7 @@ let
         <extension>${lib.concatStringsSep " " (s.extensions ++ map lib.toUpper s.extensions)}</extension>
         <command label="${s.fullname}">${famidriveLaunch}/bin/famidrive-launch ${name} %ROM%</command>
         <platform>${s.platform}</platform>
-        <theme>${s.platform}</theme>
+        <theme>${if s.theme != null then s.theme else s.platform}</theme>
       </system>
     '') cfg.systems)}
     </systemList>

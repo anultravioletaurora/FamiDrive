@@ -55,7 +55,11 @@ let
       # path. Read by the RomM agent. Per-emulator layout mapping is still
       # an open question (roms.md "Console saves: RomM sync API only").
       saveLayout = mkOption { type = types.nullOr types.attrs; default = null; };
-      platform = mkOption { type = types.str; default = "pc"; };   # ES-DE theme/scraper platform
+      platform = mkOption { type = types.str; default = "pc"; };   # ES-DE scraper platform
+      # ES-DE theme folder for the system's logo and art (default: platform).
+      # Found on the first box 2026-10-05: Steam and Media showed the "pc"
+      # theme's IBM PC logo.
+      theme = mkOption { type = types.nullOr types.str; default = null; };
       # Sent to RomM with each save, so its web UI shows what made it.
       emulator = mkOption { type = types.nullOr types.str; default = null; };
       # Folder under dataDir/firmware/ this system's firmware lands in
@@ -257,7 +261,9 @@ in
         steam = {
           fullname = "Steam";
           extensions = [ ".steam" ];
-          command = ''steam -applaunch "$(cat "$ROM")"'';
+          # -applaunch returns at once; gamescope-fg --steam waits for the game.
+          command = ''${pkgs.gamescope-fg}/bin/gamescope-fg --steam "$(cat "$ROM")"'';
+          theme = "steam";
         };
       })
       (lib.mkIf (hasLane "gog") {

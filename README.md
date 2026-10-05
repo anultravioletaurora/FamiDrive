@@ -22,9 +22,10 @@ and never needs a desktop, and makes Steam just one entry on the menu.
 
 > **Status: early.** FamiDrive runs on its first box: it boots into ES-DE
 > at 4K120 with HDR, and GameCube and Switch games launch, take focus and
-> quit back to the menu from the controller. RomM sync, the Steam lane and
-> most of the emulators haven't been tried yet. See [Status](#status) for
-> what's real and what's a placeholder.
+> quit back to the menu from the controller. Steam games launch, with rough
+> edges. RomM sync and most of the emulators haven't been tried yet. See
+> [Status](#status) for what's real and what's a placeholder, and
+> [COMPATIBILITY.md](COMPATIBILITY.md) for game-by-game results.
 
 
 ## What's in the box
