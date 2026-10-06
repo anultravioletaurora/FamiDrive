@@ -123,6 +123,14 @@
           mpv-gamepad jellyfin-mpv-shim;
       };
 
+      # `nix flake check`: unit tests, example boxes, and every package
+      # built (tests/default.nix). Run on each pull request.
+      # gogdl-cli and tcli are placeholders (no source yet) until the GOG
+      # lane is finished, so they're left out.
+      checks.${system} = import ./tests { inherit self nixpkgs pkgs system; }
+        // nixpkgs.lib.mapAttrs' (name: p: nixpkgs.lib.nameValuePair "pkg-${name}" p)
+          (removeAttrs self.packages.${system} [ "gogdl-cli" "tcli" ]);
+
       # What a box imports. Brings everything the famidrive module needs
       # (the overlay, home-manager, sops-nix), so a host only adds its own
       # file. Hosts live in their own private flake, not in this repo:

@@ -1,0 +1,24 @@
+# nix flake check on every pull request, and on main after a merge:
+# unit tests, example boxes evaluated, every package built (tests/).
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            accept-flake-config = false
+      - name: nix flake check
+        run: nix flake check --print-build-logs --keep-going
