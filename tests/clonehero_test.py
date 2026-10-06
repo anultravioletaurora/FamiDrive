@@ -133,6 +133,22 @@ class Test(unittest.TestCase):
         self.run_tool("player", spec)
         self.assertIn(guitar, prefs.read_text())
 
+    def test_songs_added_by_hand_mean_a_rescan(self):
+        ch = self.home / ".config/unity3d/srylain Inc_/Clone Hero"
+        ch.mkdir(parents=True)
+        cache = ch / "songcache.bin"
+        local = self.dir / "local"
+        local.mkdir()
+        spec = {"profiles": [], "stamps": [str(local)]}
+        cache.write_bytes(b"cache")
+        self.run_tool("player", spec)          # first time: rescan
+        cache.write_bytes(b"cache")
+        self.run_tool("player", spec)          # nothing new: kept
+        self.assertTrue(cache.exists())
+        (local / "AFI - Miss Murder").mkdir()  # a song copied in
+        self.run_tool("player", spec)
+        self.assertFalse(cache.exists())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

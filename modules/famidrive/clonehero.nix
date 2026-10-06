@@ -41,7 +41,7 @@ let
       (lib.sortOn (p: (if p.name == cfg.primaryPlayer then "0" else "1") + p.name)
         (lib.filter (p: !p.isGuest) (lib.attrValues cfg.allPlayers)))
       ++ lib.genList (i: "Guest ${toString (i + 1)}") ch.guestProfiles;
-    stamps = [ "${dir}/songs/.famidrive-stamp" ];
+    stamps = [ "${dir}/songs/.famidrive-stamp" "${dir}/local" ];
     bindings = if ch.sharedBindings then "${dir}/bindings" else null;
   };
 in

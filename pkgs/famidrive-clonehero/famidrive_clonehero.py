@@ -14,7 +14,8 @@ player: each time Clone Hero starts. Every FamiDrive player and
   and when the shared library has changed since this player last played,
   Clone Hero's song cache is cleared so it rescans. The box's controller
   bindings (below) replace the player's own. Spec: {"profiles": [names],
-  "stamps": [library stamp files], "bindings": file or null}.
+  "stamps": [library stamp files or song folders], "bindings": file or
+  null}.
 
 played: after Clone Hero exits. The player's controller bindings become
   the box's: they belong to the guitars plugged into this box, not to a
@@ -25,6 +26,7 @@ one <pref> per line. Only those move; the rest of the file (window
 settings, and a login token) stays the player's.
 """
 
+import hashlib
 import json
 import os
 import re
@@ -135,10 +137,23 @@ def seed_profiles(names):
 
 
 def library_stamp(stamps):
+    """What the shared song folders look like now. A stamp file (the
+    managed library's) by its contents; a folder (songs added by hand) by
+    what's directly in it and when each changed, so a song copied in,
+    removed or replaced is noticed. Found on the first box 2026-10-06:
+    songs moved into the hand-added folder never showed for the second
+    player, whose song cache predated them."""
     parts = []
     for s in stamps:
+        p = Path(s)
         try:
-            parts.append(Path(s).read_text().strip())
+            if p.is_dir():
+                h = hashlib.sha256()
+                for child in sorted(p.iterdir()):
+                    h.update(f"{child.name}\0{child.stat().st_mtime_ns}\0".encode())
+                parts.append(h.hexdigest())
+            else:
+                parts.append(p.read_text().strip())
         except OSError:
             parts.append("")
     return "|".join(parts)
