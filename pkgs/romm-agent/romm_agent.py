@@ -815,7 +815,11 @@ def cmd_save_push(system, rom_path, learn=True):
     newest = server_save(s, dev, entry["id"])
     if newest and not same_time(newest["updated_at"], entry.get("server_updated_at")):
         # Another box pushed since this one last pulled. Keep both; never
-        # silently overwrite. The copy here goes up beside it for a human.
+        # silently overwrite. The copy here goes up beside it for a human,
+        # once per version of it: found on the first box 2026-10-06, the
+        # 15-minute reconcile uploaded the same conflict copy every time.
+        if mine.get("conflict_pushed") == digest:
+            return
         slot = f"{SLOT}-conflict-{CFG['deviceName']}"
         print(f"conflict on {rom_path}: uploaded to slot {slot}", file=sys.stderr)
 
@@ -830,6 +834,9 @@ def cmd_save_push(system, rom_path, learn=True):
     if slot == SLOT:
         mine["pushed"] = digest
         mine["server_updated_at"] = r.json().get("updated_at")
+        mine.pop("conflict_pushed", None)
+    else:
+        mine["conflict_pushed"] = digest
     store_saves(saves)
 
 

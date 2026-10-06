@@ -226,6 +226,43 @@ class Test(unittest.TestCase):
         (card / "01-GMPE-MARIPA4BOX0.gci").write_bytes(b"v2")
         self.assertTrue(a["unpushed"]("gc", entry, root, lay, "x.iso"))     # played since
 
+    def test_conflict_copy_uploaded_once(self):
+        # RomM has a newer save from another box; this box's changed too.
+        box = Box(self.base, "alice")
+        a = box.agent()
+        key = str(box.data / "roms/gc/Mario Party 4.iso")
+        a["save_index"]({key: {"id": 216, "system": "gc", "title_id": "GMPE01"}})
+        a["store_saves"]({key: {"pushed": "old", "server_updated_at": "2026-10-06T08:00:00+00:00"}})
+        card = box.home / ".local/share/dolphin-emu/GC/USA/Card A"
+        card.mkdir(parents=True)
+        (card / "01-GMPE-MARIPA4BOX0.gci").write_bytes(b"mine")
+        posts = []
+
+        class Resp:
+            def __init__(self, data):
+                self.data = data
+
+            def json(self):
+                return self.data
+
+            def raise_for_status(self):
+                pass
+
+        class Session:
+            def post(self, url, params, **kw):
+                posts.append(params["slot"])
+                return Resp({"updated_at": "2026-10-06T09:30:00+00:00"})
+        g = a["cmd_save_push"].__globals__
+        g["session"] = lambda: Session()
+        g["device_id"] = lambda s: "dev"
+        g["server_save"] = lambda s, dev, rom_id: {"updated_at": "2026-10-06T09:00:00+00:00"}
+        a["cmd_save_push"]("gc", key, learn=False)
+        a["cmd_save_push"]("gc", key, learn=False)      # the next reconcile
+        self.assertEqual(posts, ["famidrive-conflict-box"])
+        (card / "01-GMPE-MARIPA4BOX0.gci").write_bytes(b"mine, played more")
+        a["cmd_save_push"]("gc", key, learn=False)      # changed again: a new copy
+        self.assertEqual(posts, ["famidrive-conflict-box", "famidrive-conflict-box"])
+
     def test_gamecube_saves_found_by_id(self):
         box = Box(self.base, "alice")
         a = box.agent()
