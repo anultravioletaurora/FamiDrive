@@ -249,6 +249,23 @@ in
     boot.kernelPackages = lib.mkDefault pkgs.linuxPackages_latest;
     nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
+    # Housekeeping, so the system disk doesn't fill up with old builds.
+    # Defaults: a host sets any of these to change them. Found on the first
+    # box 2026-10-06: the system disk reached 99% with every generation
+    # since the move kept.
+    nix.gc = {
+      automatic = lib.mkDefault true;
+      dates = lib.mkDefault "weekly";
+      # Two weeks of generations to roll back to, and nothing older.
+      options = lib.mkDefault "--delete-older-than 14d";
+      persistent = lib.mkDefault true;   # catch up after the box was off
+    };
+    # Identical files in the store stored once.
+    nix.optimise.automatic = lib.mkDefault true;
+    # The boot menu's list of generations, whichever loader the host uses.
+    boot.loader.systemd-boot.configurationLimit = lib.mkDefault 10;
+    boot.loader.grub.configurationLimit = lib.mkDefault 10;
+
     famidrive.allPlayers = players // lib.optionalAttrs cfg.guest.enable { guest = guest; };
 
     assertions = [{
