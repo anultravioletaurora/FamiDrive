@@ -23,6 +23,7 @@ behave differently in each. For a console game it's the emulator.
   - [Animal Crossing: New Horizons](#animal-crossing-new-horizons) (Switch)
   - [Call of Duty: Black Ops III](#call-of-duty-black-ops-iii) (PC)
   - [Cyberpunk 2077](#cyberpunk-2077) (PC)
+  - [Helldivers 2](#helldivers-2) (PC)
   - [Hollow Knight](#hollow-knight) (PC)
   - [The Jackbox Party Pack 3](#the-jackbox-party-pack-3) (PC)
   - [The Jackbox Party Pack 6](#the-jackbox-party-pack-6) (PC)
@@ -100,6 +101,16 @@ options.
 
 **GOG: ❔ Untested.** The planned home for it: DRM-free, with the
 same REDmod support.
+
+### Helldivers 2
+
+**Steam: ✅ Works.** Proton Experimental (Steam's choice), no launch
+options.
+
+- **Launching:** the status screen shows Steam processing its Vulkan
+  shaders, with progress, then the game.
+- **Controllers:** picked up right away, with Steam Input off. Online
+  play works.
 
 ### Hollow Knight
 
