@@ -42,6 +42,7 @@ let
         (lib.filter (p: !p.isGuest) (lib.attrValues cfg.allPlayers)))
       ++ lib.genList (i: "Guest ${toString (i + 1)}") ch.guestProfiles;
     stamps = [ "${dir}/songs/.famidrive-stamp" ];
+    bindings = if ch.sharedBindings then "${dir}/bindings" else null;
   };
 in
 {
@@ -102,6 +103,17 @@ in
       '';
     };
 
+    sharedBindings = mkOption {
+      type = types.bool;
+      default = true;
+      description = ''
+        Controller bindings are the box's: when anyone binds a guitar (or
+        rebinds one) and exits Clone Hero, every player gets the same
+        bindings the next time it starts. They're kept on the library disk
+        (clonehero/bindings). false leaves each player's own.
+      '';
+    };
+
     videoOffset = mkOption {
       type = types.nullOr types.int;
       default = null;
@@ -131,6 +143,8 @@ in
               || echo "famidrive-launch: couldn't set up Clone Hero" >&2
             rc=0
             ${pkgs.clonehero}/bin/clonehero || rc=$?
+            ${pkgs.famidrive-clonehero}/bin/famidrive-clonehero played ${lib.escapeShellArg playerSpec} \
+              || echo "famidrive-launch: Clone Hero's bindings not saved for the box" >&2
             [ -z "$sync" ] || romm-agent save-push clonehero app:clonehero \
               || echo "famidrive-launch: Clone Hero scores not pushed, reconcile will retry" >&2
             exit "$rc"
@@ -140,12 +154,13 @@ in
     };
 
     # songs/ is the managed library, local/ is for songs added by hand
-    # (any player can copy into it).
+    # (any player can copy into it), bindings the box's guitar bindings
+    # (any player writes them).
     systemd.tmpfiles.rules = [
       "d ${dir} 0755 famidrive-library famidrive -"
       "d ${dir}/songs 0755 famidrive-library famidrive -"
       "d ${dir}/local 2775 famidrive-library famidrive -"
-    ];
+    ] ++ lib.optional ch.sharedBindings "f ${dir}/bindings 0664 famidrive-library famidrive -";
 
     systemd.services.famidrive-clonehero-songs = {
       description = "Download this box's Clone Hero songs";
