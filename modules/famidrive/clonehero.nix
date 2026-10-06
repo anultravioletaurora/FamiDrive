@@ -124,30 +124,39 @@ in
   config = lib.mkIf (cfg.enable && ch.enable) {
     environment.systemPackages = [ pkgs.clonehero pkgs.famidrive-clonehero ];
 
-    # An entry in the Ports system (emulators.nix). Scores come down
-    # before the profiles are seeded, so a new box doesn't take its
-    # freshly seeded profiles.ini for a save RomM lacks. Like
-    # famidrive-launch, sync only for players with a RomM agent config of
-    # their own.
-    famidrive.ports.".port" = ''
-        sync=""
-        ${lib.optionalString sync ''[ -e "/etc/famidrive/romm/$(id -un).json" ] && sync=1''}
-        case "$(cat "$ROM")" in
-          clonehero)
+    # An entry in the Ports system (emulators.nix). Its setup and the
+    # saving after it run in famidrive-launch, outside the game, so a
+    # quit with Select + Start doesn't skip them. Scores come down before
+    # the profiles are seeded, so a new box doesn't take its freshly
+    # seeded profiles.ini for a save RomM lacks. $sync: famidrive-launch's,
+    # set for players with a RomM agent config of their own.
+    famidrive.ports.".port" = {
+      before = ''
+        if [ "$(cat "$ROM")" = clonehero ]; then
+          ${lib.optionalString sync ''
             [ -z "$sync" ] || romm-agent save-pull clonehero app:clonehero \
               || echo "famidrive-launch: Clone Hero scores not pulled" >&2
-            ${pkgs.famidrive-clonehero}/bin/famidrive-clonehero player ${lib.escapeShellArg playerSpec} \
-              || echo "famidrive-launch: couldn't set up Clone Hero" >&2
-            rc=0
-            ${pkgs.clonehero}/bin/clonehero || rc=$?
-            ${pkgs.famidrive-clonehero}/bin/famidrive-clonehero played ${lib.escapeShellArg playerSpec} \
-              || echo "famidrive-launch: Clone Hero's bindings not saved for the box" >&2
-            [ -z "$sync" ] || romm-agent save-push clonehero app:clonehero \
-              || echo "famidrive-launch: Clone Hero scores not pushed, reconcile will retry" >&2
-            exit "$rc"
-            ;;
+          ''}
+          ${pkgs.famidrive-clonehero}/bin/famidrive-clonehero player ${lib.escapeShellArg playerSpec} \
+            || echo "famidrive-launch: couldn't set up Clone Hero" >&2
+        fi
+      '';
+      command = ''
+        case "$(cat "$ROM")" in
+          clonehero) ${pkgs.clonehero}/bin/clonehero ;;
         esac
       '';
+      after = ''
+        if [ "$(cat "$ROM")" = clonehero ]; then
+          ${pkgs.famidrive-clonehero}/bin/famidrive-clonehero played ${lib.escapeShellArg playerSpec} \
+            || echo "famidrive-launch: Clone Hero's bindings not saved for the box" >&2
+          ${lib.optionalString sync ''
+            [ -z "$sync" ] || romm-agent save-push clonehero app:clonehero \
+              || echo "famidrive-launch: Clone Hero scores not pushed, reconcile will retry" >&2
+          ''}
+        fi
+      '';
+    };
 
     # songs/ is the managed library, local/ is for songs added by hand
     # (any player can copy into it), bindings the box's guitar bindings

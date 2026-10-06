@@ -27,6 +27,20 @@ let
     virtualjaguar = [ virtualjaguar "virtualjaguar" ];
     melondsds = [ melondsds "melondsds" ];
   };
+  # The Ports system's command, before or after: each entry's, picked by
+  # the entry's extension.
+  byExtension = part:
+    let parts = lib.filterAttrs (_: p: p.${part} != "") config.famidrive.ports;
+    in lib.optionalString (parts != { }) ''
+      case "$ROM" in
+      ${lib.concatStrings (lib.mapAttrsToList (ext: p: ''
+        *${ext})
+          ${p.${part}}
+          ;;
+      '') parts)}
+      esac
+    '';
+
   retroarch = pkgs.retroarch.withCores (_: map builtins.head (lib.attrValues cores));
   core = name: "${builtins.head cores.${name}}/lib/retroarch/cores/${builtins.elemAt cores.${name} 1}_libretro.so";
 
@@ -47,6 +61,14 @@ let
       extensions = mkOption { type = types.listOf types.str; };
       # Emulator command. "$ROM" is substituted by famidrive-launch.
       command = mkOption { type = types.str; };
+      # Shell run by famidrive-launch just before and just after the
+      # command, outside it. Quitting (Select + Start) ends the command's
+      # whole process group, so anything that must still happen after a
+      # quit (pushing a save) goes in `after`, never in the command.
+      # Found on the first box 2026-10-06: Clone Hero's score push and
+      # bindings save were in its command, and a quit skipped them.
+      before = mkOption { type = types.lines; default = ""; };
+      after = mkOption { type = types.lines; default = ""; };
       # RomM platform slug this system is pulled from (null = PC lane, not RomM-backed).
       rommPlatform = mkOption { type = types.nullOr types.str; default = null; };
       # Pull/push saves through RomM's sync API around each launch. Consoles only.
@@ -79,12 +101,18 @@ in
 
   # One Ports system for everything that isn't a console or a store:
   # Minecraft's instances, Clone Hero, ... Each kind of entry has its own
-  # file extension and the command that starts it ($ROM is the entry).
+  # file extension, the command that starts it ($ROM is the entry), and
+  # shell for before and after it (the systems' before and after).
   options.famidrive.ports = mkOption {
-    type = types.attrsOf types.lines;
+    type = types.attrsOf (types.submodule {
+      options = {
+        command = mkOption { type = types.lines; };
+        before = mkOption { type = types.lines; default = ""; };
+        after = mkOption { type = types.lines; default = ""; };
+      };
+    });
     default = { };
     internal = true;
-    example = { ".port" = ''clonehero''; };
   };
 
   config = lib.mkIf cfg.enable {
@@ -306,15 +334,9 @@ in
           fullname = "Ports";
           theme = "ports";   # Art Book Next's ports art
           extensions = lib.attrNames cfg.ports;
-          command = ''
-            case "$ROM" in
-            ${lib.concatStrings (lib.mapAttrsToList (ext: cmd: ''
-              *${ext})
-                ${cmd}
-                ;;
-            '') cfg.ports)}
-            esac
-          '';
+          command = byExtension "command";
+          before = byExtension "before";
+          after = byExtension "after";
         };
       })
     ];
@@ -323,10 +345,12 @@ in
     # 2026-10-06: as a system of their own they showed as a second Ports,
     # with the same art). Every instance starts fullscreen, whoever made
     # it (pkgs/famidrive-prism).
-    famidrive.ports.".prism" = lib.mkIf (hasLane "minecraft") ''
-      ${pkgs.famidrive-prism}/bin/famidrive-prism fullscreen "$HOME/.local/share/PrismLauncher/instances/$(cat "$ROM")"
-      ${pkgs.prismlauncher}/bin/prismlauncher --launch "$(cat "$ROM")"
-    '';
+    famidrive.ports = lib.mkIf (hasLane "minecraft") {
+      ".prism".command = ''
+        ${pkgs.famidrive-prism}/bin/famidrive-prism fullscreen "$HOME/.local/share/PrismLauncher/instances/$(cat "$ROM")"
+        ${pkgs.prismlauncher}/bin/prismlauncher --launch "$(cat "$ROM")"
+      '';
+    };
 
     programs.steam = lib.mkIf (hasLane "steam") {
       enable = true;

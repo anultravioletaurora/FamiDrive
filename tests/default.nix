@@ -134,7 +134,10 @@ in
         (!(c.famidrive.systems ? minecraft)
           && lib.sort lib.lessThan c.famidrive.systems.ports.extensions == [ ".port" ".prism" ]
           && lib.hasInfix "prismlauncher" c.famidrive.systems.ports.command
-          && lib.hasInfix "clonehero" c.famidrive.systems.ports.command))
+          && lib.hasInfix "clonehero" c.famidrive.systems.ports.command
+          # Saving after a game is outside it, where a quit can't skip it.
+          && lib.hasInfix "famidrive-clonehero played" c.famidrive.systems.ports.after
+          && !(lib.hasInfix "played" c.famidrive.systems.ports.command)))
       (check "Clone Hero reads the box's songs and calibration"
         (lib.hasInfix "/var/lib/famidrive/clonehero/songs" c.home-manager.users.bob.home.activation.famidriveCloneHero.data
           && lib.hasInfix "200" c.home-manager.users.bob.home.activation.famidriveCloneHero.data))
