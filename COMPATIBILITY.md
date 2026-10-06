@@ -40,6 +40,7 @@ behave differently in each. For a console game it's the emulator.
   - [Super Smash Bros. Brawl](#super-smash-bros-brawl) (Wii)
   - [Super Smash Bros. Melee](#super-smash-bros-melee) (GameCube)
   - [Super Smash Bros. Ultimate](#super-smash-bros-ultimate) (Switch)
+  - [Titanfall 2](#titanfall-2) (PC)
   - [Valheim](#valheim) (PC)
   - [Wii Sports](#wii-sports) (Wii)
 - [Known problems across games](#known-problems-across-games)
@@ -264,6 +265,24 @@ works.
 
 **Switch, Eden: ✅ Works.** Face buttons by label. HewDraw Remix
 support is tracked in #4.
+
+### Titanfall 2
+
+**Steam: ❔ Untested.** First try on 2026-10-06: a fresh install and first
+launch with no changes for this game, then controllers and rumble.
+
+- **What to watch for:** Steam's copy still needs an EA account. On the
+  first launch the EA app installs and asks for a sign-in inside
+  Proton. Its install-script windows count as the game's
+  (`gamescope-fg`), as they did for Star Wars Jedi: Survivor.
+- **Other ways people own it:**
+  - The EA app (once Origin).
+  - EA Play, which is included in PC Game Pass Ultimate and also runs
+    through the EA app.
+
+  FamiDrive has no EA app lane, so those copies can't be played yet.
+  EA Play bought through Steam plays as a Steam game.
+- **Northstar** (community servers and mods) is #31.
 
 ### Valheim
 
