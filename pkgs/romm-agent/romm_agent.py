@@ -207,15 +207,16 @@ def fetch_rom(s, rom, system):
     path = EP_ROM_CONTENT.format(id=rom["id"], file_name=rom["fs_name"])
     if not rom.get("has_multiple_files"):
         # A single file kept in a folder of its own: RomM's fs_name is the
-        # folder's ("Mario Party 7"), the file's is in `files` ("Mario
-        # Party 7.iso"). Found on the first box 2026-10-06: without the
+        # folder's ("Mario Party 7", fs_extension empty), the file's is in
+        # `files` ("Mario Party 7.iso"). RomM's fs_extension, not the name:
+        # "Super Smash Bros. Melee" looks like it ends in ". Melee". Found on the first box 2026-10-06: without the
         # extension, ES-DE didn't list the game.
         files = rom.get("files") or []
-        if not files and not Path(rom["fs_name"]).suffix and rom.get("has_nested_single_file"):
+        if not files and not rom.get("fs_extension") and rom.get("has_nested_single_file"):
             # RomM's ROM list sends `files` empty; the ROM's own page has
             # them. Found on the first box 2026-10-06.
             files = get(s, EP_ROM.format(id=rom["id"])).json().get("files") or []
-        if len(files) == 1 and files[0].get("file_name") and not Path(rom["fs_name"]).suffix:
+        if len(files) == 1 and files[0].get("file_name") and not rom.get("fs_extension"):
             named = dest.with_name(files[0]["file_name"])
             if dest.is_file() and not named.exists():
                 dest.rename(named)   # pulled before under the folder's name
@@ -738,10 +739,28 @@ def unpushed(system, entry, root, lay, key):
     return bool(rels) and files_hash(root, rels, lay) != entry.get("pushed")
 
 
+def my_state(saves, key, rom_id):
+    """This player's save state for a ROM, following it across a rename
+    of its file: by RomM id, or for state from before ids were kept, by
+    the name without the extension added since. Found on the first box
+    2026-10-06: renamed games looked never synced, and their saves went
+    up as conflicts."""
+    if key in saves:
+        return saves[key]
+    index = load_index()
+    for old, state in saves.items():
+        if old in index:
+            continue
+        if state.get("id") == rom_id or (state.get("id") is None and Path(old).name == Path(key).stem):
+            saves[key] = saves.pop(old)
+            return saves[key]
+    return saves.setdefault(key, {})
+
+
 def entry_for(key):
     """The library's entry for a ROM, with this player's save state on top."""
     entry = dict(load_index()[key])
-    mine = load_saves().get(key, {})
+    mine = dict(my_state(load_saves(), key, entry["id"]))
     entry.update({k: v for k, v in mine.items() if k != "title_id"})
     entry["title_id"] = entry.get("title_id") or mine.get("title_id")
     return entry
@@ -784,7 +803,8 @@ def cmd_save_pull(system, rom_path):
 
     # The manifest can teach this box an ID it couldn't work out itself.
     saves = load_saves()
-    e = saves.setdefault(key, {})
+    e = my_state(saves, key, entry["id"])
+    e["id"] = entry["id"]
     e["title_id"] = entry.get("title_id") or manifest.get("title_id")
     e["learned"] = entry.get("learned") or [from_archive(lay, p) for p in manifest.get("paths", [])]
     e["pushed"] = manifest.get("files_sha256")
@@ -799,7 +819,8 @@ def cmd_save_push(system, rom_path, learn=True):
     key = library_path(rom_path)
     entry = entry_for(key)
     saves = load_saves()
-    mine = saves.setdefault(key, {})
+    mine = my_state(saves, key, entry["id"])
+    mine["id"] = entry["id"]
 
     rels = save_paths(system, entry, key)
     if rels is None and learn and SNAPSHOT.exists():
