@@ -52,6 +52,11 @@ let
       # guest: they belong to the box, like the ROMs.
       ROMM_AGENT_CONFIG=/etc/famidrive/romm/library.json romm-agent textures \
         || echo "famidrive-session: couldn't link texture packs" >&2
+      ${lib.optionalString (cfg.systems ? switch) ''
+        # The library's Switch folder, where Eden finds updates and DLC.
+        ROMM_AGENT_CONFIG=/etc/famidrive/romm/library.json romm-agent eden-gamedir \
+          || echo "famidrive-session: couldn't add the library to Eden" >&2
+      ''}
     ''}
     ${lib.optionalString picker ''
       # A fresh start for this player's audio. Found on the first box

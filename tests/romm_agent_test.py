@@ -613,6 +613,95 @@ class Test(unittest.TestCase):
         with self.assertRaises(RuntimeError):               # a ROM's hash still counts
             a["download"](Session(), "/x", self.base / "game.iso", "not-its-hash", 8)
 
+    def nsp(self, path, names):
+        """A PFS0 header holding these file names (no file data needed)."""
+        import struct
+        table = b"".join(n.encode() + b"\0" for n in names)
+        offs, at = [], 0
+        for n in names:
+            offs.append(at)
+            at += len(n) + 1
+        body = b"".join(struct.pack("<QQII", 0, 0, o, 0) for o in offs)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"PFS0" + struct.pack("<II", len(names), len(table)) + bytes(4) + body + table)
+
+    def test_switch_game_comes_with_its_newest_update_and_dlc(self):
+        box = Box(self.base, "library", tokenFile=None)
+        box.cfg["systems"]["switch"]["extensions"] = [".nsp", ".xci"]
+        box.cfg["systems"]["switch"]["contentCategories"] = ["update", "dlc"]
+        a = box.agent()
+        files = [
+            {"id": 1, "category": "game", "file_name": "Mario Kart 8 Deluxe.nsp", "file_size_bytes": 7268, "sha1_hash": ""},
+            {"id": 2, "category": "game", "file_name": "readme.txt", "file_size_bytes": 1, "sha1_hash": ""},
+            {"id": 3, "category": "update", "file_name": "Mario Kart 8 Deluxe - update v3.0.4.nsp", "file_size_bytes": 48, "sha1_hash": ""},
+            {"id": 4, "category": "update", "file_name": "Mario Kart 8 Deluxe - update v3.0.5.nsp", "file_size_bytes": 48, "sha1_hash": ""},
+            {"id": 5, "category": "dlc", "file_name": "Mario Kart 8 Deluxe [Booster Course].nsp", "file_size_bytes": 9, "sha1_hash": ""},
+            {"id": 6, "category": "mod", "file_name": "README.md", "file_size_bytes": 1, "sha1_hash": ""},
+        ]
+        got = []
+
+        class Resp:
+            def json(self):
+                return {"files": files}
+        g = a["fetch_rom"].__globals__
+        g["get"] = lambda s, path, **kw: Resp()
+
+        def fake_download(s, path, dest, sha1=None, size=None, params=None):
+            got.append((dest.relative_to(box.data / "roms/switch"), sha1, params))
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(b"x")
+        g["download"] = fake_download
+        folder = box.data / "roms/switch/Mario Kart 8 Deluxe"
+        (folder / "update").mkdir(parents=True)
+        (folder / "update/Mario Kart 8 Deluxe - update v3.0.3.nsp").write_bytes(b"old")
+        rom = {"id": 2832, "fs_name": "Mario Kart 8 Deluxe", "fs_extension": "", "has_nested_single_file": True}
+        self.assertEqual(a["fetch_rom"](None, rom, "switch"), folder)
+        self.assertEqual(sorted(str(p) for p, _, _ in got), [
+            "Mario Kart 8 Deluxe/Mario Kart 8 Deluxe.nsp",
+            "Mario Kart 8 Deluxe/dlc/Mario Kart 8 Deluxe [Booster Course].nsp",
+            "Mario Kart 8 Deluxe/update/Mario Kart 8 Deluxe - update v3.0.5.nsp"])
+        self.assertTrue(all(sha1 is None and params for _, sha1, params in got))   # no hash: by size, one file each
+        self.assertFalse((folder / "update/Mario Kart 8 Deluxe - update v3.0.3.nsp").exists())  # replaced
+        # Only an update in RomM, no game: not a game for ES-DE.
+        files[:] = [f for f in files if f["category"] == "update"]
+        with self.assertRaises(RuntimeError):
+            a["fetch_rom"](None, dict(rom, id=2850, fs_name="Minecraft"), "switch")
+
+    def test_switch_title_id_from_the_nsp_or_its_update(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        game = self.base / "lib/Mario Kart 8 Deluxe/Mario Kart 8 Deluxe.nsp"
+        self.nsp(game, ["0a1b.nca", "0100152000022000000000000000000a.tik", "0100152000022000000000000000000a.cert"])
+        self.assertEqual(a["switch_title_id"](game), "0100152000022000")
+        # An XCI (no tickets): its update says, title ID + 0x800.
+        xci = self.base / "lib/Bayonetta 2/Bayonetta 2.xci"
+        xci.parent.mkdir(parents=True)
+        xci.write_bytes(b"HEAD" + bytes(100))
+        self.nsp(xci.parent / "update/Bayonetta 2 - update v1.1.0.nsp", ["01007AE00A70E8000000000000000004.tik"])
+        self.assertEqual(a["switch_title_id"](xci), "01007AE00A70E000")
+        # RomM's ID only counts when it's a game's own.
+        self.assertEqual(a["title_id"]("switch", {"title_id": "0105661981816000"}, {}, game), "0100152000022000")
+
+    def test_eden_reads_the_library_folder(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        cfg = box.home / ".config/eden/qt-config.ini"
+        cfg.parent.mkdir(parents=True)
+        cfg.write_text("[Core]\nx=1\n\n[UI]\nPaths\\gamedirs\\size=1\nPaths\\gamedirs\\1\\path=SDMC\nfoo=bar\n")
+        a["cmd_eden_gamedir"]()
+        text = cfg.read_text()
+        lib = str(box.data / "roms/switch")
+        self.assertIn("Paths\\gamedirs\\size=2\n", text)
+        self.assertIn(f"Paths\\gamedirs\\2\\path={lib}\n", text)
+        self.assertIn("Paths\\gamedirs\\2\\deep_scan=true\n", text)
+        self.assertIn("Paths\\gamedirs\\1\\path=SDMC\n", text)
+        self.assertNotIn("size=1", text)
+        a["cmd_eden_gamedir"]()
+        self.assertEqual(cfg.read_text(), text)          # once
+        cfg.unlink()                                     # a new player: no config yet
+        a["cmd_eden_gamedir"]()
+        self.assertIn(f"Paths\\gamedirs\\1\\path={lib}", cfg.read_text())
+
     def test_library_token_from_systemd(self):
         box = Box(self.base, "library", tokenFile=None)
         creds = self.base / "creds"
