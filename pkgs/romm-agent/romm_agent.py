@@ -38,6 +38,7 @@ import sys
 import tarfile
 import time
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -204,6 +205,16 @@ def fetch_rom(s, rom, system):
     dest = DATA / "roms" / system / rom["fs_name"]
     path = EP_ROM_CONTENT.format(id=rom["id"], file_name=rom["fs_name"])
     if not rom.get("has_multiple_files"):
+        # A single file kept in a folder of its own: RomM's fs_name is the
+        # folder's ("Mario Party 7"), the file's is in `files` ("Mario
+        # Party 7.iso"). Found on the first box 2026-10-06: without the
+        # extension, ES-DE didn't list the game.
+        files = rom.get("files") or []
+        if len(files) == 1 and files[0].get("file_name") and not Path(rom["fs_name"]).suffix:
+            named = dest.with_name(files[0]["file_name"])
+            if dest.is_file() and not named.exists():
+                dest.rename(named)   # pulled before under the folder's name
+            dest = named
         download(s, path, dest, rom.get("sha1_hash"), rom.get("fs_size_bytes"))
         return dest
     done = dest / ".famidrive-complete"
@@ -269,9 +280,12 @@ def title_id(system, rom, prev, path):
     GameCube and Wii saves are named by the full six-character ID (game
     and maker), so a shorter one from RomM is completed from the disc."""
     tid = romm_title_id(system, rom.get("title_id"))
+    had = romm_title_id(system, prev.get("title_id"))
     if system in ("gc", "wii") and (not tid or len(tid) != 6):
-        return prev.get("title_id") or derive_id(system, path) or tid
-    return tid or prev.get("title_id") or derive_id(system, path)
+        # What this box worked out before counts only if it's complete:
+        # an earlier pull may have kept RomM's hex as it was.
+        return (had if had and len(had) == 6 else None) or derive_id(system, path) or tid
+    return tid or had or derive_id(system, path)
 
 
 def fetch_cover(s, rom, system):
@@ -700,6 +714,25 @@ def unpack(blob, root, lay):
 # ---------------------------------------------------------------- save commands
 
 
+def same_time(a, b):
+    """RomM gives the same moment in UTC after an upload and in the
+    server's zone when listing. Found on the first box 2026-10-06:
+    compared as text, every push looked like a conflict."""
+    if not a or not b:
+        return a == b
+    try:
+        return datetime.fromisoformat(a) == datetime.fromisoformat(b)
+    except ValueError:
+        return a == b
+
+
+def unpushed(system, entry, root, lay, key):
+    """Whether this box has a save for the ROM that RomM doesn't: one
+    that changed since it was last pushed or pulled."""
+    rels = save_paths(system, entry, key)
+    return bool(rels) and files_hash(root, rels, lay) != entry.get("pushed")
+
+
 def entry_for(key):
     """The library's entry for a ROM, with this player's save state on top."""
     entry = dict(load_index()[key])
@@ -727,6 +760,13 @@ def cmd_save_pull(system, rom_path):
     entry = entry_for(key)
     newest = server_save(s, dev, entry["id"])
     if not newest:
+        return
+    if same_time(newest["updated_at"], entry.get("server_updated_at")):
+        return   # RomM's is the one this box already has
+    if unpushed(system, entry, root, lay, key):
+        # Never overwrite a save RomM hasn't got. The push after the game
+        # sends it up (beside RomM's, if RomM's changed meanwhile).
+        print(f"local save for {rom_path} is newer than RomM knows; kept", file=sys.stderr)
         return
     blob = get(s, EP_SAVE_CONTENT.format(id=newest["id"]), params={"device_id": dev}).content
     try:
@@ -773,7 +813,7 @@ def cmd_save_push(system, rom_path, learn=True):
     dev = device_id(s)
     slot = SLOT
     newest = server_save(s, dev, entry["id"])
-    if newest and newest["updated_at"] != entry.get("server_updated_at"):
+    if newest and not same_time(newest["updated_at"], entry.get("server_updated_at")):
         # Another box pushed since this one last pulled. Keep both; never
         # silently overwrite. The copy here goes up beside it for a human.
         slot = f"{SLOT}-conflict-{CFG['deviceName']}"
