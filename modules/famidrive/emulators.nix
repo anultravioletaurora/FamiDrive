@@ -77,6 +77,16 @@ in
     default = { };
   };
 
+  # One Ports system for everything that isn't a console or a store:
+  # Minecraft's instances, Clone Hero, ... Each kind of entry has its own
+  # file extension and the command that starts it ($ROM is the entry).
+  options.famidrive.ports = mkOption {
+    type = types.attrsOf types.lines;
+    default = { };
+    internal = true;
+    example = { ".port" = ''clonehero''; };
+  };
+
   config = lib.mkIf cfg.enable {
     # The library's RetroArch BIOS files (romm-agent firmwareDir), linked
     # into this player's RetroArch system folder. Anything a core made
@@ -291,21 +301,32 @@ in
           command = ''${pkgs.gogdl-cli}/bin/gogdl-cli launch "$(cat "$ROM")"'';   # TODO: verify subcommand
         };
       })
-      (lib.mkIf (hasLane "minecraft") {
-        minecraft = {
-          fullname = "Minecraft";
-          extensions = [ ".prism" ];
-          # Every instance starts fullscreen, whoever made it (pkgs/famidrive-prism).
+      (lib.mkIf (cfg.ports != { }) {
+        ports = {
+          fullname = "Ports";
+          theme = "ports";   # Art Book Next's ports art
+          extensions = lib.attrNames cfg.ports;
           command = ''
-            ${pkgs.famidrive-prism}/bin/famidrive-prism fullscreen "$HOME/.local/share/PrismLauncher/instances/$(cat "$ROM")"
-            ${pkgs.prismlauncher}/bin/prismlauncher --launch "$(cat "$ROM")"
+            case "$ROM" in
+            ${lib.concatStrings (lib.mapAttrsToList (ext: cmd: ''
+              *${ext})
+                ${cmd}
+                ;;
+            '') cfg.ports)}
+            esac
           '';
-          # Art Book Next has no Minecraft art; its generic "ports" art is
-          # closest. Without it ES-DE falls back to the "pc" (IBM) logo.
-          theme = "ports";
         };
       })
     ];
+
+    # Minecraft's instances are Ports entries (Found on the first box
+    # 2026-10-06: as a system of their own they showed as a second Ports,
+    # with the same art). Every instance starts fullscreen, whoever made
+    # it (pkgs/famidrive-prism).
+    famidrive.ports.".prism" = lib.mkIf (hasLane "minecraft") ''
+      ${pkgs.famidrive-prism}/bin/famidrive-prism fullscreen "$HOME/.local/share/PrismLauncher/instances/$(cat "$ROM")"
+      ${pkgs.prismlauncher}/bin/prismlauncher --launch "$(cat "$ROM")"
+    '';
 
     programs.steam = lib.mkIf (hasLane "steam") {
       enable = true;

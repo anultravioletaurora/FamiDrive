@@ -30,7 +30,8 @@ let
       serviceConfig = {
         Type = "oneshot";
         User = p.user;
-        ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate ${lane} ${(watched p).${lane}} ${p.roms}/${lane}";
+        # Minecraft's entries live in the Ports system's folder.
+        ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate ${lane} ${(watched p).${lane}} ${p.roms}/${folder lane}";
       };
     };
     # No MakeDirectory: it would make the folder as root inside the
@@ -41,6 +42,8 @@ let
       pathConfig.PathChanged = (watched p).${lane};
     };
   };
+
+  folder = lane: { minecraft = "ports"; }.${lane} or lane;
 
   lanes = lib.filter hasLane [ "steam" "gog" "minecraft" ];
 in
