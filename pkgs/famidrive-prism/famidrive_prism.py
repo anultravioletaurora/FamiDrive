@@ -14,7 +14,10 @@ activation, as the box's user. Only what the flake declares is touched:
 - .minecraft/servers.dat: the declared servers are added or updated (by
   address). Servers added in-game stay.
 
-Instances that aren't declared are left alone, worlds included.
+Instances that aren't declared are left alone, worlds included. Each
+player gets only the instances declared for them (`players`). One that
+FamiDrive made (.famidrive-instance) but that's no longer this player's
+is moved to famidrive-removed/, worlds and all, never deleted.
 
 "fullscreen" runs at every Minecraft launch, for any instance, declared
 or not: it sets fullscreen:true in the instance's options.txt. On a TV
@@ -27,7 +30,10 @@ import json
 import shutil
 import struct
 import sys
+import time
 from pathlib import Path
+
+MARK = ".famidrive-instance"   # in an instance FamiDrive made
 
 
 def set_keys(path, keys, section="[General]"):
@@ -191,9 +197,19 @@ def main():
     root = Path(spec["root"]).expanduser()
     root.mkdir(parents=True, exist_ok=True)
     set_keys(root / "prismlauncher.cfg", spec["launcher"])
+    instances = root / "instances"
+    if instances.is_dir():
+        for d in instances.iterdir():
+            if (d / MARK).exists() and d.name not in spec["instances"]:
+                # Moved aside rather than deleted: it may hold worlds.
+                gone = root / "famidrive-removed" / f"{d.name} ({time.strftime('%Y-%m-%d %H%M%S')})"
+                gone.parent.mkdir(exist_ok=True)
+                d.rename(gone)
+                print(f"famidrive-prism: {d.name} isn't this player's any more, moved to {gone}", file=sys.stderr)
     for name, inst in spec["instances"].items():
-        d = root / "instances" / name
+        d = instances / name
         (d / ".minecraft").mkdir(parents=True, exist_ok=True)
+        (d / MARK).touch()
         set_keys(d / "instance.cfg", {
             "InstanceType": "OneSix",
             "name": name,
