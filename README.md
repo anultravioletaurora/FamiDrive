@@ -153,6 +153,10 @@ planning doc for now and will move into this repo.
   Big Picture as a Settings entry, and a status screen while Steam
   updates, processes shaders or starts a game. Results per game are in
   [COMPATIBILITY.md](COMPATIBILITY.md).
+- Clone Hero in a Ports system (`famidrive.cloneHero`): songs for the
+  whole box, listed by their Chorus Encore md5 and downloaded to the
+  library disk, a profile for every player plus guests, and the TV's
+  calibration set once for everyone.
 - Menu music: each player's `~/ES-DE/music`, shuffled behind ES-DE and
   paused while a game is open (ES-DE has no music of its own).
 - Wii games with real Wii Remotes and the Balance Board, and Minecraft
