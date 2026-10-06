@@ -97,7 +97,7 @@ options.
 
 - **Runs on:** GE-Proton7-50, set in Steam.
 - **Mods:** through Vortex: Cyber Engine Tweaks, RED4ext and archive
-  mods all load.
+  mods all load. Declaring them in Nix is tracked in #6.
 - **Launch options:** `WINEDLLOVERRIDES="winmm,version=n,b" %command%`.
 - **Launching:** works. Steam's window shows briefly, then a black screen
   for about 37 s while the game starts, then the game. It used to drop
@@ -119,7 +119,7 @@ same REDmod support.
 **Steam: ✅ Works.** Proton Experimental (Steam's choice), unmodded.
 
 - **Mods:** not set up. NakeyJakey's New Vegas (a Wabbajack list of
-  about 335 mods) is the one wanted.
+  about 335 mods) is the one wanted; tracked in #5.
 
 ### Helldivers 2
 
@@ -222,7 +222,8 @@ keys only, including on Humble; there's no GOG or DRM-free version.
 
 ### Super Smash Bros. Ultimate
 
-**Switch, Eden: ✅ Works.** Face buttons by label.
+**Switch, Eden: ✅ Works.** Face buttons by label. HewDraw Remix
+support is tracked in #4.
 
 ### Valheim
 
