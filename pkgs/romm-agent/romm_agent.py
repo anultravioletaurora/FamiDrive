@@ -218,6 +218,62 @@ def fetch_rom(s, rom, system):
     return dest
 
 
+def launch_file(folder, system):
+    """The file in a multi-file ROM's folder the emulator opens: the
+    largest one at its top level with one of the system's extensions.
+    Not RomM's .m3u, which lists every file, extras and all. Found on the
+    first box 2026-10-06: GameCube folders held the game, a hack/ folder
+    with a modded copy, and a stray ._.DS_Store, all in the .m3u."""
+    exts = {e.lower() for e in CFG["systems"][system].get("extensions", [])} - {".m3u"}
+    files = [p for p in folder.iterdir()
+             if p.is_file() and not p.name.startswith(".") and p.suffix.lower() in exts]
+    return max(files, key=lambda p: p.stat().st_size) if files else None
+
+
+def launchable(dest, system):
+    """What ES-DE lists and launches for a ROM. A folder becomes a link
+    next to it, named after it, to its launch file, and the folder itself
+    is hidden from ES-DE (noload.txt), so the menu shows a game, not a
+    folder to open."""
+    if not dest.is_dir():
+        return dest
+    main = launch_file(dest, system)
+    if main is None:
+        return dest   # nothing recognizable: ES-DE shows the folder
+    (dest / "noload.txt").touch()
+    link = dest.with_name(dest.name + main.suffix)
+    target = f"{dest.name}/{main.name}"
+    if not (link.is_symlink() and os.readlink(link) == target):
+        if link.is_symlink() or link.exists():
+            link.unlink()
+        link.symlink_to(target)
+    return link
+
+
+def romm_title_id(system, tid):
+    """RomM's title_id, in the form the save layouts use. Found on the
+    first box 2026-10-06: RomM gave GameCube IDs as hex ("474D5045" for
+    GMPE), and only the first four characters."""
+    if tid and system in ("gc", "wii") and re.fullmatch(r"(?:[0-9A-Fa-f]{2}){4,6}", tid):
+        try:
+            text = bytes.fromhex(tid).decode("ascii")
+        except (ValueError, UnicodeDecodeError):
+            return tid
+        if text.isalnum():
+            return text
+    return tid
+
+
+def title_id(system, rom, prev, path):
+    """RomM's ID (rule 2), else what this box had, else read from the ROM.
+    GameCube and Wii saves are named by the full six-character ID (game
+    and maker), so a shorter one from RomM is completed from the disc."""
+    tid = romm_title_id(system, rom.get("title_id"))
+    if system in ("gc", "wii") and (not tid or len(tid) != 6):
+        return prev.get("title_id") or derive_id(system, path) or tid
+    return tid or prev.get("title_id") or derive_id(system, path)
+
+
 def fetch_cover(s, rom, system):
     """Box art for ES-DE, from RomM's own scrape. Best-effort."""
     rel = rom.get("path_cover_large") or rom.get("path_cover_small")
@@ -239,7 +295,7 @@ def fetch_cover(s, rom, system):
 def cmd_pull():
     s = session()
     old = load_index()
-    index, by_system = {}, {}
+    index, by_system, folders = {}, {}, set()
     for rom in library(s):
         system = system_for(rom)
         if system is None:
@@ -249,14 +305,15 @@ def cmd_pull():
         except (requests.RequestException, RuntimeError, zipfile.BadZipFile) as e:
             print(f"skipped {rom['fs_name']}: {e}", file=sys.stderr)
             continue
-        prev = old.get(str(dest), {})
-        tid = (rom.get("title_id")              # rule 2: RomM read it from the ROM itself
-               or prev.get("title_id")
-               or derive_id(system, dest))
+        launch = launchable(dest, system)
+        if dest != launch:
+            folders.add(str(dest))
+        prev = old.get(str(launch), {})
+        tid = title_id(system, rom, prev, launch)
         if tid and not rom.get("title_id"):
             teach_romm(s, rom["id"], tid)
-        index[str(dest)] = {"id": rom["id"], "system": system, "title_id": tid}
-        by_system.setdefault(system, []).append((dest, rom, fetch_cover(s, rom, system)))
+        index[str(launch)] = {"id": rom["id"], "system": system, "title_id": tid}
+        by_system.setdefault(system, []).append((launch, rom, fetch_cover(s, rom, system)))
         save_index(index)  # a 800 GB first pull survives being interrupted
 
     for system, entries in by_system.items():
@@ -265,7 +322,7 @@ def cmd_pull():
     # Deletion policy is undecided (roms.md). Report orphans and never delete.
     local = {str(p) for p in (DATA / "roms").glob("*/*")
              if p.parent.name in CFG["systems"] and not p.name.endswith(".part")}
-    for orphan in sorted(local - set(index)):
+    for orphan in sorted(local - set(index) - folders):
         print(f"not in RomM anymore (kept): {orphan}", file=sys.stderr)
 
 
@@ -557,7 +614,8 @@ def save_paths(system, entry, rom_path):
         found = [Path(rom_path).stem + ".srm"]
     elif kind == "dolphin-gci-folder" and tid:
         card = Path(DOLPHIN_REGION.get(tid[3], "USA")) / "Card A"
-        found = [str(card / p.name) for p in (root / card).glob(f"{tid[4:6]}-{tid[:4]}-*.gci")]
+        maker = tid[4:6] or "??"   # a game-only ID still finds its saves
+        found = [str(card / p.name) for p in (root / card).glob(f"{maker}-{tid[:4]}-*.gci")]
     elif kind == "dolphin-wii-title" and tid:
         found = [f"00010000/{tid[:4].encode().hex()}/data"]
     elif kind == "pcsx2-folder-memcard" and tid:

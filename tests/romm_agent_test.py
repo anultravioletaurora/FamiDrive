@@ -43,6 +43,9 @@ class Box:
             "systems": {
                 "switch": {"rommPlatform": "switch", "saveSync": True, "emulator": "eden",
                            "saveLayout": {"kind": "eden-title-id", "root": EDEN_ROOT}},
+                "gc": {"rommPlatform": "ngc", "saveSync": True, "emulator": "dolphin",
+                       "extensions": [".iso", ".rvz", ".gcz", ".ciso"],
+                       "saveLayout": {"kind": "dolphin-gci-folder", "root": "~/.local/share/dolphin-emu/GC"}},
                 "snes": {"rommPlatform": "snes", "saveSync": True, "emulator": "retroarch-snes9x",
                          "saveLayout": {"kind": "retroarch-srm", "root": "~/.config/retroarch/saves"}},
             },
@@ -146,6 +149,45 @@ class Test(unittest.TestCase):
         self.assertEqual(a["from_archive"](lay, "Game.srm"), "Game.srm")
 
     # ------------------------------------------------------------ the library and players
+
+    def test_folder_rom_launches_its_game_file(self):
+        # A multi-file ROM as RomM sends GameCube games: the game, its .m3u
+        # (listing everything), a modded copy in hack/, and macOS litter.
+        box = Box(self.base, "alice")
+        a = box.agent()
+        folder = box.data / "roms/gc/Mario Party 4"
+        (folder / "hack").mkdir(parents=True)
+        (folder / "Mario Party 4.iso").write_bytes(b"x" * 100)
+        (folder / "hack/Mario Party 4 (DX).iso").write_bytes(b"x" * 500)
+        (folder / "Mario Party 4.m3u").write_text("._.DS_Store\nhack/Mario Party 4 (DX).iso\nMario Party 4.iso\n")
+        (folder / "._.DS_Store").write_bytes(b"x" * 1000)
+        link = a["launchable"](folder, "gc")
+        self.assertEqual(link, box.data / "roms/gc/Mario Party 4.iso")
+        self.assertEqual(os.readlink(link), "Mario Party 4/Mario Party 4.iso")
+        self.assertTrue((folder / "noload.txt").exists())
+        self.assertEqual(a["launchable"](link, "gc"), link)       # a plain file is itself
+        self.assertEqual(a["launchable"](folder, "gc"), link)     # again: same link
+
+    def test_gamecube_ids_from_romm(self):
+        a = Box(self.base, "alice").agent()
+        self.assertEqual(a["romm_title_id"]("gc", "474D5045"), "GMPE")
+        self.assertEqual(a["romm_title_id"]("gc", "GMPE01"), "GMPE01")
+        self.assertEqual(a["romm_title_id"]("switch", "0100000000010000"), "0100000000010000")
+        # A short one is completed from the disc; a full one from RomM is kept.
+        a["derive_id"] = lambda system, path: "GMPE01"
+        a["title_id"].__globals__["derive_id"] = a["derive_id"]
+        self.assertEqual(a["title_id"]("gc", {"title_id": "474D5045"}, {}, "x.iso"), "GMPE01")
+        self.assertEqual(a["title_id"]("gc", {"title_id": "GALE01"}, {}, "x.iso"), "GALE01")
+
+    def test_gamecube_saves_found_by_id(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        card = box.home / ".local/share/dolphin-emu/GC/USA/Card A"
+        card.mkdir(parents=True)
+        (card / "01-GMPE-MARIPA4BOX0.gci").write_bytes(b"s")
+        (card / "01-GALE-SuperSmashBros0110290334.gci").write_bytes(b"s")
+        self.assertEqual(a["save_paths"]("gc", {"title_id": "GMPE01"}, "x.iso"), ["USA/Card A/01-GMPE-MARIPA4BOX0.gci"])
+        self.assertEqual(a["save_paths"]("gc", {"title_id": "GMPE"}, "x.iso"), ["USA/Card A/01-GMPE-MARIPA4BOX0.gci"])
 
     def test_rom_paths_from_a_players_folder(self):
         box = Box(self.base, "alice")
