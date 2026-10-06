@@ -129,6 +129,7 @@ in
         (c.systemd.services.romm-library-pull.serviceConfig.LoadCredential == "romm-token:/run/secrets/alice-token"
           && c.systemd.services.romm-library-pull.serviceConfig.User == "famidrive-library"))
       (check "library config holds no token" (library.tokenFile == null))
+      (check "RomM keeps three versions of each save" (bob.saveHistory == 3))
       (check "the pull waits for the library disk and sets up its folders"
         (c.systemd.services.romm-library-pull.unitConfig.RequiresMountsFor == "/var/lib/famidrive"
           && lib.hasInfix "systemd-tmpfiles --create --prefix=/var/lib/famidrive"

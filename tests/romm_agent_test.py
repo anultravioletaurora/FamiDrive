@@ -251,6 +251,7 @@ class Test(unittest.TestCase):
         class Session:
             def post(self, url, params, **kw):
                 posts.append(params["slot"])
+                assert params["autocleanup"] == "true" and params["autocleanup_limit"] == 3, params
                 return Resp({"updated_at": "2026-10-06T09:30:00+00:00"})
         g = a["cmd_save_push"].__globals__
         g["session"] = lambda: Session()

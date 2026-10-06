@@ -828,7 +828,12 @@ def cmd_save_push(system, rom_path, learn=True):
     r = s.post(API + EP_SAVES, timeout=120,
                params={"rom_id": entry["id"], "slot": slot, "device_id": dev,
                        "emulator": CFG["systems"][system].get("emulator"),
-                       "overwrite": "true"},
+                       "overwrite": "true",
+                       # RomM keeps the newest N in this slot and deletes the
+                       # rest (per user, game and slot: saves uploaded by
+                       # hand, in other slots, are never touched).
+                       "autocleanup": "true",
+                       "autocleanup_limit": CFG.get("saveHistory", 3)},
                files={"saveFile": (name, blob)})
     r.raise_for_status()
     if slot == SLOT:

@@ -192,6 +192,16 @@ in
         '';
       };
 
+      saveHistory = mkOption {
+        type = types.ints.between 1 100;
+        default = 3;
+        description = ''
+          Versions of each game's save RomM keeps for a player: every push
+          adds one, and RomM deletes the oldest beyond this. Only FamiDrive's
+          own save slots; saves uploaded to RomM by hand are left alone.
+        '';
+      };
+
       firmwarePlatforms = mkOption {
         type = types.listOf types.str;
         default = lib.unique (lib.filter (s: s != null)
