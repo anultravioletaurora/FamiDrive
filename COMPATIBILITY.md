@@ -406,6 +406,14 @@ support is tracked in #4.
 **Steam: ❔ Untested.** First try on 2026-10-06: a fresh install and first
 launch with no changes for this game, then controllers and rumble.
 
+- **2026-10-06, stopped during an update:** launching it started a Steam
+  update, which FamiDrive's status screen showed with its progress bar.
+  After about 80 minutes it had reached 6.1 GB, although Steam reported
+  around 500 Mbps. That speed would have finished in a few minutes, so
+  either the reported speed or the update itself was off. Not yet looked
+  into: try again, and check Steam's `content_log.txt` for the update's
+  real speed and any stalls.
+
 - **What to watch for:** Steam's copy still needs an EA account. On the
   first launch the EA app installs and asks for a sign-in inside
   Proton. Its install-script windows count as the game's
