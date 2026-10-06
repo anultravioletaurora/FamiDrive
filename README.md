@@ -147,8 +147,13 @@ planning doc for now and will move into this repo.
 - On the first box: the gamescope session, 4K120 HDR over HDMI 2.1,
   the Art Book Next theme, GameCube (Dolphin) and Switch (Eden) games
   taking focus, the 8BitDo Ultimate 2 over 2.4 GHz, and quitting with
-  Select + Start. That box still reads its ROMs from a local drive
-  (`localRoms`), not RomM.
+  Select + Start.
+- "Who's playing?" with two players and a guest, each with their own
+  saves, Steam and RomM account, and powering off from the controller.
+- The RomM agent against RomM 5.3 on the first box: the library pull
+  (single files, folders and nested files), firmware, and GameCube save
+  sync both ways, with conflict copies and a short save history. Switch
+  saves are next.
 - The Steam lane, with Proton pins and Steam Input set from Nix, Steam's
   Big Picture as a Settings entry, and a status screen while Steam
   updates, processes shaders or starts a game. Results per game are in
@@ -164,9 +169,9 @@ planning doc for now and will move into this repo.
 
 **Still a sketch:**
 
-- The RomM agent uses the endpoints in RomM 5.3.1's own `openapi.json`, but
-  has never run against a real server. Field values it hasn't seen yet
-  (cover paths, multi-file downloads) are marked `VERIFY`.
+- The RomM agent's save sync for systems other than GameCube hasn't run
+  against a real server yet. Field values it hasn't seen are marked
+  `VERIFY`.
 - RomM's save sync is being redesigned ("Save Sync v2", a draft as of
   2026-09-23). The agent's save half will need rewriting when it lands;
   the library and firmware half shouldn't.
@@ -341,7 +346,9 @@ covers what can be tested without a TV or a server ([tests/](tests)):
 
 Run the same locally with `nix flake check`. After merging, a change gets
 tried on a real box (and against RomM, for anything that touches it),
-and the results go in [COMPATIBILITY.md](COMPATIBILITY.md).
+and the results go in [COMPATIBILITY.md](COMPATIBILITY.md) (games) and
+[CONTROLLERS.md](CONTROLLERS.md) (controllers). Notes for coding agents
+are in [AGENTS.md](AGENTS.md).
 
 ## Special Thanks
 

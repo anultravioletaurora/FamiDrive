@@ -53,7 +53,7 @@ Every result below comes from this box, unless a game says otherwise.
 | CPU | AMD Ryzen 9 7900X |
 | GPU | AMD Radeon RX 7900 XTX (24 GB) |
 | Display | 4K TV, 120 Hz, HDR on (`display.hdr = true`, `display.refresh = 120`) |
-| Controllers | 8BitDo Ultimate 2 (2.4 GHz dongle), Xbox Wireless Controller (Bluetooth), first-party Wii Remotes |
+| Controllers | 8BitDo Ultimate 2 (2.4 GHz dongle), Xbox Wireless Controller (Bluetooth), first-party Wii Remotes ([CONTROLLERS.md](CONTROLLERS.md)) |
 | FamiDrive | `f2b8769` and later, October 2026 |
 
 ## Games
