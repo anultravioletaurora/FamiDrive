@@ -124,6 +124,10 @@ in
         (c.systemd.services.romm-library-pull.serviceConfig.LoadCredential == "romm-token:/run/secrets/alice-token"
           && c.systemd.services.romm-library-pull.serviceConfig.User == "famidrive-library"))
       (check "library config holds no token" (library.tokenFile == null))
+      (check "the pull waits for the library disk and sets up its folders"
+        (c.systemd.services.romm-library-pull.unitConfig.RequiresMountsFor == "/var/lib/famidrive"
+          && lib.hasInfix "systemd-tmpfiles --create --prefix=/var/lib/famidrive"
+            c.systemd.services.romm-library-pull.serviceConfig.ExecStartPre))
       (check "bob's agent config is his" (bob.owner == "bobby" && bob.gamelistDir == "/home/bob/ES-DE/gamelists"
         && bob.playerRoms == "/home/bob/.local/share/famidrive/roms"))
       (check "no agent config for the guest" (!(c.environment.etc ? "famidrive/romm/guest.json")))
