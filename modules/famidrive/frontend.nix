@@ -118,19 +118,6 @@ in
     '';
   };
 
-  options.famidrive.esde.music = lib.mkOption {
-    type = lib.types.nullOr lib.types.str;
-    default = "Music";
-    example = "/srv/media/music";
-    description = ''
-      Folder of background music for ES-DE's menus (MP3 or OGG), relative
-      to the home folder or absolute. ES-DE only looks in ES-DE/music, so
-      that becomes a link to this folder. null: leave ES-DE/music alone.
-      Music plays while ES-DE's "Play background music" (Sound settings)
-      is on; ES-DE reads the folder when it starts.
-    '';
-  };
-
   config = lib.mkIf cfg.enable {
     # Before the session: ES-DE only reads its folders at startup.
     systemd.services.famidrive-skip-folders = lib.mkIf (cfg.esde.skipFolders != [ ]) {
@@ -152,18 +139,12 @@ in
 
     environment.systemPackages = [ famidriveLaunch ];
 
-    home-manager.users.${cfg.user} = { config, lib, ... }: {
+    home-manager.users.${cfg.user} = { lib, ... }: {
       home.file = {
         "ES-DE/custom_systems/es_systems.xml".source = esSystemsXml;
         "ES-DE/custom_systems/es_systems_sorting.xml".source = esSystemsSortingXml;
       } // lib.optionalAttrs (theme != null) {
         "ES-DE/themes/${theme.name}".source = theme.src;
-      } // lib.optionalAttrs (cfg.esde.music != null) {
-        # Out of the store: the music stays where it is, and adding a song
-        # needs no rebuild, only an ES-DE restart.
-        "ES-DE/music".source = config.lib.file.mkOutOfStoreSymlink
-          (if lib.hasPrefix "/" cfg.esde.music then cfg.esde.music
-           else "${config.home.homeDirectory}/${cfg.esde.music}");
       };
 
       home.activation.famidriveEsSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
