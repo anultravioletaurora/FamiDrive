@@ -745,16 +745,21 @@ def my_state(saves, key, rom_id):
     the name without the extension added since. Found on the first box
     2026-10-06: renamed games looked never synced, and their saves went
     up as conflicts."""
-    if key in saves:
-        return saves[key]
+    mine = saves.setdefault(key, {})
+    if "server_updated_at" in mine:
+        return mine
+    # Merged in, not just taken: the new name may already have state of
+    # its own (a conflict copy pushed before this fix), but not the sync.
     index = load_index()
-    for old, state in saves.items():
-        if old in index:
+    for old in list(saves):
+        if old == key or old in index:
             continue
+        state = saves[old]
         if state.get("id") == rom_id or (state.get("id") is None and Path(old).name == Path(key).stem):
-            saves[key] = saves.pop(old)
-            return saves[key]
-    return saves.setdefault(key, {})
+            for k, v in saves.pop(old).items():
+                mine.setdefault(k, v)
+            break
+    return mine
 
 
 def entry_for(key):

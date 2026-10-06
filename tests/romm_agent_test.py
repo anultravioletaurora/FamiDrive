@@ -292,6 +292,14 @@ class Test(unittest.TestCase):
         saves = a["load_saves"]()
         self.assertEqual(a["my_state"](saves, new7, 222)["pushed"], "a")
         self.assertNotIn(str(gc / "Mario Party 7"), saves)       # moved, not copied
+        # The new name already has state of its own (a conflict copy pushed
+        # before the fix): the sync from before the rename is merged in.
+        news = str(gc / "Shrek Superslam.iso")
+        a["save_index"]({news: {"id": 245, "system": "gc", "title_id": "G2RE52"}})
+        a["store_saves"]({str(gc / "Shrek Superslam"): {"pushed": "old", "server_updated_at": "t1"},
+                          news: {"conflict_pushed": "c"}})
+        e = a["entry_for"](news)
+        self.assertEqual((e["server_updated_at"], e["pushed"], e["conflict_pushed"]), ("t1", "old", "c"))
 
     def test_gamecube_saves_found_by_id(self):
         box = Box(self.base, "alice")
