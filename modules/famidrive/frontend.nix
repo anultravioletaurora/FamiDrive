@@ -7,7 +7,7 @@
 #
 # Each player's ES-DE reads their own ROM folder (players.<name>, `roms`):
 # every shared system is a link into dataDir/roms, and the per-player
-# lanes (Steam, GOG, Minecraft, Settings, Media) are their own.
+# lanes (Steam, GOG, Minecraft, Settings, Media, Ports) are their own.
 { config, lib, pkgs, ... }:
 
 let
@@ -16,7 +16,7 @@ let
 
   # Systems whose entries differ per player. Every other system is the
   # shared library's.
-  perPlayer = [ "steam" "gog" "minecraft" "settings" "media" ];
+  perPlayer = [ "steam" "gog" "minecraft" "settings" "media" "ports" ];
   shared = lib.filter (n: !(lib.elem n perPlayer)) (lib.attrNames cfg.systems);
 
   # famidrive-launch <system> <rom>
