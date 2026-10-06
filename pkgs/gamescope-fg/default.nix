@@ -103,7 +103,8 @@ writeShellApplication {
       seen=$(wc -l < "$log" 2>/dev/null || echo 0)
       status_pid=""   # the status screen's, while it's up (see below)
       # Put the game on top and stay until it's gone: until none of its
-      # Steam processes (`SteamLaunch AppId=N`) is left. Not one pid: Steam
+      # Steam processes (`SteamLaunch AppId=N --`) is left. Not the game's
+      # install script, whose launcher is `SteamLaunch AppId=N Install=1`. Not one pid: Steam
       # may swap the process it started for another. Found on the first box
       # 2026-10-05: Cyberpunk's went through three in its first 40 s, and
       # following only the first handed the screen back to ES-DE while the
@@ -123,7 +124,7 @@ writeShellApplication {
               status_stop
             fi
           fi
-          pid=$(pgrep -o -f "SteamLaunch AppId=$appid( |$)" || true)
+          pid=$(pgrep -o -f "SteamLaunch AppId=$appid( --|$)" || true)
           if [ -z "$pid" ]; then
             misses=$((misses + 1))
           else
@@ -146,7 +147,7 @@ writeShellApplication {
 
       # Picked again while it's still running (say ES-DE came back over
       # it): bring it back instead of asking Steam, which would refuse.
-      pid=$(pgrep -o -f "SteamLaunch AppId=$appid( |$)" || true)
+      pid=$(pgrep -o -f "SteamLaunch AppId=$appid( --|$)" || true)
       if [ -n "$pid" ]; then
         follow
         exit 0
@@ -179,6 +180,30 @@ writeShellApplication {
         done
       }
       focusable() { xprop -root GAMESCOPE_FOCUSABLE_APPS 2>/dev/null | grep -qE "[ ,]$1(,|$)"; }
+      # descends PID ROOT: whether PID is ROOT or runs under it.
+      descends() {
+        p="$1"
+        while [ -n "$p" ] && [ "$p" -gt 1 ]; do
+          [ "$p" = "$2" ] && return 0
+          p=$(awk '/^PPid:/ { print $2 }' "/proc/$p/status" 2>/dev/null || true)
+        done
+        return 1
+      }
+      # The windows of a game's first-time setup, labelled as the game so
+      # they're shown and can be answered. Found on the first box
+      # 2026-10-06: Star Wars Jedi: Survivor's install script runs the EA
+      # app's installer, which waits on a "Let's go" button. Its window
+      # carries no app id, so gamescope never showed it, and ES-DE came back
+      # after three minutes over a setup still waiting.
+      tag_install() {
+        for wid in $(windows); do
+          untagged "$wid" || continue
+          xwininfo -id "$wid" 2>/dev/null | grep -q IsViewable || continue
+          wpid=$(window_pid "$wid")
+          [ -n "$wpid" ] || continue
+          if descends "$wpid" "$1"; then tag "$wid" "$appid"; fi
+        done
+      }
       trap status_stop EXIT
 
       # This game's launch steps since the launch. Read whole, not piped into
@@ -199,8 +224,9 @@ writeShellApplication {
       # returns. Wait for Steam's launcher (`reaper SteamLaunch AppId=N`),
       # or for Steam to log that the launch failed.
       #
-      # No overall time limit: Steam may be updating the game or processing
-      # its shaders. Found on the first box 2026-10-05: shader processing
+      # No overall time limit: Steam may be updating the game, processing
+      # its shaders, or running its first-time setup (which can wait on
+      # someone answering it). Found on the first box 2026-10-05: shader processing
       # alone took up to 5 min 41 s, past the old five-minute limit, and
       # ES-DE came back over a launch that was still going. The only limit
       # is on silence: two minutes with no launch step logged and no game
@@ -220,7 +246,7 @@ writeShellApplication {
         # screen back to ES-DE when the script ended, while Steam carried
         # on with the shaders behind it.
         if grep -qE "changed task to (WaitingGameWindow|Completed)" <<< "$steps"; then
-          pid=$(pgrep -o -f "SteamLaunch AppId=$appid( |$)" || true)
+          pid=$(pgrep -o -f "SteamLaunch AppId=$appid( --|$)" || true)
           [ -n "$pid" ] && break
         fi
         if grep -qE "changed task to Failed|LaunchApp failed" <<< "$steps"; then
@@ -252,24 +278,33 @@ writeShellApplication {
         # Steam is busy while its last step is a long one that hasn't
         # finished: updating, processing shaders, or waiting on a prompt.
         now=$(tail -n 1 <<< "$steps")
+        install=$(pgrep -o -f "SteamLaunch AppId=$appid Install=1" || true)
         case "$now" in
+          *RunningInstallScript*) state=installing ;;
           *DownloadingDepots*) state=updating ;;
           *ProcessingShaderCache*) state=shaders ;;
           *"waiting for user response to CreatingProcess"*) state=asking ;;
           *"waiting for user response"*) state=prompt ;;
           *) state=asking ;;
         esac
+        # Its launcher running counts too: picked again while an earlier
+        # launch's setup still waits, Steam logs nothing new.
+        if [ -n "$install" ] && [ "$state" = asking ]; then state=installing; fi
         status "$state"
         if [ "$state" = prompt ]; then
           base "769,$STATUS,$FRONTEND"
+        elif [ "$state" = installing ]; then
+          # Its windows over the status screen: they may ask something.
+          [ -n "$install" ] && tag_install "$install"
+          base "$appid,$STATUS,769,$FRONTEND"
         else
           base "$STATUS,769,$FRONTEND"
         fi
         status_tag
-        if [ "$now" != "$last" ]; then
+        if [ "$now" != "$last" ] || [ -n "$install" ]; then
           last="$now"
           idle=0
-        elif ! grep -qE "DownloadingDepots|ProcessingShaderCache|waiting for user response" <<< "$now"; then
+        elif ! grep -qE "DownloadingDepots|ProcessingShaderCache|RunningInstallScript|waiting for user response" <<< "$now"; then
           idle=$((idle + 1))
         fi
         sleep 0.5

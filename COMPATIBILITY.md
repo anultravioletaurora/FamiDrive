@@ -36,6 +36,7 @@ behave differently in each. For a console game it's the emulator.
   - [Minecraft (vanilla 26.2, a private server)](#minecraft-vanilla-262-a-private-server) (PC)
   - [Rocket League](#rocket-league) (PC)
   - [Street Fighter 6](#street-fighter-6) (PC)
+  - [Star Wars Jedi: Survivor](#star-wars-jedi-survivor) (PC)
   - [Super Smash Bros. Brawl](#super-smash-bros-brawl) (Wii)
   - [Super Smash Bros. Melee](#super-smash-bros-melee) (GameCube)
   - [Super Smash Bros. Ultimate](#super-smash-bros-ultimate) (Switch)
@@ -235,6 +236,18 @@ joins the server straight from launch.
 
 **Other stores:** none known. Street Fighter 6 on PC is sold as Steam
 keys only, including on Humble; there's no GOG or DRM-free version.
+
+### Star Wars Jedi: Survivor
+
+**Steam: ⚠️ In progress.** Installed remotely through Steam while the box
+was in use; ES-DE listed it after the next session start.
+
+- **First launch:** Steam runs the game's install script first, which
+  installs the EA app. Its installer waits on a "Let's go" button, but its
+  window wasn't shown, so the status screen sat on "Asking Steam" and
+  ES-DE came back after three minutes. FamiDrive now shows an install
+  script's windows on top ("Setting up the game") and waits for them.
+  The EA app's installer and sign-in want a mouse or keyboard.
 
 ### Super Smash Bros. Brawl
 
