@@ -142,6 +142,25 @@ class Test(unittest.TestCase):
         self.assertEqual(b["from_archive"](lay2, "11111111111111111111111111111111/X"),
                          "22222222222222222222222222222222/X")
 
+    def test_switch_device_saves_go_with_the_game(self):
+        # Animal Crossing's island is a device save: the console's, under an
+        # all-zero user, not the profile's. It travels as it is.
+        box = Box(self.base, "alice", edenProfileId="AAAABBBBCCCCDDDDEEEEFFFF00001111")
+        a = box.agent()
+        _, root, lay = a["layout"]("switch")
+        device = root / ("0" * 32) / "01006F8002326000"
+        device.mkdir(parents=True)
+        (device / "main.dat").write_bytes(b"island")
+        mine = root / "AAAABBBBCCCCDDDDEEEEFFFF00001111" / "01006F8002326000"
+        mine.mkdir(parents=True)
+        (mine / "profile.dat").write_bytes(b"me")
+        rels = a["save_paths"]("switch", {"title_id": "01006F8002326000"}, "x.nsp")
+        self.assertEqual(sorted(rels), ["0" * 32 + "/01006F8002326000", "AAAABBBBCCCCDDDDEEEEFFFF00001111/01006F8002326000"])
+        self.assertEqual(a["to_archive"](lay, rels[0] if rels[0].startswith("0") else rels[1]), "0" * 32 + "/01006F8002326000")
+        self.assertEqual(a["from_archive"](lay, "0" * 32 + "/01006F8002326000/main.dat"), "0" * 32 + "/01006F8002326000/main.dat")
+        self.assertEqual(a["from_archive"](lay, "@profile/01006F8002326000/profile.dat"),
+                         "AAAABBBBCCCCDDDDEEEEFFFF00001111/01006F8002326000/profile.dat")
+
     def test_other_systems_keep_their_paths(self):
         a = Box(self.base, "alice").agent()
         _, _, lay = a["layout"]("snes")
