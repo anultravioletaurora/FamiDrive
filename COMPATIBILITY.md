@@ -23,9 +23,11 @@ behave differently in each. For a console game it's the emulator.
   - [Animal Crossing: New Horizons](#animal-crossing-new-horizons) (Switch)
   - [Call of Duty: Black Ops III](#call-of-duty-black-ops-iii) (PC)
   - [Cyberpunk 2077](#cyberpunk-2077) (PC)
+  - [Hollow Knight](#hollow-knight) (PC)
   - [The Jackbox Party Pack 3](#the-jackbox-party-pack-3) (PC)
   - [The Jackbox Party Pack 6](#the-jackbox-party-pack-6) (PC)
   - [Left 4 Dead 2](#left-4-dead-2) (PC)
+  - [Mario Kart: Double Dash!!](#mario-kart-double-dash) (GameCube)
   - [Minecraft (vanilla 26.2, a private server)](#minecraft-vanilla-262-a-private-server) (PC)
   - [Rocket League](#rocket-league) (PC)
   - [Street Fighter 6](#street-fighter-6) (PC)
@@ -67,7 +69,8 @@ options.
 
 - **Performance:** 170–185 fps at 4K with every graphics setting maxed.
 - **Controllers:** the Xbox Wireless Controller's rumble works. The
-  8BitDo's rumble isn't checked yet.
+  8BitDo's rumble isn't checked in a Steam game yet; it works in Dolphin
+  ([Super Smash Bros. Melee](#super-smash-bros-melee)).
 - **ES-DE:** TheGamesDB's scraper matched it to the 2010 *Call of Duty:
   Black Ops*, so it was listed under that name with that game's details.
   Fixed by re-scraping it in ES-DE. ScreenScraper matches more reliably.
@@ -97,6 +100,13 @@ options.
 
 **GOG: ❔ Untested.** The planned home for it: DRM-free, with the
 same REDmod support.
+
+### Hollow Knight
+
+**Steam: ✅ Works.** Proton 11.0 (Steam's choice), no launch options.
+
+- **Launching:** FamiDrive's status screen shows, then the game.
+- **Controllers:** work as configured, with Steam Input off.
 
 ### The Jackbox Party Pack 3
 
@@ -130,6 +140,10 @@ content loads.
   "NOT BOUND".
 - **Steam Input off:** worse. Controller support had to be turned on in
   the game's options by hand, and even then shooting didn't work.
+
+### Mario Kart: Double Dash!!
+
+**GameCube, Dolphin: ✅ Works.** The 8BitDo's rumble works.
 
 ### Minecraft (vanilla 26.2, a private server)
 
@@ -174,7 +188,7 @@ keys only, including on Humble; there's no GOG or DRM-free version.
 ### Super Smash Bros. Melee
 
 **GameCube, Dolphin: ✅ Works.** Face buttons by label
-(`controllers.faceButtons`).
+(`controllers.faceButtons`). The 8BitDo's rumble works.
 
 ### Super Smash Bros. Ultimate
 
