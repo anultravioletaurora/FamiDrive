@@ -4,14 +4,24 @@
 #   es_systems.xml, themes          -> only Nix writes them: plain symlinks
 #   es_settings.xml                 -> ES-DE rewrites it: seed + lock a few keys
 #   gamelists/, ROMs, placeholders  -> runtime-generated, Nix never touches them
+#
+# Each player's ES-DE reads their own ROM folder (players.<name>, `roms`):
+# every shared system is a link into dataDir/roms, and the per-player
+# lanes (Steam, GOG, Minecraft, Settings, Media) are their own.
 { config, lib, pkgs, ... }:
 
 let
   cfg = config.famidrive;
   seedLib = import ./lib/seed.nix { inherit lib pkgs; };
 
+  # Systems whose entries differ per player. Every other system is the
+  # shared library's.
+  perPlayer = [ "steam" "gog" "minecraft" "settings" "media" ];
+  shared = lib.filter (n: !(lib.elem n perPlayer)) (lib.attrNames cfg.systems);
+
   # famidrive-launch <system> <rom>
-  #   1. pull the newest save for this ROM from RomM (consoles only)
+  #   1. pull the newest save for this ROM from RomM (consoles only, and
+  #      only for players with a RomM account: not the guest)
   #   2. run the emulator with the STEAM_GAME focus atom set, so gamescope
   #      shows the game, not ES-DE (base-os.md "The real cost: window focus")
   #   3. push the save back to RomM after the emulator exits
@@ -25,14 +35,19 @@ let
       system="$1"
       ROM="$2"
       export ROM
+      ${lib.optionalString cfg.romm.enable ''
+        # Save sync is for players with a RomM agent config of their own.
+        sync=""
+        if [ -e "/etc/famidrive/romm/$(id -un).json" ]; then sync=1; fi
+      ''}
 
       case "$system" in
       ${lib.concatStrings (lib.mapAttrsToList (name: s: ''
         ${name})
-          ${lib.optionalString (s.saveSync && cfg.romm.enable) ''romm-agent save-pull ${name} "$ROM" || echo "famidrive-launch: save pull failed, launching with local save" >&2''}
+          ${lib.optionalString (s.saveSync && cfg.romm.enable) ''[ -z "$sync" ] || romm-agent save-pull ${name} "$ROM" || echo "famidrive-launch: save pull failed, launching with local save" >&2''}
           rc=0
           gamescope-fg bash -c ${lib.escapeShellArg s.command} || rc=$?
-          ${lib.optionalString (s.saveSync && cfg.romm.enable) ''romm-agent save-push ${name} "$ROM" || echo "famidrive-launch: save push failed, timer reconcile will retry" >&2''}
+          ${lib.optionalString (s.saveSync && cfg.romm.enable) ''[ -z "$sync" ] || romm-agent save-push ${name} "$ROM" || echo "famidrive-launch: save push failed, timer reconcile will retry" >&2''}
           exit "$rc"
           ;;
       '') cfg.systems)}
@@ -125,10 +140,9 @@ in
       wantedBy = [ "display-manager.service" ];
       before = [ "display-manager.service" ];
       after = [ "local-fs.target" ];
-      serviceConfig = {
-        Type = "oneshot";
-        User = cfg.user;
-      };
+      # As root: the shared library isn't any one player's. noload.txt is
+      # an empty marker, so who owns it doesn't matter.
+      serviceConfig.Type = "oneshot";
       # -L: systems from localRoms are symlinks to elsewhere.
       script = ''
         ${pkgs.findutils}/bin/find -L ${cfg.dataDir}/roms -mindepth 2 -type d \( ${
@@ -139,7 +153,7 @@ in
 
     environment.systemPackages = [ famidriveLaunch ];
 
-    home-manager.users.${cfg.user} = { lib, ... }: {
+    famidrive.playerHome = { lib, famidrivePlayer, ... }: {
       home.file = {
         "ES-DE/custom_systems/es_systems.xml".source = esSystemsXml;
         "ES-DE/custom_systems/es_systems_sorting.xml".source = esSystemsSortingXml;
@@ -147,12 +161,30 @@ in
         "ES-DE/themes/${theme.name}".source = theme.src;
       };
 
+      # This player's ROM folder: a link to each shared system. Links to
+      # systems this box no longer has are cleared out; their own folders
+      # (Steam, Settings, ...) are left to the generators.
+      home.activation.famidriveRoms = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        roms=${lib.escapeShellArg famidrivePlayer.roms}
+        mkdir -p "$roms"
+        for link in "$roms"/*; do
+          [ -L "$link" ] || continue
+          case " ${lib.concatStringsSep " " shared} " in
+            *" $(basename "$link") "*) ;;
+            *) rm -f "$link" ;;
+          esac
+        done
+        ${lib.concatMapStrings (n: ''
+          ln -sfn ${lib.escapeShellArg "${cfg.dataDir}/roms/${n}"} "$roms/${n}"
+        '') shared}
+      '';
+
       home.activation.famidriveEsSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         ${seedLib.lockKeys {
           format = "esSettings";
           target = "$HOME/ES-DE/settings/es_settings.xml";
           keys = {
-            ROMDirectory = { type = "string"; value = "${cfg.dataDir}/roms"; };
+            ROMDirectory = { type = "string"; value = famidrivePlayer.roms; };
           } // lib.optionalAttrs (theme != null) {
             # Locked, so a rebuild always brings the chosen theme back. The
             # theme's own options (color scheme, aspect ratio) stay editable.

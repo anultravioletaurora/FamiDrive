@@ -2,14 +2,16 @@
 # RomM can't model PC saves yet (pc-games.md open questions, "PC game save sync").
 # Console saves never come through here; they use RomM's sync API only.
 #
-# Scoped to the box owner like everything else: folder IDs are prefixed with
-# the owner, so two owners' boxes can never pair the same folder.
+# The primary player's (famidrive.primaryPlayer): Syncthing runs as one
+# account. Folder IDs are prefixed with their RomM username, so two
+# people's boxes can never pair the same folder.
 { config, lib, ... }:
 
 let
   inherit (lib) mkOption types;
   cfg = config.famidrive;
   pcLanes = lib.any (l: lib.elem l cfg.lanes) [ "steam" "gog" ];
+  p = cfg.allPlayers.${cfg.primaryPlayer};
 in
 {
   options.famidrive.pcSaves = {
@@ -31,15 +33,20 @@ in
   };
 
   config = lib.mkIf (cfg.enable && pcLanes && cfg.pcSaves.folders != { }) {
+    assertions = [{
+      assertion = cfg.primaryPlayer != null;
+      message = "famidrive.pcSaves: set famidrive.primaryPlayer, whose PC saves these are.";
+    }];
+
     services.syncthing = {
       enable = true;
-      user = cfg.user;
-      dataDir = "/home/${cfg.user}";
+      user = p.user;
+      dataDir = p.home;
       overrideDevices = true;
       overrideFolders = true;
       settings = {
         devices = lib.mapAttrs (_: id: { inherit id; }) cfg.pcSaves.peers;
-        folders = lib.mapAttrs' (name: path: lib.nameValuePair "${cfg.owner}-pc-${name}" {
+        folders = lib.mapAttrs' (name: path: lib.nameValuePair "${p.owner}-pc-${name}" {
           inherit path;
           devices = lib.attrNames cfg.pcSaves.peers;
           versioning = { type = "staggered"; params.maxAge = "2592000"; };   # 30 days

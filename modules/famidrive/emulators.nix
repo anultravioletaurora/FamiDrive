@@ -78,6 +78,20 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # The library's RetroArch BIOS files (romm-agent firmwareDir), linked
+    # into this player's RetroArch system folder. Anything a core made
+    # there itself is left alone.
+    famidrive.sessionSetup = lib.mkIf (hasLane "roms") ''
+      sys="$HOME/.config/retroarch/system"
+      mkdir -p "$sys"
+      for f in ${fw}/retroarch/*; do
+        [ -e "$f" ] || continue
+        t="$sys/$(basename "$f")"
+        if [ -e "$t" ] && [ ! -L "$t" ]; then continue; fi
+        ln -sfn "$f" "$t"
+      done
+    '';
+
     famidrive.systems = lib.mkMerge [
       (lib.mkIf (hasLane "roms") {
         gc = {
@@ -142,7 +156,8 @@ in
           platform = "switch";
           # One folder per game, named by title ID, under the profile's folder:
           # <root>/<edenProfileId>/<title ID>/. No save index to write on restore.
-          saveLayout = { kind = "eden-title-id"; root = "~/.local/share/eden/nand/user/save/0000000000000000"; profile = cfg.identity.edenProfileId; };
+          # The profile is each player's (players.<name>.edenProfileId).
+          saveLayout = { kind = "eden-title-id"; root = "~/.local/share/eden/nand/user/save/0000000000000000"; };
         };
         xbox360 = {
           fullname = "Microsoft Xbox 360";
@@ -152,7 +167,7 @@ in
           emulator = "xenia";
           saveSync = true;
           platform = "xbox360";
-          saveLayout = { kind = "xenia-content"; root = "~/.local/share/Xenia/content"; profile = cfg.identity.xeniaXuid; };   # TODO: verify path
+          saveLayout = { kind = "xenia-content"; root = "~/.local/share/Xenia/content"; };   # profile: each player's xeniaXuid. TODO: verify path
         };
 
         # Added 2026-10-05: every other RomM platform except Windows/PC, the
@@ -304,7 +319,7 @@ in
     # Seeded/locked emulator settings. Only the keys this design depends
     # on are locked; everything else stays editable from each emulator's
     # own UI and survives rebuilds.
-    home-manager.users.${cfg.user} = { lib, ... }: {
+    famidrive.playerHome = { lib, ... }: {
       home.activation.famidriveEmulators = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         ${seedLib.lockKeys {
           format = "ini";
@@ -319,7 +334,11 @@ in
           format = "keyValue";
           target = "$HOME/.config/retroarch/retroarch.cfg";
           keys = {
-            system_directory = "${fw}/retroarch";   # every core's BIOS, flat (romm-agent firmwareDir)
+            # Each player's own, with the library's BIOS files linked in at
+            # the start of each session (below): cores also write there
+            # (Mupen64Plus its ini and shader cache), and the library's
+            # firmware folder is read-only to players.
+            system_directory = "~/.config/retroarch/system";
             savefile_directory = "~/.config/retroarch/saves";   # RetroArch expands ~ itself
             sort_savefiles_by_content_enable = "false";
             video_fullscreen = "true";
@@ -348,9 +367,9 @@ in
             confirmStop = 2;
           };
         }}
-        # Eden's profile (cfg.identity.edenProfileId) isn't seeded: profiles.dat
+        # Eden's profile (players.<name>.edenProfileId) isn't seeded: profiles.dat
         # is binary. Open question in roms.md.
-        # Xenia profile: pin cfg.identity.xeniaXuid once the fork's profile
+        # Xenia profile: pin each player's xeniaXuid once the fork's profile
         # config format is known (depends on the Xenia fork decision).
       '';
     };

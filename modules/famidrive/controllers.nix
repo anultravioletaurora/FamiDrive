@@ -105,7 +105,12 @@ in
         than on the original console.
       - `"positions"`: buttons keep the original console's places. On the
         Switch, the bottom button is B and the right one A; on the
-        GameCube, B is left and X right, whatever the pad says.
+        GameCube and the N64, B is left (and the GameCube's X right),
+        whatever the pad says.
+
+      On the N64 (RetroArch's Mupen64Plus-Next), "labels" puts the N64's
+      B on the pad's B and the C button that was there on X. Found on the
+      first box 2026-10-06: Mario Party 3's dialog skipped ahead on X.
 
       In Eden this applies to the pads FamiDrive knows (see
       `gamecube.ports`) once Eden has set one up; other pads keep Eden's
@@ -199,7 +204,7 @@ in
     # passthrough (Dolphin's udev rules).
     services.udev.packages = lib.mkIf (lib.elem "adapter" ports || wii.bluetoothPassthrough) [ pkgs.dolphin-emu ];
 
-    home-manager.users.${cfg.user} = { lib, ... }: {
+    famidrive.playerHome = { lib, ... }: {
       home.activation.famidriveControllers = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         mkdir -p "$HOME/.config/dolphin-emu"
         touch "$HOME/.config/dolphin-emu/Dolphin.ini" ${gcpad}
@@ -247,6 +252,27 @@ in
         # Read the controllers even if gamescope hasn't given Dolphin's
         # window keyboard focus. Only one game runs at a time.
         ${crudini} --set "$HOME/.config/dolphin-emu/Dolphin.ini" Input BackgroundInput True
+
+        # N64 (RetroArch's Mupen64Plus-Next): a remap file for the core,
+        # every port. Face buttons per faceButtons: btn_a is the pad's
+        # right button, btn_y its left; RetroPad ids 1 is Y (the core's
+        # N64 B), 8 is A (its C1). And both triggers are Z: the core puts
+        # Z on LT only, and on RT a "C buttons mode" that does nothing by
+        # itself (the right stick already gives the C buttons). Found on
+        # the first box 2026-10-06 in Mario Party 3: RT did nothing.
+        # 12 is L2, the core's Z.
+        n64="$HOME/.config/retroarch/config/remaps/Mupen64Plus-Next"
+        mkdir -p "$n64"
+        touch "$n64/Mupen64Plus-Next.rmp"
+        ${seedLib.lockKeys {
+          format = "keyValue";
+          target = "$HOME/.config/retroarch/config/remaps/Mupen64Plus-Next/Mupen64Plus-Next.rmp";
+          keys = lib.listToAttrs (lib.concatMap (n: [
+            (lib.nameValuePair "input_player${toString n}_btn_a" (if byLabel then 1 else 8))
+            (lib.nameValuePair "input_player${toString n}_btn_y" (if byLabel then 8 else 1))
+            (lib.nameValuePair "input_player${toString n}_btn_r2" 12)
+          ]) [ 1 2 3 4 ]);
+        }}
 
         # RetroArch's own menu (save states, settings) on L3 + R3. Its combo
         # list has no Select + X, and anything with Select + Start would

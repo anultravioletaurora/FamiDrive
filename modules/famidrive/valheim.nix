@@ -77,7 +77,7 @@ in
     # BepInExPack's own launcher for the Linux build.
     famidrive.steam.launchOptions."892970" = lib.mkDefault "./start_game_bepinex.sh %command%";
 
-    home-manager.users.${cfg.user} = { lib, ... }: {
+    famidrive.playerHome = { lib, ... }: {
       home.activation.famidriveValheim = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         ${pkgs.famidrive-valheim}/bin/famidrive-valheim ${lib.escapeShellArg (builtins.toJSON spec)} || true
       '';

@@ -6,21 +6,21 @@
 #                           options, Steam Input, downloads); steam lane
 #   Jellyfin Media Player   the Jellyfin app, with its sign-in and its
 #                           own settings menu; media.jellyfin.enable
+#   Switch Player           back to "Who's playing?"; more than one player
 { config, lib, pkgs, ... }:
 
 let
   cfg = config.famidrive;
   steam = lib.elem "steam" cfg.lanes;
   jellyfin = cfg.media.jellyfin.enable;
-  dir = "${cfg.dataDir}/roms/settings";
+  switch = lib.length (lib.attrNames cfg.allPlayers) > 1;
 
   # Placeholder file name (what ES-DE shows) -> what it opens.
   entries =
     lib.optionalAttrs steam { "Steam Settings" = "steam"; }
-    // lib.optionalAttrs jellyfin { "Jellyfin Media Player" = "jellyfin"; };
+    // lib.optionalAttrs jellyfin { "Jellyfin Media Player" = "jellyfin"; }
+    // lib.optionalAttrs switch { "Switch Player" = "switch"; };
 
-  # ES-DE sorts by name; Steam Settings goes first by its sort name. ES-DE
-  # rewrites gamelists itself (play counts), so this is only a first copy.
   gamelist = pkgs.writeText "gamelist.xml" ''
     <?xml version="1.0"?>
     <gameList>
@@ -43,28 +43,34 @@ in
         case "$(cat "$ROM")" in
           ${lib.optionalString steam ''steam) exec ${pkgs.gamescope-fg}/bin/gamescope-fg --steam bigpicture ;;''}
           ${lib.optionalString jellyfin ''jellyfin) ${cfg.systems.media.command} ;;''}
+          ${lib.optionalString switch ''switch) ${pkgs.famidrive-switch-player}/bin/famidrive-switch-player ;;''}
         esac
       '';
     };
 
-    # tmpfiles rewrites the placeholders on every boot and switch. An entry
-    # whose feature is turned off is removed with it.
-    systemd.tmpfiles.rules = [
-      "d ${dir} 0755 ${cfg.user} users -"
-    ] ++ lib.mapAttrsToList (name: what:
-      "f+ ${dir}/${lib.replaceStrings [ " " ] [ "\\x20" ] name}.setting 0644 ${cfg.user} users - ${what}"
-    ) entries ++ map (name:
-      "r ${dir}/${lib.replaceStrings [ " " ] [ "\\x20" ] name}.setting"
-    ) (lib.filter (n: !(entries ? ${n})) [ "Steam Settings" "Jellyfin Media Player" ]);
-
-    home-manager.users.${cfg.user} = { lib, ... }: {
-      home.activation.famidriveSettingsGamelist = lib.mkIf steam (lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        g="$HOME/ES-DE/gamelists/settings/gamelist.xml"
-        if [ ! -e "$g" ]; then
-          mkdir -p "$(dirname "$g")"
-          install -m 0644 ${gamelist} "$g"
-        fi
-      '');
+    # Each player's own Settings folder, rewritten on every boot and
+    # switch. An entry whose feature is turned off is removed with it.
+    famidrive.playerHome = { lib, famidrivePlayer, ... }: {
+      home.activation.famidriveSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        d=${lib.escapeShellArg "${famidrivePlayer.roms}/settings"}
+        mkdir -p "$d"
+        ${lib.concatStrings (lib.mapAttrsToList (name: what: ''
+          printf '%s' ${what} > "$d/${name}.setting"
+        '') entries)}
+        ${lib.concatMapStrings (name: ''
+          rm -f "$d/${name}.setting"
+        '') (lib.filter (n: !(entries ? ${n})) [ "Steam Settings" "Jellyfin Media Player" "Switch Player" ])}
+        ${lib.optionalString steam ''
+          # ES-DE sorts by name; Steam Settings goes first by its sort name.
+          # ES-DE rewrites gamelists itself (play counts), so this is only a
+          # first copy.
+          g="$HOME/ES-DE/gamelists/settings/gamelist.xml"
+          if [ ! -e "$g" ]; then
+            mkdir -p "$(dirname "$g")"
+            install -m 0644 ${gamelist} "$g"
+          fi
+        ''}
+      '';
     };
   };
 }

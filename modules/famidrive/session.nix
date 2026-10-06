@@ -1,11 +1,17 @@
 # Boot straight into ES-DE inside gamescope, with no display manager UI and no DE.
 # Steam is one entry on the menu, not the shell (base-os.md).
+#
+# With more than one player (famidrive.players, the guest counts), the box
+# starts on "Who's playing?" instead (pkgs/famidrive-picker, as greetd's
+# greeter), and Settings → Switch Player comes back to it.
 { config, lib, pkgs, ... }:
 
 let
   inherit (lib) mkOption types;
   cfg = config.famidrive;
   hasLane = l: lib.elem l cfg.lanes;
+
+  picker = lib.length (lib.attrNames cfg.allPlayers) > 1;
 
   famidriveSession = pkgs.writeShellScript "famidrive-session" ''
     ${lib.optionalString cfg.display.hdr ''
@@ -28,6 +34,15 @@ let
       # The Steam launch status screen draws in the theme's fonts.
       export FAMIDRIVE_STATUS_THEME=${config.famidrive.esde.theme.src}
     ''}
+    ${lib.optionalString (cfg.romm.enable && lib.elem "roms" cfg.lanes) ''
+      # Players with RomM: the library's newest game lists before ES-DE
+      # reads them, then firmware into this player's emulators.
+      if [ -e "/etc/famidrive/romm/$(id -un).json" ]; then
+        ${pkgs.romm-agent}/bin/romm-agent gamelists || echo "famidrive-session: couldn't copy game lists" >&2
+        ${pkgs.romm-agent}/bin/romm-agent firmware-install &
+      fi
+    ''}
+    ${cfg.sessionSetup}
     # Nothing is running yet: clear what a crashed launch may have left.
     rm -f "''${XDG_RUNTIME_DIR:-/nonexistent}"/famidrive-game.*
     # Hold Select + Start on any controller to quit the running game
@@ -37,6 +52,15 @@ let
     # gamescope shows (nothing does that without Steam; see gamescope-fg).
     exec ${pkgs.gamescope-fg}/bin/gamescope-fg --frontend ${pkgs.es-de}/bin/es-de --no-splash
   '';
+
+  gamescopeFlags = lib.optionals cfg.display.vrr [
+    "--adaptive-sync"
+  ] ++ lib.optionals cfg.display.hdr [
+    "--hdr-enabled"
+  ] ++ lib.optionals (cfg.display.refresh != null) [
+    # gamescope otherwise takes the TV's preferred mode, which is usually 60 Hz.
+    "-r" (toString cfg.display.refresh)
+  ];
 
   gamescopeCmd = lib.concatStringsSep " " ([
     # Plain gamescope, not the programs.gamescope.capSysNice wrapper.
@@ -48,14 +72,7 @@ let
     "${pkgs.gamescope}/bin/gamescope"
     "-f"                  # fullscreen
     "-e"                  # Steam-integration mode, needed for STEAM_GAME focus atoms
-  ] ++ lib.optionals cfg.display.vrr [
-    "--adaptive-sync"
-  ] ++ lib.optionals cfg.display.hdr [
-    "--hdr-enabled"
-  ] ++ lib.optionals (cfg.display.refresh != null) [
-    # gamescope otherwise takes the TV's preferred mode, which is usually 60 Hz.
-    "-r" (toString cfg.display.refresh)
-  ] ++ [
+  ] ++ gamescopeFlags ++ [
     "--"
     "${famidriveSession}"
   ]);
@@ -69,8 +86,35 @@ let
     [ -f "$log/session.log" ] && mv "$log/session.log" "$log/session.log.1"
     exec ${gamescopeCmd} > "$log/session.log" 2>&1
   ''}";
+
+  # "Who's playing?": greetd's greeter, in a gamescope of its own (no
+  # Steam mode: it's the only window). Picks a player and asks greetd to
+  # start their session, the same one autologin starts with one player.
+  pickerSpec = pkgs.writeText "famidrive-picker.json" (builtins.toJSON {
+    # The primary player first, then the others by name, the guest last.
+    players = map (p: { inherit (p) user displayName isGuest; })
+      (lib.sortOn (p: (if p.name == cfg.primaryPlayer then "0" else if p.isGuest then "2" else "1") + p.name)
+        (lib.attrValues cfg.allPlayers));
+    session = [ sessionCmd ];
+    last = "/var/lib/famidrive-picker/last";
+    theme = if cfg.esde.theme != null then "${cfg.esde.theme.src}" else null;
+  });
+  pickerCmd = lib.concatStringsSep " " ([
+    "${pkgs.gamescope}/bin/gamescope" "-f"
+  ] ++ gamescopeFlags ++ [
+    "--" "${pkgs.famidrive-picker}/bin/famidrive-picker" "${pickerSpec}"
+  ]);
 in
 {
+  # Shell lines run at the start of each player's session, before ES-DE,
+  # as that player. For setup that has to follow the shared library, which
+  # changes between rebuilds.
+  options.famidrive.sessionSetup = mkOption {
+    type = types.lines;
+    internal = true;
+    default = "";
+  };
+
   options.famidrive.steam.compatTools = mkOption {
     type = types.attrsOf types.str;
     default = { };
@@ -172,21 +216,44 @@ in
 
     services.greetd = {
       enable = true;
-      settings = {
-        # Autologin straight into the session on boot.
+      settings = if picker then {
+        # "Who's playing?" on boot, after Switch Player, and if a session
+        # ever exits or crashes.
+        default_session = {
+          user = "greeter";
+          command = pickerCmd;
+        };
+      } else
+        let only = lib.head (lib.attrValues cfg.allPlayers); in {
+        # One player: autologin straight into the session on boot.
         initial_session = {
-          user = cfg.user;
+          user = only.user;
           command = sessionCmd;
         };
         # If the session ever exits or crashes, greetd falls back to
         # default_session. Pointing it at the same command makes the TV
         # come back to ES-DE without a login prompt.
         default_session = {
-          user = cfg.user;
+          user = only.user;
           command = sessionCmd;
         };
       };
     };
+
+    # Picking a player is the whole login: no password, the same as the
+    # one-player box's autologin. Only for greetd (the TV), only for
+    # players (group famidrive), and checked before the password prompt.
+    security.pam.services.greetd.rules.auth.famidrive-player = lib.mkIf picker {
+      order = config.security.pam.services.greetd.rules.auth.unix.order - 10;
+      control = "sufficient";
+      modulePath = "${config.security.pam.package}/lib/security/pam_succeed_if.so";
+      args = [ "user" "ingroup" "famidrive" "quiet" ];
+    };
+    users.users.greeter.extraGroups = lib.mkIf picker [ "video" "input" "render" ];
+    # Who played last starts out selected.
+    systemd.tmpfiles.rules = lib.optionals picker [
+      "d /var/lib/famidrive-picker 0755 greeter greeter -"
+    ];
 
     hardware.graphics.enable = true;
     hardware.bluetooth.enable = true;

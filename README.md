@@ -78,9 +78,13 @@ A few ideas run through all of it:
   survives.
 - **Firmware and keys never enter the Nix store**, which anyone on the box
   can read. They come from RomM.
-- **Every box belongs to one person.** `famidrive.owner` scopes the RomM
-  token, the saves and the emulator profiles, so two people's boxes never
-  share saves by accident.
+- **Everyone in the house gets their own profile.** Each player in
+  `famidrive.players` is their own Linux account and their own RomM user:
+  their own Steam login, saves, favorites and RomM token, so two people's
+  saves never mix. The ROMs, firmware and controller setup are the box's
+  and shared. With more than one player, the box starts on a "Who's
+  playing?" screen, and Settings → Switch Player goes back to it. An
+  optional Guest plays everything with saves kept on the box only.
 - **The base is the latest NixOS release; only the emulators chase
   unstable.** The kernel, graphics stack, Steam and the session come from
   `nixos-26.05`, so the parts that would leave you without a working TV
@@ -101,9 +105,9 @@ A few ideas run through all of it:
 ```
 flake.nix                    inputs, overlay, nixosModules.default, lib.mkBox
 modules/famidrive/
-  default.nix                the options a host sets: owner, user, lanes, romm.*, localRoms, dataDir
+  default.nix                the options a host sets: players, guest, lanes, romm.*, localRoms, dataDir
   endpoints.nix              every server address in one place, with no defaults
-  session.nix                greetd autologin into gamescope running ES-DE
+  session.nix                greetd: "Who's playing?" (or autologin), then gamescope running ES-DE
   emulators.nix              famidrive.systems: the one table of systems, emulators and save layouts
   frontend.nix               es_systems.xml generated from famidrive.systems; famidrive-launch
   romm-agent.nix             library + firmware pull, save reconcile timer
@@ -117,6 +121,7 @@ pkgs/
   es-de/                     ES-DE 3.5.0 AppImage (ES-DE left nixpkgs on 2025-10-23)
   gamescope-fg/              sets STEAM_GAME on the game's window so gamescope focuses it
   famidrive-quit/            hold Select + Start on any controller to quit the game
+  famidrive-picker/          "Who's playing?", greetd's greeter on a box with more than one player
   romm-agent/                Python: pull, firmware, save-pull/push, reconcile
   famidrive-generators/      Python: install manifests -> ES-DE menu entries
   gogdl-cli/ tcli/           headless GOG and Thunderstore CLIs (unfinished)
@@ -197,7 +202,7 @@ It usually lives in `/etc/nixos`.
 
   famidrive = {
     enable = true;
-    owner = "alice";                       # your RomM username
+    players.alice = { };                   # a Linux account and RomM user, both "alice"
     lanes = [ "roms" "steam" ];
     endpoints.romm = "https://romm.example.org";
     endpoints.jellyfin = "https://jellyfin.example.org";
@@ -221,15 +226,48 @@ Logins for Jellyfin, Steam and GOG happen once in each app, on the TV. The
 only secrets are in the host's `secrets.yaml`, encrypted with
 [sops](https://github.com/getsops/sops) to the box's age key plus yours:
 
-- `romm-token`: a RomM Client API Token (`rmm_…`) issued by the box's
-  owner. Scopes the agent uses: `roms.read`, `platforms.read`,
+- `romm-token-<player>`: one per player, a RomM Client API Token (`rmm_…`)
+  issued by that player's RomM user. The primary player's
+  (`famidrive.primaryPlayer`) also pulls the shared library. Scopes the agent uses: `roms.read`, `platforms.read`,
   `firmware.read`, `collections.read`, `assets.read`, `assets.write`,
   `devices.read`, `devices.write`. Add `roms.write` to let a box write game
   IDs it worked out back to RomM (optional; skipped quietly without it).
-- `rpcn-password`: only for PS3 with `famidrive.online.enable`.
+- `rpcn-password-<player>`: only for PS3 with `famidrive.online.enable`.
 
 A box with `famidrive.romm.enable = false` needs no secrets and no sops
 setup at all.
+
+## Players
+
+```nix
+famidrive = {
+  players = {
+    alice = { };                       # Linux account and RomM user "alice"
+    sam.owner = "sammy";               # account "sam", RomM user "sammy"
+  };
+  primaryPlayer = "alice";             # whose token pulls the shared library
+  guest.enable = true;                 # optional
+};
+```
+
+- **What's shared:** ROMs, cover art and firmware live in `dataDir`,
+  readable by every player (group `famidrive`) and written only by the
+  library pull. ROM folders from `localRoms` need the same: readable by
+  group `famidrive` or by everyone.
+- **What's each player's own:** everything in their home. Saves, emulator
+  settings, ES-DE's favorites and play counts, Steam, Prism, the Jellyfin
+  login. Each player's saves go to RomM under their own RomM user, with
+  their own token.
+- **Steam:** each player signs in to their own account once, in Settings →
+  Steam Settings. Games installed in one player's home show up only in
+  their menu, so a game both play is downloaded twice. Steam Family lets
+  a family share one copy of each *purchase* (each account still keeps
+  its own download).
+- **The guest:** no RomM, so their saves stay on this box. They can sign
+  in to their own Steam or play without it.
+- **Switching:** Settings → Switch Player closes Steam and ends the
+  session, and "Who's playing?" comes back. Who played last starts out
+  selected.
 
 ## Moving an existing NixOS box over
 
@@ -241,10 +279,12 @@ RomM along the way.
    `nand/user/save`, Prism's instances, Steam's `userdata`, and `/etc/nixos`.
    Note the current generation number; it's the way back.
 2. **Write the host file.** Keep `system.stateVersion` at the original
-   install's value. Set `famidrive.user` to the existing account, so the
+   install's value. Make the existing account a player
+   (`famidrive.players.<account> = { };`), so the
    Steam library and emulator data carry over. Carry over anything else
    the old config did that isn't about Steam (Sunshine, Avahi, Bluetooth,
-   GPU tools). Fill in `owner` and `endpoints.romm`.
+   GPU tools). Fill in `endpoints.romm`, and set `owner` on the player if
+   their RomM username isn't the account's name.
 3. **Give the box its RomM token:** make an age key on the box
    (`/var/lib/sops-nix/key.txt`), add it to `.sops.yaml`, create a Client
    API Token in RomM with the scopes under [Secrets](#using-it), and put
@@ -262,13 +302,14 @@ RomM along the way.
    session doesn't restart on a live switch: run
    `sudo systemctl restart display-manager.service` to see the new one,
    and `sudo systemd-tmpfiles --create` if a library folder is missing.
-7. **Pull a little first:** run `romm-agent pull` with `romm.collection` set
+7. **Pull a little first:** run `sudo systemctl start romm-library-pull` with `romm.collection` set
    to a small test collection, and check the games show up in ES-DE. Then
    set it back to `null` and let the full pull run (the timer does it every
    30 minutes; it resumes where it stopped).
 8. **Bring old saves in:** copy them back into each emulator's save folder,
    sort out any duplicate Eden profiles first (keep the one Eden uses, and
-   set `identity.edenProfileId` to it), then run `romm-agent reconcile`.
+   set the player's `edenProfileId` to it), then run `romm-agent reconcile`
+   as that player.
    Every save RomM doesn't have goes up, under your user.
 9. **Check:** a GameCube game, a Switch game and a Steam game each launch,
    take focus, and quit back to ES-DE; the controller works throughout; a

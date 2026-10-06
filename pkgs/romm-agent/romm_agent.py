@@ -1,10 +1,18 @@
 """romm-agent: the box's only link to RomM.
 
+The library, shared by every player (run as famidrive-library):
     romm-agent pull                    mirror the library (or one collection), write gamelists
-    romm-agent firmware                pull each platform's firmware, run emulator installs
+    romm-agent firmware                pull each platform's firmware
+
+Each player's own (run as that player):
+    romm-agent gamelists               copy the library's newest gamelists into ES-DE
+    romm-agent firmware-install        run emulator firmware installs (keys, PS3 firmware)
     romm-agent save-pull SYSTEM ROM    newest save for ROM -> local (pre-launch)
     romm-agent save-push SYSTEM ROM    local save for ROM -> RomM (post-exit)
     romm-agent reconcile               push every local save RomM doesn't have yet
+
+Config: $ROMM_AGENT_CONFIG, or /etc/famidrive/romm/<user>.json for
+whoever runs it (romm-agent.nix writes one per player, and library.json).
 
 `reconcile` doubles as the one-time import: copy old saves into each
 emulator's save folder, run it, and RomM gets them in FamiDrive's format
@@ -16,6 +24,7 @@ platform, Range support) is still unconfirmed until it runs once against
 a real server; those spots say VERIFY.
 """
 
+import getpass
 import hashlib
 import io
 import json
@@ -33,16 +42,21 @@ from xml.sax.saxutils import escape
 
 import requests
 
-CFG = json.loads(Path(os.environ["ROMM_AGENT_CONFIG"]).read_text())
+CFG = json.loads(Path(os.environ.get("ROMM_AGENT_CONFIG")
+                      or f"/etc/famidrive/romm/{getpass.getuser()}.json").read_text())
 BASE = CFG["url"].rstrip("/")
 API = BASE + "/api"
 DATA = Path(CFG["dataDir"])
 MEDIA = DATA / "media"
-# local ROM path -> {id, system, title_id, learned, pushed}, written by
-# `pull`, enriched by save-push (learned save paths, last pushed hash)
+GAMELISTS = DATA / "gamelists"  # the library's; each player's ES-DE gets a copy
+# Shared, written by `pull` only: local ROM path -> {id, system, title_id}
 INDEX = DATA / "index.json"
-DEVICE = DATA / "device.json"
-SNAPSHOT = DATA / "save-snapshot.json"  # pre-launch mtimes for learn-by-diff
+# Each player's own, in their home: this box as their RomM device, and
+# what they've pushed of each ROM's save (learned save paths, last hash).
+STATE = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "romm-agent"
+DEVICE = STATE / "device.json"
+SAVES = STATE / "saves.json"
+SNAPSHOT = STATE / "save-snapshot.json"  # pre-launch mtimes for learn-by-diff
 
 # Every FamiDrive save lives in this RomM slot. The sync API pairs saves on
 # (rom_id, slot), so a stable name keeps one box's pushes and another's
@@ -64,7 +78,10 @@ EP_SAVE_CONTENT = "/saves/{id}/content"
 
 def session():
     s = requests.Session()
-    token = Path(CFG["tokenFile"]).read_text().strip()
+    # The library pull gets its token from systemd (LoadCredential).
+    creds = os.environ.get("CREDENTIALS_DIRECTORY")
+    token_file = Path(creds) / "romm-token" if creds else Path(CFG["tokenFile"])
+    token = token_file.read_text().strip()
     s.headers["Authorization"] = f"Bearer {token}"
     return s
 
@@ -222,13 +239,7 @@ def cmd_pull():
                or derive_id(system, dest))
         if tid and not rom.get("title_id"):
             teach_romm(s, rom["id"], tid)
-        index[str(dest)] = {
-            "id": rom["id"],
-            "system": system,
-            "title_id": tid,
-            "learned": prev.get("learned", []),
-            "pushed": prev.get("pushed"),
-        }
+        index[str(dest)] = {"id": rom["id"], "system": system, "title_id": tid}
         by_system.setdefault(system, []).append((dest, rom, fetch_cover(s, rom, system)))
         save_index(index)  # a 800 GB first pull survives being interrupted
 
@@ -252,7 +263,7 @@ def teach_romm(s, rom_id, tid):
 
 
 def write_gamelist(system, entries):
-    out = Path(CFG["gamelistDir"]) / system / "gamelist.xml"
+    out = GAMELISTS / system / "gamelist.xml"
     out.parent.mkdir(parents=True, exist_ok=True)
     games = []
     for dest, rom, cover in entries:
@@ -296,15 +307,54 @@ def cmd_firmware():
         slug = sysdef["rommPlatform"]
         if slug not in wanted or slug not in platforms:
             continue
-        # RetroArch cores share one system dir, so their firmware lands flat
-        # in firmware/retroarch; everything else gets firmware/<slug>.
-        target = DATA / "firmware" / (sysdef.get("firmwareDir") or slug)
-        changed = False
+        target = firmware_dir(system, sysdef)
         for fw in get(s, EP_FIRMWARE, params={"platform_id": platforms[slug]}).json():
-            changed |= download(s, EP_FIRMWARE_CONTENT.format(id=fw["id"], file_name=fw["file_name"]),
-                                target / fw["file_name"], fw.get("sha1_hash"), fw.get("file_size_bytes"))
-        if changed and system in INSTALLERS:
-            INSTALLERS[system](target)
+            download(s, EP_FIRMWARE_CONTENT.format(id=fw["id"], file_name=fw["file_name"]),
+                     target / fw["file_name"], fw.get("sha1_hash"), fw.get("file_size_bytes"))
+
+
+def firmware_dir(system, sysdef):
+    # RetroArch cores share one system dir, so their firmware lands flat
+    # in firmware/retroarch; everything else gets firmware/<slug>.
+    return DATA / "firmware" / (sysdef.get("firmwareDir") or sysdef["rommPlatform"])
+
+
+def cmd_firmware_install():
+    """Install the library's firmware into this player's emulators, again
+    whenever the library's copy changes. Run at the start of each session."""
+    for system, install in INSTALLERS.items():
+        sysdef = CFG["systems"].get(system)
+        if not sysdef:
+            continue
+        target = firmware_dir(system, sysdef)
+        files = sorted(p for p in target.glob("*") if p.is_file()) if target.is_dir() else []
+        if not files:
+            continue
+        stamp = json.dumps([[p.name, p.stat().st_size, int(p.stat().st_mtime)] for p in files])
+        marker = STATE / f"firmware-{system}.json"
+        if marker.exists() and marker.read_text() == stamp:
+            continue
+        install(target)
+        STATE.mkdir(parents=True, exist_ok=True)
+        marker.write_text(stamp)
+
+
+def cmd_gamelists():
+    """Copy each system's gamelist from the library into this player's
+    ES-DE, when the library has written a newer one since the last copy.
+    ES-DE rewrites its own copy (play counts, favorites) in between."""
+    copied_file = STATE / "gamelists.json"
+    copied = json.loads(copied_file.read_text()) if copied_file.exists() else {}
+    for src in sorted(GAMELISTS.glob("*/gamelist.xml")):
+        system, mtime = src.parent.name, src.stat().st_mtime
+        if copied.get(system) == mtime:
+            continue
+        dest = Path(CFG["gamelistDir"]) / system / "gamelist.xml"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(src.read_bytes())
+        copied[system] = mtime
+    STATE.mkdir(parents=True, exist_ok=True)
+    copied_file.write_text(json.dumps(copied, indent=2))
 
 
 # ---------------------------------------------------------------- game IDs
@@ -321,6 +371,27 @@ def load_index():
 def save_index(index):
     INDEX.parent.mkdir(parents=True, exist_ok=True)
     INDEX.write_text(json.dumps(index, indent=2))
+
+
+def load_saves():
+    return json.loads(SAVES.read_text()) if SAVES.exists() else {}
+
+
+def store_saves(saves):
+    STATE.mkdir(parents=True, exist_ok=True)
+    SAVES.write_text(json.dumps(saves, indent=2))
+
+
+def library_path(rom_path):
+    """The library's path for a ROM. ES-DE hands over paths in the
+    player's own ROM folder, whose systems are links into the library."""
+    p = Path(rom_path)
+    if CFG.get("playerRoms"):
+        try:
+            return str(DATA / "roms" / p.relative_to(CFG["playerRoms"]))
+        except ValueError:
+            pass
+    return str(p)
 
 
 def iso_member(iso, member):
@@ -375,7 +446,12 @@ DOLPHIN_REGION = {"E": "USA", "P": "EUR", "J": "JAP"}
 
 
 def layout(system):
-    lay = CFG["systems"][system]["saveLayout"]
+    lay = dict(CFG["systems"][system]["saveLayout"])
+    # Profiles are the player's own (players.<name> in the module).
+    if lay["kind"] == "eden-title-id":
+        lay["profile"] = CFG.get("edenProfileId")
+    elif lay["kind"] == "xenia-content":
+        lay["profile"] = CFG.get("xeniaXuid")
     return lay["kind"], Path(lay["root"]).expanduser(), lay
 
 
@@ -475,8 +551,13 @@ def unpack(blob, root):
 # ---------------------------------------------------------------- save commands
 
 
-def entry_for(rom_path):
-    return load_index()[str(Path(rom_path))]
+def entry_for(key):
+    """The library's entry for a ROM, with this player's save state on top."""
+    entry = dict(load_index()[key])
+    mine = load_saves().get(key, {})
+    entry.update({k: v for k, v in mine.items() if k != "title_id"})
+    entry["title_id"] = entry.get("title_id") or mine.get("title_id")
+    return entry
 
 
 def server_save(s, dev, rom_id):
@@ -488,11 +569,13 @@ def server_save(s, dev, rom_id):
 
 def cmd_save_pull(system, rom_path):
     kind, root, _ = layout(system)
+    key = library_path(rom_path)
+    STATE.mkdir(parents=True, exist_ok=True)
     SNAPSHOT.write_text(json.dumps(snapshot(root)))  # for rule 3 at push time
 
     s = session()
     dev = device_id(s)
-    entry = entry_for(rom_path)
+    entry = entry_for(key)
     newest = server_save(s, dev, entry["id"])
     if not newest:
         return
@@ -506,29 +589,31 @@ def cmd_save_pull(system, rom_path):
         return
 
     # The manifest can teach this box an ID it couldn't work out itself.
-    index = load_index()
-    e = index[str(Path(rom_path))]
-    e["title_id"] = e.get("title_id") or manifest.get("title_id")
-    e["learned"] = e.get("learned") or manifest.get("paths", [])
+    saves = load_saves()
+    e = saves.setdefault(key, {})
+    e["title_id"] = entry.get("title_id") or manifest.get("title_id")
+    e["learned"] = entry.get("learned") or manifest.get("paths", [])
     e["pushed"] = manifest.get("files_sha256")
     e["server_updated_at"] = newest["updated_at"]
-    save_index(index)
+    store_saves(saves)
 
     SNAPSHOT.write_text(json.dumps(snapshot(root)))  # don't count the restore as play
 
 
 def cmd_save_push(system, rom_path, learn=True):
     kind, root, _ = layout(system)
-    index = load_index()
-    entry = index[str(Path(rom_path))]
+    key = library_path(rom_path)
+    entry = entry_for(key)
+    saves = load_saves()
+    mine = saves.setdefault(key, {})
 
-    rels = save_paths(system, entry, rom_path)
+    rels = save_paths(system, entry, key)
     if rels is None and learn and SNAPSHOT.exists():
         rels = learn_by_diff(root, json.loads(SNAPSHOT.read_text())) or None
         if rels:
-            entry["learned"] = rels
+            mine["learned"] = rels
+            store_saves(saves)
     if not rels:
-        save_index(index)
         return  # nothing saved yet, or nothing we can attribute
 
     digest = files_hash(root, rels)
@@ -554,9 +639,9 @@ def cmd_save_push(system, rom_path, learn=True):
                files={"saveFile": (name, blob)})
     r.raise_for_status()
     if slot == SLOT:
-        entry["pushed"] = digest
-        entry["server_updated_at"] = r.json().get("updated_at")
-    save_index(index)
+        mine["pushed"] = digest
+        mine["server_updated_at"] = r.json().get("updated_at")
+    store_saves(saves)
 
 
 def cmd_reconcile():
@@ -576,6 +661,7 @@ def main():
     commands = {
         "pull": cmd_pull, "firmware": cmd_firmware, "reconcile": cmd_reconcile,
         "save-pull": cmd_save_pull, "save-push": cmd_save_push,
+        "gamelists": cmd_gamelists, "firmware-install": cmd_firmware_install,
     }
     if cmd not in commands:
         print(__doc__)

@@ -5,27 +5,30 @@
 { config, lib, pkgs, ... }:
 
 let
-  inherit (lib) mkOption mkEnableOption types;
+  inherit (lib) mkEnableOption;
   cfg = config.famidrive;
   ep = cfg.endpoints;
   seedLib = import ./lib/seed.nix { inherit lib pkgs; };
   has = s: cfg.systems ? ${s};
 in
 {
+  # Each player shows up in lobbies and rooms by their RomM username
+  # (players.<name>.owner); the guest as "Guest".
+  imports = [
+    (lib.mkRemovedOptionModule [ "famidrive" "online" "nickname" ] "Each player's netplay name is their RomM username, famidrive.players.<name>.owner.")
+  ];
+
   options.famidrive.online = {
     enable = mkEnableOption "online play for this box's emulators";
-
-    nickname = mkOption {
-      type = types.str;
-      default = cfg.owner;
-      description = "Name shown in netplay lobbies and rooms.";
-    };
   };
 
   config = lib.mkIf (cfg.enable && cfg.online.enable) {
-    # Per-owner RPCN account. Created by script against the self-hosted
-    # RPCN (email validation off), not by hand. Open question in roms.md.
-    sops.secrets."rpcn-password" = lib.mkIf (has "ps3") { owner = cfg.user; };
+    # An RPCN account per player (the guest has none). Created by script
+    # against the self-hosted RPCN (email validation off), not by hand.
+    # Open question in roms.md.
+    sops.secrets = lib.mkIf (has "ps3") (lib.mapAttrs' (name: p:
+      lib.nameValuePair "rpcn-password-${name}" { owner = p.user; }
+    ) (lib.filterAttrs (_: p: !p.isGuest) cfg.allPlayers));
 
     # Inbound for peer-to-peer play when this box hosts. Ports to verify
     # per emulator. Dolphin's traversal server usually makes this
@@ -34,7 +37,7 @@ in
       lib.optionals (has "ps3") [ 3658 ]
       ++ lib.optionals (has "gc" || has "wii") [ 2626 ];
 
-    home-manager.users.${cfg.user} = { lib, ... }: {
+    famidrive.playerHome = { lib, famidrivePlayer, ... }: {
       home.activation.famidriveOnline = lib.hm.dag.entryAfter [ "famidriveEmulators" ] (lib.concatStrings [
         (lib.optionalString (has "gc" || has "wii") (seedLib.lockKeys {
           format = "ini";
@@ -43,7 +46,7 @@ in
             TraversalChoice = "traversal";
             TraversalServer = ep.dolphinTraversal;
             TraversalPort = ep.dolphinTraversalPort;
-            Nickname = cfg.online.nickname;
+            Nickname = famidrivePlayer.nickname;
           };
         }))
 
@@ -51,7 +54,7 @@ in
           format = "keyValue";
           target = "$HOME/.config/retroarch/retroarch.cfg";
           keys = {
-            netplay_nickname = cfg.online.nickname;
+            netplay_nickname = famidrivePlayer.nickname;
             netplay_use_mitm_server = "true";
             netplay_mitm_server = "custom";
             netplay_custom_mitm_server = ep.retroarchTunnel;
@@ -65,11 +68,13 @@ in
             target = "$HOME/.config/rpcs3/rpcn.yml";
             keys = {
               ".Host" = ep.rpcn;          # TODO: verify rpcn.yml key names
-              ".NPID" = cfg.online.nickname;
+              ".NPID" = famidrivePlayer.nickname;
             };
           }}
-          # Password comes from sops at activation time, never from the Nix store.
-          ${pkgs.yq-go}/bin/yq -i ".Password = \"$(cat ${config.sops.secrets."rpcn-password".path})\"" "$HOME/.config/rpcs3/rpcn.yml"
+          ${lib.optionalString (!famidrivePlayer.isGuest) ''
+            # Password comes from sops at activation time, never from the Nix store.
+            ${pkgs.yq-go}/bin/yq -i ".Password = \"$(cat ${config.sops.secrets."rpcn-password-${famidrivePlayer.name}".path})\"" "$HOME/.config/rpcs3/rpcn.yml"
+          ''}
         '')
 
         # Revised 2026-10-05: Switch is Eden, which tunnels local wireless
@@ -85,7 +90,7 @@ in
             "Multiplayer\\ip\\default" = "false";
             "Multiplayer\\port" = ep.edenRoomPort;
             "Multiplayer\\port\\default" = "false";
-            "Multiplayer\\nickname" = cfg.online.nickname;
+            "Multiplayer\\nickname" = famidrivePlayer.nickname;
             "Multiplayer\\nickname\\default" = "false";
           };
         }))

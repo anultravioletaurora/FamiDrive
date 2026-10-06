@@ -4,6 +4,87 @@
 
 let
   inherit (lib) mkOption mkEnableOption types;
+  cfg = config.famidrive;
+
+  playerModule = { name, config, ... }: {
+    options = {
+      user = mkOption {
+        type = types.str;
+        default = name;
+        description = "Their Linux account. Made if it doesn't exist yet.";
+      };
+      displayName = mkOption {
+        type = types.str;
+        default = lib.toUpper (lib.substring 0 1 name) + lib.substring 1 (-1) name;
+        defaultText = "the name, capitalized";
+        description = "What the \"Who's playing?\" screen calls them.";
+      };
+      owner = mkOption {
+        type = types.str;
+        default = name;
+        description = ''
+          Their RomM username. Their token is issued by this user, the box
+          registers as one of this user's RomM devices, and their saves go
+          up under it. One owner across several boxes shares saves;
+          different owners never do (multi-box.md "Per-user saves").
+        '';
+      };
+      romm.tokenFile = mkOption {
+        type = types.nullOr types.path;
+        default = null;
+        defaultText = "their sops secret, romm-token-<name>";
+        description = "Their RomM Client API Token (rmm_...), decrypted by sops-nix.";
+      };
+      # Revised 2026-10-05: the Switch emulator is Eden, not Ryubing. Eden
+      # keeps profiles in a binary profiles.dat, so the ID isn't derived and
+      # seeded the way Ryubing's Profiles.json was going to be. It's the
+      # profile Eden already uses on the player's first box, set by hand,
+      # and seeding it onto later boxes is an open question in roms.md.
+      edenProfileId = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "The Eden profile whose saves sync with RomM. Needed before Switch save sync.";
+      };
+      # Xenia's is derived from `owner`, never set by hand: if each box
+      # invented its own, one owner's saves wouldn't line up across their
+      # boxes (roms.md "Mapping saves to games").
+      xeniaXuid = mkOption {
+        type = types.str;
+        readOnly = true;
+        # Offline profiles use the E0... range. VERIFY against the chosen Xenia fork.
+        default = lib.toUpper ("E0" + builtins.substring 0 14 (builtins.hashString "sha256" "famidrive-xenia:${config.owner}"));
+      };
+    };
+  };
+
+  # What the rest of the module reads for each player. `roms` is their
+  # own view of the library: the shared systems linked in from dataDir,
+  # next to their own Steam, Minecraft and Settings entries.
+  withPaths = p: p // rec {
+    home = "/home/${p.user}";
+    roms = "${home}/.local/share/famidrive/roms";
+    nickname = p.owner;
+  };
+
+  players = lib.mapAttrs (name: p: withPaths (p // {
+    name = name;
+    isGuest = false;
+    tokenFile =
+      if p.romm.tokenFile != null then p.romm.tokenFile
+      else if cfg.romm.enable then config.sops.secrets."romm-token-${name}".path
+      else null;
+  })) cfg.players;
+
+  guest = withPaths {
+    name = "guest";
+    user = "guest";
+    displayName = "Guest";
+    owner = "guest";
+    tokenFile = null;   # no RomM: the guest's saves stay on this box
+    edenProfileId = null;
+    xeniaXuid = "E000000000000000";
+    isGuest = true;
+  } // { nickname = "Guest"; };
 in
 {
   imports = [
@@ -20,32 +101,51 @@ in
     ./minecraft.nix
     ./valheim.nix
     ./settings.nix
+    (lib.mkRemovedOptionModule [ "famidrive" "user" ] "Each player is listed in famidrive.players instead: famidrive.players.<name>.user is their Linux account.")
+    (lib.mkRemovedOptionModule [ "famidrive" "owner" ] "Each player is listed in famidrive.players instead: famidrive.players.<name>.owner is their RomM username.")
+    (lib.mkRemovedOptionModule [ "famidrive" "romm" "tokenFile" ] "Each player has their own: famidrive.players.<name>.romm.tokenFile.")
+    (lib.mkRemovedOptionModule [ "famidrive" "identity" "edenProfileId" ] "Each player has their own: famidrive.players.<name>.edenProfileId.")
   ];
 
   options.famidrive = {
     enable = mkEnableOption "FamiDrive";
 
-    user = mkOption {
-      type = types.str;
-      default = "famidrive";
+    players = mkOption {
+      type = types.attrsOf (types.submodule playerModule);
+      default = { };
+      example = lib.literalExpression ''
+        {
+          alice = { };                              # Linux account and RomM user "alice"
+          sam = { displayName = "Sammy"; };
+        }
+      '';
       description = ''
-        Local Linux account the session runs as. Separate from `owner` on
-        purpose: every box can use the same local user, but each belongs to
-        a different person.
+        Who plays on this box. Each player is their own Linux account and
+        their own RomM user, so each has their own Steam login, saves,
+        RetroAchievements and ES-DE favorites, while the ROMs, firmware and
+        controller setup are the box's and shared. With more than one
+        player (the guest counts), the box starts on a "Who's playing?"
+        screen, and Settings in ES-DE gets "Switch Player".
       '';
     };
 
-    owner = mkOption {
-      type = types.str;
+    primaryPlayer = mkOption {
+      type = types.nullOr types.str;
+      default = if lib.length (lib.attrNames config.famidrive.players) == 1
+        then lib.head (lib.attrNames config.famidrive.players) else null;
+      defaultText = "the only player, when there's one";
       example = "alice";
       description = ''
-        RomM user this box belongs to. Everything that touches save data
-        follows from it: the RomM Client API Token is issued by this user,
-        the box registers as one of this user's RomM devices, and PC save
-        folders pair only with this user's. One owner, many boxes share
-        saves; different owners never do (multi-box.md "Per-user saves").
+        The box's main player. Their RomM token is the one the shared
+        library and firmware are pulled with, and it's whose PC saves sync
+        (`pcSaves`). Needed once there's more than one player.
       '';
     };
+
+    guest.enable = mkEnableOption ''
+      a Guest player on the "Who's playing?" screen, for anyone without
+      their own: every game on the box, their own saves kept on this box
+      only (no RomM), and Steam if they sign in to theirs'';
 
     lanes = mkOption {
       type = types.listOf (types.enum [ "roms" "steam" "gog" "minecraft" ]);
@@ -85,12 +185,6 @@ in
         '';
       };
 
-      tokenFile = mkOption {
-        type = types.path;
-        default = config.sops.secrets."romm-token".path;
-        description = "Client API Token (rmm_...) issued by `owner`, decrypted by sops-nix.";
-      };
-
       firmwarePlatforms = mkOption {
         type = types.listOf types.str;
         default = lib.unique (lib.filter (s: s != null)
@@ -108,38 +202,37 @@ in
       type = types.attrsOf types.str;
       default = { };
       example = { gc = "/srv/roms/gamecube"; };
-    };
-
-    # Per-owner emulator profile IDs. Xenia's is derived from `owner`, never
-    # set by hand: if each box invented its own, one owner's saves wouldn't
-    # line up across their boxes (roms.md "Mapping saves to games").
-    identity = {
-      # Revised 2026-10-05: the Switch emulator is Eden, not Ryubing. Eden
-      # keeps profiles in a binary profiles.dat, so the ID isn't derived and
-      # seeded the way Ryubing's Profiles.json was going to be. It's the
-      # profile Eden already uses on the owner's first box, set by hand,
-      # and seeding it onto later boxes is an open question in roms.md.
-      edenProfileId = mkOption {
-        type = types.nullOr types.str;
-        default = null;
-        description = "Eden profile whose saves sync with RomM. Required before Switch save sync.";
-      };
-      xeniaXuid = mkOption {
-        type = types.str;
-        readOnly = true;
-        # Offline profiles use the E0... range. VERIFY against the chosen Xenia fork.
-        default = lib.toUpper ("E0" + builtins.substring 0 14 (builtins.hashString "sha256" "famidrive-xenia:${config.famidrive.owner}"));
-      };
+      description = ''
+        ROM folders already on this box, by system. Every player has to be
+        able to read them: group `famidrive` (every player is in it) with
+        read access all the way down, or readable by everyone.
+      '';
     };
 
     dataDir = mkOption {
       type = types.path;
       default = "/var/lib/famidrive";
-      description = "Local library root: pulled ROMs, firmware, generator placeholders.";
+      description = "The shared library: pulled ROMs, firmware, cover art. Every player reads it; only the library pull writes it.";
+    };
+
+    # Every player, the guest included, as the rest of the module sees them.
+    allPlayers = mkOption {
+      type = types.attrsOf types.attrs;
+      internal = true;
+      readOnly = true;
+    };
+
+    # Home-manager config every player gets (emulator settings, ES-DE,
+    # controllers, ...). Modules add to it instead of naming a user; each
+    # player's is given `famidrivePlayer`, that player's entry in allPlayers.
+    playerHome = mkOption {
+      type = types.deferredModule;
+      internal = true;
+      default = { };
     };
   };
 
-  config = lib.mkIf config.famidrive.enable {
+  config = lib.mkIf cfg.enable {
     # Steam, the Xbox controller driver and others are unfree.
     nixpkgs.config.allowUnfree = true;
 
@@ -149,26 +242,59 @@ in
     boot.kernelPackages = lib.mkDefault pkgs.linuxPackages_latest;
     nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
-    users.users.${config.famidrive.user} = {
+    famidrive.allPlayers = players // lib.optionalAttrs cfg.guest.enable { guest = guest; };
+
+    assertions = [{
+      assertion = cfg.players != { };
+      message = "famidrive.players: list at least one player (the box's main user).";
+    } {
+      assertion = cfg.primaryPlayer == null || cfg.players ? ${toString cfg.primaryPlayer};
+      message = "famidrive.primaryPlayer: \"${toString cfg.primaryPlayer}\" isn't in famidrive.players.";
+    } {
+      assertion = !(cfg.guest.enable && cfg.players ? guest);
+      message = "famidrive.players.guest: that name is the guest's (famidrive.guest.enable); pick another.";
+    } {
+      assertion = !(cfg.romm.enable && lib.elem "roms" cfg.lanes) || cfg.primaryPlayer != null;
+      message = "famidrive.primaryPlayer: with more than one player, say whose RomM token pulls the library.";
+    }];
+
+    # One Linux account per player. Group famidrive can read the shared
+    # library; nobody but the library pull can change it.
+    users.groups.famidrive = { };
+    users.users = lib.mapAttrs' (_: p: lib.nameValuePair p.user {
       isNormalUser = true;
-      extraGroups = [ "input" "video" "audio" ];
+      extraGroups = [ "input" "video" "audio" "famidrive" ];
+    }) cfg.allPlayers // {
+      # Owns the shared library: the RomM pull runs as it, with the primary
+      # player's token handed over by systemd (romm-agent.nix).
+      famidrive-library = {
+        isSystemUser = true;
+        group = "famidrive";
+        home = cfg.dataDir;
+      };
     };
 
-    # Per-box secrets. Each host points sops.defaultSopsFile at its own file.
-    sops.secrets."romm-token" = lib.mkIf config.famidrive.romm.enable {
-      owner = config.famidrive.user;
-    };
+    # Per-player secrets. Each host points sops.defaultSopsFile at its own file.
+    sops.secrets = lib.mkIf cfg.romm.enable (lib.mapAttrs' (name: p:
+      lib.nameValuePair "romm-token-${name}" { owner = p.user; }
+    ) (lib.filterAttrs (_: p: p.romm.tokenFile == null) cfg.players));
 
+    # The shared library. Players read it (group famidrive); saves never
+    # live here, they're in each player's home.
     systemd.tmpfiles.rules = [
-      "d ${config.famidrive.dataDir} 0755 ${config.famidrive.user} users -"
-      "d ${config.famidrive.dataDir}/roms 0755 ${config.famidrive.user} users -"
-      "d ${config.famidrive.dataDir}/firmware 0750 ${config.famidrive.user} users -"
+      "d ${cfg.dataDir} 0755 famidrive-library famidrive -"
+      "d ${cfg.dataDir}/roms 0755 famidrive-library famidrive -"
+      "d ${cfg.dataDir}/firmware 0750 famidrive-library famidrive -"
     ] ++ lib.mapAttrsToList (system: dir:
-      "L+ ${config.famidrive.dataDir}/roms/${system} - - - - ${dir}"
-    ) config.famidrive.localRoms;
+      "L+ ${cfg.dataDir}/roms/${system} - - - - ${dir}"
+    ) cfg.localRoms;
 
     home-manager.useGlobalPkgs = true;
-    home-manager.users.${config.famidrive.user}.home.stateVersion = "26.05";
+    home-manager.users = lib.mapAttrs' (_: p: lib.nameValuePair p.user {
+      imports = [ cfg.playerHome ];
+      _module.args.famidrivePlayer = p;
+      home.stateVersion = "26.05";
+    }) cfg.allPlayers;
 
     # Remote management baseline (remote-management.md).
     services.openssh.enable = true;

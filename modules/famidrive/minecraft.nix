@@ -151,7 +151,7 @@ in
       }
     ]) cfg.minecraft.instances);
 
-    home-manager.users.${cfg.user} = { lib, ... }: {
+    famidrive.playerHome = { lib, ... }: {
       home.activation.famidriveMinecraft = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         ${pkgs.famidrive-prism}/bin/famidrive-prism ${lib.escapeShellArg (builtins.toJSON spec)}
       '';

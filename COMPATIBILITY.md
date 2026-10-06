@@ -32,6 +32,7 @@ behave differently in each. For a console game it's the emulator.
   - [The Legend of Zelda: Breath of the Wild](#the-legend-of-zelda-breath-of-the-wild) (Switch)
   - [Left 4 Dead 2](#left-4-dead-2) (PC)
   - [Mario Kart: Double Dash!!](#mario-kart-double-dash) (GameCube)
+  - [Mario Party 3](#mario-party-3) (N64)
   - [Minecraft (vanilla 26.2, a private server)](#minecraft-vanilla-262-a-private-server) (PC)
   - [Rocket League](#rocket-league) (PC)
   - [Street Fighter 6](#street-fighter-6) (PC)
@@ -181,6 +182,18 @@ content loads.
 ### Mario Kart: Double Dash!!
 
 **GameCube, Dolphin: ✅ Works.** The 8BitDo's rumble works.
+
+### Mario Party 3
+
+**N64, RetroArch (Mupen64Plus-Next): ✅ Works.** The 8BitDo was picked up
+right away.
+
+- **Buttons:** with the core's own layout, the 8BitDo's X was the N64's B
+  (where B sits on an N64 pad), so X sped through dialog, and the right
+  trigger did nothing (the core puts Z on the left trigger only).
+  FamiDrive now maps N64 buttons by label (`controllers.faceButtons`), the
+  same as GameCube and Switch, and makes both triggers Z. Not yet tried
+  that way.
 
 ### Minecraft (vanilla 26.2, a private server)
 

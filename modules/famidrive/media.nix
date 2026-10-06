@@ -26,8 +26,8 @@ in
   };
 
   config = lib.mkIf (cfg.enable && cfg.media.jellyfin.enable) {
-    # One fixed entry, so no generator: the placeholder is written once.
-    # The RomM agent never deletes under roms/, so it won't fight this.
+    # One fixed entry, so no generator: the placeholder is written at
+    # activation, below.
     famidrive.systems.media = {
       fullname = "Media";
       # Art Book Next has no Jellyfin art; Kodi's media-center art is
@@ -40,18 +40,17 @@ in
       # saveSync stays false: watch progress lives on the Jellyfin server.
     };
 
-    systemd.tmpfiles.rules = [
-      "d ${cfg.dataDir}/roms/media 0755 ${cfg.user} users -"
-      "f ${cfg.dataDir}/roms/media/Jellyfin.jellyfin 0644 ${cfg.user} users -"
-    ];
-
     environment.systemPackages = [ pkgs.jellyfin-mpv-shim ];
 
     # The shim rewrites conf.json from its own settings screen: lock the few
     # keys a TV box depends on, leave the rest editable. Key names from
     # 3.1.0's conf.py.
-    home-manager.users.${cfg.user} = { lib, ... }: {
+    famidrive.playerHome = { lib, famidrivePlayer, ... }: {
       home.activation.famidriveJellyfin = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        # The Media entry, in this player's own library view: each player
+        # signs in to their own Jellyfin account.
+        mkdir -p ${lib.escapeShellArg "${famidrivePlayer.roms}/media"}
+        touch ${lib.escapeShellArg "${famidrivePlayer.roms}/media/Jellyfin.jellyfin"}
         ${seedLib.lockKeys {
           format = "json";
           target = "$HOME/.config/jellyfin-mpv-shim/conf.json";
