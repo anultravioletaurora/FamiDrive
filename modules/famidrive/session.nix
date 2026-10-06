@@ -3,7 +3,7 @@
 #
 # With more than one player (famidrive.players, the guest counts), the box
 # starts on "Who's playing?" instead (pkgs/famidrive-picker, as greetd's
-# greeter), and Settings → Switch Player comes back to it.
+# greeter), and quitting ES-DE (its Quit menu) comes back to it.
 { config, lib, pkgs, ... }:
 
 let
@@ -61,7 +61,11 @@ let
     ${pkgs.famidrive-quit}/bin/famidrive-quit &
     # ES-DE through gamescope-fg, which labels its window and makes it what
     # gamescope shows (nothing does that without Steam; see gamescope-fg).
-    exec ${pkgs.gamescope-fg}/bin/gamescope-fg --frontend ${pkgs.es-de}/bin/es-de --no-splash
+    ${pkgs.gamescope-fg}/bin/gamescope-fg --frontend ${pkgs.es-de}/bin/es-de --no-splash || true
+    # ES-DE closed: Quit ES-DE in its Quit menu (or Power off / Reboot,
+    # which it has already asked for, or a crash). End the session cleanly:
+    # "Who's playing?" comes back, or on a one-player box, ES-DE.
+    exec ${pkgs.famidrive-end-session}/bin/famidrive-end-session
   '';
 
   gamescopeFlags = lib.optionals cfg.display.vrr [
@@ -109,6 +113,7 @@ let
     session = [ sessionCmd ];
     last = "/var/lib/famidrive-picker/last";
     theme = if cfg.esde.theme != null then "${cfg.esde.theme.src}" else null;
+    powerOff = [ "${config.systemd.package}/bin/systemctl" "poweroff" ];
   });
   pickerCmd = lib.concatStringsSep " " ([
     "${pkgs.gamescope}/bin/gamescope" "-f"
@@ -246,7 +251,7 @@ in
     services.greetd = {
       enable = true;
       settings = if picker then {
-        # "Who's playing?" on boot, after Switch Player, and if a session
+        # "Who's playing?" on boot, after quitting ES-DE, and if a session
         # ever exits or crashes.
         default_session = {
           user = "greeter";
@@ -279,6 +284,21 @@ in
       args = [ "user" "ingroup" "famidrive" "quiet" ];
     };
     users.users.greeter.extraGroups = lib.mkIf picker [ "video" "input" "render" ];
+
+    # Powering off and rebooting from the TV: ES-DE's Quit menu (as a
+    # player) and "Who's playing?" (as the greeter). Without this, logind
+    # asks for a password whenever anyone else is logged in, an SSH login
+    # included, and the TV has no way to type one.
+    security.polkit.extraConfig = ''
+      polkit.addRule(function (action, subject) {
+        if ((action.id.indexOf("org.freedesktop.login1.power-off") == 0
+             || action.id.indexOf("org.freedesktop.login1.reboot") == 0)
+            && subject.local && subject.active
+            && (subject.isInGroup("famidrive") || subject.user == "greeter")) {
+          return polkit.Result.YES;
+        }
+      });
+    '';
     # Who played last starts out selected.
     systemd.tmpfiles.rules = lib.optionals picker [
       "d /var/lib/famidrive-picker 0755 greeter greeter -"

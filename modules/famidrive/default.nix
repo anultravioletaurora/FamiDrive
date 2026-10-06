@@ -132,7 +132,7 @@ in
         RetroAchievements and ES-DE favorites, while the ROMs, firmware and
         controller setup are the box's and shared. With more than one
         player (the guest counts), the box starts on a "Who's playing?"
-        screen, and Settings in ES-DE gets "Switch Player".
+        screen, and quitting ES-DE goes back to it.
       '';
     };
 

@@ -185,6 +185,10 @@ in
           target = "$HOME/ES-DE/settings/es_settings.xml";
           keys = {
             ROMDirectory = { type = "string"; value = famidrivePlayer.roms; };
+            # ES-DE's Quit menu: Quit ES-DE (back to "Who's playing?"),
+            # Reboot system, Power off system. The way to turn the box off
+            # from a controller.
+            ShowQuitMenu = { type = "bool"; value = "true"; };
           } // lib.optionalAttrs (theme != null) {
             # Locked, so a rebuild always brings the chosen theme back. The
             # theme's own options (color scheme, aspect ratio) stay editable.

@@ -6,20 +6,17 @@
 #                           options, Steam Input, downloads); steam lane
 #   Jellyfin Media Player   the Jellyfin app, with its sign-in and its
 #                           own settings menu; media.jellyfin.enable
-#   Switch Player           back to "Who's playing?"; more than one player
 { config, lib, pkgs, ... }:
 
 let
   cfg = config.famidrive;
   steam = lib.elem "steam" cfg.lanes;
   jellyfin = cfg.media.jellyfin.enable;
-  switch = lib.length (lib.attrNames cfg.allPlayers) > 1;
 
   # Placeholder file name (what ES-DE shows) -> what it opens.
   entries =
     lib.optionalAttrs steam { "Steam Settings" = "steam"; }
-    // lib.optionalAttrs jellyfin { "Jellyfin Media Player" = "jellyfin"; }
-    // lib.optionalAttrs switch { "Switch Player" = "switch"; };
+    // lib.optionalAttrs jellyfin { "Jellyfin Media Player" = "jellyfin"; };
 
   gamelist = pkgs.writeText "gamelist.xml" ''
     <?xml version="1.0"?>
@@ -43,13 +40,13 @@ in
         case "$(cat "$ROM")" in
           ${lib.optionalString steam ''steam) exec ${pkgs.gamescope-fg}/bin/gamescope-fg --steam bigpicture ;;''}
           ${lib.optionalString jellyfin ''jellyfin) ${cfg.systems.media.command} ;;''}
-          ${lib.optionalString switch ''switch) ${pkgs.famidrive-switch-player}/bin/famidrive-switch-player ;;''}
         esac
       '';
     };
 
     # Each player's own Settings folder, rewritten on every boot and
-    # switch. An entry whose feature is turned off is removed with it.
+    # switch. An entry whose feature is turned off is removed with it, and
+    # so is the old Switch Player (ES-DE's own Quit does that now).
     famidrive.playerHome = { lib, famidrivePlayer, ... }: {
       home.activation.famidriveSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         d=${lib.escapeShellArg "${famidrivePlayer.roms}/settings"}

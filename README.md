@@ -83,7 +83,7 @@ A few ideas run through all of it:
   their own Steam login, saves, favorites and RomM token, so two people's
   saves never mix. The ROMs, firmware and controller setup are the box's
   and shared. With more than one player, the box starts on a "Who's
-  playing?" screen, and Settings → Switch Player goes back to it. An
+  playing?" screen, and quitting ES-DE goes back to it. An
   optional Guest plays everything with saves kept on the box only.
 - **The base is the latest NixOS release; only the emulators chase
   unstable.** The kernel, graphics stack, Steam and the session come from
@@ -265,9 +265,10 @@ famidrive = {
   its own download).
 - **The guest:** no RomM, so their saves stay on this box. They can sign
   in to their own Steam or play without it.
-- **Switching:** Settings → Switch Player closes Steam and ends the
-  session, and "Who's playing?" comes back. Who played last starts out
-  selected.
+- **Switching and turning off:** ES-DE's Quit menu (Start → Quit) has
+  Quit ES-DE, which closes Steam and ends the session so "Who's playing?"
+  comes back, plus Reboot and Power Off. "Who's playing?" has Power Off
+  too, below the players. Who played last starts out selected.
 
 ## Moving an existing NixOS box over
 

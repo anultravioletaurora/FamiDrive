@@ -72,8 +72,8 @@ in
   } (c: [
     (check "autologin as the only player" (c.services.greetd.settings.initial_session.user == "alice"))
     (check "no picker" (c.services.greetd.settings.default_session.user == "alice"))
-    (check "no Switch Player without a second player"
-      (!(lib.hasInfix "Switch Player" c.home-manager.users.alice.home.activation.famidriveSettings.data or "")))
+    (check "ES-DE's Quit menu (power off, reboot) is on"
+      (lib.hasInfix "ShowQuitMenu" c.home-manager.users.alice.home.activation.famidriveEsSettings.data))
     (check "alice is a player" (lib.elem "famidrive" c.users.users.alice.extraGroups))
     (check "ES-DE reads alice's own ROM folder"
       (lib.hasInfix "/home/alice/.local/share/famidrive/roms" c.home-manager.users.alice.home.activation.famidriveEsSettings.data))
@@ -132,8 +132,9 @@ in
           && !(c.systemd.timers ? romm-save-reconcile-guest)))
       (check "a Steam menu generator per player"
         (lib.all (p: c.systemd.services ? "famidrive-gen-steam-${p}") [ "alice" "bob" "guest" ]))
-      (check "Switch Player in Settings"
-        (lib.hasInfix "Switch Player" c.home-manager.users.bob.home.activation.famidriveSettings.data))
+      (check "the TV can power off and reboot without a password"
+        (lib.hasInfix "org.freedesktop.login1.power-off" c.security.polkit.extraConfig
+          && lib.hasInfix "isInGroup(\"famidrive\")" c.security.polkit.extraConfig))
       (check "the shared library is read-only to players"
         (lib.elem "d /var/lib/famidrive/roms 0755 famidrive-library famidrive -" c.systemd.tmpfiles.rules))
     ]);

@@ -3,15 +3,16 @@
 "Who's playing?": the screen a box with more than one player starts on.
 It runs as greetd's greeter, inside a gamescope of its own, and is the
 whole login: pick a player and greetd starts their session (the same
-FamiDrive session a one-player box autologins into). Settings → Switch
-Player in ES-DE ends a session, and greetd brings this back.
+FamiDrive session a one-player box autologins into). Quitting ES-DE
+ends a session, and greetd brings this back.
 
 SPEC_JSON (session.nix): {"players": [{"user", "displayName",
 "isGuest"}], "session": [command...], "last": file remembering who
-played last, "theme": the ES-DE theme's folder or null}.
+played last, "theme": the ES-DE theme's folder or null, "powerOff":
+the command that turns the box off, or null}.
 
 Left and right (D-pad, stick or arrow keys) to choose, A, Start or Enter
-to play. It draws in ES-DE's look, in the theme's own fonts, like
+to play. Down to Power Off, below the players. It draws in ES-DE's look, in the theme's own fonts, like
 famidrive-status.
 """
 
@@ -20,6 +21,7 @@ import os
 import re
 import socket
 import struct
+import subprocess
 import sys
 from pathlib import Path
 
@@ -164,12 +166,22 @@ def main():
     pads = {}
     stick_held = False
     error = ""
-    busy = False
+    busy = ""            # what's happening, while it happens
+    power = spec.get("powerOff")
+    on_power = False     # Power Off has the focus, not a player
 
     def choose():
         nonlocal error, busy
+        if on_power:
+            busy, error = "Turning off…", ""
+            draw()
+            r = subprocess.run(power, capture_output=True, text=True)
+            if r.returncode != 0:
+                log(f"power off: {r.stderr.strip()}")
+                busy, error = "", "The box couldn't turn off."
+            return
         p = players[selected]
-        busy, error = True, ""
+        busy, error = "Starting…", ""
         draw()
         err = start(p["user"], spec["session"])
         if err is None:
@@ -179,11 +191,17 @@ def main():
                 pass
             sys.exit(0)
         log(err)
-        busy, error = False, err
+        busy, error = "", err
 
     def move(step):
         nonlocal selected, error
-        selected = (selected + step) % len(players)
+        if not on_power:
+            selected = (selected + step) % len(players)
+        error = ""
+
+    def focus_power(down):
+        nonlocal on_power, error
+        on_power = bool(power) and down
         error = ""
 
     def draw():
@@ -203,7 +221,7 @@ def main():
         for i, p in enumerate(players):
             cx = x + size // 2
             r = size // 2
-            on = i == selected
+            on = i == selected and not on_power
             if on:
                 r = int(r * 1.08)
                 pygame.draw.circle(screen, WHITE, (cx, cy), r + int(10 * u))
@@ -218,13 +236,25 @@ def main():
             screen.blit(name, (cx - name.get_width() // 2, cy + size // 2 + int(40 * u)))
             x += size + gap
 
-        line = "Starting…" if busy else error
+        if power:
+            # A button below the players, like ES-DE's selected row when
+            # it has the focus: black text on white.
+            label = body_f.render("Power Off", True, BLACK if on_power else DIM)
+            bw, bh = label.get_width() + int(56 * u), label.get_height() + int(20 * u)
+            bx, by = (w - bw) // 2, int(h * 0.80)
+            if on_power:
+                pygame.draw.rect(screen, WHITE, (bx, by, bw, bh), border_radius=bh // 2)
+            else:
+                pygame.draw.rect(screen, DIM, (bx, by, bw, bh), max(1, int(2 * u)), border_radius=bh // 2)
+            screen.blit(label, (bx + (bw - label.get_width()) // 2, by + (bh - label.get_height()) // 2))
+
+        line = busy or error
         if line:
             msg = body_f.render(line, True, ERROR if error and not busy else DIM)
-            screen.blit(msg, ((w - msg.get_width()) // 2, int(h * 0.76)))
+            screen.blit(msg, ((w - msg.get_width()) // 2, int(h * 0.72)))
 
         # ES-DE's help bar, bottom right.
-        hint = help_f.render("A   PLAY", True, DIM)
+        hint = help_f.render("A   POWER OFF" if on_power else "A   PLAY", True, DIM)
         bar = pygame.Surface((hint.get_width() + int(48 * u), hint.get_height() + int(24 * u)), pygame.SRCALPHA)
         bar.fill(PANEL)
         bar.blit(hint, (int(24 * u), int(12 * u)))
@@ -250,19 +280,31 @@ def main():
                     move(-1)
                 elif event.button == pygame.CONTROLLER_BUTTON_DPAD_RIGHT:
                     move(1)
+                elif event.button == pygame.CONTROLLER_BUTTON_DPAD_DOWN:
+                    focus_power(True)
+                elif event.button == pygame.CONTROLLER_BUTTON_DPAD_UP:
+                    focus_power(False)
                 elif event.button in (pygame.CONTROLLER_BUTTON_A, pygame.CONTROLLER_BUTTON_START):
                     choose()
-            elif event.type == pygame.CONTROLLERAXISMOTION and event.axis == pygame.CONTROLLER_AXIS_LEFTX:
+            elif event.type == pygame.CONTROLLERAXISMOTION and event.axis in (
+                    pygame.CONTROLLER_AXIS_LEFTX, pygame.CONTROLLER_AXIS_LEFTY):
                 if abs(event.value) < STICK // 2:
                     stick_held = False
                 elif abs(event.value) > STICK and not stick_held:
                     stick_held = True
-                    move(1 if event.value > 0 else -1)
+                    if event.axis == pygame.CONTROLLER_AXIS_LEFTX:
+                        move(1 if event.value > 0 else -1)
+                    else:
+                        focus_power(event.value > 0)
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
                     move(-1)
                 elif event.key == pygame.K_RIGHT:
                     move(1)
+                elif event.key == pygame.K_DOWN:
+                    focus_power(True)
+                elif event.key == pygame.K_UP:
+                    focus_power(False)
                 elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
                     choose()
         draw()
