@@ -84,6 +84,10 @@ This is the house controller, and FamiDrive knows it by name
 - **Steam games:** ✅ Steam Input is off. Two at once worked in Street
   Fighter 6 and Rocket League. In Rocket League, which pad is switched on
   first doesn't decide who's player 1.
+- **Kodi:** ❌ at first. Kodi saw the pad but had no button map for it,
+  so it ignored the pad and kept offering to set it up. FamiDrive now gives
+  every player's Kodi a map for it (the Xbox 360 pad's layout, which is
+  the same under `xpad`). Not yet tried that way.
 - **Still to check:**
   - how the analog triggers feel for GameCube L/R
   - a pad going to sleep mid-game and waking up again
@@ -99,6 +103,12 @@ ports set by its short name) doesn't match it yet.
 
 Over Bluetooth. ❔ No results recorded yet. It's in the test box's list
 and has been paired, but nothing about how it did was written down.
+
+- **Kodi:** ❌ Seen ("Xbox Wireless Controller", 11 buttons, 9 axes)
+  but no button map, so it didn't work. Kodi ships maps for the Xbox pad
+  under other names and drivers, not for this one. Its layout still
+  needs reading off the box, with the controller connected, to add a
+  map like the 8BitDo's.
 
 FamiDrive doesn't add xpadneo. The controller uses the kernel's own
 driver. Rumble and the Share button are the usual reasons people add

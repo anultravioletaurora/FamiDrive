@@ -31,10 +31,63 @@ let
       rm "$lang"
       cp -r "$src" "$lang"
       chmod -R u+w "$lang"
-      sed -i '/^msgctxt "#13012"$/{n;s/^msgid "Exit"$/msgid "Return Home"/}' "$lang/resources/strings.po"
-      grep -q '^msgid "Return Home"$' "$lang/resources/strings.po"
+      sed -i '/^msgctxt "#13012"$/{n;s/^msgid "Exit"$/msgid "Return home"/}' "$lang/resources/strings.po"
+      grep -q '^msgid "Return home"$' "$lang/resources/strings.po"
     '';
   });
+
+  # Button maps for the pads FamiDrive knows (controllers.nix), which
+  # Kodi's joystick add-on ships none for, so it ignored them. Found on
+  # the first box 2026-10-06. Kodi's "linux" driver (joydev) numbers
+  # buttons and axes in kernel order; on xpad pads (the 8BitDo on its
+  # dongle) that's the Xbox 360 pad's layout, which Kodi does ship.
+  xpadLayout = ''
+    <feature name="a" button="0" />
+    <feature name="b" button="1" />
+    <feature name="x" button="2" />
+    <feature name="y" button="3" />
+    <feature name="leftbumper" button="4" />
+    <feature name="rightbumper" button="5" />
+    <feature name="back" button="6" />
+    <feature name="start" button="7" />
+    <feature name="guide" button="8" />
+    <feature name="leftthumb" button="9" />
+    <feature name="rightthumb" button="10" />
+    <feature name="lefttrigger" axis="+2" />
+    <feature name="righttrigger" axis="+5" />
+    <feature name="leftstick">
+      <up axis="-1" />
+      <down axis="+1" />
+      <right axis="+0" />
+      <left axis="-0" />
+    </feature>
+    <feature name="rightstick">
+      <up axis="-4" />
+      <down axis="+4" />
+      <right axis="+3" />
+      <left axis="-3" />
+    </feature>
+    <feature name="up" axis="-7" />
+    <feature name="down" axis="+7" />
+    <feature name="left" axis="-6" />
+    <feature name="right" axis="+6" />
+  '';
+  buttonmap = { name, buttons, axes, layout }: pkgs.writeText "${lib.replaceStrings [ " " ] [ "_" ] name}_${toString buttons}b_${toString axes}a.xml" ''
+    <?xml version="1.0" ?>
+    <buttonmap>
+      <device name="${name}" provider="linux" buttoncount="${toString buttons}" axiscount="${toString axes}">
+        <configuration>
+          <appearance id="game.controller.default" />
+        </configuration>
+        <controller id="game.controller.default">
+          ${layout}
+        </controller>
+      </device>
+    </buttonmap>
+  '';
+  buttonmaps = [
+    (buttonmap { name = "8BitDo Ultimate 2 Wireless Controller"; buttons = 11; axes = 8; layout = xpadLayout; })
+  ];
 
   kodiSpec = builtins.toJSON {
     inherit (kodi) sources;
@@ -164,6 +217,12 @@ in
         rm -f "$media/Kodi.kodi" "$media/Jellyfin.jellyfin"
       '' + lib.optionalString kodi.enable ''
         touch "$media/Kodi.kodi"
+        # Seeded, not locked: a pad set up again in Kodi keeps its new map.
+        maps="$HOME/.kodi/userdata/addon_data/peripheral.joystick/resources/buttonmaps/xml/linux"
+        mkdir -p "$maps"
+        ${lib.concatMapStrings (m: ''
+          [ -e "$maps/${m.name}" ] || cp ${m} "$maps/${m.name}"
+        '') buttonmaps}
       '' + lib.optionalString jellyfin.enable ''
         touch "$media/Jellyfin.jellyfin"
         # The shim rewrites conf.json from its own settings screen: lock
