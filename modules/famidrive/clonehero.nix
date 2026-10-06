@@ -124,15 +124,12 @@ in
   config = lib.mkIf (cfg.enable && ch.enable) {
     environment.systemPackages = [ pkgs.clonehero pkgs.famidrive-clonehero ];
 
-    famidrive.systems.ports = {
-      fullname = "Ports";
-      theme = "ports";   # Art Book Next's ports art
-      extensions = [ ".port" ];
-      # Scores come down before the profiles are seeded, so a new box
-      # doesn't take its freshly seeded profiles.ini for a save RomM lacks.
-      # Like famidrive-launch, sync only for players with a RomM agent
-      # config of their own.
-      command = ''
+    # An entry in the Ports system (emulators.nix). Scores come down
+    # before the profiles are seeded, so a new box doesn't take its
+    # freshly seeded profiles.ini for a save RomM lacks. Like
+    # famidrive-launch, sync only for players with a RomM agent config of
+    # their own.
+    famidrive.ports.".port" = ''
         sync=""
         ${lib.optionalString sync ''[ -e "/etc/famidrive/romm/$(id -un).json" ] && sync=1''}
         case "$(cat "$ROM")" in
@@ -151,7 +148,6 @@ in
             ;;
         esac
       '';
-    };
 
     # songs/ is the managed library, local/ is for songs added by hand
     # (any player can copy into it), bindings the box's guitar bindings

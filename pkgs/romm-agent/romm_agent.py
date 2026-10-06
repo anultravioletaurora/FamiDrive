@@ -814,7 +814,12 @@ def cmd_save_pull(system, rom_path):
     kind, root, lay = layout(system)
     key = library_path(rom_path)
     STATE.mkdir(parents=True, exist_ok=True)
-    SNAPSHOT.write_text(json.dumps(snapshot(root)))  # for rule 3 at push time
+    # For rule 3 at push time; fixed files need no learning. Found on the
+    # first box 2026-10-06: Clone Hero's root is the home folder, and
+    # snapshotting all of it (Steam, songs) took 24 s before every launch.
+    learns = kind != "files"
+    if learns:
+        SNAPSHOT.write_text(json.dumps(snapshot(root)))
 
     s = session()
     dev = device_id(s)
@@ -848,7 +853,8 @@ def cmd_save_pull(system, rom_path):
     e["server_updated_at"] = newest["updated_at"]
     store_saves(saves)
 
-    SNAPSHOT.write_text(json.dumps(snapshot(root)))  # don't count the restore as play
+    if learns:
+        SNAPSHOT.write_text(json.dumps(snapshot(root)))  # don't count the restore as play
 
 
 def cmd_save_push(system, rom_path, learn=True):

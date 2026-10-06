@@ -348,6 +348,7 @@ class Test(unittest.TestCase):
         g["server_save"] = lambda s, dev, rom_id: {"id": 1, "updated_at": "2026-10-06T10:00:00+00:00"}
         g["get"] = lambda s, path, **kw: Resp(content=uploads[0][2])
         b["cmd_save_pull"]("clonehero", "app:clonehero")
+        self.assertFalse(b["SNAPSHOT"].exists())   # no scan of the whole home
         for rel in paths:
             self.assertEqual((other.home / rel).read_text(), f"mine: {rel}")
 

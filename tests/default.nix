@@ -130,6 +130,11 @@ in
       (check "Clone Hero is in Ports, songs come down as the library"
         (c.famidrive.systems ? ports
           && c.systemd.services.famidrive-clonehero-songs.serviceConfig.User == "famidrive-library"))
+      (check "one Ports system, for Minecraft and Clone Hero both"
+        (!(c.famidrive.systems ? minecraft)
+          && lib.sort lib.lessThan c.famidrive.systems.ports.extensions == [ ".port" ".prism" ]
+          && lib.hasInfix "prismlauncher" c.famidrive.systems.ports.command
+          && lib.hasInfix "clonehero" c.famidrive.systems.ports.command))
       (check "Clone Hero reads the box's songs and calibration"
         (lib.hasInfix "/var/lib/famidrive/clonehero/songs" c.home-manager.users.bob.home.activation.famidriveCloneHero.data
           && lib.hasInfix "200" c.home-manager.users.bob.home.activation.famidriveCloneHero.data))

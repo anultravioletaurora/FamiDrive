@@ -26,11 +26,11 @@
 # whole tree gets closed (it isn't in a group of its own);
 # famidrive-game.close holds a command to run instead of killing anything
 # (Big Picture: closing it must not take the Steam client with it).
-{ writeShellApplication, xprop, xwininfo, procps, util-linux, gnugrep, coreutils, socat, famidrive-status }:
+{ writeShellApplication, xprop, xwininfo, xrestop, procps, util-linux, gnugrep, coreutils, socat, famidrive-status }:
 
 writeShellApplication {
   name = "gamescope-fg";
-  runtimeInputs = [ xprop xwininfo procps util-linux gnugrep coreutils socat famidrive-status ];
+  runtimeInputs = [ xprop xwininfo xrestop procps util-linux gnugrep coreutils socat famidrive-status ];
   text = ''
     FRONTEND=1
     GAME=2
@@ -57,7 +57,33 @@ writeShellApplication {
       # gamescope's own 1x1 "steamcompmgr" window is never a candidate.
       xwininfo -root -children 2>/dev/null | awk '/^ +0x/ && !/"steamcompmgr"/ { print $1 }' || true
     }
-    window_pid() { xprop -id "$1" _NET_WM_PID 2>/dev/null | awk '/= / { print $3 }' || true; }
+    # A window's process: _NET_WM_PID when the app sets it, or else the X
+    # server's own record of which client made the window (XRes, through
+    # xrestop). Found on the first box 2026-10-06: Kodi never sets
+    # _NET_WM_PID, so its window was never labelled and the screen stayed
+    # black while it ran.
+    window_pid() {
+      local pid
+      pid=$(xprop -id "$1" _NET_WM_PID 2>/dev/null | awk '/= / { print $3 }' || true)
+      if [ -z "$pid" ]; then pid=$(xres_pid "$1"); fi
+      echo "$pid"
+    }
+    xres_pid() {
+      local wid line pid="" base=""
+      wid=$(( $1 ))
+      while IFS= read -r line; do
+        case "$line" in
+          *"( PID:"*) pid=''${line##*PID:}; pid=''${pid%%[!0-9]*} ;;
+          *res_base*) base=$(( ''${line##*: } )) ;;
+          *res_mask*)
+            if [ -n "$pid" ] && [ "$(( wid & ~''${line##*: } ))" -eq "$base" ]; then
+              echo "$pid"
+              return
+            fi
+            ;;
+        esac
+      done < <(xrestop -b -m 1 2>/dev/null || true)
+    }
     untagged() { ! xprop -id "$1" STEAM_GAME 2>/dev/null | grep -q " = "; }
     tag() { xprop -id "$1" -f STEAM_GAME 32c -set STEAM_GAME "$2" 2>/dev/null || true; }
 
