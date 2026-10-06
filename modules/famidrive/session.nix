@@ -17,7 +17,7 @@ let
       # Proton pins and Steam Input, written while Steam isn't running
       # (pkgs/famidrive-steam-config).
       ${pkgs.famidrive-steam-config}/bin/famidrive-steam-config ${lib.escapeShellArg (builtins.toJSON {
-        inherit (cfg.steam) compatTools steamInput steamInputGames;
+        inherit (cfg.steam) compatTools steamInput steamInputGames launchOptions;
       })} || echo "famidrive-session: couldn't apply Steam settings" >&2
       # Start Steam hidden up front. Otherwise the first `steam -applaunch`
       # brings up Steam's own client windows, which then fight the game
@@ -115,6 +115,17 @@ in
       Steam and ES-DE show it) or app id. For games whose own controller
       support is missing or worse, such as Valve's older games, which
       expect Steam Input.
+    '';
+  };
+
+  options.famidrive.steam.launchOptions = mkOption {
+    type = types.attrsOf types.str;
+    default = { };
+    example = { "Cyberpunk 2077" = ''WINEDLLOVERRIDES="winmm,version=n,b" %command%''; };
+    description = ''
+      Games' launch options, by name (as Steam and ES-DE show it) or app
+      id. Set at the start of each session; a game not listed keeps what
+      was set in Steam.
     '';
   };
 

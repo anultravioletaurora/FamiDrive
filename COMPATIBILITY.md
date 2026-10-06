@@ -21,8 +21,10 @@ behave differently in each. For a console game it's the emulator.
 - **Games**
   - [Animal Crossing](#animal-crossing) (GameCube)
   - [Animal Crossing: New Horizons](#animal-crossing-new-horizons) (Switch)
+  - [Back 4 Blood](#back-4-blood) (PC)
   - [Call of Duty: Black Ops III](#call-of-duty-black-ops-iii) (PC)
   - [Cyberpunk 2077](#cyberpunk-2077) (PC)
+  - [Fallout: New Vegas](#fallout-new-vegas) (PC)
   - [Helldivers 2](#helldivers-2) (PC)
   - [Hollow Knight](#hollow-knight) (PC)
   - [The Jackbox Party Pack 3](#the-jackbox-party-pack-3) (PC)
@@ -63,6 +65,16 @@ Select + Start quits, with a short flicker of Dolphin's window first.
 (`-f -g`). The save loads; it didn't from Steam's old launcher, likely a
 different Eden profile.
 
+### Back 4 Blood
+
+**Steam: ✅ Works.** Proton Experimental (Steam's choice), no launch
+options.
+
+- **Graphics:** turn the game's own HDR setting off. With it on, colors
+  were oversaturated: the sun blinding, shadows too dark to see into.
+- **Controllers:** the 8BitDo plays well, rumble included, with Steam
+  Input off.
+
 ### Call of Duty: Black Ops III
 
 **Steam: ✅ Works.** Proton Experimental (Steam's choice), no launch
@@ -70,8 +82,8 @@ options.
 
 - **Performance:** 170–185 fps at 4K with every graphics setting maxed.
 - **Controllers:** the Xbox Wireless Controller's rumble works. The
-  8BitDo's rumble isn't checked in a Steam game yet; it works in Dolphin
-  ([Super Smash Bros. Melee](#super-smash-bros-melee)).
+  8BitDo's wasn't checked here; it works in other Steam games
+  ([Back 4 Blood](#back-4-blood)).
 - **ES-DE:** TheGamesDB's scraper matched it to the 2010 *Call of Duty:
   Black Ops*, so it was listed under that name with that game's details.
   Fixed by re-scraping it in ES-DE. ScreenScraper matches more reliably.
@@ -101,6 +113,13 @@ options.
 
 **GOG: ❔ Untested.** The planned home for it: DRM-free, with the
 same REDmod support.
+
+### Fallout: New Vegas
+
+**Steam: ✅ Works.** Proton Experimental (Steam's choice), unmodded.
+
+- **Mods:** not set up. NakeyJakey's New Vegas (a Wabbajack list of
+  about 335 mods) is the one wanted.
 
 ### Helldivers 2
 
@@ -210,7 +229,10 @@ keys only, including on Humble; there's no GOG or DRM-free version.
 **Steam: ✅ Works.**
 
 - **Runs on:** native, with mods through BepInEx.
-- **Launch options:** `./start_game_bepinex.sh || %command%`.
+- **Mods:** declared with `famidrive.valheim.mods` (Thunderstore ids
+  and hashes), which installs BepInEx, the mods, and the launch option
+  `./start_game_bepinex.sh %command%`. Tested on a copy of the first
+  box's install; not yet played that way.
 - **Graphics:** runs on Vulkan, which the game picks on its own.
 
 ### Wii Sports

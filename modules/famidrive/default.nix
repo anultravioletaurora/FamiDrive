@@ -18,6 +18,7 @@ in
     ./endpoints.nix
     ./controllers.nix
     ./minecraft.nix
+    ./valheim.nix
     ./settings.nix
   ];
 
