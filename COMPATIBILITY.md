@@ -21,6 +21,7 @@ behave differently in each. For a console game it's the emulator.
 - **Games**
   - [Animal Crossing](#animal-crossing) (GameCube)
   - [Animal Crossing: New Horizons](#animal-crossing-new-horizons) (Switch)
+  - [Call of Duty: Black Ops III](#call-of-duty-black-ops-iii) (PC)
   - [Cyberpunk 2077](#cyberpunk-2077) (PC)
   - [The Jackbox Party Pack 3](#the-jackbox-party-pack-3) (PC)
   - [The Jackbox Party Pack 6](#the-jackbox-party-pack-6) (PC)
@@ -58,6 +59,20 @@ Select + Start quits, with a short flicker of Dolphin's window first.
 **Switch, Eden: ✅ Works.** Fullscreen with no menu or status bar
 (`-f -g`). The save loads; it didn't from Steam's old launcher, likely a
 different Eden profile.
+
+### Call of Duty: Black Ops III
+
+**Steam: ✅ Works.** Proton Experimental (Steam's choice), no launch
+options.
+
+- **Performance:** 170–185 fps at 4K with every graphics setting maxed.
+- **Controllers:** the Xbox Wireless Controller's rumble works. The
+  8BitDo's rumble isn't checked yet.
+- **ES-DE:** TheGamesDB's scraper matched it to the 2010 *Call of Duty:
+  Black Ops*, so it was listed under that name with that game's details.
+  Fixed by re-scraping it in ES-DE. ScreenScraper matches more reliably.
+- **Community clients:** BOIII-style clients aren't set up. Neither is
+  Plutonium, for the older Treyarch games.
 
 ### Cyberpunk 2077
 
