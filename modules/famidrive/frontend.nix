@@ -45,8 +45,10 @@ let
       ${lib.concatStrings (lib.mapAttrsToList (name: s: ''
         ${name})
           ${lib.optionalString (s.saveSync && cfg.romm.enable) ''[ -z "$sync" ] || romm-agent save-pull ${name} "$ROM" || echo "famidrive-launch: save pull failed, launching with local save" >&2''}
+          ${s.before}
           rc=0
           gamescope-fg bash -c ${lib.escapeShellArg s.command} || rc=$?
+          ${s.after}
           ${lib.optionalString (s.saveSync && cfg.romm.enable) ''[ -z "$sync" ] || romm-agent save-push ${name} "$ROM" || echo "famidrive-launch: save push failed, timer reconcile will retry" >&2''}
           exit "$rc"
           ;;
