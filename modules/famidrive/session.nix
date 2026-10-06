@@ -24,6 +24,10 @@ let
       # for gamescope's single focused window.
       steam -silent &
     ''}
+    ${lib.optionalString (config.famidrive.esde.theme != null) ''
+      # The Steam launch status screen draws in the theme's fonts.
+      export FAMIDRIVE_STATUS_FONTS=${config.famidrive.esde.theme.src}/_inc/fonts
+    ''}
     # Nothing is running yet: clear what a crashed launch may have left.
     rm -f "''${XDG_RUNTIME_DIR:-/nonexistent}"/famidrive-game.*
     # Hold Select + Start on any controller to quit the running game

@@ -26,14 +26,15 @@
 # whole tree gets closed (it isn't in a group of its own);
 # famidrive-game.close holds a command to run instead of killing anything
 # (Big Picture: closing it must not take the Steam client with it).
-{ writeShellApplication, xprop, xwininfo, procps, util-linux, gnugrep, coreutils }:
+{ writeShellApplication, xprop, xwininfo, procps, util-linux, gnugrep, coreutils, famidrive-status }:
 
 writeShellApplication {
   name = "gamescope-fg";
-  runtimeInputs = [ xprop xwininfo procps util-linux gnugrep coreutils ];
+  runtimeInputs = [ xprop xwininfo procps util-linux gnugrep coreutils famidrive-status ];
   text = ''
     FRONTEND=1
     GAME=2
+    STATUS=3   # famidrive-status, while a Steam game gets going
     run="''${XDG_RUNTIME_DIR:-/tmp/famidrive-$(id -u)}"
     mkdir -p "$run"
 
@@ -100,6 +101,7 @@ writeShellApplication {
       # Games in the default library only; others don't get the update retry.
       manifest="$HOME/.local/share/Steam/steamapps/appmanifest_$appid.acf"
       seen=$(wc -l < "$log" 2>/dev/null || echo 0)
+      status_pid=""   # the status screen's, while it's up (see below)
       # Put the game on top and stay until it's gone: until none of its
       # Steam processes (`SteamLaunch AppId=N`) is left. Not one pid: Steam
       # may swap the process it started for another. Found on the first box
@@ -107,9 +109,20 @@ writeShellApplication {
       # following only the first handed the screen back to ES-DE while the
       # game played on behind it.
       follow() {
-        base "$appid,$GAME,769,$FRONTEND"   # Steam's windows above ES-DE, below the game
+        # The status screen stays until the game's own window is up (or
+        # three minutes, if a game never opens one gamescope can show).
+        base "$appid,$GAME,$STATUS,769,$FRONTEND"   # Steam's windows above ES-DE, below the game
+        [ -n "$status_pid" ] && status launching
         misses=0
+        waited=0
         while [ "$misses" -lt 3 ]; do
+          if [ -n "$status_pid" ]; then
+            status_tag
+            waited=$((waited + 1))
+            if focusable "$appid" || [ "$waited" -ge 180 ]; then
+              status_stop
+            fi
+          fi
           pid=$(pgrep -o -f "SteamLaunch AppId=$appid( |$)" || true)
           if [ -z "$pid" ]; then
             misses=$((misses + 1))
@@ -139,14 +152,41 @@ writeShellApplication {
         exit 0
       fi
 
+      # The status screen (pkgs/famidrive-status): shown from the moment
+      # the game is picked until its window is up, with what Steam is
+      # doing (updating, processing shaders, waiting on a prompt, starting).
+      # This writes the state; famidrive-status draws it.
+      status_file="$run/famidrive-status.json"
+      status() {
+        printf '{"state": "%s", "detail": "%s"}\n' "$1" "''${2:-}" > "$status_file.new"
+        mv "$status_file.new" "$status_file"
+      }
+      status_stop() {
+        if [ -n "$status_pid" ]; then kill "$status_pid" 2>/dev/null || true; fi
+        status_pid=""
+        rm -f "$status_file"
+      }
+      status_tag() {
+        for wid in $(windows); do
+          untagged "$wid" || continue
+          if [ "$(window_pid "$wid")" = "$status_pid" ]; then tag "$wid" "$STATUS"; fi
+        done
+      }
+      focusable() { xprop -root GAMESCOPE_FOCUSABLE_APPS 2>/dev/null | grep -qE "[ ,]$1(,|$)"; }
+      trap status_stop EXIT
+
       # This game's launch steps since the launch. Read whole, not piped into
       # grep -q, which under pipefail can fail on tail's SIGPIPE.
       since() { tail -n +"$((seen + 1))" "$log" 2>/dev/null | grep -F "GameAction [AppID $appid, " || true; }
-      # While Steam gets the game going, its own windows go above ES-DE:
-      # a first-launch "which version?" picker, a EULA or an error would
-      # otherwise wait unseen behind it. With no Steam window up, gamescope
-      # falls through to ES-DE.
-      base "769,$FRONTEND"
+      # While Steam gets the game going, the status screen is on top, then
+      # Steam's own windows, then ES-DE. When Steam asks something (a
+      # first-launch "which version?" picker, a EULA, the controller
+      # prompt), its windows go on top instead, so the question can be
+      # answered.
+      status asking
+      famidrive-status "$appid" "$status_file" &
+      status_pid=$!
+      base "$STATUS,769,$FRONTEND"
       steam -applaunch "$appid"
 
       # -applaunch only hands the game to the running Steam client and
@@ -174,7 +214,10 @@ writeShellApplication {
           # carries on. Wait for the update, then ask once more.
           if [ -z "$retried" ] && grep -q DownloadingDepots <<< "$steps"; then
             retried=1
+            status updating
+            base "$STATUS,769,$FRONTEND"
             while ! grep -qE '"StateFlags"[[:space:]]+"4"' "$manifest" 2>/dev/null; do
+              status_tag
               sleep 0.5
             done
             seen=$(wc -l < "$log" 2>/dev/null || echo 0)
@@ -184,12 +227,30 @@ writeShellApplication {
             continue
           fi
           echo "gamescope-fg: Steam couldn't launch $appid; see $log" >&2
+          err=$(grep -oE "AppError_[0-9]+" <<< "$steps" | tail -n 1 || true)
+          status failed "Steam stopped the launch''${err:+ ($err)}."
+          base "$STATUS,$FRONTEND"
+          for _ in $(seq 1 10); do status_tag; sleep 0.5; done
           base "$FRONTEND"
           exit 1
         fi
         # Steam is busy while its last step is a long one that hasn't
         # finished: updating, processing shaders, or waiting on a prompt.
         now=$(tail -n 1 <<< "$steps")
+        case "$now" in
+          *DownloadingDepots*) state=updating ;;
+          *ProcessingShaderCache*) state=shaders ;;
+          *"waiting for user response to CreatingProcess"*) state=asking ;;
+          *"waiting for user response"*) state=prompt ;;
+          *) state=asking ;;
+        esac
+        status "$state"
+        if [ "$state" = prompt ]; then
+          base "769,$STATUS,$FRONTEND"
+        else
+          base "$STATUS,769,$FRONTEND"
+        fi
+        status_tag
         if [ "$now" != "$last" ]; then
           last="$now"
           idle=0
@@ -200,6 +261,9 @@ writeShellApplication {
       done
       if [ -z "$pid" ]; then
         echo "gamescope-fg: Steam never started $appid" >&2
+        status failed "Steam didn't start the game and stopped reporting progress."
+        base "$STATUS,$FRONTEND"
+        for _ in $(seq 1 10); do status_tag; sleep 0.5; done
         base "$FRONTEND"
         exit 1
       fi

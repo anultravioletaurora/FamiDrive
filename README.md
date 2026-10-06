@@ -144,6 +144,12 @@ planning doc for now and will move into this repo.
   taking focus, the 8BitDo Ultimate 2 over 2.4 GHz, and quitting with
   Select + Start. That box still reads its ROMs from a local drive
   (`localRoms`), not RomM.
+- The Steam lane, with Proton pins and Steam Input set from Nix, Steam's
+  Big Picture as a Settings entry, and a status screen while Steam
+  updates, processes shaders or starts a game. Results per game are in
+  [COMPATIBILITY.md](COMPATIBILITY.md).
+- Wii games with real Wii Remotes and the Balance Board, and Minecraft
+  instances declared in Nix, with controller play through Controlify.
 
 **Still a sketch:**
 

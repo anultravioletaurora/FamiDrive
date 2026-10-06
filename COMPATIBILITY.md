@@ -183,30 +183,28 @@ connected with 1 + 2, as two players in bowling
 ### Steam launches
 
 ES-DE only knows "a game is running" or "it isn't". Steam has many states
-in between, and most of them look like a black screen or Steam's own
-window:
+in between. FamiDrive's status screen (`famidrive-status`) covers them:
+from the moment a Steam game is picked until its own window is up, it
+shows the game's scraped art in the theme's fonts, with what Steam is
+doing. The states come from Steam's launch log
+(`~/.local/share/Steam/logs/console_log.txt`, `GameAction [AppID …] :
+LaunchApp changed task to …`):
 
-- **Updating:** a game that needs an update first. Waited for, then the
-  launch is retried.
-- **Processing shaders:** Steam's own window. It took up to 5 min 41 s
-  (Left 4 Dead 2). Until the fix after `62db9af`, FamiDrive gave up after
-  five minutes and ES-DE came back over a launch that was still going;
-  that's why several games seemed to drop back to ES-DE. FamiDrive now
-  waits as long as Steam is still working, and only gives up after two
-  minutes with no progress at all. Select + Start gives up at any time.
-  Steam's "Allow background processing" (Settings → Downloads → Shader
-  Pre-Caching) should mean fewer of these waits at launch.
-- **Waiting for an answer:** a first-launch prompt such as "which
-  version?", a EULA or the controller prompt. Shown, but these are
-  desktop-style Steam windows, not made for a controller.
-- **Started, no window yet:** Cyberpunk takes about 37 s, a black screen
-  meanwhile.
+| Steam is… | Shown |
+|---|---|
+| asking for the game | "Asking Steam" |
+| downloading an update | "Updating", with a progress bar, speed and time left |
+| processing Vulkan shaders | "Processing Vulkan shaders", with why. Took up to 5 min 41 s (Left 4 Dead 2). |
+| waiting on a prompt (version picker, EULA, controller prompt) | Steam's own window, on top, to answer |
+| starting the game, no window yet | "Starting" (Cyberpunk: about 37 s) |
+| failing | "Steam couldn't start the game", for five seconds, then ES-DE |
 
-Planned: a FamiDrive status screen in ES-DE's look ("Updating Rocket
-League: 18 of 40 GB", "Processing shaders", "Starting Cyberpunk 2077…")
-from the moment a game is chosen until its window appears. Steam's
-launch steps are in `~/.local/share/Steam/logs/console_log.txt`
-(`GameAction [AppID …] : LaunchApp changed task to …`).
+FamiDrive waits as long as Steam is still working, and only gives up after
+two minutes with no progress at all. When Steam fails a launch because the
+game needs an update (`AppError_19`), it waits for the update and asks
+again. Select + Start gives up at any time. Steam's "Allow background
+processing" (Settings → Downloads → Shader Pre-Caching) should mean fewer
+shader waits at launch.
 
 ### Controllers in Steam games
 
