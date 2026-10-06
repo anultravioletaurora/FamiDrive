@@ -400,6 +400,10 @@ def romm_title_id(system, tid):
     return tid
 
 
+def switch_game_id(tid):
+    return bool(tid) and re.fullmatch(r"0100[0-9A-Fa-f]{12}", tid) is not None
+
+
 def title_id(system, rom, prev, path):
     """RomM's ID (rule 2), else what this box had, else read from the ROM.
     GameCube and Wii saves are named by the full six-character ID (game
@@ -409,9 +413,8 @@ def title_id(system, rom, prev, path):
     if system == "switch":
         # Only a game's own ID (0100…000-style) names its save folder.
         # Found on the first box 2026-10-06: RomM had 0105661981816000.
-        ok = lambda t: bool(t) and re.fullmatch(r"0100[0-9A-Fa-f]{12}", t) is not None
-        tid = tid if ok(tid) else None
-        had = had if ok(had) else None
+        tid = tid if switch_game_id(tid) else None
+        had = had if switch_game_id(had) else None
     if system in ("gc", "wii") and (not tid or len(tid) != 6):
         # What this box worked out before counts only if it's complete:
         # an earlier pull may have kept RomM's hex as it was.
