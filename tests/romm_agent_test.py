@@ -203,8 +203,13 @@ class Test(unittest.TestCase):
                "has_nested_single_file": True, "files": []}
         self.assertEqual(a["fetch_rom"](None, rom, "gc"), gc / "Shrek SuperSlam.iso")
         self.assertEqual((gc / "Shrek SuperSlam.iso").read_bytes(), b"pulled before")
+        # A dot in the name isn't an extension; RomM's fs_extension says.
+        (gc / "Super Smash Bros. Melee").write_bytes(b"pulled before")
+        rom = {"id": 254, "fs_name": "Super Smash Bros. Melee", "fs_extension": "", "has_multiple_files": False,
+               "files": [{"file_name": "Super Smash Bros. Melee.iso"}]}
+        self.assertEqual(a["fetch_rom"](None, rom, "gc"), gc / "Super Smash Bros. Melee.iso")
         # A file named with its extension stays as it is.
-        rom = {"id": 1, "fs_name": "Game.sfc", "has_multiple_files": False, "files": [{"file_name": "Game.sfc"}]}
+        rom = {"id": 1, "fs_name": "Game.sfc", "fs_extension": "sfc", "has_multiple_files": False, "files": [{"file_name": "Game.sfc"}]}
         self.assertEqual(a["fetch_rom"](None, rom, "gc"), gc / "Game.sfc")
 
     def test_hex_id_kept_from_an_earlier_pull_is_fixed(self):
@@ -271,6 +276,30 @@ class Test(unittest.TestCase):
         (card / "01-GMPE-MARIPA4BOX0.gci").write_bytes(b"mine, played more")
         a["cmd_save_push"]("gc", key, learn=False)      # changed again: a new copy
         self.assertEqual(posts, ["famidrive-conflict-box", "famidrive-conflict-box"])
+
+    def test_save_state_follows_a_rename(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        gc = box.data / "roms/gc"
+        new7, newm = str(gc / "Mario Party 7.iso"), str(gc / "Super Smash Bros. Melee.iso")
+        a["save_index"]({new7: {"id": 222, "system": "gc", "title_id": "GP7E01"},
+                         newm: {"id": 254, "system": "gc", "title_id": "GALE01"}})
+        # State from before the rename: one from before ids were kept, one with.
+        a["store_saves"]({str(gc / "Mario Party 7"): {"pushed": "a", "server_updated_at": "t7"},
+                          str(gc / "Melee, old name"): {"id": 254, "pushed": "b", "server_updated_at": "tm"}})
+        self.assertEqual(a["entry_for"](new7)["server_updated_at"], "t7")
+        self.assertEqual(a["entry_for"](newm)["server_updated_at"], "tm")
+        saves = a["load_saves"]()
+        self.assertEqual(a["my_state"](saves, new7, 222)["pushed"], "a")
+        self.assertNotIn(str(gc / "Mario Party 7"), saves)       # moved, not copied
+        # The new name already has state of its own (a conflict copy pushed
+        # before the fix): the sync from before the rename is merged in.
+        news = str(gc / "Shrek Superslam.iso")
+        a["save_index"]({news: {"id": 245, "system": "gc", "title_id": "G2RE52"}})
+        a["store_saves"]({str(gc / "Shrek Superslam"): {"pushed": "old", "server_updated_at": "t1"},
+                          news: {"conflict_pushed": "c"}})
+        e = a["entry_for"](news)
+        self.assertEqual((e["server_updated_at"], e["pushed"], e["conflict_pushed"]), ("t1", "old", "c"))
 
     def test_gamecube_saves_found_by_id(self):
         box = Box(self.base, "alice")

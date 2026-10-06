@@ -36,14 +36,17 @@ let
     ''}
     ${lib.optionalString (cfg.romm.enable && lib.elem "roms" cfg.lanes) ''
       # Players with RomM: the library's newest game lists before ES-DE
-      # reads them, then firmware into this player's emulators.
+      # reads them, then firmware into this player's emulators. By name,
+      # from the system's PATH, not its store path: an agent fix then
+      # doesn't count as a new session, and a switch doesn't restart the
+      # TV for it. Found on the first box 2026-10-06.
       if [ -e "/etc/famidrive/romm/$(id -un).json" ]; then
-        ${pkgs.romm-agent}/bin/romm-agent gamelists || echo "famidrive-session: couldn't copy game lists" >&2
+        romm-agent gamelists || echo "famidrive-session: couldn't copy game lists" >&2
         ${lib.optionalString (cfg.systems ? switch) ''
           # Before Eden ever starts: this player's profile, the same ID on each of their boxes.
-          ${pkgs.romm-agent}/bin/romm-agent eden-profile || echo "famidrive-session: couldn't set up the Eden profile" >&2
+          romm-agent eden-profile || echo "famidrive-session: couldn't set up the Eden profile" >&2
         ''}
-        ${pkgs.romm-agent}/bin/romm-agent firmware-install &
+        romm-agent firmware-install &
       fi
     ''}
     ${lib.optionalString picker ''

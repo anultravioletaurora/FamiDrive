@@ -82,7 +82,7 @@ in
   };
 
   config = lib.mkIf (cfg.enable && ch.enable) {
-    environment.systemPackages = [ pkgs.clonehero ];
+    environment.systemPackages = [ pkgs.clonehero pkgs.famidrive-clonehero ];
 
     famidrive.systems.ports = {
       fullname = "Ports";
@@ -122,8 +122,9 @@ in
       };
     };
 
+    # By name (systemPackages), so a fix to it doesn't restart the TV.
     famidrive.sessionSetup = ''
-      ${pkgs.famidrive-clonehero}/bin/famidrive-clonehero player ${lib.escapeShellArg playerSpec} \
+      famidrive-clonehero player ${lib.escapeShellArg playerSpec} \
         || echo "famidrive-session: couldn't set up Clone Hero" >&2
     '';
 
