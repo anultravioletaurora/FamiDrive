@@ -127,6 +127,9 @@ let
       java = "${i.java}/bin/java";
       mods = map toString (lib.optionals i.controller controllerMods.${i.minecraft} ++ i.mods);
     }) (lib.filterAttrs (_: i: lib.elem player i.players) cfg.minecraft.instances);
+    # Every instance this box declares, anyone's: one of these in a
+    # player's Prism is FamiDrive's, even from before it was marked.
+    declared = lib.attrNames cfg.minecraft.instances;
   };
 in
 {
