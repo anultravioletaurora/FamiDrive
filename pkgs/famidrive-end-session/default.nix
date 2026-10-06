@@ -1,13 +1,15 @@
-# Settings → Switch Player: end this player's session, so greetd brings
-# back "Who's playing?" (pkgs/famidrive-picker).
+# The end of a player's session: ES-DE has closed (its Quit menu, or a
+# crash). Then greetd brings back "Who's playing?" (pkgs/famidrive-picker),
+# or, on a one-player box, starts the session again.
 #
 # Steam is asked to quit first and given a moment: it keeps its login and
-# downloads tidy that way. Then the whole session ends (logind), which
-# takes everything else in it along.
+# downloads tidy that way, and doesn't stay behind in a session nobody's
+# using. Then the whole session ends (logind), which takes everything else
+# in it along.
 { writeShellApplication, procps, systemd, coreutils }:
 
 writeShellApplication {
-  name = "famidrive-switch-player";
+  name = "famidrive-end-session";
   runtimeInputs = [ procps systemd coreutils ];
   text = ''
     if pgrep -u "$(id -u)" -x steam > /dev/null; then

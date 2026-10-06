@@ -67,7 +67,7 @@
         famidrive-valheim = final.callPackage ./pkgs/famidrive-valheim { };
         famidrive-status = final.callPackage ./pkgs/famidrive-status { };
         famidrive-picker = final.callPackage ./pkgs/famidrive-picker { };
-        famidrive-switch-player = final.callPackage ./pkgs/famidrive-switch-player { };
+        famidrive-end-session = final.callPackage ./pkgs/famidrive-end-session { };
 
         # libmpv with SDL2 gamepad input compiled in. nixpkgs builds mpv
         # with sdl2Support = false, and without it the shim's gamepad
@@ -119,7 +119,7 @@
       };
 
       packages.${system} = {
-        inherit (pkgs) es-de gogdl-cli tcli xenia-netplay gamescope-fg romm-agent famidrive-generators famidrive-quit famidrive-steam-config famidrive-prism famidrive-status famidrive-valheim famidrive-picker famidrive-switch-player
+        inherit (pkgs) es-de gogdl-cli tcli xenia-netplay gamescope-fg romm-agent famidrive-generators famidrive-quit famidrive-steam-config famidrive-prism famidrive-status famidrive-valheim famidrive-picker famidrive-end-session
           mpv-gamepad jellyfin-mpv-shim;
       };
 

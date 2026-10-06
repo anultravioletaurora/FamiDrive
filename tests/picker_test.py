@@ -66,6 +66,7 @@ class Test(unittest.TestCase):
             "session": ["/run/current-system/sw/bin/famidrive-start"],
             "last": str(self.last),
             "theme": None,
+            "powerOff": [sys.executable, "-c", f"open({str(self.dir / 'off')!r}, 'w').write('off')"],
         }))
         os.environ["GREETD_SOCK"] = str(self.dir / "greetd.sock")
 
@@ -121,6 +122,17 @@ class Test(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual([r["type"] for r in reqs],
                          ["create_session", "post_auth_message_response", "start_session"])
+
+    def test_power_off_below_the_players(self):
+        code, reqs = self.play([pygame.K_DOWN, pygame.K_RETURN])
+        self.assertIsNone(code)            # stays up while the box turns off
+        self.assertEqual(reqs, [])         # nobody logged in
+        self.assertEqual((self.dir / "off").read_text(), "off")
+        self.assertFalse(self.last.exists())
+
+    def test_back_up_to_the_players(self):
+        code, reqs = self.play([pygame.K_DOWN, pygame.K_UP, pygame.K_RETURN])
+        self.assertEqual(reqs[0], {"type": "create_session", "username": "alice"})
 
     def test_password_prompt_is_cancelled(self):
         code, reqs = self.play([pygame.K_RETURN], replies=[
