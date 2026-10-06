@@ -36,6 +36,7 @@ behave differently in each. For a console game it's the emulator.
   - [Minecraft (vanilla 26.2, a private server)](#minecraft-vanilla-262-a-private-server) (PC)
   - [Rocket League](#rocket-league) (PC)
   - [Street Fighter 6](#street-fighter-6) (PC)
+  - [Super Smash Bros. Brawl](#super-smash-bros-brawl) (Wii)
   - [Super Smash Bros. Melee](#super-smash-bros-melee) (GameCube)
   - [Super Smash Bros. Ultimate](#super-smash-bros-ultimate) (Switch)
   - [Valheim](#valheim) (PC)
@@ -234,6 +235,12 @@ joins the server straight from launch.
 
 **Other stores:** none known. Street Fighter 6 on PC is sold as Steam
 keys only, including on Humble; there's no GOG or DRM-free version.
+
+### Super Smash Bros. Brawl
+
+**Wii, Dolphin: ✅ Works.** Played with the 8BitDo as a GameCube
+controller (Brawl takes them; `controllers.gamecube.ports`). Rumble
+works.
 
 ### Super Smash Bros. Melee
 

@@ -319,6 +319,23 @@ RomM along the way.
     Don't garbage-collect for a while: the old system's generation in the
     boot menu is the safety net.
 
+## Making changes
+
+Changes go in through pull requests. Each one runs `nix flake check` on
+GitHub ([.github/workflows/check.yml](.github/workflows/check.yml)), which
+covers what can be tested without a TV or a server ([tests/](tests)):
+
+- unit tests for FamiDrive's own tools (the RomM agent, the Valheim mod
+  installer, the Steam settings writer, "Who's playing?"), against
+  made-up files
+- example boxes (one player; a family with RomM and a guest), evaluated
+  with checks on what the module made of them
+- every package in the flake, built
+
+Run the same locally with `nix flake check`. After merging, a change gets
+tried on a real box (and against RomM, for anything that touches it),
+and the results go in [COMPATIBILITY.md](COMPATIBILITY.md).
+
 ## Special Thanks
 
 - **[Jovian-NixOS](https://github.com/Jovian-Experiments/Jovian-NixOS)
