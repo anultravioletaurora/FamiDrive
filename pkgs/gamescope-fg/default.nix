@@ -100,15 +100,42 @@ writeShellApplication {
       # Games in the default library only; others don't get the update retry.
       manifest="$HOME/.local/share/Steam/steamapps/appmanifest_$appid.acf"
       seen=$(wc -l < "$log" 2>/dev/null || echo 0)
+      # Put the game on top and stay until it's gone: until none of its
+      # Steam processes (`SteamLaunch AppId=N`) is left. Not one pid: Steam
+      # may swap the process it started for another. Found on the first box
+      # 2026-10-05: Cyberpunk's went through three in its first 40 s, and
+      # following only the first handed the screen back to ES-DE while the
+      # game played on behind it.
+      follow() {
+        base "$appid,$GAME,769,$FRONTEND"   # Steam's windows above ES-DE, below the game
+        misses=0
+        while [ "$misses" -lt 3 ]; do
+          pid=$(pgrep -o -f "SteamLaunch AppId=$appid( |$)" || true)
+          if [ -z "$pid" ]; then
+            misses=$((misses + 1))
+          else
+            misses=0
+            echo "$pid" > "$run/famidrive-game.tree"
+          fi
+          # Steam's game windows normally come labelled with the app id. Any
+          # that don't get it from the SteamGameId their process was started with.
+          for wid in $(windows); do
+            untagged "$wid" || continue
+            wpid=$(window_pid "$wid")
+            [ -n "$wpid" ] || continue
+            tr '\0' '\n' < "/proc/$wpid/environ" 2>/dev/null | grep -qx "SteamGameId=$appid" && tag "$wid" "$appid"
+          done
+          sleep 1
+        done
+        rm -f "$run/famidrive-game.tree"
+        base "$FRONTEND"
+      }
+
       # Picked again while it's still running (say ES-DE came back over
       # it): bring it back instead of asking Steam, which would refuse.
       pid=$(pgrep -o -f "SteamLaunch AppId=$appid( |$)" || true)
       if [ -n "$pid" ]; then
-        echo "$pid" > "$run/famidrive-game.tree"
-        base "$appid,$GAME,769,$FRONTEND"
-        while kill -0 "$pid" 2>/dev/null; do sleep 1; done
-        rm -f "$run/famidrive-game.tree"
-        base "$FRONTEND"
+        follow
         exit 0
       fi
 
@@ -177,21 +204,7 @@ writeShellApplication {
         exit 1
       fi
 
-      echo "$pid" > "$run/famidrive-game.tree"
-      base "$appid,$GAME,769,$FRONTEND"   # Steam's windows stay above ES-DE, below the game
-      # Steam's game windows normally come labelled with the app id. Any
-      # that don't get it from the SteamGameId their process was started with.
-      while kill -0 "$pid" 2>/dev/null; do
-        for wid in $(windows); do
-          untagged "$wid" || continue
-          wpid=$(window_pid "$wid")
-          [ -n "$wpid" ] || continue
-          tr '\0' '\n' < "/proc/$wpid/environ" 2>/dev/null | grep -qx "SteamGameId=$appid" && tag "$wid" "$appid"
-        done
-        sleep 1
-      done
-      rm -f "$run/famidrive-game.tree"
-      base "$FRONTEND"
+      follow
       exit 0
     fi
 

@@ -10,6 +10,8 @@ activation, as the box's user. Only what the flake declares is touched:
 - .minecraft/mods: the declared mods. FamiDrive remembers which jars are
   its own (.famidrive-mods) and replaces only those; mods added by hand
   stay.
+- .minecraft/options.txt: the game options in "options" (fullscreen).
+  Everything else in it is the game's own.
 - .minecraft/servers.dat: the declared servers are added or updated (by
   address). Servers added in-game stay.
 
@@ -126,6 +128,21 @@ def update_servers(path, wanted):
     path.write_bytes(bytes([10]) + nbt_string("") + nbt_payload(10, root))
 
 
+def set_options(path, options):
+    """Set key:value lines in Minecraft's options.txt. A new file holding
+    only these is fine: Minecraft fills in the rest on its first start."""
+    lines = path.read_text().split("\n") if path.exists() else []
+    for key, value in options.items():
+        line = f"{key}:{value}"
+        for i, existing in enumerate(lines):
+            if existing.split(":", 1)[0] == key:
+                lines[i] = line
+                break
+        else:
+            lines.insert(len(lines) - 1 if lines and lines[-1] == "" else len(lines), line)
+    path.write_text("\n".join(lines))
+
+
 def update_pack(path, minecraft, fabric):
     want = {"net.minecraft": minecraft}
     if fabric:
@@ -178,6 +195,7 @@ def main():
         })
         update_pack(d / "mmc-pack.json", inst["minecraft"], inst["fabricLoader"])
         update_mods(d / ".minecraft/mods", inst["mods"])
+        set_options(d / ".minecraft/options.txt", inst["options"])
         if inst["servers"]:
             update_servers(d / ".minecraft/servers.dat", inst["servers"])
 

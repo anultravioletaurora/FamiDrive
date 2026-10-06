@@ -25,11 +25,13 @@ behave differently in each. For a console game it's the emulator.
   - [The Jackbox Party Pack 3](#the-jackbox-party-pack-3) (PC)
   - [The Jackbox Party Pack 6](#the-jackbox-party-pack-6) (PC)
   - [Left 4 Dead 2](#left-4-dead-2) (PC)
+  - [Minecraft (vanilla 26.2, a private server)](#minecraft-vanilla-262-a-private-server) (PC)
   - [Rocket League](#rocket-league) (PC)
   - [Street Fighter 6](#street-fighter-6) (PC)
   - [Super Smash Bros. Melee](#super-smash-bros-melee) (GameCube)
   - [Super Smash Bros. Ultimate](#super-smash-bros-ultimate) (Switch)
   - [Valheim](#valheim) (PC)
+  - [Wii Sports](#wii-sports) (Wii)
 - [Known problems across games](#known-problems-across-games)
 
 ## Test box
@@ -41,7 +43,7 @@ Every result below comes from this box, unless a game says otherwise.
 | CPU | AMD Ryzen 9 7900X |
 | GPU | AMD Radeon RX 7900 XTX (24 GB) |
 | Display | 4K TV, 120 Hz, HDR on (`display.hdr = true`, `display.refresh = 120`) |
-| Controller | 8BitDo Ultimate 2, 2.4 GHz dongle |
+| Controllers | 8BitDo Ultimate 2 (2.4 GHz dongle), Xbox Wireless Controller (Bluetooth), first-party Wii Remotes |
 | FamiDrive | `f2b8769` and later, October 2026 |
 
 ## Games
@@ -66,10 +68,11 @@ different Eden profile.
   mods all load.
 - **Launch options:** `WINEDLLOVERRIDES="winmm,version=n,b" %command%`.
 - **Launching:** about 37 s pass between Steam starting it and its first
-  window. Until `f2b8769`, a closing launcher window could crash
-  FamiDrive's launcher, and ES-DE came back over the loading game. That's
-  fixed but not yet retested. Picking it again in ES-DE now brings back
-  the running game instead of starting another.
+  window. It kept dropping back to ES-DE with the game running behind it
+  (audible, and picking it again brought it forward). Steam swaps the
+  process it starts for another, three times in 40 s, and FamiDrive
+  followed only the first. It now follows the game until none of its
+  Steam processes is left. Fixed after `190714b`, not yet retested.
 - **Performance:** frame rate not measured yet (see
   [Measuring performance](#measuring-performance)). One sample, place in
   the game unknown: GPU 50–70% busy at 1.5 GHz and 105 W, 9 GB of video
@@ -101,16 +104,28 @@ Don't test it without being ready for a reboot.
 
 ### Left 4 Dead 2
 
-**Steam: 🟡 Playable, with Steam Input.** Native (Source engine).
-Workshop content loads.
+**Steam: ✅ Works, with Steam Input.** Native (Source engine). Workshop
+content loads.
 
-- **Steam Input on:** plays. Some on-screen controller prompts show
-  "NOT BOUND" instead of a button.
+- **Steam Input on, kept on with `steam.steamInputGames`:** menus,
+  starting a campaign and shooting all work, and the on-screen prompts
+  show the right buttons. Before, with Steam Input on but Steam not
+  running the show, prompts for some buttons (D-pad left, D-pad up) read
+  "NOT BOUND".
 - **Steam Input off:** worse. Controller support had to be turned on in
   the game's options by hand, and even then shooting didn't work.
 
-Kept on Steam Input with `steam.steamInputGames = [ "Left 4 Dead 2" ]`.
-Valve's older games expect it.
+### Minecraft (vanilla 26.2, a private server)
+
+**Prism Launcher: ✅ Works.** Declared in Nix (`minecraft.instances`) and
+joins the server straight from launch.
+
+- **Controller:** Controlify, added by FamiDrive. Works perfectly, with
+  button prompts that match the pad.
+- **Sign-in:** Prism asked to sign in again and showed a code to enter in
+  a browser on another device. No keyboard or browser needed on the box.
+- **Fullscreen:** it opened in a window. FamiDrive now sets fullscreen
+  in the game's options (`fullscreen`, on by default); not yet retested.
 
 ### Rocket League
 
@@ -157,6 +172,12 @@ keys only, including on Humble; there's no GOG or DRM-free version.
 - **Launch options:** `./start_game_bepinex.sh || %command%`.
 - **Graphics:** runs on Vulkan, which the game picks on its own.
 
+### Wii Sports
+
+**Wii, Dolphin: ✅ Works.** Custom textures. Two real Wii Remotes,
+connected with 1 + 2, as two players in bowling
+(`controllers.wii.remotes = [ "real" … ]`).
+
 ## Known problems across games
 
 ### Steam launches
@@ -200,7 +221,7 @@ of each session. Games that do better with it are listed in
 
 | Game | Steam Input on | Steam Input off |
 |---|---|---|
-| Left 4 Dead 2 | plays; some "NOT BOUND" prompts | no shooting: **kept on** |
+| Left 4 Dead 2 | works, right prompts: **kept on** | no shooting |
 | Rocket League | no pad at all | works, split-screen too |
 | Street Fighter 6 | works, two players | works, two players |
 
