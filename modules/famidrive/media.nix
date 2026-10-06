@@ -87,6 +87,11 @@ let
   '';
   buttonmaps = [
     (buttonmap { name = "8BitDo Ultimate 2 Wireless Controller"; buttons = 11; axes = 8; layout = xpadLayout; })
+    # An Xbox controller over Bluetooth through xpadneo: the same buttons
+    # and first eight axes as xpad, plus a ninth (xpadneo's profile
+    # switch, ABS_PROFILE) that Kodi doesn't need. Read off the first
+    # box 2026-10-06.
+    (buttonmap { name = "Xbox Wireless Controller"; buttons = 11; axes = 9; layout = xpadLayout; })
   ];
 
   kodiSpec = builtins.toJSON {

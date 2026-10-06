@@ -30,9 +30,9 @@ class Test(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def run_tool(self, instances):
+    def run_tool(self, instances, declared=()):
         spec = {"root": "~/.local/share/PrismLauncher", "launcher": {"CloseAfterLaunch": "true"},
-                "instances": instances}
+                "instances": instances, "declared": list(declared)}
         r = subprocess.run([sys.executable, str(SCRIPT), json.dumps(spec)],
                            env={**os.environ, "HOME": str(self.home)}, capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -52,6 +52,14 @@ class Test(unittest.TestCase):
         self.assertEqual(len(kept), 1)
         self.assertTrue(kept[0].name.startswith("Friends Server ("))
         self.assertTrue((kept[0] / ".minecraft/saves/My World").is_dir())   # worlds kept
+
+    def test_an_unmarked_one_declared_for_someone_else_is_moved_too(self):
+        # Made before FamiDrive marked its instances: no .famidrive-instance.
+        old = self.root / "instances/Friends Server"
+        (old / ".minecraft").mkdir(parents=True)
+        self.run_tool({}, declared=["Friends Server"])
+        self.assertFalse(old.exists())
+        self.assertEqual(len(list((self.root / "famidrive-removed").iterdir())), 1)
 
     def test_still_theirs_stays(self):
         self.run_tool({"Friends Server": instance()})

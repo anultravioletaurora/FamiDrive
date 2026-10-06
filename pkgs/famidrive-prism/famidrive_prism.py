@@ -16,8 +16,9 @@ activation, as the box's user. Only what the flake declares is touched:
 
 Instances that aren't declared are left alone, worlds included. Each
 player gets only the instances declared for them (`players`). One that
-FamiDrive made (.famidrive-instance) but that's no longer this player's
-is moved to famidrive-removed/, worlds and all, never deleted.
+FamiDrive made (.famidrive-instance, or a name declared on the box,
+"declared") but that's no longer this player's is moved to
+famidrive-removed/, worlds and all, never deleted.
 
 "fullscreen" runs at every Minecraft launch, for any instance, declared
 or not: it sets fullscreen:true in the instance's options.txt. On a TV
@@ -200,7 +201,11 @@ def main():
     instances = root / "instances"
     if instances.is_dir():
         for d in instances.iterdir():
-            if (d / MARK).exists() and d.name not in spec["instances"]:
+            # By name too: instances made before the mark existed have none.
+            # Found on the first box 2026-10-06: the second player kept the
+            # first player's instance.
+            ours = (d / MARK).exists() or d.name in spec.get("declared", [])
+            if ours and d.name not in spec["instances"]:
                 # Moved aside rather than deleted: it may hold worlds.
                 gone = root / "famidrive-removed" / f"{d.name} ({time.strftime('%Y-%m-%d %H%M%S')})"
                 gone.parent.mkdir(exist_ok=True)

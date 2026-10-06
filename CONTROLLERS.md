@@ -84,10 +84,10 @@ This is the house controller, and FamiDrive knows it by name
 - **Steam games:** ✅ Steam Input is off. Two at once worked in Street
   Fighter 6 and Rocket League. In Rocket League, which pad is switched on
   first doesn't decide who's player 1.
-- **Kodi:** ❌ at first. Kodi saw the pad but had no button map for it,
-  so it ignored the pad and kept offering to set it up. FamiDrive now gives
-  every player's Kodi a map for it (the Xbox 360 pad's layout, which is
-  the same under `xpad`). Not yet tried that way.
+- **Kodi:** ✅ with FamiDrive's button map, 2026-10-06. At first Kodi saw
+  the pad but had no button map for it, so it ignored the pad and kept
+  offering to set it up. FamiDrive now gives every player's Kodi a map for
+  it: the Xbox 360 pad's layout, which is the same under `xpad`.
 - **Still to check:**
   - how the analog triggers feel for GameCube L/R
   - a pad going to sleep mid-game and waking up again
@@ -104,14 +104,13 @@ ports set by its short name) doesn't match it yet.
 Over Bluetooth. ❔ No results recorded yet. It's in the test box's list
 and has been paired, but nothing about how it did was written down.
 
-- **Kodi:** ❌ Seen ("Xbox Wireless Controller", 11 buttons, 9 axes)
-  but no button map, so it didn't work. Kodi ships maps for the Xbox pad
-  under other names and drivers, not for this one. Its layout still
-  needs reading off the box, with the controller connected, to add a
-  map like the 8BitDo's.
-
-FamiDrive doesn't add xpadneo. The controller uses the kernel's own
-driver. Rumble and the Share button are the usual reasons people add
+- **Driver:** xpadneo, which the test box's host config turns on
+  (`hardware.xpadneo.enable`). FamiDrive doesn't add it itself. Under
+  xpadneo the pad reports as `045e:028e`.
+- **Kodi:** ❌ at first. Kodi saw it ("Xbox Wireless Controller", 11
+  buttons, 9 axes) but had no button map for it. FamiDrive now gives each
+  player's Kodi one: the same buttons and first eight axes as `xpad`, plus
+  xpadneo's profile switch as a ninth axis. Not yet tried that way. Rumble and the Share button are the usual reasons people add
 xpadneo, so test those first.
 
 ## DualShock 4
@@ -174,10 +173,14 @@ presents the guitar as an ordinary USB gamepad.
   worked on another hub, so the hub was the problem.
 - **Clone Hero:** ✅ Bound and played on Expert, 2026-10-06. FamiDrive
   saves bindings for the whole box (`cloneHero.sharedBindings`), so one
-  player binding the guitar binds it for everyone. Still to record:
-  - which button is which
-  - whether minus + plus quits
-  - calibration
+  player binding the guitar binds it for everyone. A second player's
+  Clone Hero found the guitar with no setup.
+- **Quitting:** ❌ holding minus + plus doesn't quit. famidrive-quit only
+  watches pads that have Select and Start buttons, and the Raphnet
+  reports neither: its 16 buttons are numbered, not named. To fix:
+  record which numbers minus and plus are, and give famidrive-quit a
+  combo for this adapter.
+- **Still to record:** which button is which, and calibration.
 
 ## Xbox 360 guitar
 
