@@ -7,6 +7,7 @@ The library, shared by every player (run as famidrive-library):
 Each player's own (run as that player):
     romm-agent gamelists               copy the library's newest gamelists into ES-DE
     romm-agent firmware-install        run emulator firmware installs (keys, PS3 firmware)
+    romm-agent eden-profile            give a new Eden this player's profile, before it first runs
     romm-agent save-pull SYSTEM ROM    newest save for ROM -> local (pre-launch)
     romm-agent save-push SYSTEM ROM    local save for ROM -> RomM (post-exit)
     romm-agent reconcile               push every local save RomM doesn't have yet
@@ -57,6 +58,21 @@ STATE = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") /
 DEVICE = STATE / "device.json"
 SAVES = STATE / "saves.json"
 SNAPSHOT = STATE / "save-snapshot.json"  # pre-launch mtimes for learn-by-diff
+
+# Eden (Switch). Profiles live in a binary profiles.dat: a 0x10 header,
+# then 8 users of 0xC8 bytes each (16-byte ID, the ID again, 8-byte
+# creation time, 32-byte nickname, 0x80 bytes of extra data). Seen on a
+# real Eden 0.2.1 box. A user's saves are in a folder named by their ID's
+# two 64-bit halves, high half first. Settings' current_user picks which
+# user games run as.
+EDEN = Path.home() / ".local/share/eden"
+EDEN_PROFILES = EDEN / "nand/system/save/8000000000000010/su/avators/profiles.dat"
+EDEN_CONFIG = Path.home() / ".config/eden/qt-config.ini"
+EDEN_USER = 0xC8
+# In save archives, Eden's profile folder is written as this, and becomes
+# the box's own profile when unpacked: the same player's profile can have
+# a different ID on each box.
+PROFILE_SLOT = "@profile"
 
 # Every FamiDrive save lives in this RomM slot. The sync API pairs saves on
 # (rom_id, slot), so a stable name keeps one box's pushes and another's
@@ -445,11 +461,83 @@ def derive_id(system, rom_path):
 DOLPHIN_REGION = {"E": "USA", "P": "EUR", "J": "JAP"}
 
 
+def eden_folder(uid):
+    lo, hi = int.from_bytes(uid[:8], "little"), int.from_bytes(uid[8:16], "little")
+    return f"{hi:016X}{lo:016X}"
+
+
+def eden_users():
+    """Eden's users' save folder names, in profiles.dat's order."""
+    try:
+        raw = EDEN_PROFILES.read_bytes()
+    except OSError:
+        return []
+    users = []
+    for i in range(8):
+        uid = raw[0x10 + i * EDEN_USER:0x10 + i * EDEN_USER + 16]
+        if len(uid) == 16 and any(uid):
+            users.append(eden_folder(uid))
+    return users
+
+
+def eden_profile():
+    """The profile this player's Switch games save under: the one set in
+    the module (players.<name>.edenProfileId), or else the user Eden runs
+    games as."""
+    if CFG.get("edenProfileId"):
+        return CFG["edenProfileId"].upper()
+    users = eden_users()
+    if not users:
+        return None
+    try:
+        m = re.search(r"^current_user=(\d+)$", EDEN_CONFIG.read_text(errors="replace"), re.M)
+    except OSError:
+        m = None
+    i = int(m.group(1)) if m else 0
+    return users[i] if i < len(users) else users[0]
+
+
+def cmd_eden_profile():
+    """Before this player's Eden first starts: give it one user, named
+    after the player, with an ID derived from their RomM username, so a
+    new box comes up with the same profile ID as the player's others.
+    An Eden that already has profiles is left alone."""
+    if EDEN_PROFILES.exists():
+        return
+    uid = hashlib.sha256(f"famidrive-eden:{CFG['owner']}".encode()).digest()[:16]
+    # The Switch allows 10-character nicknames.
+    name = (CFG.get("displayName") or CFG["owner"])[:10].encode()[:31]
+    user = uid + uid + struct.pack("<Q", int(time.time())) + name.ljust(0x20, b"\0") + bytes(0x80)
+    EDEN_PROFILES.parent.mkdir(parents=True, exist_ok=True)
+    EDEN_PROFILES.write_bytes(bytes(0x10) + user + bytes(EDEN_USER * 7))
+
+
+def to_archive(lay, rel):
+    """A save path as it's stored in RomM: no box-specific profile ID."""
+    if lay["kind"] == "eden-title-id" and lay.get("profile"):
+        first, sep, rest = rel.partition("/")
+        if first.upper() == lay["profile"].upper():
+            return PROFILE_SLOT + sep + rest
+    return rel
+
+
+def from_archive(lay, rel):
+    """A save path from RomM, put under this box's own profile. Also
+    takes archives that name a profile ID outright."""
+    if lay["kind"] == "eden-title-id":
+        first, sep, rest = rel.partition("/")
+        if first == PROFILE_SLOT or re.fullmatch(r"[0-9A-Fa-f]{32}", first):
+            if not lay.get("profile"):
+                raise RuntimeError("Eden has no profile here yet")
+            return lay["profile"] + sep + rest
+    return rel
+
+
 def layout(system):
     lay = dict(CFG["systems"][system]["saveLayout"])
     # Profiles are the player's own (players.<name> in the module).
     if lay["kind"] == "eden-title-id":
-        lay["profile"] = CFG.get("edenProfileId")
+        lay["profile"] = eden_profile()
     elif lay["kind"] == "xenia-content":
         lay["profile"] = CFG.get("xeniaXuid")
     return lay["kind"], Path(lay["root"]).expanduser(), lay
@@ -500,14 +588,15 @@ def learn_by_diff(root, before):
     return sorted(changed)
 
 
-def files_hash(root, rels):
+def files_hash(root, rels, lay):
     """Hash of the save's actual contents, so an unchanged save is never
-    re-uploaded (a tar.gz's own bytes change with every pack)."""
+    re-uploaded (a tar.gz's own bytes change with every pack). Paths go
+    in as they're archived, so the same save hashes the same on every box."""
     h = hashlib.sha256()
     for rel in sorted(rels):
         p = root / rel
         for f in sorted([p] if p.is_file() else [x for x in p.rglob("*") if x.is_file()]):
-            h.update(str(f.relative_to(root)).encode() + b"\0")
+            h.update(to_archive(lay, str(f.relative_to(root))).encode() + b"\0")
             h.update(f.read_bytes())
     return h.hexdigest()
 
@@ -518,12 +607,12 @@ def files_hash(root, rels):
 # emulator's save root) + famidrive-manifest.json.
 
 
-def pack(system, entry, root, rels, digest):
+def pack(system, entry, root, rels, digest, lay):
     buf = io.BytesIO()
     manifest = {
         "system": system,
         "title_id": entry.get("title_id"),
-        "paths": rels,
+        "paths": [to_archive(lay, r) for r in rels],
         "files_sha256": digest,
         "device": CFG["deviceName"],
         "owner": CFG["owner"],
@@ -531,7 +620,7 @@ def pack(system, entry, root, rels, digest):
     }
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
         for rel in rels:
-            tar.add(root / rel, arcname=rel)
+            tar.add(root / rel, arcname=to_archive(lay, rel))
         data = json.dumps(manifest, indent=2).encode()
         info = tarfile.TarInfo("famidrive-manifest.json")
         info.size = len(data)
@@ -539,10 +628,12 @@ def pack(system, entry, root, rels, digest):
     return buf.getvalue(), manifest
 
 
-def unpack(blob, root):
+def unpack(blob, root, lay):
     with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
         manifest = json.load(tar.extractfile("famidrive-manifest.json"))
         members = [m for m in tar.getmembers() if m.name != "famidrive-manifest.json"]
+        for m in members:
+            m.name = from_archive(lay, m.name)
         root.mkdir(parents=True, exist_ok=True)
         tar.extractall(root, members=members, filter="data")  # refuses ../ escapes
     return manifest
@@ -568,7 +659,7 @@ def server_save(s, dev, rom_id):
 
 
 def cmd_save_pull(system, rom_path):
-    kind, root, _ = layout(system)
+    kind, root, lay = layout(system)
     key = library_path(rom_path)
     STATE.mkdir(parents=True, exist_ok=True)
     SNAPSHOT.write_text(json.dumps(snapshot(root)))  # for rule 3 at push time
@@ -581,7 +672,7 @@ def cmd_save_pull(system, rom_path):
         return
     blob = get(s, EP_SAVE_CONTENT.format(id=newest["id"]), params={"device_id": dev}).content
     try:
-        manifest = unpack(blob, root)
+        manifest = unpack(blob, root, lay)
     except tarfile.ReadError:
         # A raw save uploaded by hand through RomM's web page, not a
         # FamiDrive archive. Restoring those isn't built yet (roms.md).
@@ -592,7 +683,7 @@ def cmd_save_pull(system, rom_path):
     saves = load_saves()
     e = saves.setdefault(key, {})
     e["title_id"] = entry.get("title_id") or manifest.get("title_id")
-    e["learned"] = entry.get("learned") or manifest.get("paths", [])
+    e["learned"] = entry.get("learned") or [from_archive(lay, p) for p in manifest.get("paths", [])]
     e["pushed"] = manifest.get("files_sha256")
     e["server_updated_at"] = newest["updated_at"]
     store_saves(saves)
@@ -601,7 +692,7 @@ def cmd_save_pull(system, rom_path):
 
 
 def cmd_save_push(system, rom_path, learn=True):
-    kind, root, _ = layout(system)
+    kind, root, lay = layout(system)
     key = library_path(rom_path)
     entry = entry_for(key)
     saves = load_saves()
@@ -616,7 +707,7 @@ def cmd_save_push(system, rom_path, learn=True):
     if not rels:
         return  # nothing saved yet, or nothing we can attribute
 
-    digest = files_hash(root, rels)
+    digest = files_hash(root, rels, lay)
     if digest == entry.get("pushed"):
         return  # RomM already has exactly this
 
@@ -630,7 +721,7 @@ def cmd_save_push(system, rom_path, learn=True):
         slot = f"{SLOT}-conflict-{CFG['deviceName']}"
         print(f"conflict on {rom_path}: uploaded to slot {slot}", file=sys.stderr)
 
-    blob, _ = pack(system, entry, root, rels, digest)
+    blob, _ = pack(system, entry, root, rels, digest, lay)
     name = f"{system}-{entry.get('title_id') or entry['id']}.famidrive.tar.gz"
     r = s.post(API + EP_SAVES, timeout=120,
                params={"rom_id": entry["id"], "slot": slot, "device_id": dev,
@@ -662,6 +753,7 @@ def main():
         "pull": cmd_pull, "firmware": cmd_firmware, "reconcile": cmd_reconcile,
         "save-pull": cmd_save_pull, "save-push": cmd_save_push,
         "gamelists": cmd_gamelists, "firmware-install": cmd_firmware_install,
+        "eden-profile": cmd_eden_profile,
     }
     if cmd not in commands:
         print(__doc__)

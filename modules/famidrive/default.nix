@@ -35,15 +35,22 @@ let
         defaultText = "their sops secret, romm-token-<name>";
         description = "Their RomM Client API Token (rmm_...), decrypted by sops-nix.";
       };
-      # Revised 2026-10-05: the Switch emulator is Eden, not Ryubing. Eden
-      # keeps profiles in a binary profiles.dat, so the ID isn't derived and
-      # seeded the way Ryubing's Profiles.json was going to be. It's the
-      # profile Eden already uses on the player's first box, set by hand,
-      # and seeding it onto later boxes is an open question in roms.md.
+      # Revised 2026-10-06: no longer needed by hand. A player's new Eden
+      # gets a profile from the RomM agent before its first start, with an
+      # ID derived from `owner`; an Eden that already has one is read
+      # (profiles.dat, and the user Eden runs games as). Saves go to RomM
+      # without the ID and unpack under each box's own, so the same player
+      # can have different IDs on different boxes.
       edenProfileId = mkOption {
         type = types.nullOr types.str;
         default = null;
-        description = "The Eden profile whose saves sync with RomM. Needed before Switch save sync.";
+        example = "63CA1C4C81D775E24288780D17344942";
+        description = ''
+          The Eden profile whose saves sync with RomM, by its save folder's
+          name. Usually left unset: FamiDrive uses the one Eden runs games
+          as. For an Eden with old saves spread over several profiles, to
+          say which one is real.
+        '';
       };
       # Xenia's is derived from `owner`, never set by hand: if each box
       # invented its own, one owner's saves wouldn't line up across their

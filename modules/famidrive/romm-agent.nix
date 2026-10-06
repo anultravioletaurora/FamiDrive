@@ -37,6 +37,7 @@ let
     url = cfg.romm.url;
     tokenFile = p.tokenFile;
     owner = p.owner;
+    inherit (p) displayName;   # names a new Eden profile
     deviceName = config.networking.hostName;
     dataDir = cfg.dataDir;
     playerRoms = p.roms;   # famidrive-launch hands over ROM paths in here

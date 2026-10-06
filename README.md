@@ -307,10 +307,10 @@ RomM along the way.
    set it back to `null` and let the full pull run (the timer does it every
    30 minutes; it resumes where it stopped).
 8. **Bring old saves in:** copy them back into each emulator's save folder,
-   sort out any duplicate Eden profiles first (keep the one Eden uses, and
-   set the player's `edenProfileId` to it), then run `romm-agent reconcile`
-   as that player.
-   Every save RomM doesn't have goes up, under your user.
+   sort out any duplicate Eden profiles first (FamiDrive syncs the one
+   Eden runs games as; set the player's `edenProfileId` only if that isn't
+   the one with the real saves), then run `romm-agent reconcile` as that
+   player. Every save RomM doesn't have goes up, under their RomM user.
 9. **Check:** a GameCube game, a Switch game and a Steam game each launch,
    take focus, and quit back to ES-DE; the controller works throughout; a
    new save shows up in RomM after quitting; Media → Jellyfin plays

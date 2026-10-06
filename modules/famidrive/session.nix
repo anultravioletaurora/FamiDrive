@@ -39,6 +39,10 @@ let
       # reads them, then firmware into this player's emulators.
       if [ -e "/etc/famidrive/romm/$(id -un).json" ]; then
         ${pkgs.romm-agent}/bin/romm-agent gamelists || echo "famidrive-session: couldn't copy game lists" >&2
+        ${lib.optionalString (cfg.systems ? switch) ''
+          # Before Eden ever starts: this player's profile, the same ID on each of their boxes.
+          ${pkgs.romm-agent}/bin/romm-agent eden-profile || echo "famidrive-session: couldn't set up the Eden profile" >&2
+        ''}
         ${pkgs.romm-agent}/bin/romm-agent firmware-install &
       fi
     ''}
