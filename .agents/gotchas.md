@@ -124,6 +124,10 @@ See [CONTROLLERS.md](../CONTROLLERS.md) for per-controller results.
 - **writeShellApplication runs shellcheck.** A variable that's only used
   when an option is on breaks the build when it's off. Wrap it in
   `optionalString`.
+- **The Python tools' packages run flake8** (`writePython3Bin`), and their
+  unit tests don't. A lambda assigned to a name (E731) passed every test
+  and still failed CI. Build `.#checks.<system>.pkg-<name>` as well as the
+  tool's test before pushing.
 - **Name clashes in checks:** a flake check can't share a name with a
   package, so packages are checked as `pkg-<name>`.
 - **Defining one attribute twice:** set `systemd.services` and similar
