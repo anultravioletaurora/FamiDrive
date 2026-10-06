@@ -6,8 +6,9 @@ starts this, writes the current state to STATUS_FILE (JSON: "state" and,
 for "failed", "detail"), puts this window on top, and closes it once the
 game's own window is up.
 
-It draws in ES-DE's look, using the theme's fonts and the game's scraped
-art when there is some (FAMIDRIVE_STATUS_FONTS, FAMIDRIVE_STATUS_MEDIA).
+It draws in ES-DE's look: the fonts the theme itself uses for game names
+and descriptions (read from the theme's theme.xml, FAMIDRIVE_STATUS_THEME),
+and the game's scraped art when there is some (FAMIDRIVE_STATUS_MEDIA).
 It takes no input: Select + Start (famidrive-quit) is the way out, and
 when Steam shows a prompt, gamescope-fg puts Steam's window above this.
 """
@@ -25,7 +26,7 @@ os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 import pygame  # noqa: E402
 
 STEAM = Path.home() / ".local/share/Steam"
-FONTS = Path(os.environ.get("FAMIDRIVE_STATUS_FONTS", "/nonexistent"))
+THEME = Path(os.environ.get("FAMIDRIVE_STATUS_THEME", "/nonexistent"))
 MEDIA = Path(os.environ.get("FAMIDRIVE_STATUS_MEDIA", str(Path.home() / "ES-DE/downloaded_media/steam")))
 
 WHITE = (255, 255, 255)
@@ -90,11 +91,23 @@ def load(path):
         return None
 
 
-def font(name, size):
+def theme_fonts():
+    """(regular, light) font files the theme uses for game names and for
+    descriptions. Art Book Next names them in theme.xml's <variables> as
+    fontRegular and fontLight; other themes fall back to ES-DE's default."""
+    names = dict(re.findall(r"<(font\w+)>([^<]+)</font\w+>", read(THEME / "theme.xml")))
+    regular = names.get("fontRegular")
+    light = names.get("fontLight", regular)
+    return (THEME / regular if regular else None), (THEME / light if light else None)
+
+
+def font(path, size):
     try:
-        return pygame.font.Font(str(FONTS / name), size)
+        if path:
+            return pygame.font.Font(str(path), size)
     except (FileNotFoundError, OSError):
-        return pygame.font.Font(None, int(size * 1.3))
+        pass
+    return pygame.font.Font(None, int(size * 1.3))
 
 
 def wrap(text, f, width):
@@ -145,10 +158,11 @@ def main():
     name = field(text, "name") or f"Steam game {appid}"
     cover_img, bg_img = (load(p) for p in art(name))
 
-    title_f = font("ChangaOne-Italic.ttf", int(64 * u))
-    head_f = font("Mulish-Medium.ttf", int(40 * u))
-    body_f = font("Mulish-Light.ttf", int(28 * u))
-    help_f = font("Mulish-Medium.ttf", int(24 * u))
+    regular, light = theme_fonts()
+    title_f = font(regular, int(64 * u))
+    head_f = font(regular, int(40 * u))
+    body_f = font(light, int(28 * u))
+    help_f = font(regular, int(24 * u))
 
     # The background: the game's art, scaled to fill and darkened.
     background = pygame.Surface((w, h), 0, 32)
