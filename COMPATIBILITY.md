@@ -162,7 +162,8 @@ same REDmod support.
 
 ### Gears 5
 
-**Steam: ❔ Untested.**
+**Steam: 🟡 Plays.** 2026-10-06: it runs, and controllers work well.
+Multiplayer, split-screen, rumble and HDR are still to check.
 
 - **Accounts:** it wants a Microsoft account (Xbox) sign-in for the
   campaign's online parts and for multiplayer. Expect that sign-in on
