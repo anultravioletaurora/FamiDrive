@@ -26,11 +26,11 @@
 # whole tree gets closed (it isn't in a group of its own);
 # famidrive-game.close holds a command to run instead of killing anything
 # (Big Picture: closing it must not take the Steam client with it).
-{ writeShellApplication, xprop, xwininfo, procps, util-linux, gnugrep, coreutils, famidrive-status }:
+{ writeShellApplication, xprop, xwininfo, procps, util-linux, gnugrep, coreutils, socat, famidrive-status }:
 
 writeShellApplication {
   name = "gamescope-fg";
-  runtimeInputs = [ xprop xwininfo procps util-linux gnugrep coreutils famidrive-status ];
+  runtimeInputs = [ xprop xwininfo procps util-linux gnugrep coreutils socat famidrive-status ];
   text = ''
     FRONTEND=1
     GAME=2
@@ -39,6 +39,14 @@ writeShellApplication {
     mkdir -p "$run"
 
     base() { xprop -root -f GAMESCOPECTRL_BASELAYER_APPID 32c -set GAMESCOPECTRL_BASELAYER_APPID "$1"; }
+
+    # The menu's music (the session plays the player's ES-DE/music through
+    # mpv): paused while anything else is on screen, back when ES-DE is.
+    music_paused() {
+      [ -S "$run/famidrive-music.sock" ] || return 0
+      printf '{"command": ["set_property", "pause", %s]}\n' "$1" \
+        | socat - "UNIX-CONNECT:$run/famidrive-music.sock" > /dev/null 2>&1 || true
+    }
 
     # Windows come and go between listing them and reading them. These
     # helpers never fail: under errexit, one window closing at the wrong
@@ -78,6 +86,11 @@ writeShellApplication {
       wait "$pid"
       exit $?
     fi
+
+    # Everything else (a game, Steam, Big Picture, the Media app) covers
+    # ES-DE until it's gone, so the menu's music waits too.
+    music_paused true
+    trap 'music_paused false' EXIT
 
     if [ "''${1:-}" = "--steam" ] && [ "''${2:-}" = "bigpicture" ]; then
       echo "steam steam://close/bigpicture" > "$run/famidrive-game.close"
@@ -204,7 +217,7 @@ writeShellApplication {
           if descends "$wpid" "$1"; then tag "$wid" "$appid"; fi
         done
       }
-      trap status_stop EXIT
+      trap 'status_stop; music_paused false' EXIT
 
       # This game's launch steps since the launch. Read whole, not piped into
       # grep -q, which under pipefail can fail on tail's SIGPIPE.

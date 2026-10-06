@@ -120,6 +120,17 @@ in
     description = "ES-DE theme, symlinked in and selected. null = ES-DE's bundled default.";
   };
 
+  options.famidrive.esde.musicVolume = lib.mkOption {
+    type = lib.types.ints.between 0 100;
+    default = 50;
+    description = ''
+      Volume of the menu's music, 0 to 100. ES-DE has no music of its own:
+      FamiDrive plays each player's `~/ES-DE/music` (MP3, OGG, FLAC, ...)
+      shuffled behind the menu, paused while a game or app is open.
+      Players without music files get none.
+    '';
+  };
+
   options.famidrive.esde.skipFolders = lib.mkOption {
     type = lib.types.listOf lib.types.str;
     # RomM's names for a game's extra folders, plus common variants.
