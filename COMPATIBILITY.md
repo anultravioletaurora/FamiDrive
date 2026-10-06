@@ -29,6 +29,7 @@ behave differently in each. For a console game it's the emulator.
   - [Hollow Knight](#hollow-knight) (PC)
   - [The Jackbox Party Pack 3](#the-jackbox-party-pack-3) (PC)
   - [The Jackbox Party Pack 6](#the-jackbox-party-pack-6) (PC)
+  - [The Legend of Zelda: Breath of the Wild](#the-legend-of-zelda-breath-of-the-wild) (Switch)
   - [Left 4 Dead 2](#left-4-dead-2) (PC)
   - [Mario Kart: Double Dash!!](#mario-kart-double-dash) (GameCube)
   - [Minecraft (vanilla 26.2, a private server)](#minecraft-vanilla-262-a-private-server) (PC)
@@ -157,6 +158,12 @@ options.
   whole box reset itself. Nothing was logged; the cause is unknown.
 
 Don't test it without being ready for a reboot.
+
+### The Legend of Zelda: Breath of the Wild
+
+**Switch, Eden: ✅ Works.** The first save went into Eden's profile, the
+same one Animal Crossing: New Horizons and Smash Ultimate use. The
+8BitDo's rumble works.
 
 ### Left 4 Dead 2
 
