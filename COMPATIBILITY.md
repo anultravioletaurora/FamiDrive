@@ -23,8 +23,11 @@ behave differently in each. For a console game it's the emulator.
   - [Animal Crossing: New Horizons](#animal-crossing-new-horizons) (Switch)
   - [Back 4 Blood](#back-4-blood) (PC)
   - [Call of Duty: Black Ops III](#call-of-duty-black-ops-iii) (PC)
+  - [Call of Duty: WWII](#call-of-duty-wwii) (PC)
   - [Cyberpunk 2077](#cyberpunk-2077) (PC)
   - [Fallout: New Vegas](#fallout-new-vegas) (PC)
+  - [Tom Clancy's Ghost Recon Wildlands](#tom-clancys-ghost-recon-wildlands) (PC)
+  - [Halo: The Master Chief Collection](#halo-the-master-chief-collection) (PC)
   - [Helldivers 2](#helldivers-2) (PC)
   - [Hollow Knight](#hollow-knight) (PC)
   - [The Jackbox Party Pack 3](#the-jackbox-party-pack-3) (PC)
@@ -36,10 +39,12 @@ behave differently in each. For a console game it's the emulator.
   - [Minecraft (vanilla 26.2, a private server)](#minecraft-vanilla-262-a-private-server) (PC)
   - [Rocket League](#rocket-league) (PC)
   - [Street Fighter 6](#street-fighter-6) (PC)
+  - [Star Wars Jedi: Fallen Order](#star-wars-jedi-fallen-order) (PC)
   - [Star Wars Jedi: Survivor](#star-wars-jedi-survivor) (PC)
   - [Super Smash Bros. Brawl](#super-smash-bros-brawl) (Wii)
   - [Super Smash Bros. Melee](#super-smash-bros-melee) (GameCube)
   - [Super Smash Bros. Ultimate](#super-smash-bros-ultimate) (Switch)
+  - [Team Fortress 2](#team-fortress-2) (PC)
   - [Titanfall 2](#titanfall-2) (PC)
   - [Valheim](#valheim) (PC)
   - [Wii Sports](#wii-sports) (Wii)
@@ -96,6 +101,19 @@ options.
   (a BOIII-style client) and #3 (Plutonium, for the older Treyarch
   games).
 
+### Call of Duty: WWII
+
+**Steam: ❔ Untested.**
+
+- **Modes:** the campaign and Nazi Zombies run from one program, and
+  multiplayer from another. Steam asks which one to start, so expect
+  Steam's own chooser on screen first. FamiDrive shows that prompt on
+  top, as it does Left 4 Dead 2's. Check whether the choice can be
+  answered with a controller, and whether ES-DE should get one entry
+  per mode instead.
+- **To check:** multiplayer under Proton (matchmaking and anti-cheat),
+  controllers and rumble in each mode.
+
 ### Cyberpunk 2077
 
 **Steam: ✅ Works.**
@@ -125,6 +143,31 @@ same REDmod support.
 
 - **Mods:** not set up. NakeyJakey's New Vegas (a Wabbajack list of
   about 335 mods) is the one wanted; tracked in #5.
+
+### Tom Clancy's Ghost Recon Wildlands
+
+**Steam: ❔ Untested.**
+
+- **Ubisoft Connect** starts first and wants a sign-in, like the EA app
+  for EA's games. Expect the same first-launch hurdles: its installer and
+  sign-in window, probably wanting a mouse or keyboard
+  ([Star Wars Jedi: Survivor](#star-wars-jedi-survivor)).
+- **Multiplayer** (co-op, Ghost War) uses BattlEye. Check whether it
+  works under Proton.
+- **To check:** controllers and rumble, and whether Ubisoft Connect
+  closes when the game does, so that quitting returns to ES-DE.
+
+### Halo: The Master Chief Collection
+
+**Steam: ❔ Untested.**
+
+- **Anti-cheat:** Steam offers two ways to start it: with Easy
+  Anti-Cheat (matchmaking) or with it off (campaigns, custom games,
+  mods). That's another Steam chooser on screen before the game. Check
+  that both work under Proton, and that matchmaking works with EAC on.
+- **To check:** controllers and rumble, split-screen (MCC has it in some
+  games, depending on the game and mode), and playing online with a
+  Microsoft account sign-in.
 
 ### Helldivers 2
 
@@ -238,6 +281,17 @@ joins the server straight from launch.
 **Other stores:** none known. Street Fighter 6 on PC is sold as Steam
 keys only, including on Humble; there's no GOG or DRM-free version.
 
+### Star Wars Jedi: Fallen Order
+
+**Steam: ❔ Untested.** Expect the same EA hurdle as
+[Jedi: Survivor](#star-wars-jedi-survivor): Steam's copy runs the EA app
+first, which installs and asks for a sign-in. FamiDrive shows its windows
+now, but they want a mouse or keyboard.
+
+- **To check:** whether the EA app gets out of the way after the first
+  sign-in, controllers and rumble, and quitting back to ES-DE with the EA
+  app still running behind.
+
 ### Star Wars Jedi: Survivor
 
 **Steam: ⚠️ In progress.** Installed remotely through Steam while the box
@@ -265,6 +319,17 @@ works.
 
 **Switch, Eden: ✅ Works.** Face buttons by label. HewDraw Remix
 support is tracked in #4.
+
+### Team Fortress 2
+
+**Steam: ❔ Untested.** Native Linux build (Source engine, 64-bit since
+2024). There's no Proton pin unless the native build misbehaves.
+
+- **Controllers:** like [Left 4 Dead 2](#left-4-dead-2), a Source game
+  whose controller support leans on Steam Input. It probably needs
+  `steam.steamInputGames`. Check with Steam Input off first.
+- **To check:** VAC-secured servers, rumble, and the on-screen button
+  prompts.
 
 ### Titanfall 2
 
