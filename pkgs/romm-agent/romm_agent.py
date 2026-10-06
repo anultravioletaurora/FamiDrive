@@ -82,6 +82,7 @@ SLOT = "famidrive"
 PAGE = 500
 
 EP_ROMS = "/roms"                                      # paginated, ?collection_id= optional
+EP_ROM = "/roms/{id}"
 EP_ROM_CONTENT = "/roms/{id}/content/{file_name}"      # multi-file ROMs come back as a zip
 EP_ROM_IDENTITY = "/roms/{id}/identity"                # PUT title_id back (needs roms.write)
 EP_COLLECTIONS = "/collections"
@@ -210,6 +211,10 @@ def fetch_rom(s, rom, system):
         # Party 7.iso"). Found on the first box 2026-10-06: without the
         # extension, ES-DE didn't list the game.
         files = rom.get("files") or []
+        if not files and not Path(rom["fs_name"]).suffix and rom.get("has_nested_single_file"):
+            # RomM's ROM list sends `files` empty; the ROM's own page has
+            # them. Found on the first box 2026-10-06.
+            files = get(s, EP_ROM.format(id=rom["id"])).json().get("files") or []
         if len(files) == 1 and files[0].get("file_name") and not Path(rom["fs_name"]).suffix:
             named = dest.with_name(files[0]["file_name"])
             if dest.is_file() and not named.exists():

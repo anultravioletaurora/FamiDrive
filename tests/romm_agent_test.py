@@ -195,6 +195,14 @@ class Test(unittest.TestCase):
         self.assertEqual(dest, gc / "Mario Party 7.iso")
         self.assertEqual(dest.read_bytes(), b"pulled before")      # renamed, not fetched again
         self.assertEqual(got, [("/roms/222/content/Mario Party 7", gc / "Mario Party 7.iso")])
+        # From RomM's ROM list, `files` comes empty: the ROM's own page has it.
+        (gc / "Shrek Superslam").write_bytes(b"pulled before")
+        a["fetch_rom"].__globals__["get"] = lambda s, path, **kw: type("R", (), {
+            "json": lambda self: {"files": [{"file_name": "Shrek SuperSlam.iso"}]} if path == "/roms/245" else {}})()
+        rom = {"id": 245, "fs_name": "Shrek Superslam", "has_multiple_files": False,
+               "has_nested_single_file": True, "files": []}
+        self.assertEqual(a["fetch_rom"](None, rom, "gc"), gc / "Shrek SuperSlam.iso")
+        self.assertEqual((gc / "Shrek SuperSlam.iso").read_bytes(), b"pulled before")
         # A file named with its extension stays as it is.
         rom = {"id": 1, "fs_name": "Game.sfc", "has_multiple_files": False, "files": [{"file_name": "Game.sfc"}]}
         self.assertEqual(a["fetch_rom"](None, rom, "gc"), gc / "Game.sfc")
