@@ -204,6 +204,16 @@ def fetch_rom(s, rom, system):
     dest = DATA / "roms" / system / rom["fs_name"]
     path = EP_ROM_CONTENT.format(id=rom["id"], file_name=rom["fs_name"])
     if not rom.get("has_multiple_files"):
+        # A single file kept in a folder of its own: RomM's fs_name is the
+        # folder's ("Mario Party 7"), the file's is in `files` ("Mario
+        # Party 7.iso"). Found on the first box 2026-10-06: without the
+        # extension, ES-DE didn't list the game.
+        files = rom.get("files") or []
+        if len(files) == 1 and files[0].get("file_name") and not Path(rom["fs_name"]).suffix:
+            named = dest.with_name(files[0]["file_name"])
+            if dest.is_file() and not named.exists():
+                dest.rename(named)   # pulled before under the folder's name
+            dest = named
         download(s, path, dest, rom.get("sha1_hash"), rom.get("fs_size_bytes"))
         return dest
     done = dest / ".famidrive-complete"
@@ -269,9 +279,12 @@ def title_id(system, rom, prev, path):
     GameCube and Wii saves are named by the full six-character ID (game
     and maker), so a shorter one from RomM is completed from the disc."""
     tid = romm_title_id(system, rom.get("title_id"))
+    had = romm_title_id(system, prev.get("title_id"))
     if system in ("gc", "wii") and (not tid or len(tid) != 6):
-        return prev.get("title_id") or derive_id(system, path) or tid
-    return tid or prev.get("title_id") or derive_id(system, path)
+        # What this box worked out before counts only if it's complete:
+        # an earlier pull may have kept RomM's hex as it was.
+        return (had if had and len(had) == 6 else None) or derive_id(system, path) or tid
+    return tid or had or derive_id(system, path)
 
 
 def fetch_cover(s, rom, system):
