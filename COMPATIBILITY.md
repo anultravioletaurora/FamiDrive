@@ -124,8 +124,8 @@ joins the server straight from launch.
   button prompts that match the pad.
 - **Sign-in:** Prism asked to sign in again and showed a code to enter in
   a browser on another device. No keyboard or browser needed on the box.
-- **Fullscreen:** it opened in a window. FamiDrive now sets fullscreen
-  in the game's options (`fullscreen`, on by default); not yet retested.
+- **Fullscreen:** opened in a window at first. FamiDrive now starts
+  every Prism instance fullscreen; confirmed.
 
 ### Rocket League
 
