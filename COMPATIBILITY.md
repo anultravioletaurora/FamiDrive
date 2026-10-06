@@ -71,8 +71,9 @@ options.
 - **ES-DE:** TheGamesDB's scraper matched it to the 2010 *Call of Duty:
   Black Ops*, so it was listed under that name with that game's details.
   Fixed by re-scraping it in ES-DE. ScreenScraper matches more reliably.
-- **Community clients:** BOIII-style clients aren't set up. Neither is
-  Plutonium, for the older Treyarch games.
+- **Community clients:** not set up. Opt-in support is tracked in #2
+  (a BOIII-style client) and #3 (Plutonium, for the older Treyarch
+  games).
 
 ### Cyberpunk 2077
 
