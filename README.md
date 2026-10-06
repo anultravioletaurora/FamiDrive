@@ -52,7 +52,7 @@ and never needs a desktop, and makes Steam just one entry on the menu.
 | Steam | Steam, started hidden | Your Steam library |
 | GOG | `gogdl` (not packaged yet) | Your GOG library |
 | Minecraft | Prism Launcher | Your Prism instances |
-| Media | [Jellyfin MPV Shim](https://github.com/jellyfin/jellyfin-mpv-shim) 3.1 | Your Jellyfin server |
+| Media | [Kodi](https://kodi.tv) 21 with [Jellyfin for Kodi](https://github.com/jellyfin/jellyfin-kodi), or [Jellyfin MPV Shim](https://github.com/jellyfin/jellyfin-mpv-shim) 3.1 | Your Jellyfin server, and media folders on the box (an external drive) |
 
 RetroArch runs everything it does well, so those systems share one
 controller setup and one save folder. The rest get the standalone emulator
@@ -114,7 +114,7 @@ modules/famidrive/
   generators.nix             Steam / GOG / Prism menu entries, regenerated when installs change
   pc-saves.nix               Syncthing for PC saves, the one thing RomM can't hold yet
   online.nix                 famidrive.online.enable fills in each emulator's netplay settings
-  media.nix                  famidrive.media.jellyfin.enable: a "Media" entry for Jellyfin
+  media.nix                  famidrive.media.kodi / .jellyfin: "Media" entries for Kodi and Jellyfin
   controllers.nix            GameCube ports per box, the quit combo, RetroArch's menu combo
   lib/seed.nix               seed / lockKeys helpers for configs the app also writes
 pkgs/
@@ -362,7 +362,7 @@ are in [AGENTS.md](AGENTS.md).
 - **Everyone else whose open source work this is built on**: NixOS and
   nixpkgs, ES-DE, gamescope, Steam's Linux team, the emulator projects
   (Dolphin, Eden, RetroArch and its cores, PCSX2, RPCS3, Xenia, Azahar,
-  PPSSPP, Cemu, melonDS), Prism Launcher, Jellyfin and Jellyfin MPV Shim, mpv,
+  PPSSPP, Cemu, melonDS), Prism Launcher, Kodi, Jellyfin and Jellyfin MPV Shim, mpv,
   home-manager and sops-nix.
 
 ## License
