@@ -109,6 +109,7 @@ in
     in [
       (check "starts on the picker as greeter" (picker.user == "greeter" && lib.hasInfix "famidrive-picker" picker.command))
       (check "no autologin" (!(c.services.greetd.settings ? initial_session)))
+      (check "a switch restarts the session when it changed" c.systemd.services.greetd.restartIfChanged)
       (check "players log in without a password from greetd"
         (pam.famidrive-player.enable && pam.famidrive-player.control == "sufficient"
           && pam.famidrive-player.order < pam.unix.order))

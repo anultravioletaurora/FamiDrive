@@ -46,6 +46,13 @@ let
         ${pkgs.romm-agent}/bin/romm-agent firmware-install &
       fi
     ''}
+    ${lib.optionalString picker ''
+      # A fresh start for this player's audio. Found on the first box
+      # 2026-10-06: after switching players, WirePlumber tried to open the
+      # HDMI output while logind was still handing the TV over, gave up,
+      # and left only "Dummy Output" (no sound) for the whole session.
+      systemctl --user restart wireplumber.service || echo "famidrive-session: couldn't restart WirePlumber" >&2
+    ''}
     ${cfg.sessionSetup}
     # Nothing is running yet: clear what a crashed launch may have left.
     rm -f "''${XDG_RUNTIME_DIR:-/nonexistent}"/famidrive-game.*
@@ -177,6 +184,18 @@ in
     '';
   };
 
+  options.famidrive.session.restartOnSwitch = mkOption {
+    type = types.bool;
+    default = true;
+    description = ''
+      Restart the TV's session on `nixos-rebuild switch` when the switch
+      changed it, so the new one is what's on screen. Whatever is running
+      on the TV closes (back to "Who's playing?" or the menu). Off: the
+      new session starts at the next reboot or
+      `systemctl restart display-manager`, as on plain NixOS.
+    '';
+  };
+
   options.famidrive.display.hdr = mkOption {
     type = types.bool;
     default = false;
@@ -217,6 +236,12 @@ in
       enable = true;
       capSysNice = false;   # see gamescopeCmd
     };
+
+    # A switch restarts the session only when the session itself changed
+    # (greetd's unit names the session and picker commands), so a new
+    # session comes up without restarting display-manager by hand.
+    # NixOS's own default is never, so a rebuild can't end a game.
+    systemd.services.greetd.restartIfChanged = lib.mkForce cfg.session.restartOnSwitch;
 
     services.greetd = {
       enable = true;

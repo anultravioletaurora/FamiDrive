@@ -299,9 +299,9 @@ RomM along the way.
 6. **Try it without committing:** `sudo nixos-rebuild test --flake /etc/nixos#tv`,
    over SSH. That switches the running system but not the boot default,
    so if anything goes wrong, a reboot brings back the old system. The
-   session doesn't restart on a live switch: run
-   `sudo systemctl restart display-manager.service` to see the new one,
-   and `sudo systemd-tmpfiles --create` if a library folder is missing.
+   TV's session restarts by itself when the switch changed it
+   (`famidrive.session.restartOnSwitch`); run
+   `sudo systemd-tmpfiles --create` if a library folder is missing.
 7. **Pull a little first:** run `sudo systemctl start romm-library-pull` with `romm.collection` set
    to a small test collection, and check the games show up in ES-DE. Then
    set it back to `null` and let the full pull run (the timer does it every
