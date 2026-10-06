@@ -78,6 +78,9 @@ in
     (check "ES-DE reads alice's own ROM folder"
       (lib.hasInfix "/home/alice/.local/share/famidrive/roms" c.home-manager.users.alice.home.activation.famidriveEsSettings.data))
     (check "no RomM agent configs" (!(c.environment.etc ? "famidrive/romm/library.json")))
+    (check "old builds are cleaned up weekly, two weeks kept"
+      (c.nix.gc.automatic && c.nix.gc.options == "--delete-older-than 14d"
+        && c.boot.loader.systemd-boot.configurationLimit == 10))
   ]);
 
   # A family: two players with RomM, a guest, every lane.
@@ -100,6 +103,7 @@ in
       };
       valheim.mods."ValheimModding-Jotunn-2.30.2" = "sha256-iq6S2ivg62ggzUz1fi9sHWrQ1zjUkVlm58PXqU6amw8=";
     };
+    nix.gc.options = "--delete-older-than 30d";   # a host's own choice wins
   } (c:
     let
       picker = c.services.greetd.settings.default_session;
@@ -110,6 +114,7 @@ in
       (check "starts on the picker as greeter" (picker.user == "greeter" && lib.hasInfix "famidrive-picker" picker.command))
       (check "no autologin" (!(c.services.greetd.settings ? initial_session)))
       (check "a switch restarts the session when it changed" c.systemd.services.greetd.restartIfChanged)
+      (check "a host's own cleanup choice wins" (c.nix.gc.options == "--delete-older-than 30d"))
       (check "new players start at full volume"
         (c.services.pipewire.wireplumber.extraConfig.famidrive-volume."wireplumber.settings"."device.routes.default-sink-volume" == 1.0))
       (check "players log in without a password from greetd"
