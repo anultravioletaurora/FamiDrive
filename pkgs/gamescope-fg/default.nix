@@ -205,9 +205,18 @@ writeShellApplication {
       idle=0
       last=""
       while [ "$idle" -lt 240 ]; do
-        pid=$(pgrep -o -f "SteamLaunch AppId=$appid( |$)" || true)
-        [ -n "$pid" ] && break
         steps=$(since)
+        # The game's processes count only once Steam says it has started
+        # the game. Found on the first box 2026-10-05: Steam runs a game's
+        # install script (ProcessingInstallScript) through the same
+        # `SteamLaunch AppId=N` launcher, before processing its shaders.
+        # Taking that for the game showed "Starting", then handed the
+        # screen back to ES-DE when the script ended, while Steam carried
+        # on with the shaders behind it.
+        if grep -qE "changed task to (WaitingGameWindow|Completed)" <<< "$steps"; then
+          pid=$(pgrep -o -f "SteamLaunch AppId=$appid( |$)" || true)
+          [ -n "$pid" ] && break
+        fi
         if grep -qE "changed task to Failed|LaunchApp failed" <<< "$steps"; then
           # Found on the first box 2026-10-05: when a game needs an update,
           # Steam may fail the launch (AppError_19) while the update itself

@@ -109,6 +109,20 @@ def wrap(text, f, width):
     return lines + ([line] if line else [])
 
 
+def shader_progress(appid):
+    """Steam's shader-processing percentage for this game, from its shader
+    log ("Still replaying <appid> (57%, …)"), or None."""
+    try:
+        with open(STEAM / "logs/shader_log.txt", "rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 65536))
+            tail = f.read().decode("utf-8", "replace")
+    except OSError:
+        return None
+    found = re.findall(rf"Still replaying {appid} \((\d+)%", tail)
+    return int(found[-1]) if found else None
+
+
 def gb(n):
     return f"{n / 1e9:.1f} GB"
 
@@ -155,6 +169,7 @@ def main():
     state, detail, since = "asking", "", time.monotonic()
     rate, last_bytes, last_t = None, None, None
     done = total = 0
+    shaders = None
     next_read = 0.0
     clock = pygame.time.Clock()
     while True:
@@ -221,6 +236,20 @@ def main():
                     mins = (total - done) / rate / 60
                     line += f"  ·  {rate / 1e6:.0f} MB/s  ·  about {max(1, round(mins))} min left"
                 screen.blit(body_f.render(line, True, WHITE), (left, y))
+                y += body_f.get_linesize() + int(8 * u)
+
+        if state == "shaders":
+            now = time.monotonic()
+            if now >= next_read:
+                next_read = now + 2
+                shaders = shader_progress(appid)
+            if shaders is not None:
+                bar_w, bar_h = width, int(14 * u)
+                pygame.draw.rect(screen, BAR_BG, (left, y, bar_w, bar_h), border_radius=bar_h // 2)
+                pygame.draw.rect(screen, WHITE, (left, y, max(bar_h, int(bar_w * shaders / 100)), bar_h),
+                                 border_radius=bar_h // 2)
+                y += bar_h + int(16 * u)
+                screen.blit(body_f.render(f"{shaders}%", True, WHITE), (left, y))
                 y += body_f.get_linesize() + int(8 * u)
 
         for line in wrap(body, body_f, width):

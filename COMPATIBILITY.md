@@ -194,12 +194,15 @@ LaunchApp changed task to …`):
 |---|---|
 | asking for the game | "Asking Steam" |
 | downloading an update | "Updating", with a progress bar, speed and time left |
-| processing Vulkan shaders | "Processing Vulkan shaders", with why. Took up to 5 min 41 s (Left 4 Dead 2). |
+| processing Vulkan shaders | "Processing Vulkan shaders", with a progress bar from Steam's `shader_log.txt` and why it happens. Took up to 5 min 41 s (Left 4 Dead 2). |
 | waiting on a prompt (version picker, EULA, controller prompt) | Steam's own window, on top, to answer |
 | starting the game, no window yet | "Starting" (Cyberpunk: about 37 s) |
 | failing | "Steam couldn't start the game", for five seconds, then ES-DE |
 
-FamiDrive waits as long as Steam is still working, and only gives up after
+A game counts as started only once Steam's log says so: Steam runs a
+game's install script through the same launcher process first, and
+taking that for the game sent Rocket League back to ES-DE while Steam
+processed its shaders behind it. FamiDrive waits as long as Steam is still working, and only gives up after
 two minutes with no progress at all. When Steam fails a launch because the
 game needs an update (`AppError_19`), it waits for the update and asks
 again. Select + Start gives up at any time. Steam's "Allow background
