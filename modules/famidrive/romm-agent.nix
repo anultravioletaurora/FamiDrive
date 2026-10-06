@@ -72,7 +72,13 @@ in
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
       environment.ROMM_AGENT_CONFIG = "/etc/famidrive/romm/library.json";
+      # The library disk, and its folders with the right owners first.
+      # Found on the first box 2026-10-06: a freshly formatted library disk
+      # was mounted after tmpfiles had run, so dataDir was root's and the
+      # first pull couldn't make roms/.
+      unitConfig.RequiresMountsFor = cfg.dataDir;
       serviceConfig = background // {
+        ExecStartPre = "+${config.systemd.package}/bin/systemd-tmpfiles --create --prefix=${cfg.dataDir}";
         User = "famidrive-library";
         Group = "famidrive";
         # The primary player's token, read by systemd as root, so it can
