@@ -185,7 +185,7 @@ class Test(unittest.TestCase):
         box = Box(self.base, "alice")
         a = box.agent()
         got = []
-        a["fetch_rom"].__globals__["download"] = lambda s, path, dest, *rest: got.append((path, dest))
+        a["fetch_rom"].__globals__["download"] = lambda s, path, dest, *rest, **kw: got.append((path, dest))
         rom = {"id": 222, "fs_name": "Mario Party 7", "has_multiple_files": False,
                "files": [{"file_name": "Mario Party 7.iso"}]}
         gc = box.data / "roms/gc"
@@ -211,6 +211,22 @@ class Test(unittest.TestCase):
         # A file named with its extension stays as it is.
         rom = {"id": 1, "fs_name": "Game.sfc", "fs_extension": "sfc", "has_multiple_files": False, "files": [{"file_name": "Game.sfc"}]}
         self.assertEqual(a["fetch_rom"](None, rom, "gc"), gc / "Game.sfc")
+
+    def test_a_folder_with_extras_downloads_only_the_game(self):
+        box = Box(self.base, "library", tokenFile=None)
+        a = box.agent()
+        got = []
+        g = a["fetch_rom"].__globals__
+        g["download"] = lambda s, path, dest, sha1=None, size=None, params=None: got.append((path, dest.name, sha1, size, params))
+        files = [{"id": 187, "file_name": "AC HD Texture Pack.zip", "sha1_hash": "aaa", "file_size_bytes": 90},
+                 {"id": 188, "file_name": "Animal Crossing (USA) (Deluxe).iso", "sha1_hash": "bbb", "file_size_bytes": 34},
+                 {"id": 189, "file_name": "Animal Crossing.ciso", "sha1_hash": "ccc", "file_size_bytes": 31}]
+        rom = {"id": 186, "fs_name": "Animal Crossing", "fs_extension": "", "has_nested_single_file": True,
+               "has_multiple_files": False, "sha1_hash": "ccc", "fs_size_bytes": 156, "files": files}
+        dest = a["fetch_rom"](None, rom, "gc")
+        self.assertEqual(dest.name, "Animal Crossing.ciso")
+        self.assertEqual(got, [("/roms/186/content/Animal Crossing.ciso", "Animal Crossing.ciso", "ccc", 31,
+                                {"file_ids": 189})])
 
     def test_hex_id_kept_from_an_earlier_pull_is_fixed(self):
         a = Box(self.base, "alice").agent()

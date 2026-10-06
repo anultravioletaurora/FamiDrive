@@ -232,12 +232,23 @@ def fetch_rom(s, rom, system):
             # RomM's ROM list sends `files` empty; the ROM's own page has
             # them. Found on the first box 2026-10-06.
             files = get(s, EP_ROM.format(id=rom["id"])).json().get("files") or []
-        if len(files) == 1 and files[0].get("file_name") and not rom.get("fs_extension"):
-            named = dest.with_name(files[0]["file_name"])
+        main = main_file(rom, files) if not rom.get("fs_extension") else None
+        params = None
+        size = rom.get("fs_size_bytes")
+        if main:
+            named = dest.with_name(main["file_name"])
             if dest.is_file() and not named.exists():
                 dest.rename(named)   # pulled before under the folder's name
             dest = named
-        download(s, path, dest, rom.get("sha1_hash"), rom.get("fs_size_bytes"))
+            if len(files) > 1:
+                # The folder holds more than the game (a texture pack, a
+                # hack): RomM serves the whole folder as a zip unless asked
+                # for one file. Found on the first box 2026-10-06: Animal
+                # Crossing's zip never matched the game's hash.
+                path = EP_ROM_CONTENT.format(id=rom["id"], file_name=main["file_name"])
+                params = {"file_ids": main["id"]}
+                size = main.get("file_size_bytes")
+        download(s, path, dest, rom.get("sha1_hash"), size, params=params)
         return dest
     done = dest / ".famidrive-complete"
     if done.exists():
@@ -249,6 +260,15 @@ def fetch_rom(s, rom, system):
     archive.unlink()
     done.touch()
     return dest
+
+
+def main_file(rom, files):
+    """The game's own file among a folder's: the one RomM's hash for the
+    ROM is of, or the only one."""
+    named = [f for f in files if f.get("file_name")]
+    if len(named) == 1:
+        return named[0]
+    return next((f for f in named if f.get("sha1_hash") and f["sha1_hash"] == rom.get("sha1_hash")), None)
 
 
 def launch_file(folder, system):
