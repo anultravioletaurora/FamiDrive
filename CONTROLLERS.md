@@ -162,8 +162,10 @@ presents the guitar as an ordinary USB gamepad.
   or minus and plus, but that isn't confirmed.
 - **Hub:** the adapter failed with "Cannot enable" on a VIA USB hub and
   worked on another hub, so the hub was the problem.
-- **Clone Hero:** being tested. Still to record:
-  - the binding
+- **Clone Hero:** ✅ Bound and played on Expert, 2026-10-06. FamiDrive
+  saves bindings for the whole box (`cloneHero.sharedBindings`), so one
+  player binding the guitar binds it for everyone. Still to record:
+  - which button is which
   - whether minus + plus quits
   - calibration
 

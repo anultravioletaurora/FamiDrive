@@ -103,6 +103,36 @@ class Test(unittest.TestCase):
         self.run_tool("player", spec)          # library changed: rescan
         self.assertFalse(cache.exists())
 
+    def test_bindings_are_the_boxs(self):
+        unity = self.home / ".config/unity3d/srylain Inc_/Clone Hero"
+        unity.mkdir(parents=True)
+        prefs = unity / "prefs"
+        shared = self.dir / "bindings"
+        spec = {"profiles": [], "stamps": [], "bindings": str(shared)}
+        guitar = '\t<pref name="RewiredSaveData|playerName=Player1|hardwareIdentifier=Guitar" type="string">QUFB</pref>\n'
+        prefs.write_text('<unity_prefs version_major="1" version_minor="1">\n'
+                         '\t<pref name="token" type="string">secret</pref>\n'
+                         + guitar + '</unity_prefs>\n')
+        self.run_tool("player", spec)                 # nothing shared yet: kept
+        self.assertIn(guitar, prefs.read_text())
+        self.run_tool("played", spec)                 # bound here: now the box's
+        self.assertEqual(shared.read_text(), guitar)
+        self.assertNotIn("secret", shared.read_text())
+        # Another player, with an old binding of their own and no prefs at all.
+        rebound = guitar.replace("QUFB", "QkJC")
+        prefs.write_text('<unity_prefs version_major="1" version_minor="1">\n'
+                         '\t<pref name="token" type="string">theirs</pref>\n'
+                         + rebound + '</unity_prefs>\n')
+        self.run_tool("player", spec)
+        text = prefs.read_text()
+        self.assertIn(guitar, text)
+        self.assertNotIn(rebound, text)
+        self.assertIn("theirs", text)
+        self.assertTrue(text.endswith("</unity_prefs>\n"))
+        prefs.unlink()
+        self.run_tool("player", spec)
+        self.assertIn(guitar, prefs.read_text())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
