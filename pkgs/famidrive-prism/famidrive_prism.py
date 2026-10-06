@@ -1,4 +1,5 @@
 """famidrive-prism SPEC_JSON
+famidrive-prism fullscreen INSTANCE_DIR
 
 Brings Prism Launcher instances in line with famidrive.minecraft. Runs at
 activation, as the box's user. Only what the flake declares is touched:
@@ -10,12 +11,15 @@ activation, as the box's user. Only what the flake declares is touched:
 - .minecraft/mods: the declared mods. FamiDrive remembers which jars are
   its own (.famidrive-mods) and replaces only those; mods added by hand
   stay.
-- .minecraft/options.txt: the game options in "options" (fullscreen).
-  Everything else in it is the game's own.
 - .minecraft/servers.dat: the declared servers are added or updated (by
   address). Servers added in-game stay.
 
 Instances that aren't declared are left alone, worlds included.
+
+"fullscreen" runs at every Minecraft launch, for any instance, declared
+or not: it sets fullscreen:true in the instance's options.txt. On a TV
+box every instance should start fullscreen; windowed, gamescope stretches
+a small window to the TV at a low resolution.
 """
 
 import gzip
@@ -177,6 +181,12 @@ def update_mods(mods_dir, jars):
 
 
 def main():
+    if sys.argv[1] == "fullscreen":
+        d = Path(sys.argv[2])
+        if d.is_dir():
+            (d / ".minecraft").mkdir(exist_ok=True)
+            set_options(d / ".minecraft/options.txt", {"fullscreen": "true"})
+        return
     spec = json.loads(sys.argv[1])
     root = Path(spec["root"]).expanduser()
     root.mkdir(parents=True, exist_ok=True)
@@ -195,7 +205,6 @@ def main():
         })
         update_pack(d / "mmc-pack.json", inst["minecraft"], inst["fabricLoader"])
         update_mods(d / ".minecraft/mods", inst["mods"])
-        set_options(d / ".minecraft/options.txt", inst["options"])
         if inst["servers"]:
             update_servers(d / ".minecraft/servers.dat", inst["servers"])
 

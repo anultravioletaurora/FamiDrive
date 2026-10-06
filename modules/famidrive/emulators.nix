@@ -277,7 +277,11 @@ in
         minecraft = {
           fullname = "Minecraft";
           extensions = [ ".prism" ];
-          command = ''${pkgs.prismlauncher}/bin/prismlauncher --launch "$(cat "$ROM")"'';
+          # Every instance starts fullscreen, whoever made it (pkgs/famidrive-prism).
+          command = ''
+            ${pkgs.famidrive-prism}/bin/famidrive-prism fullscreen "$HOME/.local/share/PrismLauncher/instances/$(cat "$ROM")"
+            ${pkgs.prismlauncher}/bin/prismlauncher --launch "$(cat "$ROM")"
+          '';
           # Art Book Next has no Minecraft art; its generic "ports" art is
           # closest. Without it ES-DE falls back to the "pc" (IBM) logo.
           theme = "ports";

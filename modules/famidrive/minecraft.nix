@@ -90,16 +90,6 @@ let
         description = "Java to run it with. Minecraft 26 needs 25; older versions want older ones (1.20.5 to 1.21: jdk21).";
       };
 
-      fullscreen = mkOption {
-        type = types.bool;
-        default = true;
-        description = ''
-          Start in fullscreen. Off, Minecraft opens a small window, which
-          gamescope stretches to the TV at a low resolution. Set at every
-          switch; F11 still toggles it in-game.
-        '';
-      };
-
       memory = mkOption {
         type = types.nullOr types.ints.positive;
         default = null;
@@ -122,7 +112,6 @@ let
     instances = lib.mapAttrs (_: i: {
       inherit (i) minecraft fabricLoader servers join memory;
       java = "${i.java}/bin/java";
-      options.fullscreen = lib.boolToString i.fullscreen;
       mods = map toString (lib.optionals i.controller controllerMods.${i.minecraft} ++ i.mods);
     }) cfg.minecraft.instances;
   };
