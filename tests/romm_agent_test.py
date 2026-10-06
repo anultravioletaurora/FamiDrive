@@ -352,6 +352,77 @@ class Test(unittest.TestCase):
         for rel in paths:
             self.assertEqual((other.home / rel).read_text(), f"mine: {rel}")
 
+    def test_gamelist_has_romms_metadata_and_keeps_the_players(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        melee = {"id": 254, "name": "Super Smash Bros. Melee", "summary": "Fight & win",
+                 "metadatum": {"genres": ["Fighting", "Platform"], "developers": ["HAL Laboratory"],
+                               "publishers": ["Nintendo"], "player_count": "1-4",
+                               "first_release_date": 1006300800000, "average_rating": 94.37}}
+        a["write_gamelist"]("gc", [(Path("Super Smash Bros. Melee.iso"), melee)])
+        lib = box.data / "gamelists/gc/gamelist.xml"
+        game = {c.tag: c.text for c in __import__("xml.etree.ElementTree").etree.ElementTree.parse(lib).getroot().find("game")}
+        self.assertEqual(game["path"], "./Super Smash Bros. Melee.iso")
+        self.assertEqual(game["desc"], "Fight & win")
+        self.assertEqual((game["genre"], game["developer"], game["publisher"], game["players"]),
+                         ("Fighting, Platform", "HAL Laboratory", "Nintendo", "1-4"))
+        self.assertEqual((game["releasedate"], game["rating"]), ("20011121T000000", "0.94"))
+        # The player's copy: an old scraped name, a favorite, play counts,
+        # a game only they have, and a folder entry.
+        mine = box.home / "ES-DE/gamelists/gc/gamelist.xml"
+        mine.parent.mkdir(parents=True)
+        mine.write_text("<gameList><game><path>./Super Smash Bros. Melee.iso</path><name>Melee (scraped)</name>"
+                        "<favorite>true</favorite><playcount>12</playcount></game>"
+                        "<game><path>./Homebrew.dol</path><name>Homebrew</name></game>"
+                        "<folder><path>./Hacks</path><name>Hacks</name></folder></gameList>")
+        merged = __import__("xml.etree.ElementTree").etree.ElementTree.fromstring(a["merge_gamelist"](lib, mine))
+        games = {g.findtext("path"): g for g in merged.findall("game")}
+        self.assertEqual(games["./Super Smash Bros. Melee.iso"].findtext("name"), "Super Smash Bros. Melee")
+        self.assertEqual(games["./Super Smash Bros. Melee.iso"].findtext("favorite"), "true")
+        self.assertEqual(games["./Super Smash Bros. Melee.iso"].findtext("playcount"), "12")
+        self.assertEqual(len(games["./Super Smash Bros. Melee.iso"].findall("name")), 1)
+        self.assertIn("./Homebrew.dol", games)
+        self.assertEqual(merged.find("folder").findtext("name"), "Hacks")
+
+    def test_media_in_esdes_layout_with_romms_cover_link_as_fallback(self):
+        box = Box(self.base, "library", tokenFile=None)
+        a = box.agent()
+        asked = []
+
+        class Resp:
+            def __init__(self, code, kind, body=b""):
+                self.status_code, self.headers, self.content = code, {"content-type": kind}, body
+
+            def raise_for_status(self):
+                if self.status_code >= 400:
+                    raise a["requests"].HTTPError(str(self.status_code))
+
+        def fake_get(url, timeout=None, **kw):
+            asked.append(url)
+            if url.endswith("cover/big.png") or url.endswith("cover/small.png"):
+                return Resp(404, "text/html")      # RomM lists it, has no file
+            if "steamgriddb" in url:
+                return Resp(200, "image/png", b"cover")
+            return Resp(200, "image/jpeg", b"shot")
+
+        class Session:
+            get = staticmethod(fake_get)
+        g = a["fetch_media"].__globals__
+        g["requests"] = type("R", (), {"get": staticmethod(fake_get), "RequestException": Exception})
+        rom = {"id": 254, "updated_at": "t1",
+               "path_cover_large": "/assets/romm/resources/roms/19/254/cover/big.png?ts=x",
+               "path_cover_small": "/assets/romm/resources/roms/19/254/cover/small.png?ts=x",
+               "url_cover": "https://cdn2.steamgriddb.com/grid/abc.png",
+               "merged_screenshots": ["/assets/romm/resources/roms/19/254/screenshots/0.jpg"]}
+        a["fetch_media"](Session(), rom, "gc", Path("Super Smash Bros. Melee.iso"))
+        media = box.data / "media/gc"
+        self.assertEqual((media / "covers/Super Smash Bros. Melee.png").read_bytes(), b"cover")
+        self.assertEqual((media / "screenshots/Super Smash Bros. Melee.jpg").read_bytes(), b"shot")
+        self.assertNotIn("?ts", "".join(asked))
+        asked.clear()
+        a["fetch_media"](Session(), rom, "gc", Path("Super Smash Bros. Melee.iso"))
+        self.assertEqual(asked, [])                 # unchanged in RomM: not fetched again
+
     def test_gamecube_saves_found_by_id(self):
         box = Box(self.base, "alice")
         a = box.agent()
@@ -381,24 +452,27 @@ class Test(unittest.TestCase):
         self.assertIsNone(b["entry_for"](key).get("pushed"))
         self.assertEqual(b["entry_for"](key)["id"], 7)
 
-    def test_gamelists_copied_once_per_library_change(self):
+    def test_gamelists_merged_once_per_library_change(self):
         box = Box(self.base, "alice")
         a = box.agent()
         src = box.data / "gamelists/snes/gamelist.xml"
         src.parent.mkdir(parents=True)
-        src.write_text("<gameList>v1</gameList>")
+        game = "<gameList><game><path>./a.sfc</path><name>{}</name></game></gameList>"
+        src.write_text(game.format("v1"))
         a["cmd_gamelists"]()
         dest = box.home / "ES-DE/gamelists/snes/gamelist.xml"
-        self.assertEqual(dest.read_text(), "<gameList>v1</gameList>")
+        self.assertIn("<name>v1</name>", dest.read_text())
         # ES-DE's own edits (favorites, play counts) survive...
-        dest.write_text("<gameList>favorites</gameList>")
+        dest.write_text("<gameList><game><path>./a.sfc</path><name>v1</name>"
+                        "<favorite>true</favorite></game></gameList>")
         a["cmd_gamelists"]()
-        self.assertEqual(dest.read_text(), "<gameList>favorites</gameList>")
-        # ...until the library writes a new one.
-        src.write_text("<gameList>v2</gameList>")
+        self.assertIn("<favorite>true</favorite>", dest.read_text())
+        # ...and the library's next one is merged in, keeping them.
+        src.write_text(game.format("v2"))
         os.utime(src, (src.stat().st_atime, src.stat().st_mtime + 10))
         a["cmd_gamelists"]()
-        self.assertEqual(dest.read_text(), "<gameList>v2</gameList>")
+        self.assertIn("<name>v2</name>", dest.read_text())
+        self.assertIn("<favorite>true</favorite>", dest.read_text())
 
     def test_library_token_from_systemd(self):
         box = Box(self.base, "library", tokenFile=None)
