@@ -60,6 +60,7 @@ in
   valheim = unit "valheim" ../pkgs/famidrive-valheim/famidrive_valheim.py pkgs.python3;
   steam-config = unit "steam_config" ../pkgs/famidrive-steam-config/famidrive_steam_config.py pkgs.python3;
   clonehero = unit "clonehero" ../pkgs/famidrive-clonehero/famidrive_clonehero.py pkgs.python3;
+  kodi = unit "kodi" ../pkgs/famidrive-kodi/famidrive_kodi.py pkgs.python3;
   picker = unit "picker" ../pkgs/famidrive-picker/famidrive_picker.py
     (pkgs.python3.withPackages (ps: [ ps.pygame-ce ]));
 
@@ -98,6 +99,11 @@ in
       endpoints.romm = "https://romm.example.org";
       endpoints.jellyfin = "https://jellyfin.example.org";
       media.jellyfin.enable = true;
+      media.kodi = {
+        enable = true;
+        sources.Movies = { path = "/media/movies"; content = "movies"; };
+        addons = p: [ p.upnext ];
+      };
       minecraft.instances."Test Server" = {
         minecraft = "26.2";
         servers = [ { name = "Test"; address = "mc.example.org"; } ];
@@ -127,6 +133,11 @@ in
       (check "Clone Hero reads the box's songs and calibration"
         (lib.hasInfix "/var/lib/famidrive/clonehero/songs" c.home-manager.users.bob.home.activation.famidriveCloneHero.data
           && lib.hasInfix "200" c.home-manager.users.bob.home.activation.famidriveCloneHero.data))
+      (check "Media has Kodi and Jellyfin, one entry each, for every player"
+        (c.famidrive.systems.media.extensions == [ ".kodi" ".jellyfin" ]
+          && lib.hasInfix "Kodi.kodi" c.home-manager.users.bob.home.activation.famidriveMedia.data
+          && lib.hasInfix "Jellyfin.jellyfin" c.home-manager.users.guest.home.activation.famidriveMedia.data
+          && lib.hasInfix "/media/movies" c.famidrive.systems.media.command))
       (check "new players start at full volume"
         (c.services.pipewire.wireplumber.extraConfig.famidrive-volume."wireplumber.settings"."device.routes.default-sink-volume" == 1.0))
       (check "players log in without a password from greetd"
