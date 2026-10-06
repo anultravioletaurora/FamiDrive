@@ -166,10 +166,16 @@ writeShellApplication {
         status_pid=""
         rm -f "$status_file"
       }
+      # Whatever label the window already has: it's in the same session as
+      # the outer gamescope-fg, whose loop may label it GAME first. Found on
+      # the first box 2026-10-05: then the status screen stayed hidden and
+      # Street Fighter 6 showed Steam's own shader dialog instead.
       status_tag() {
         for wid in $(windows); do
-          untagged "$wid" || continue
-          if [ "$(window_pid "$wid")" = "$status_pid" ]; then tag "$wid" "$STATUS"; fi
+          if [ "$(window_pid "$wid")" = "$status_pid" ] \
+              && ! xprop -id "$wid" STEAM_GAME 2>/dev/null | grep -q "= $STATUS$"; then
+            tag "$wid" "$STATUS"
+          fi
         done
       }
       focusable() { xprop -root GAMESCOPE_FOCUSABLE_APPS 2>/dev/null | grep -qE "[ ,]$1(,|$)"; }

@@ -1,0 +1,44 @@
+name: Configuration bug
+description: The flake doesn't build, an option does the wrong thing, or a rebuild leaves the box in a bad state.
+title: "[Config] "
+labels: ["bug", "configuration"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For problems with FamiDrive's Nix options and what they set up. Something going wrong *while playing* is a [game or runtime bug](?template=2-runtime-bug.yml) instead.
+
+        Leave out anything private: server addresses, account names, tokens.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: The relevant part of your configuration
+      description: The `famidrive = { … };` options involved. Replace private values with placeholders.
+      render: nix
+  - type: textarea
+    id: output
+    attributes:
+      label: Error or build output
+      description: From `nixos-rebuild`, or `journalctl -b -u <service>`.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: FamiDrive commit
+      description: The `famidrive` input's revision in your host's `flake.lock`.
+      placeholder: "61f327c"
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Hardware
+      description: CPU, GPU, and anything else that matters here.
+      placeholder: "Ryzen 9 7900X, Radeon RX 7900 XTX"

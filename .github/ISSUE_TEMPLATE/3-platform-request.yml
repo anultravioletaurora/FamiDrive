@@ -1,0 +1,41 @@
+name: Platform request
+description: Ask for a new system, store or app to show up in ES-DE.
+title: "[Platform] "
+labels: ["enhancement", "platform"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A new console or computer to emulate, a store (Epic, itch.io…), or an app like Jellyfin. Each one needs an emulator or launcher, a way into ES-DE, controller support and a way to quit back to the menu.
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: "Sega Saturn / Epic Games Store / Plex"
+    validations:
+      required: true
+  - type: textarea
+    id: runner
+    attributes:
+      label: What would run it
+      description: The emulator, launcher or app you have in mind, and whether it's in nixpkgs.
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters to you
+      description: What you'd play or watch with it.
+  - type: dropdown
+    id: library
+    attributes:
+      label: Where its games or media would come from
+      options:
+        - RomM
+        - A local folder
+        - A store account
+        - A media server
+        - Not sure
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything known about it
+      description: Controller support, BIOS or firmware it needs, saves, how other frontends (Batocera, RetroDECK) handle it.

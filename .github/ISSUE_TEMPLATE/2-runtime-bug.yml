@@ -1,0 +1,68 @@
+name: Game or runtime bug
+description: Something goes wrong while using the box, such as a launch, a game, a controller or quitting.
+title: "[Runtime] "
+labels: ["bug", "runtime"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For problems on the TV: a game that won't launch or drops back to ES-DE, a controller that isn't seen, a black screen, a crash. If it's about one game working with FamiDrive (mods, a specific release), a [game support request](?template=4-game-support.yml) may fit better.
+
+        Results also go into [COMPATIBILITY.md](https://github.com/anultravioletaurora/FamiDrive/blob/main/COMPATIBILITY.md).
+  - type: input
+    id: game
+    attributes:
+      label: Game
+      placeholder: "Rocket League"
+    validations:
+      required: true
+  - type: dropdown
+    id: lane
+    attributes:
+      label: How it's launched
+      options:
+        - Steam
+        - GOG
+        - Minecraft (Prism)
+        - Emulator (ROM)
+        - Media (Jellyfin)
+        - Settings entry
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: runner
+    attributes:
+      label: Emulator, Proton version or launcher
+      placeholder: "Dolphin / Proton Experimental / GE-Proton7-50"
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Step by step, from picking it in ES-DE.
+    validations:
+      required: true
+  - type: textarea
+    id: controllers
+    attributes:
+      label: Controllers
+      description: Which pads, how they're connected (2.4 GHz dongle, Bluetooth, USB), and Steam Input on or off if it's a Steam game.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Useful ones: `~/.local/state/famidrive/session.log` (FamiDrive and gamescope), `~/ES-DE/logs/es_log.txt`, and for Steam games the `GameAction` lines in `~/.local/share/Steam/logs/console_log.txt`.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: FamiDrive commit
+      placeholder: "61f327c"
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Hardware and display
+      placeholder: "Radeon RX 7900 XTX, 4K TV at 120 Hz, HDR on"

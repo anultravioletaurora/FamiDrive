@@ -1,0 +1,46 @@
+name: Game support request
+description: How FamiDrive should cooperate with one specific game, such as its mods, release, launch options or tools.
+title: "[Game] "
+labels: ["enhancement", "game-support"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a game that needs something FamiDrive doesn't do yet: a mod loader or companion tool (BakkesMod, Cyber Engine Tweaks), a pinned Proton version, launch options, Steam Input on or off, or a release that behaves differently from the others.
+  - type: input
+    id: game
+    attributes:
+      label: Game
+      placeholder: "Rocket League"
+    validations:
+      required: true
+  - type: input
+    id: store
+    attributes:
+      label: Store and release
+      description: Where it's from and which build, if it matters.
+      placeholder: "Steam, Windows build under Proton"
+    validations:
+      required: true
+  - type: textarea
+    id: want
+    attributes:
+      label: What you'd like FamiDrive to do
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: How it works without FamiDrive
+      description: What people do today on Linux or the Steam Deck, with links.
+  - type: textarea
+    id: caveats
+    attributes:
+      label: Caveats
+      description: Anti-cheat or online rules, things that break on game updates, anything that needs a keyboard or mouse.
+  - type: textarea
+    id: config
+    attributes:
+      label: Proposed configuration
+      description: What setting it could become, if you have an idea.
+      render: nix
