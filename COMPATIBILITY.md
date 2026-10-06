@@ -23,11 +23,14 @@ behave differently in each. For a console game it's the emulator.
   - [Animal Crossing: New Horizons](#animal-crossing-new-horizons) (Switch)
   - [Back 4 Blood](#back-4-blood) (PC)
   - [Call of Duty: Black Ops III](#call-of-duty-black-ops-iii) (PC)
+  - [Call of Duty: Infinite Warfare](#call-of-duty-infinite-warfare) (PC)
   - [Call of Duty: WWII](#call-of-duty-wwii) (PC)
   - [Cyberpunk 2077](#cyberpunk-2077) (PC)
   - [Fallout: New Vegas](#fallout-new-vegas) (PC)
+  - [Gears 5](#gears-5) (PC)
   - [Tom Clancy's Ghost Recon Wildlands](#tom-clancys-ghost-recon-wildlands) (PC)
   - [Halo: The Master Chief Collection](#halo-the-master-chief-collection) (PC)
+  - [Hell Let Loose](#hell-let-loose) (PC)
   - [Helldivers 2](#helldivers-2) (PC)
   - [Hollow Knight](#hollow-knight) (PC)
   - [The Jackbox Party Pack 3](#the-jackbox-party-pack-3) (PC)
@@ -37,6 +40,9 @@ behave differently in each. For a console game it's the emulator.
   - [Mario Kart: Double Dash!!](#mario-kart-double-dash) (GameCube)
   - [Mario Party 3](#mario-party-3) (N64)
   - [Minecraft (vanilla 26.2, a private server)](#minecraft-vanilla-262-a-private-server) (PC)
+  - [Overwatch](#overwatch) (PC)
+  - [Palworld](#palworld) (PC)
+  - [Peak](#peak) (PC)
   - [Rocket League](#rocket-league) (PC)
   - [Street Fighter 6](#street-fighter-6) (PC)
   - [Star Wars Jedi: Fallen Order](#star-wars-jedi-fallen-order) (PC)
@@ -101,6 +107,16 @@ options.
   (a BOIII-style client) and #3 (Plutonium, for the older Treyarch
   games).
 
+### Call of Duty: Infinite Warfare
+
+**Steam: ❔ Untested.**
+
+- **Modes:** like [WWII](#call-of-duty-wwii), the campaign and Zombies
+  run from one program, and multiplayer from another, so expect Steam's
+  chooser first.
+- **To check:** multiplayer under Proton, controllers and rumble in each
+  mode.
+
 ### Call of Duty: WWII
 
 **Steam: ❔ Untested.**
@@ -144,6 +160,17 @@ same REDmod support.
 - **Mods:** not set up. NakeyJakey's New Vegas (a Wabbajack list of
   about 335 mods) is the one wanted; tracked in #5.
 
+### Gears 5
+
+**Steam: ❔ Untested.**
+
+- **Accounts:** it wants a Microsoft account (Xbox) sign-in for the
+  campaign's online parts and for multiplayer. Expect that sign-in on
+  first launch, and check whether it can be done with a controller.
+- **To check:** whether multiplayer and its anti-cheat run under Proton,
+  split-screen co-op, controllers and rumble (it's an Xbox game, so pads
+  should be first-class), and HDR.
+
 ### Tom Clancy's Ghost Recon Wildlands
 
 **Steam: ❔ Untested.**
@@ -168,6 +195,16 @@ same REDmod support.
 - **To check:** controllers and rumble, split-screen (MCC has it in some
   games, depending on the game and mode), and playing online with a
   Microsoft account sign-in.
+
+### Hell Let Loose
+
+**Steam: ❔ Untested.**
+
+- **Anti-cheat:** it uses Easy Anti-Cheat, and whether the developers
+  have turned on EAC's Proton support decides whether it plays at all.
+  Check that first.
+- **Controllers:** it's built around mouse and keyboard on PC, so check
+  how far a controller gets, with Steam Input off and on.
 
 ### Helldivers 2
 
@@ -252,6 +289,39 @@ joins the server straight from launch.
   a browser on another device. No keyboard or browser needed on the box.
 - **Fullscreen:** opened in a window at first. FamiDrive now starts
   every Prism instance fullscreen; confirmed.
+
+### Overwatch
+
+**Steam: ❔ Untested.** The Steam copy needs a Battle.net account linked
+on first launch, but not the Battle.net app.
+
+- **Other launchers:** Battle.net's own copy runs through the Battle.net
+  app. FamiDrive has no Battle.net lane, so only the Steam copy plays for
+  now. A Battle.net lane is worth an issue if this goes well. One account
+  can play through either.
+- **To check:**
+  - the Battle.net account link with a controller
+  - matchmaking under Proton
+  - controllers and rumble (Overwatch has full console-style controller
+    support)
+  - the shader compile on first start
+
+### Palworld
+
+**Steam: ❔ Untested.**
+
+- **To check:**
+  - controllers and rumble
+  - co-op with friends and joining dedicated servers
+  - performance with a big base
+
+### Peak
+
+**Steam: ❔ Untested.** Co-op climbing, for up to four players online.
+
+- **To check:** controllers and rumble, joining friends through Steam,
+  and voice chat (proximity voice) through the TV's audio and a mic, if
+  there is one.
 
 ### Rocket League
 
