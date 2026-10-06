@@ -90,6 +90,19 @@ let
         description = "Java to run it with. Minecraft 26 needs 25; older versions want older ones (1.20.5 to 1.21: jdk21).";
       };
 
+      players = mkOption {
+        type = types.listOf types.str;
+        default = lib.attrNames cfg.players;
+        defaultText = "every player (not the guest)";
+        example = [ "alice" ];
+        description = ''
+          The players (`famidrive.players`) who get this instance. Each
+          plays with their own Microsoft account, signed in once in their
+          own Prism. A player no longer listed loses the instance from
+          their Ports; it's moved aside, worlds and all, not deleted.
+        '';
+      };
+
       memory = mkOption {
         type = types.nullOr types.ints.positive;
         default = null;
@@ -99,7 +112,7 @@ let
     };
   });
 
-  spec = {
+  spec = player: {
     root = "~/.local/share/PrismLauncher";
     launcher = {
       # Prism's window closes once the game is up, and Prism quits when the
@@ -113,7 +126,7 @@ let
       inherit (i) minecraft fabricLoader servers join memory;
       java = "${i.java}/bin/java";
       mods = map toString (lib.optionals i.controller controllerMods.${i.minecraft} ++ i.mods);
-    }) cfg.minecraft.instances;
+    }) (lib.filterAttrs (_: i: lib.elem player i.players) cfg.minecraft.instances);
   };
 in
 {
@@ -135,7 +148,9 @@ in
     '';
   };
 
-  config = lib.mkIf (cfg.enable && hasLane "minecraft" && cfg.minecraft.instances != { }) {
+  # On with the lane, not only while instances are declared: a player who
+  # loses their last instance still has it moved out of their Ports.
+  config = lib.mkIf (cfg.enable && hasLane "minecraft") {
     assertions = lib.concatLists (lib.mapAttrsToList (name: i: [
       {
         assertion = !i.controller || i.fabricLoader != null;
@@ -149,11 +164,15 @@ in
           Set controller = false and add Controlify for that version to `mods` yourself.
         '';
       }
+      {
+        assertion = lib.all (p: cfg.players ? ${p}) i.players;
+        message = "famidrive.minecraft.instances.\"${name}\".players: no such player (${lib.concatStringsSep ", " (lib.filter (p: !(cfg.players ? ${p})) i.players)}).";
+      }
     ]) cfg.minecraft.instances);
 
-    famidrive.playerHome = { lib, ... }: {
+    famidrive.playerHome = { lib, famidrivePlayer, ... }: {
       home.activation.famidriveMinecraft = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        ${pkgs.famidrive-prism}/bin/famidrive-prism ${lib.escapeShellArg (builtins.toJSON spec)}
+        ${pkgs.famidrive-prism}/bin/famidrive-prism ${lib.escapeShellArg (builtins.toJSON (spec famidrivePlayer.name))}
       '';
     };
   };

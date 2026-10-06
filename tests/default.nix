@@ -61,6 +61,7 @@ in
   steam-config = unit "steam_config" ../pkgs/famidrive-steam-config/famidrive_steam_config.py pkgs.python3;
   clonehero = unit "clonehero" ../pkgs/famidrive-clonehero/famidrive_clonehero.py pkgs.python3;
   kodi = unit "kodi" ../pkgs/famidrive-kodi/famidrive_kodi.py pkgs.python3;
+  prism = unit "prism" ../pkgs/famidrive-prism/famidrive_prism.py pkgs.python3;
   picker = unit "picker" ../pkgs/famidrive-picker/famidrive_picker.py
     (pkgs.python3.withPackages (ps: [ ps.pygame-ce ]));
 
@@ -106,6 +107,7 @@ in
       };
       minecraft.instances."Test Server" = {
         minecraft = "26.2";
+        players = [ "alice" ];
         servers = [ { name = "Test"; address = "mc.example.org"; } ];
       };
       cloneHero = {
@@ -130,6 +132,10 @@ in
       (check "Clone Hero is in Ports, songs come down as the library"
         (c.famidrive.systems ? ports
           && c.systemd.services.famidrive-clonehero-songs.serviceConfig.User == "famidrive-library"))
+      (check "a Minecraft instance only for the players it's declared for"
+        (lib.hasInfix "Test Server" c.home-manager.users.alice.home.activation.famidriveMinecraft.data
+          && !(lib.hasInfix "Test Server" c.home-manager.users.bob.home.activation.famidriveMinecraft.data)
+          && !(lib.hasInfix "Test Server" c.home-manager.users.guest.home.activation.famidriveMinecraft.data)))
       (check "one Ports system, for Minecraft and Clone Hero both"
         (!(c.famidrive.systems ? minecraft)
           && lib.sort lib.lessThan c.famidrive.systems.ports.extensions == [ ".port" ".prism" ]
