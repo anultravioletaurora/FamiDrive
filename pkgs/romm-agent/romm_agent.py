@@ -91,6 +91,11 @@ EDEN_USER = 0xC8
 # the box's own profile when unpacked: the same player's profile can have
 # a different ID on each box.
 PROFILE_SLOT = "@profile"
+# Device saves: a game's save that belongs to the console, not a profile
+# (Animal Crossing: New Horizons keeps its island there, Mario Kart 8
+# Deluxe part of its data). Eden keeps them under an all-zero user ID.
+# Found on the first box 2026-10-06.
+EDEN_DEVICE = "0" * 32
 
 # Every FamiDrive save lives in this RomM slot. The sync API pairs saves on
 # (rom_id, slot), so a stable name keeps one box's pushes and another's
@@ -878,6 +883,8 @@ def from_archive(lay, rel):
     takes archives that name a profile ID outright."""
     if lay["kind"] == "eden-title-id":
         first, sep, rest = rel.partition("/")
+        if first == EDEN_DEVICE:
+            return rel   # the console's, the same on every box
         if first == PROFILE_SLOT or re.fullmatch(r"[0-9A-Fa-f]{32}", first):
             if not lay.get("profile"):
                 raise RuntimeError("Eden has no profile here yet")
@@ -921,7 +928,8 @@ def save_paths(system, entry, rom_path):
     elif kind == "eden-title-id" and tid and lay.get("profile"):
         # Revised 2026-10-05 (Eden, not Ryubing): one folder per game, named by
         # title ID, under the profile's folder. Seen on a real Eden 0.2.1 box.
-        found = [f"{lay['profile']}/{tid.upper()}"]
+        # Plus the game's device save, if it has one.
+        found = [f"{lay['profile']}/{tid.upper()}", f"{EDEN_DEVICE}/{tid.upper()}"]
     elif kind == "xenia-content" and tid:
         found = [f"{lay['profile']}/{tid}/00000001"]
     elif kind == "files":
