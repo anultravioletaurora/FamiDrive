@@ -9,7 +9,7 @@ songs: the box's song library, as the famidrive-library account. Each
   charts no longer listed are removed. Anything that changes the library
   bumps .famidrive-stamp. Spec: {"dir", "songs": {name: md5}, "onlyListed"}.
 
-player: at the start of each player's session. Every FamiDrive player and
+player: each time Clone Hero starts. Every FamiDrive player and
   a few guests get a Clone Hero profile (existing ones are never changed),
   and when the shared library has changed since this player last played,
   Clone Hero's song cache is cleared so it rescans. Spec: {"profiles":
@@ -28,6 +28,8 @@ ENCORE = os.environ.get("FAMIDRIVE_ENCORE", "https://files.enchor.us/{md5}.sng")
 MARK = ".famidrive-songs.json"     # name -> md5 of what's in the folder
 STAMP = ".famidrive-stamp"
 HOME = Path.home() / ".clonehero"
+# Clone Hero 1.1's own data: scores, the song cache, Unity's prefs.
+UNITY = Path.home() / ".config/unity3d/srylain Inc_/Clone Hero"
 
 # A new profile's settings: Clone Hero's own defaults, as a profile it
 # wrote on the first box (1.1).
@@ -133,15 +135,16 @@ def library_stamp(stamps):
 
 def cmd_player(spec):
     seed_profiles(spec["profiles"])
-    # Rescan when the shared library changed since this player's last
-    # session: Clone Hero only looks for new songs when told to, or when
-    # its cache is gone.
+    # Rescan when the shared library changed since this player last
+    # played: Clone Hero only looks for new songs when told to, or when
+    # its cache is gone. Found on the first box 2026-10-06: 1.1 keeps the
+    # cache with its Unity data, not in ~/.clonehero.
     state = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "famidrive"
     seen = state / "clonehero-library"
     now = library_stamp(spec["stamps"])
     old = seen.read_text() if seen.exists() else None
     if now != old:
-        for cache in HOME.glob("songcache.bin"):
+        for cache in [*UNITY.glob("songcache.bin"), *HOME.glob("songcache.bin")]:
             cache.unlink()
             log("song library changed: Clone Hero will rescan")
         state.mkdir(parents=True, exist_ok=True)

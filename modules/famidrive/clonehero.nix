@@ -3,7 +3,8 @@
 # downloaded to the library disk (not the Nix store: a song library runs
 # to many GB), plus a folder for songs added by hand. Profiles, scores and
 # Clone Hero's own settings stay each player's; the TV's audio and video
-# calibration is the box's, so it's set here once for everyone.
+# calibration is the box's, so it's set here once for everyone. Each
+# player's scores and profiles sync with RomM like a console game's save.
 { config, lib, pkgs, ... }:
 
 let
@@ -16,6 +17,22 @@ let
   songsSpec = builtins.toJSON {
     dir = "${dir}/songs";
     inherit (ch) songs onlyListed;
+  };
+
+  sync = cfg.romm.enable && ch.romm.entry != null;
+
+  # Scores and profiles: what a player would miss on another box. Clone
+  # Hero's settings and bindings stay put (they belong to this box's TV
+  # and guitars), and so does the Unity prefs file, which also holds a
+  # login token.
+  saveLayout = {
+    kind = "files";
+    root = "~";
+    paths = [
+      ".config/unity3d/srylain Inc_/Clone Hero/scoredata.bin"
+      ".config/unity3d/srylain Inc_/Clone Hero/scoresext.bin"
+      ".clonehero/profiles.ini"
+    ];
   };
 
   # A profile for every player, in "Who's playing?" order, then guests.
@@ -74,6 +91,17 @@ in
       '';
     };
 
+    romm.entry = mkOption {
+      type = types.nullOr types.str;
+      default = "Clone Hero";
+      description = ''
+        The RomM entry each player's Clone Hero scores and profiles are
+        saved under, by name. RomM keeps saves only for games in its
+        library, so add one by hand (any platform this box doesn't pull,
+        and any small file). null keeps scores on this box only.
+      '';
+    };
+
     videoOffset = mkOption {
       type = types.nullOr types.int;
       default = null;
@@ -88,9 +116,25 @@ in
       fullname = "Ports";
       theme = "ports";   # Art Book Next's ports art
       extensions = [ ".port" ];
+      # Scores come down before the profiles are seeded, so a new box
+      # doesn't take its freshly seeded profiles.ini for a save RomM lacks.
+      # Like famidrive-launch, sync only for players with a RomM agent
+      # config of their own.
       command = ''
+        sync=""
+        ${lib.optionalString sync ''[ -e "/etc/famidrive/romm/$(id -un).json" ] && sync=1''}
         case "$(cat "$ROM")" in
-          clonehero) ${pkgs.clonehero}/bin/clonehero ;;
+          clonehero)
+            [ -z "$sync" ] || romm-agent save-pull clonehero app:clonehero \
+              || echo "famidrive-launch: Clone Hero scores not pulled" >&2
+            ${pkgs.famidrive-clonehero}/bin/famidrive-clonehero player ${lib.escapeShellArg playerSpec} \
+              || echo "famidrive-launch: couldn't set up Clone Hero" >&2
+            rc=0
+            ${pkgs.clonehero}/bin/clonehero || rc=$?
+            [ -z "$sync" ] || romm-agent save-push clonehero app:clonehero \
+              || echo "famidrive-launch: Clone Hero scores not pushed, reconcile will retry" >&2
+            exit "$rc"
+            ;;
         esac
       '';
     };
@@ -122,11 +166,9 @@ in
       };
     };
 
-    # By name (systemPackages), so a fix to it doesn't restart the TV.
-    famidrive.sessionSetup = ''
-      famidrive-clonehero player ${lib.escapeShellArg playerSpec} \
-        || echo "famidrive-session: couldn't set up Clone Hero" >&2
-    '';
+    famidrive.romm.apps = lib.mkIf sync {
+      clonehero = { rom = ch.romm.entry; emulator = "clonehero"; inherit saveLayout; };
+    };
 
     famidrive.playerHome = { lib, famidrivePlayer, ... }: {
       home.activation.famidriveCloneHero = lib.hm.dag.entryAfter [ "writeBoundary" ] ''

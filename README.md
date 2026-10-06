@@ -161,7 +161,8 @@ planning doc for now and will move into this repo.
 - Clone Hero in a Ports system (`famidrive.cloneHero`): songs for the
   whole box, listed by their Chorus Encore md5 and downloaded to the
   library disk, a profile for every player plus guests, and the TV's
-  calibration set once for everyone.
+  calibration set once for everyone. Each player's scores and profiles
+  sync with RomM, under a "Clone Hero" entry added there by hand.
 - Menu music: each player's `~/ES-DE/music`, shuffled behind ES-DE and
   paused while a game is open (ES-DE has no music of its own).
 - Wii games with real Wii Remotes and the Balance Board, and Minecraft
