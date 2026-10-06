@@ -376,6 +376,14 @@ in
           };
         }}
         ${seedLib.lockKeys {
+          format = "ini";
+          target = "$HOME/.config/dolphin-emu/GFX.ini";
+          # HD texture packs from RomM (romm-agent textures): Dolphin's
+          # "Load Custom Textures", and preloading them so they don't
+          # stutter in as they're first seen.
+          keys.Settings = { HiresTextures = "True"; CacheHiresTextures = "True"; };
+        }}
+        ${seedLib.lockKeys {
           format = "keyValue";
           target = "$HOME/.config/retroarch/retroarch.cfg";
           keys = {

@@ -8,6 +8,7 @@ Each player's own (run as that player):
     romm-agent gamelists               copy the library's newest gamelists into ES-DE
     romm-agent firmware-install        run emulator firmware installs (keys, PS3 firmware)
     romm-agent eden-profile            give a new Eden this player's profile, before it first runs
+    romm-agent textures                link the library's Dolphin texture packs into this player's Dolphin
     romm-agent save-pull SYSTEM ROM    newest save for ROM -> local (pre-launch)
     romm-agent save-push SYSTEM ROM    local save for ROM -> RomM (post-exit)
     romm-agent reconcile               push every local save RomM doesn't have yet
@@ -35,6 +36,7 @@ import io
 import json
 import os
 import re
+import shutil
 import socket
 import struct
 import subprocess
@@ -59,6 +61,12 @@ DATA = Path(CFG["dataDir"])
 # its downloaded_media/<system> to MEDIA/<system>).
 MEDIA = DATA / "media"
 MEDIA_STATE = DATA / "media.json"   # rom id -> RomM's updated_at when fetched
+# Dolphin HD texture packs: zips in a game's mod/ folder in RomM, unpacked
+# once here (<system>/<game ID>/<pack>/), linked into each player's Dolphin.
+TEXTURES = DATA / "textures"
+TEXTURES_STATE = DATA / "textures.json"   # rom id -> RomM's updated_at, packs
+DOLPHIN_TEXTURES = Path.home() / ".local/share/dolphin-emu/Load/Textures"
+GAME_ID = re.compile(r"[A-Z0-9]{3}(?:[A-Z0-9]{3})?")
 GAMELISTS = DATA / "gamelists"  # the library's; each player's ES-DE gets a copy
 # Shared, written by `pull` only: local ROM path -> {id, system, title_id}
 INDEX = DATA / "index.json"
@@ -137,8 +145,16 @@ def sha1(path):
     return h.hexdigest()
 
 
+ARCHIVES = {".zip", ".7z", ".rar"}
+
+
 def download(s, path, dest, expected_sha1=None, expected_size=None, params=None):
     """Resumable download: a 40 GB ISO must not restart from zero."""
+    if dest.suffix.lower() in ARCHIVES:
+        # RomM hashes what's inside an archive (so a zipped ROM matches its
+        # known checksums), not the archive itself: only the size can be
+        # checked. Found on the first box 2026-10-06, with a texture pack.
+        expected_sha1 = None
     if dest.exists():
         if expected_sha1 and sha1(dest) == expected_sha1:
             return False
@@ -157,6 +173,9 @@ def download(s, path, dest, expected_sha1=None, expected_size=None, params=None)
     if expected_sha1 and sha1(part) != expected_sha1:
         part.unlink()
         raise RuntimeError(f"hash mismatch for {dest}, discarded")
+    if dest.suffix.lower() in ARCHIVES and expected_size and part.stat().st_size != expected_size:
+        part.unlink()
+        raise RuntimeError(f"size mismatch for {dest}, discarded")
     part.rename(dest)
     return True
 
@@ -382,6 +401,113 @@ def fetch_media(s, rom, system, rel):
         MEDIA_STATE.write_text(json.dumps(state, indent=2))
 
 
+def dolphin_systems():
+    return [n for n, d in CFG["systems"].items() if d.get("emulator") == "dolphin"]
+
+
+def unpack_textures(archive, dest):
+    """A Dolphin texture pack zip into dest. Packs usually hold one folder
+    named for the game's ID (GAFE01, or GAF for every region); that folder
+    is dropped, since dest is already the game's. False if the zip has no
+    Dolphin textures (tex1_...) in it: some other kind of mod."""
+    with zipfile.ZipFile(archive) as z:
+        files = [i for i in z.infolist() if not i.is_dir()]
+        if not any(Path(i.filename).name.startswith("tex1_") for i in files):
+            return False
+        tops = {i.filename.split("/")[0] for i in files}
+        prefix = ""
+        if len(tops) == 1 and all("/" in i.filename for i in files) and GAME_ID.fullmatch(next(iter(tops))):
+            prefix = next(iter(tops)) + "/"
+        tmp = dest.with_name(dest.name + ".unpacking")
+        shutil.rmtree(tmp, ignore_errors=True)
+        for i in files:
+            rel = Path(i.filename[len(prefix):] if i.filename.startswith(prefix) else i.filename)
+            if rel.is_absolute() or ".." in rel.parts or rel.name.startswith("._"):
+                continue
+            out = tmp / rel
+            out.parent.mkdir(parents=True, exist_ok=True)
+            with z.open(i) as src, open(out, "wb") as f:
+                shutil.copyfileobj(src, f, 1 << 20)
+    shutil.rmtree(dest, ignore_errors=True)
+    tmp.rename(dest)
+    return True
+
+
+def sync_textures(s, rom, system, tid):
+    """This game's texture packs from RomM (zips in its mod/ folder), when
+    the game changed in RomM since the last look. A pack whose file changed
+    is unpacked again; one gone from RomM is removed."""
+    if system not in dolphin_systems() or not tid or not GAME_ID.fullmatch(tid):
+        return
+    state = json.loads(TEXTURES_STATE.read_text()) if TEXTURES_STATE.exists() else {}
+    key = str(rom["id"])
+    have = state.get(key, {})
+    if have.get("updated_at") == rom.get("updated_at"):
+        return
+    files = get(s, EP_ROM.format(id=rom["id"])).json().get("files") or []
+    mods = [f for f in files if f.get("category") == "mod"
+            and f["file_name"].lower().endswith(".zip") and not f["file_name"].startswith(".")]
+    game = TEXTURES / system / tid
+    packs, keep = have.get("packs", {}), {}
+    for f in mods:
+        fid, old = str(f["id"]), have.get("packs", {}).get(str(f["id"]))
+        if old and old.get("sha1") == f.get("sha1_hash") and (game / old["dir"]).is_dir():
+            keep[fid] = old
+            continue
+        tmp = TEXTURES / ".download" / f"{fid}.zip"
+        download(s, EP_ROM_CONTENT.format(id=rom["id"], file_name=f["file_name"]), tmp,
+                 f.get("sha1_hash"), f.get("file_size_bytes"), params={"file_ids": f["id"]})
+        name = re.sub(r'[/\\:*?"<>|]', "_", Path(f["file_name"]).stem).strip() or fid
+        if old:
+            shutil.rmtree(game / old["dir"], ignore_errors=True)
+        game.mkdir(parents=True, exist_ok=True)
+        if unpack_textures(tmp, game / name):
+            keep[fid] = {"sha1": f.get("sha1_hash"), "dir": name}
+            print(f"texture pack for {rom['fs_name']}: {f['file_name']}", file=sys.stderr)
+        else:
+            print(f"{f['file_name']} ({rom['fs_name']}) has no Dolphin textures; left in RomM", file=sys.stderr)
+        tmp.unlink(missing_ok=True)
+    for fid, old in packs.items():
+        if fid not in keep:
+            shutil.rmtree(game / old["dir"], ignore_errors=True)
+    if game.is_dir() and not any(game.iterdir()):
+        game.rmdir()
+    state[key] = {"updated_at": rom.get("updated_at"), "packs": keep}
+    TEXTURES_STATE.write_text(json.dumps(state, indent=2))
+
+
+def cmd_textures():
+    """Each of the library's texture packs, linked into this player's
+    Dolphin as Load/Textures/<game ID>. A folder this player had there for
+    the same game (by its full or 3-letter ID) is moved to
+    Textures-before-romm, so Dolphin doesn't load two copies. Links to
+    packs the library no longer has are removed."""
+    shared = {}
+    for system in dolphin_systems():
+        if (TEXTURES / system).is_dir():
+            shared.update({d.name: d for d in (TEXTURES / system).iterdir()
+                           if d.is_dir() and GAME_ID.fullmatch(d.name)})
+    DOLPHIN_TEXTURES.mkdir(parents=True, exist_ok=True)
+    for p in DOLPHIN_TEXTURES.iterdir():
+        if p.is_symlink() and str(os.readlink(p)).startswith(str(TEXTURES)) and p.name not in shared:
+            p.unlink()
+    before = DOLPHIN_TEXTURES.parent / "Textures-before-romm"
+    for tid, d in sorted(shared.items()):
+        for old in {DOLPHIN_TEXTURES / tid, DOLPHIN_TEXTURES / tid[:3]}:
+            if old.exists() and not old.is_symlink():
+                before.mkdir(exist_ok=True)
+                dest = before / old.name
+                if dest.exists():
+                    dest = before / f"{old.name}.{int(time.time())}"
+                old.rename(dest)
+        link = DOLPHIN_TEXTURES / tid
+        if link.is_symlink() and os.readlink(link) == str(d):
+            continue
+        if link.is_symlink():
+            link.unlink()
+        link.symlink_to(d)
+
+
 def cmd_pull():
     s = session()
     old = load_index()
@@ -407,6 +533,10 @@ def cmd_pull():
             rel = Path(launch).relative_to(DATA / "roms" / system)
         except ValueError:
             rel = Path(Path(launch).name)
+        try:
+            sync_textures(s, rom, system, tid)
+        except (requests.RequestException, RuntimeError, OSError, zipfile.BadZipFile) as e:
+            print(f"texture packs for {rom['fs_name']} skipped: {e}", file=sys.stderr)
         fetch_media(s, rom, system, rel)
         by_system.setdefault(system, []).append((rel, rom))
         save_index(index)  # a 800 GB first pull survives being interrupted
@@ -1055,7 +1185,7 @@ def main():
         "pull": cmd_pull, "firmware": cmd_firmware, "reconcile": cmd_reconcile,
         "save-pull": cmd_save_pull, "save-push": cmd_save_push,
         "gamelists": cmd_gamelists, "firmware-install": cmd_firmware_install,
-        "eden-profile": cmd_eden_profile,
+        "eden-profile": cmd_eden_profile, "textures": cmd_textures,
     }
     if cmd not in commands:
         print(__doc__)

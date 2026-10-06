@@ -155,7 +155,9 @@ planning doc for now and will move into this repo.
   sync both ways, with conflict copies and a short save history. Each
   game's details and box art come from RomM, with each player's
   favorites and play counts kept. A box can mirror some platforms only
-  (`romm.platforms`). Switch saves are next.
+  (`romm.platforms`). Dolphin HD texture packs kept in RomM (a zip in the
+  game's `mod/` folder) are unpacked once and loaded for every player.
+  Switch saves are next.
 - The Steam lane, with Proton pins and Steam Input set from Nix, Steam's
   Big Picture as a Settings entry, and a status screen while Steam
   updates, processes shaders or starts a game. Results per game are in

@@ -490,6 +490,110 @@ class Test(unittest.TestCase):
         self.assertIn("<name>v2</name>", dest.read_text())
         self.assertIn("<favorite>true</favorite>", dest.read_text())
 
+    def texture_zip(self, path, names):
+        import zipfile
+        with zipfile.ZipFile(path, "w") as z:
+            for n in names:
+                z.writestr(n, n.encode())
+
+    def test_texture_packs_unpacked_with_or_without_their_id_folder(self):
+        box = Box(self.base, "library", tokenFile=None)
+        a = box.agent()
+        with_id, without, other = (self.base / n for n in ("a.zip", "b.zip", "c.zip"))
+        self.texture_zip(with_id, ["GAFE01/tex1_64x64_aa.png", "GAFE01/sub/tex1_8x8_bb.png"])
+        self.texture_zip(without, ["tex1_64x64_cc.png", "__MACOSX/._tex1_64x64_cc.png"])
+        self.texture_zip(other, ["Riivolution/patch.xml"])
+        dest = box.data / "textures/gc/GAFE01"
+        self.assertTrue(a["unpack_textures"](with_id, dest / "A"))
+        self.assertTrue((dest / "A/tex1_64x64_aa.png").exists())
+        self.assertTrue((dest / "A/sub/tex1_8x8_bb.png").exists())
+        self.assertTrue(a["unpack_textures"](without, dest / "B"))
+        self.assertTrue((dest / "B/tex1_64x64_cc.png").exists())
+        self.assertFalse(a["unpack_textures"](other, dest / "C"))
+        self.assertFalse((dest / "C").exists())
+
+    def test_texture_packs_follow_romm(self):
+        box = Box(self.base, "library", tokenFile=None)
+        a = box.agent()
+        zips = {}
+        files = [{"id": 33013, "category": "mod", "file_name": "ac hd textures v17.zip", "sha1_hash": "s1"},
+                 {"id": 33011, "category": "mod", "file_name": ".nfs.20051657.b4b8", "sha1_hash": "x"},
+                 {"id": 189, "category": "game", "file_name": "Animal Crossing.ciso", "sha1_hash": "g"}]
+        rom = {"id": 186, "fs_name": "Animal Crossing", "updated_at": "t1"}
+
+        class Resp:
+            def json(self):
+                return {"files": files}
+        g = a["sync_textures"].__globals__
+        g["get"] = lambda s, path, **kw: Resp()
+        g["download"] = lambda s, path, dest, sha1=None, size=None, params=None: (
+            zips.setdefault("asked", []).append((path, params)),
+            dest.parent.mkdir(parents=True, exist_ok=True),
+            self.texture_zip(dest, ["GAFE01/tex1_1x1_" + sha1 + ".png"]))
+        a["sync_textures"](None, rom, "gc", "GAFE01")
+        pack = box.data / "textures/gc/GAFE01/ac hd textures v17"
+        self.assertTrue((pack / "tex1_1x1_s1.png").exists())
+        self.assertEqual(zips["asked"], [("/roms/186/content/ac hd textures v17.zip", {"file_ids": 33013})])
+        a["sync_textures"](None, rom, "gc", "GAFE01")          # unchanged in RomM: nothing asked
+        self.assertEqual(len(zips["asked"]), 1)
+        files[0]["sha1_hash"] = "s2"                            # a new version of the pack
+        a["sync_textures"](None, dict(rom, updated_at="t2"), "gc", "GAFE01")
+        self.assertTrue((pack / "tex1_1x1_s2.png").exists())
+        self.assertFalse((pack / "tex1_1x1_s1.png").exists())
+        del files[0]                                            # gone from RomM
+        a["sync_textures"](None, dict(rom, updated_at="t3"), "gc", "GAFE01")
+        self.assertFalse((box.data / "textures/gc/GAFE01").exists())
+
+    def test_texture_packs_linked_into_each_players_dolphin(self):
+        box = Box(self.base, "alice")
+        shared = box.data / "textures/gc/GAFE01/pack"
+        shared.mkdir(parents=True)
+        a = box.agent()
+        mine = box.home / ".local/share/dolphin-emu/Load/Textures"
+        (mine / "GAF").mkdir(parents=True)                      # set up by hand before
+        (mine / "GAF/tex1_old.png").write_text("old")
+        (mine / "GUG").mkdir()                                  # another game's: untouched
+        a["cmd_textures"]()
+        self.assertEqual(Path(os.readlink(mine / "GAFE01")), box.data / "textures/gc/GAFE01")
+        self.assertFalse((mine / "GAF").exists())
+        self.assertEqual((mine.parent / "Textures-before-romm/GAF/tex1_old.png").read_text(), "old")
+        self.assertTrue((mine / "GUG").is_dir())
+        import shutil
+        shutil.rmtree(box.data / "textures/gc/GAFE01")          # the library dropped it
+        a["cmd_textures"]()
+        self.assertFalse(os.path.lexists(mine / "GAFE01"))
+
+    def test_an_archive_is_checked_by_size_not_romms_hash(self):
+        box = Box(self.base, "library", tokenFile=None)
+        a = box.agent()
+
+        class Resp:
+            status_code = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *e):
+                pass
+
+            def raise_for_status(self):
+                pass
+
+            def iter_content(self, n):
+                yield b"zipbytes"
+
+        class Session:
+            def get(self, *a, **kw):
+                return Resp()
+        dest = self.base / "pack.zip"
+        # RomM's hash is of what's inside: it never matches the zip's own.
+        self.assertTrue(a["download"](Session(), "/x", dest, "inner-hash", 8))
+        self.assertEqual(dest.read_bytes(), b"zipbytes")
+        with self.assertRaises(RuntimeError):
+            a["download"](Session(), "/x", self.base / "short.zip", "inner-hash", 9)
+        with self.assertRaises(RuntimeError):               # a ROM's hash still counts
+            a["download"](Session(), "/x", self.base / "game.iso", "not-its-hash", 8)
+
     def test_library_token_from_systemd(self):
         box = Box(self.base, "library", tokenFile=None)
         creds = self.base / "creds"

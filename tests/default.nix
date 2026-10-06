@@ -140,6 +140,9 @@ in
         (lib.hasInfix "/var/lib/famidrive/media/gc" c.home-manager.users.bob.home.activation.famidriveRoms.data
           && !(lib.hasInfix "/var/lib/famidrive/media/steam" c.home-manager.users.bob.home.activation.famidriveRoms.data)
           && library.platforms == null))
+      (check "Dolphin loads the library's texture packs, for every player"
+        (lib.elem "d /var/lib/famidrive/textures 0755 famidrive-library famidrive -" c.systemd.tmpfiles.rules
+          && lib.hasInfix "HiresTextures" c.home-manager.users.guest.home.activation.famidriveEmulators.data))
       (check "one Ports system, for Minecraft and Clone Hero both"
         (!(c.famidrive.systems ? minecraft)
           && lib.sort lib.lessThan c.famidrive.systems.ports.extensions == [ ".port" ".prism" ]

@@ -48,6 +48,10 @@ let
         ''}
         romm-agent firmware-install &
       fi
+      # The library's Dolphin texture packs, for every player and the
+      # guest: they belong to the box, like the ROMs.
+      ROMM_AGENT_CONFIG=/etc/famidrive/romm/library.json romm-agent textures \
+        || echo "famidrive-session: couldn't link texture packs" >&2
     ''}
     ${lib.optionalString picker ''
       # A fresh start for this player's audio. Found on the first box
