@@ -86,8 +86,9 @@ class Test(unittest.TestCase):
         self.assertEqual((ch / "profiles.ini").read_text(), text)
 
     def test_cache_cleared_when_library_changes(self):
-        ch = self.home / ".clonehero"
-        ch.mkdir()
+        # Where Clone Hero 1.1 keeps it (found on the first box).
+        ch = self.home / ".config/unity3d/srylain Inc_/Clone Hero"
+        ch.mkdir(parents=True)
         cache = ch / "songcache.bin"
         stamp = self.dir / "stamp"
         stamp.write_text("1")

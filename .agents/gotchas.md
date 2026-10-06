@@ -103,6 +103,22 @@ Found against RomM 5.3:
 
 See [CONTROLLERS.md](../CONTROLLERS.md) for per-controller results.
 
+## Clone Hero
+
+- **Clone Hero 1.1 keeps its data in two places.** Scores
+  (`scoredata.bin`, `scoresext.bin`), the song cache and Unity's `prefs`
+  are in `~/.config/unity3d/srylain Inc_/Clone Hero/`. Profiles and
+  settings are in `~/.clonehero/`.
+- **`prefs` holds three kinds of data:**
+  - the guitar bindings and calibration (Rewired's keys)
+  - the window settings
+  - a Unity login token
+
+  Never sync the whole file.
+- **RomM keeps saves only for entries in its library.** Clone Hero's
+  saves live under an entry added by hand, which the agent finds by name
+  (`famidrive.romm.apps`).
+
 ## Nix and CI
 
 - **writeShellApplication runs shellcheck.** A variable that's only used

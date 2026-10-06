@@ -301,6 +301,56 @@ class Test(unittest.TestCase):
         e = a["entry_for"](news)
         self.assertEqual((e["server_updated_at"], e["pushed"], e["conflict_pushed"]), ("t1", "old", "c"))
 
+    def test_app_saves_round_trip(self):
+        # Clone Hero: fixed files under the home, under a RomM entry found
+        # by name, and pushed by reconcile like any ROM's.
+        paths = [".config/unity3d/srylain Inc_/Clone Hero/scoredata.bin", ".clonehero/profiles.ini"]
+        box = Box(self.base, "alice", apps={"clonehero": {
+            "rom": "Clone Hero", "emulator": "clonehero",
+            "saveLayout": {"kind": "files", "root": "~", "paths": paths}}})
+        a = box.agent()
+        for rel in paths:
+            (box.home / rel).parent.mkdir(parents=True, exist_ok=True)
+            (box.home / rel).write_text(f"mine: {rel}")
+        uploads, searches = [], []
+
+        class Resp:
+            def __init__(self, data=None, content=b""):
+                self.data, self.content = data, content
+
+            def json(self):
+                return self.data
+
+            def raise_for_status(self):
+                pass
+
+        class Session:
+            def post(self, url, params, files, **kw):
+                uploads.append((params["rom_id"], params["slot"], files["saveFile"][1]))
+                return Resp({"updated_at": "2026-10-06T10:00:00+00:00"})
+        g = a["cmd_save_push"].__globals__
+        g["session"] = lambda: Session()
+        g["device_id"] = lambda s: "dev"
+        g["server_save"] = lambda s, dev, rom_id: None
+        g["all_roms"] = lambda s, params: searches.append(params) or [
+            {"id": 7, "name": "Clone Hero Live"}, {"id": 9, "name": "Clone Hero"}]
+        a["cmd_reconcile"]()
+        a["cmd_reconcile"]()                     # unchanged: not sent again
+        self.assertEqual([(r, s) for r, s, _ in uploads], [(9, "famidrive")])
+        self.assertEqual(len(searches), 1)       # the id is kept
+        # Another box: the archive unpacks to the same places.
+        other = Box(self.base, "alice-elsewhere", apps=box.cfg["apps"])
+        b = other.agent()
+        g = b["cmd_save_pull"].__globals__
+        g["session"] = lambda: Session()
+        g["device_id"] = lambda s: "dev"
+        g["app_id"] = lambda name: 9
+        g["server_save"] = lambda s, dev, rom_id: {"id": 1, "updated_at": "2026-10-06T10:00:00+00:00"}
+        g["get"] = lambda s, path, **kw: Resp(content=uploads[0][2])
+        b["cmd_save_pull"]("clonehero", "app:clonehero")
+        for rel in paths:
+            self.assertEqual((other.home / rel).read_text(), f"mine: {rel}")
+
     def test_gamecube_saves_found_by_id(self):
         box = Box(self.base, "alice")
         a = box.agent()

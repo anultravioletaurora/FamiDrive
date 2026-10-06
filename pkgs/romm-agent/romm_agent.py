@@ -12,6 +12,10 @@ Each player's own (run as that player):
     romm-agent save-push SYSTEM ROM    local save for ROM -> RomM (post-exit)
     romm-agent reconcile               push every local save RomM doesn't have yet
 
+Apps that aren't ROMs (Clone Hero) sync the same way, as `save-pull APP
+app:APP`: their saves go up under a RomM entry found by name (`apps` in
+the config), so they sit in RomM with every other game's.
+
 Config: $ROMM_AGENT_CONFIG, or /etc/famidrive/romm/<user>.json for
 whoever runs it (romm-agent.nix writes one per player, and library.json).
 
@@ -475,6 +479,29 @@ def store_saves(saves):
     SAVES.write_text(json.dumps(saves, indent=2))
 
 
+def app_id(name):
+    """RomM's id for an app's entry (an entry added by hand, so its
+    saves have somewhere to live), found by its name once and kept."""
+    saves = load_saves()
+    key = f"app:{name}"
+    if saves.get(key, {}).get("id"):
+        return saves[key]["id"]
+    want = CFG["apps"][name]["rom"]
+    s = session()
+    found = [r for r in all_roms(s, {"search_term": want})
+             if want in (r.get("name"), r.get("fs_name_no_ext"), r.get("fs_name"))]
+    if not found:
+        raise RuntimeError(f"RomM has no entry named {want!r} for {name}'s saves")
+    saves.setdefault(key, {})["id"] = found[0]["id"]
+    store_saves(saves)
+    return found[0]["id"]
+
+
+def target(system):
+    """A system's, or an app's, definition from the config."""
+    return CFG["systems"].get(system) or CFG.get("apps", {})[system]
+
+
 def library_path(rom_path):
     """The library's path for a ROM. ES-DE hands over paths in the
     player's own ROM folder, whose systems are links into the library."""
@@ -611,7 +638,7 @@ def from_archive(lay, rel):
 
 
 def layout(system):
-    lay = dict(CFG["systems"][system]["saveLayout"])
+    lay = dict(target(system)["saveLayout"])
     # Profiles are the player's own (players.<name> in the module).
     if lay["kind"] == "eden-title-id":
         lay["profile"] = eden_profile()
@@ -649,6 +676,8 @@ def save_paths(system, entry, rom_path):
         found = [f"{lay['profile']}/{tid.upper()}"]
     elif kind == "xenia-content" and tid:
         found = [f"{lay['profile']}/{tid}/00000001"]
+    elif kind == "files":
+        found = list(lay["paths"])   # fixed files under the root (apps)
 
     found = [f for f in found if (root / f).exists()]
     return found or entry.get("learned") or None
@@ -752,7 +781,7 @@ def my_state(saves, key, rom_id):
     # its own (a conflict copy pushed before this fix), but not the sync.
     index = load_index()
     for old in list(saves):
-        if old == key or old in index:
+        if old == key or old in index or old.startswith("app:"):
             continue
         state = saves[old]
         if state.get("id") == rom_id or (state.get("id") is None and Path(old).name == Path(key).stem):
@@ -764,7 +793,10 @@ def my_state(saves, key, rom_id):
 
 def entry_for(key):
     """The library's entry for a ROM, with this player's save state on top."""
-    entry = dict(load_index()[key])
+    if key.startswith("app:"):
+        entry = {"id": app_id(key[4:]), "system": key[4:]}
+    else:
+        entry = dict(load_index()[key])
     mine = dict(my_state(load_saves(), key, entry["id"]))
     entry.update({k: v for k, v in mine.items() if k != "title_id"})
     entry["title_id"] = entry.get("title_id") or mine.get("title_id")
@@ -858,7 +890,7 @@ def cmd_save_push(system, rom_path, learn=True):
     name = f"{system}-{entry.get('title_id') or entry['id']}.famidrive.tar.gz"
     r = s.post(API + EP_SAVES, timeout=120,
                params={"rom_id": entry["id"], "slot": slot, "device_id": dev,
-                       "emulator": CFG["systems"][system].get("emulator"),
+                       "emulator": target(system).get("emulator"),
                        "overwrite": "true",
                        # RomM keeps the newest N in this slot and deletes the
                        # rest (per user, game and slot: saves uploaded by
@@ -886,6 +918,11 @@ def cmd_reconcile():
                 cmd_save_push(entry["system"], rom_path, learn=False)
             except requests.RequestException as e:
                 print(f"push failed for {rom_path}: {e}", file=sys.stderr)
+    for name in CFG.get("apps", {}):
+        try:
+            cmd_save_push(name, f"app:{name}", learn=False)
+        except (requests.RequestException, RuntimeError) as e:
+            print(f"push failed for {name}: {e}", file=sys.stderr)
 
 
 def main():

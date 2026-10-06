@@ -44,7 +44,7 @@ let
     gamelistDir = "${p.home}/ES-DE/gamelists";
     edenProfileId = p.edenProfileId;
     xeniaXuid = p.xeniaXuid;
-    inherit (cfg.romm) saveHistory;
+    inherit (cfg.romm) saveHistory apps;
     inherit systems;
   };
 

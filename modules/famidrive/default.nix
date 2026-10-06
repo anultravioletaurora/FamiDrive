@@ -203,6 +203,17 @@ in
         '';
       };
 
+      apps = mkOption {
+        type = types.attrsOf (types.attrsOf types.anything);
+        default = { };
+        internal = true;
+        description = ''
+          Apps that aren't ROMs but keep saves in RomM, under an entry added
+          to RomM by hand (Clone Hero's scores): name -> { rom, emulator,
+          saveLayout }. Set by the app's module.
+        '';
+      };
+
       firmwarePlatforms = mkOption {
         type = types.listOf types.str;
         default = lib.unique (lib.filter (s: s != null)
