@@ -38,6 +38,7 @@ import sys
 import tarfile
 import time
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -713,6 +714,25 @@ def unpack(blob, root, lay):
 # ---------------------------------------------------------------- save commands
 
 
+def same_time(a, b):
+    """RomM gives the same moment in UTC after an upload and in the
+    server's zone when listing. Found on the first box 2026-10-06:
+    compared as text, every push looked like a conflict."""
+    if not a or not b:
+        return a == b
+    try:
+        return datetime.fromisoformat(a) == datetime.fromisoformat(b)
+    except ValueError:
+        return a == b
+
+
+def unpushed(system, entry, root, lay, key):
+    """Whether this box has a save for the ROM that RomM doesn't: one
+    that changed since it was last pushed or pulled."""
+    rels = save_paths(system, entry, key)
+    return bool(rels) and files_hash(root, rels, lay) != entry.get("pushed")
+
+
 def entry_for(key):
     """The library's entry for a ROM, with this player's save state on top."""
     entry = dict(load_index()[key])
@@ -740,6 +760,13 @@ def cmd_save_pull(system, rom_path):
     entry = entry_for(key)
     newest = server_save(s, dev, entry["id"])
     if not newest:
+        return
+    if same_time(newest["updated_at"], entry.get("server_updated_at")):
+        return   # RomM's is the one this box already has
+    if unpushed(system, entry, root, lay, key):
+        # Never overwrite a save RomM hasn't got. The push after the game
+        # sends it up (beside RomM's, if RomM's changed meanwhile).
+        print(f"local save for {rom_path} is newer than RomM knows; kept", file=sys.stderr)
         return
     blob = get(s, EP_SAVE_CONTENT.format(id=newest["id"]), params={"device_id": dev}).content
     try:
@@ -786,7 +813,7 @@ def cmd_save_push(system, rom_path, learn=True):
     dev = device_id(s)
     slot = SLOT
     newest = server_save(s, dev, entry["id"])
-    if newest and newest["updated_at"] != entry.get("server_updated_at"):
+    if newest and not same_time(newest["updated_at"], entry.get("server_updated_at")):
         # Another box pushed since this one last pulled. Keep both; never
         # silently overwrite. The copy here goes up beside it for a human.
         slot = f"{SLOT}-conflict-{CFG['deviceName']}"

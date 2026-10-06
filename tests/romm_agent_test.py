@@ -205,6 +205,27 @@ class Test(unittest.TestCase):
         self.assertEqual(a["title_id"]("gc", {"title_id": "47503745"}, {"title_id": "47503745"}, "x.iso"), "GP7E01")
         self.assertEqual(a["title_id"]("gc", {"title_id": "47503745"}, {"title_id": "GP7E01"}, "x.iso"), "GP7E01")
 
+    def test_times_compared_as_times(self):
+        a = Box(self.base, "alice").agent()
+        self.assertTrue(a["same_time"]("2026-10-06T08:55:20.372044+00:00", "2026-10-06T03:55:20.372044-05:00"))
+        self.assertFalse(a["same_time"]("2026-10-06T08:55:20+00:00", "2026-10-06T08:56:20+00:00"))
+        self.assertFalse(a["same_time"](None, "2026-10-06T08:55:20+00:00"))
+
+    def test_unpushed_local_save(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        card = box.home / ".local/share/dolphin-emu/GC/USA/Card A"
+        card.mkdir(parents=True)
+        (card / "01-GMPE-MARIPA4BOX0.gci").write_bytes(b"v1")
+        _, root, lay = a["layout"]("gc")
+        entry = {"title_id": "GMPE01"}
+        digest = a["files_hash"](root, ["USA/Card A/01-GMPE-MARIPA4BOX0.gci"], lay)
+        self.assertTrue(a["unpushed"]("gc", entry, root, lay, "x.iso"))     # never pushed
+        entry["pushed"] = digest
+        self.assertFalse(a["unpushed"]("gc", entry, root, lay, "x.iso"))    # RomM has it
+        (card / "01-GMPE-MARIPA4BOX0.gci").write_bytes(b"v2")
+        self.assertTrue(a["unpushed"]("gc", entry, root, lay, "x.iso"))     # played since
+
     def test_gamecube_saves_found_by_id(self):
         box = Box(self.base, "alice")
         a = box.agent()
