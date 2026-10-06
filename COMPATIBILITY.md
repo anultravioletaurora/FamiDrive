@@ -107,8 +107,8 @@ options.
 
 - **Modes:** the campaign and Nazi Zombies run from one program, and
   multiplayer from another. Steam asks which one to start, so expect
-  Steam's own chooser on screen first. FamiDrive shows that prompt on
-  top, as it does Left 4 Dead 2's. Check whether the choice can be
+  Steam's own chooser on screen first. FamiDrive shows Steam's prompts
+  on top ([Steam launches](#steam-launches)). Check whether the choice can be
   answered with a controller, and whether ES-DE should get one entry
   per mode instead.
 - **To check:** multiplayer under Proton (matchmaking and anti-cheat),
