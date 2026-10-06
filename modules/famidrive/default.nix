@@ -193,6 +193,18 @@ in
         '';
       };
 
+      platforms = mkOption {
+        type = types.nullOr (types.listOf types.str);
+        default = null;
+        example = [ "ngc" "wii" ];
+        description = ''
+          RomM platforms (their slugs, as in RomM's URLs) this box mirrors,
+          or null for every platform it has a system for. Works with
+          `collection`: both set, a box gets that collection's games on
+          these platforms.
+        '';
+      };
+
       saveHistory = mkOption {
         type = types.ints.between 1 100;
         default = 3;
@@ -331,6 +343,7 @@ in
       "d ${cfg.dataDir} 0755 famidrive-library famidrive -"
       "d ${cfg.dataDir}/roms 0755 famidrive-library famidrive -"
       "d ${cfg.dataDir}/firmware 0750 famidrive-library famidrive -"
+      "d ${cfg.dataDir}/media 0755 famidrive-library famidrive -"
     ] ++ lib.mapAttrsToList (system: dir:
       "L+ ${cfg.dataDir}/roms/${system} - - - - ${dir}"
     ) cfg.localRoms;

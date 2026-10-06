@@ -28,6 +28,7 @@ let
     tokenFile = null;   # systemd hands it over (LoadCredential, below)
     deviceName = config.networking.hostName;
     collection = cfg.romm.collection;
+    inherit (cfg.romm) platforms;
     dataDir = cfg.dataDir;
     firmwarePlatforms = cfg.romm.firmwarePlatforms;
     inherit systems;

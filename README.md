@@ -152,8 +152,10 @@ planning doc for now and will move into this repo.
   saves, Steam and RomM account, and powering off from the controller.
 - The RomM agent against RomM 5.3 on the first box: the library pull
   (single files, folders and nested files), firmware, and GameCube save
-  sync both ways, with conflict copies and a short save history. Switch
-  saves are next.
+  sync both ways, with conflict copies and a short save history. Each
+  game's details and box art come from RomM, with each player's
+  favorites and play counts kept. A box can mirror some platforms only
+  (`romm.platforms`). Switch saves are next.
 - The Steam lane, with Proton pins and Steam Input set from Nix, Steam's
   Big Picture as a Settings entry, and a status screen while Steam
   updates, processes shaders or starts a game. Results per game are in

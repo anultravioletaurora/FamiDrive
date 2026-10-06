@@ -18,6 +18,9 @@ let
   # shared library's.
   perPlayer = [ "steam" "gog" "minecraft" "settings" "media" "ports" ];
   shared = lib.filter (n: !(lib.elem n perPlayer)) (lib.attrNames cfg.systems);
+  # Shared systems whose games (and so art) come from RomM.
+  rommShared = lib.optionals cfg.romm.enable
+    (lib.filter (n: cfg.systems.${n}.rommPlatform != null && !(cfg.localRoms ? ${n})) shared);
 
   # famidrive-launch <system> <rom>
   #   1. pull the newest save for this ROM from RomM (consoles only, and
@@ -190,6 +193,35 @@ in
         ${lib.concatMapStrings (n: ''
           ln -sfn ${lib.escapeShellArg "${cfg.dataDir}/roms/${n}"} "$roms/${n}"
         '') shared}
+
+        # Box art and screenshots from RomM, for the systems it fills:
+        # ES-DE's media folder for each is a link to the library's, which
+        # the RomM pull keeps. Art scraped here before is moved aside, not
+        # deleted. Steam, GOG and the rest keep their own, and ES-DE's
+        # scraper still fills those.
+        media="$HOME/ES-DE/downloaded_media"
+        before="$HOME/ES-DE/downloaded_media-before-romm"
+        mkdir -p "$media"
+        for link in "$media"/*; do
+          [ -L "$link" ] || continue
+          case "$(readlink "$link")" in
+            ${lib.escapeShellArg "${cfg.dataDir}/media/"}*)
+              case " ${lib.concatStringsSep " " rommShared} " in
+                *" $(basename "$link") "*) ;;
+                *) rm -f "$link" ;;
+              esac
+              ;;
+          esac
+        done
+        ${lib.concatMapStrings (n: ''
+          if [ -d "$media/${n}" ] && [ ! -L "$media/${n}" ]; then
+            mkdir -p "$before"
+            dest="$before/${n}"
+            [ ! -e "$dest" ] || dest="$dest.$(date +%s)"
+            mv "$media/${n}" "$dest"
+          fi
+          ln -sfn ${lib.escapeShellArg "${cfg.dataDir}/media/${n}"} "$media/${n}"
+        '') rommShared}
       '';
 
       home.activation.famidriveEsSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''

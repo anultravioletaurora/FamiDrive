@@ -41,8 +41,9 @@ import subprocess
 import sys
 import tarfile
 import time
+import xml.etree.ElementTree as ET
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -53,7 +54,11 @@ CFG = json.loads(Path(os.environ.get("ROMM_AGENT_CONFIG")
 BASE = CFG["url"].rstrip("/")
 API = BASE + "/api"
 DATA = Path(CFG["dataDir"])
+# Box art and screenshots, in ES-DE's own layout (<system>/covers/<game>.png),
+# so each player's ES-DE reads them straight from here (frontend.nix links
+# its downloaded_media/<system> to MEDIA/<system>).
 MEDIA = DATA / "media"
+MEDIA_STATE = DATA / "media.json"   # rom id -> RomM's updated_at when fetched
 GAMELISTS = DATA / "gamelists"  # the library's; each player's ES-DE gets a copy
 # Shared, written by `pull` only: local ROM path -> {id, system, title_id}
 INDEX = DATA / "index.json"
@@ -193,12 +198,19 @@ def all_roms(s, params):
 
 
 def library(s):
-    """Every ROM, or one collection's when `collection` is set."""
+    """Every ROM, or one collection's when `collection` is set, and only
+    the platforms in `platforms` when that's set (both can be)."""
     params = {}
     if CFG.get("collection"):
         cols = get(s, EP_COLLECTIONS).json()
         col = next(c for c in cols if c["name"] == CFG["collection"])
         params["collection_id"] = col["id"]
+    if CFG.get("platforms"):
+        wanted = set(CFG["platforms"])
+        params["platform_ids"] = [p["id"] for p in get(s, EP_PLATFORMS).json()
+                                  if wanted & {p.get("fs_slug"), p.get("slug")}]
+        if not params["platform_ids"]:
+            return iter(())
     return all_roms(s, params)
 
 
@@ -298,22 +310,56 @@ def title_id(system, rom, prev, path):
     return tid or had or derive_id(system, path)
 
 
-def fetch_cover(s, rom, system):
-    """Box art for ES-DE, from RomM's own scrape. Best-effort."""
-    rel = rom.get("path_cover_large") or rom.get("path_cover_small")
-    if not rel:
-        return None
-    out = MEDIA / system / f"{rom['id']}{Path(rel.split('?')[0]).suffix or '.png'}"
-    if out.exists():
-        return out
-    try:
-        r = s.get(BASE + rel if rel.startswith("/") else rel, timeout=60)  # VERIFY: path or URL
-        r.raise_for_status()
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_bytes(r.content)
-        return out
-    except requests.RequestException:
-        return None
+def media_url(rel):
+    """A RomM asset path, without its cache-busting ?ts=."""
+    return BASE + rel.split("?")[0] if rel.startswith("/") else rel
+
+
+def fetch_one(s, urls, dest_stem):
+    """The first of `urls` that downloads, saved as dest_stem.<ext>, in
+    place of any other extension's copy. RomM's own files go through its
+    session; outside links (its SteamGridDB cover) without our token."""
+    for url in urls:
+        if not url:
+            continue
+        try:
+            r = (s if url.startswith(BASE) else requests).get(url, timeout=60)
+            r.raise_for_status()
+        except requests.RequestException:
+            continue
+        kind = r.headers.get("content-type", "").split(";")[0]
+        ext = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}.get(kind)
+        if not ext:
+            continue
+        dest_stem.parent.mkdir(parents=True, exist_ok=True)
+        for old in dest_stem.parent.glob(dest_stem.name + ".*"):
+            old.unlink()
+        Path(str(dest_stem) + ext).write_bytes(r.content)
+        return True
+    return False
+
+
+def fetch_media(s, rom, system, rel):
+    """Cover and screenshot for one game, where ES-DE looks for them:
+    MEDIA/<system>/covers/<game>.png, <game> being its file's path in the
+    system folder without the extension. Fetched again only when RomM's
+    entry changed. Found on the first box 2026-10-06: RomM listed
+    covers it had no file for (404), so its cover link is the fallback."""
+    state = json.loads(MEDIA_STATE.read_text()) if MEDIA_STATE.exists() else {}
+    key = str(rom["id"])
+    stem = Path(rel).with_suffix("")
+    have = state.get(key)
+    if have and have.get("updated_at") == rom.get("updated_at") and have.get("stem") == str(stem):
+        return
+    root = MEDIA / system
+    got = fetch_one(s, [media_url(rom["path_cover_large"]) if rom.get("path_cover_large") else None,
+                        media_url(rom["path_cover_small"]) if rom.get("path_cover_small") else None,
+                        rom.get("url_cover")], root / "covers" / stem)
+    shots = rom.get("merged_screenshots") or []
+    fetch_one(s, [media_url(shots[0])] if shots else [], root / "screenshots" / stem)
+    if got:
+        state[key] = {"updated_at": rom.get("updated_at"), "stem": str(stem)}
+        MEDIA_STATE.write_text(json.dumps(state, indent=2))
 
 
 def cmd_pull():
@@ -337,7 +383,12 @@ def cmd_pull():
         if tid and not rom.get("title_id"):
             teach_romm(s, rom["id"], tid)
         index[str(launch)] = {"id": rom["id"], "system": system, "title_id": tid}
-        by_system.setdefault(system, []).append((launch, rom, fetch_cover(s, rom, system)))
+        try:
+            rel = Path(launch).relative_to(DATA / "roms" / system)
+        except ValueError:
+            rel = Path(Path(launch).name)
+        fetch_media(s, rom, system, rel)
+        by_system.setdefault(system, []).append((rel, rom))
         save_index(index)  # a 800 GB first pull survives being interrupted
 
     for system, entries in by_system.items():
@@ -359,22 +410,68 @@ def teach_romm(s, rom_id, tid):
         pass
 
 
+# What a gamelist's game gets from RomM. Everything else in a player's
+# copy (favorite, playcount, lastplayed, hidden, ...) is theirs, and kept.
+FROM_ROMM = ("name", "desc", "rating", "releasedate", "developer", "publisher", "genre", "players")
+
+
+def game_metadata(rom):
+    """ES-DE's gamelist fields from RomM's metadata."""
+    m = rom.get("metadatum") or {}
+    fields = {"name": rom.get("name") or rom.get("fs_name_no_ext"), "desc": rom.get("summary") or ""}
+    if m.get("average_rating"):
+        fields["rating"] = f"{min(m['average_rating'], 100) / 100:.2f}"
+    if m.get("first_release_date"):
+        day = datetime.fromtimestamp(m["first_release_date"] / 1000, tz=timezone.utc)
+        fields["releasedate"] = day.strftime("%Y%m%dT000000")
+    for field, key in (("developer", "developers"), ("publisher", "publishers"), ("genre", "genres")):
+        if m.get(key):
+            fields[field] = ", ".join(m[key][:2] if field != "genre" else m[key])
+    if m.get("player_count"):
+        fields["players"] = m["player_count"]
+    return fields
+
+
 def write_gamelist(system, entries):
     out = GAMELISTS / system / "gamelist.xml"
     out.parent.mkdir(parents=True, exist_ok=True)
     games = []
-    for dest, rom, cover in entries:
-        image = f"    <image>{escape(str(cover))}</image>\n" if cover else ""
-        games.append(
-            "  <game>\n"
-            f"    <path>./{escape(dest.name)}</path>\n"
-            f"    <name>{escape(rom.get('name') or dest.stem)}</name>\n"
-            f"    <desc>{escape(rom.get('summary') or '')}</desc>\n"
-            f"{image}"
-            "  </game>\n"
-        )
+    for rel, rom in entries:
+        fields = {"path": f"./{rel}", **game_metadata(rom)}
+        games.append("  <game>\n" + "".join(
+            f"    <{k}>{escape(str(v))}</{k}>\n" for k, v in fields.items()) + "  </game>\n")
     out.write_text('<?xml version="1.0"?>\n<gameList>\n'
                    + "".join(games) + "</gameList>\n")
+
+
+def merge_gamelist(library, mine):
+    """The library's gamelist, with this player's own fields kept: RomM
+    has the say on what a game is, the player on how they've played it.
+    Games only the player's copy has stay too."""
+    lib_root = ET.parse(library).getroot()
+    try:
+        my_root = ET.parse(mine).getroot()
+    except (OSError, ET.ParseError):
+        my_root = ET.Element("gameList")
+    mine_by_path = {g.findtext("path"): g for g in my_root.findall("game")}
+    out = ET.Element("gameList")
+    for game in lib_root.findall("game"):
+        path = game.findtext("path")
+        merged = ET.SubElement(out, "game")
+        for child in game:
+            merged.append(child)
+        old = mine_by_path.pop(path, None)
+        if old is not None:
+            for child in old:
+                if child.tag != "path" and child.tag not in FROM_ROMM and child.tag != "image":
+                    merged.append(child)
+    for left in mine_by_path.values():
+        out.append(left)
+    for other in my_root:
+        if other.tag != "game":   # ES-DE's <folder> entries
+            out.append(other)
+    ET.indent(out)
+    return b'<?xml version="1.0"?>\n' + ET.tostring(out, encoding="utf-8") + b"\n"
 
 
 # ---------------------------------------------------------------- firmware
@@ -437,8 +534,9 @@ def cmd_firmware_install():
 
 
 def cmd_gamelists():
-    """Copy each system's gamelist from the library into this player's
-    ES-DE, when the library has written a newer one since the last copy.
+    """Merge each system's gamelist from the library into this player's
+    ES-DE, when the library has written a newer one since the last time:
+    RomM's metadata in, the player's favorites and play counts kept.
     ES-DE rewrites its own copy (play counts, favorites) in between."""
     copied_file = STATE / "gamelists.json"
     copied = json.loads(copied_file.read_text()) if copied_file.exists() else {}
@@ -448,7 +546,7 @@ def cmd_gamelists():
             continue
         dest = Path(CFG["gamelistDir"]) / system / "gamelist.xml"
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(src.read_bytes())
+        dest.write_bytes(merge_gamelist(src, dest))
         copied[system] = mtime
     STATE.mkdir(parents=True, exist_ok=True)
     copied_file.write_text(json.dumps(copied, indent=2))

@@ -136,6 +136,10 @@ in
         (lib.hasInfix ''"instances":{"Test Server"'' c.home-manager.users.alice.home.activation.famidriveMinecraft.data
           && lib.hasInfix ''"instances":{}'' c.home-manager.users.bob.home.activation.famidriveMinecraft.data
           && lib.hasInfix ''"instances":{}'' c.home-manager.users.guest.home.activation.famidriveMinecraft.data))
+      (check "RomM systems' art is the library's, PC lanes' stays the player's"
+        (lib.hasInfix "/var/lib/famidrive/media/gc" c.home-manager.users.bob.home.activation.famidriveRoms.data
+          && !(lib.hasInfix "/var/lib/famidrive/media/steam" c.home-manager.users.bob.home.activation.famidriveRoms.data)
+          && library.platforms == null))
       (check "one Ports system, for Minecraft and Clone Hero both"
         (!(c.famidrive.systems ? minecraft)
           && lib.sort lib.lessThan c.famidrive.systems.ports.extensions == [ ".port" ".prism" ]
