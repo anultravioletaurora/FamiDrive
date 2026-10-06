@@ -54,6 +54,16 @@ let
       systemctl --user restart wireplumber.service || echo "famidrive-session: couldn't restart WirePlumber" >&2
     ''}
     ${cfg.sessionSetup}
+    # The menu's music: ES-DE has none of its own (ES-DE 3.5 has no music
+    # support at all), so the player's ES-DE/music plays here, shuffled,
+    # and gamescope-fg pauses it while a game or app covers the menu.
+    music="$HOME/ES-DE/music"
+    if [ -n "$(${pkgs.findutils}/bin/find -L "$music" -type f \( -iname '*.mp3' -o -iname '*.ogg' -o -iname '*.opus' \
+        -o -iname '*.flac' -o -iname '*.m4a' -o -iname '*.wav' \) -print -quit 2>/dev/null)" ]; then
+      ${pkgs.mpv}/bin/mpv --no-video --no-terminal --really-quiet --shuffle --loop-playlist=inf \
+        --volume=${toString cfg.esde.musicVolume} \
+        --input-ipc-server="''${XDG_RUNTIME_DIR:-/tmp}/famidrive-music.sock" "$music" &
+    fi
     # Nothing is running yet: clear what a crashed launch may have left.
     rm -f "''${XDG_RUNTIME_DIR:-/nonexistent}"/famidrive-game.*
     # Hold Select + Start on any controller to quit the running game

@@ -153,6 +153,8 @@ planning doc for now and will move into this repo.
   Big Picture as a Settings entry, and a status screen while Steam
   updates, processes shaders or starts a game. Results per game are in
   [COMPATIBILITY.md](COMPATIBILITY.md).
+- Menu music: each player's `~/ES-DE/music`, shuffled behind ES-DE and
+  paused while a game is open (ES-DE has no music of its own).
 - Wii games with real Wii Remotes and the Balance Board, and Minecraft
   instances declared in Nix, with controller play through Controlify.
 
