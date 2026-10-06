@@ -289,6 +289,14 @@ in
     services.pipewire = {
       enable = true;
       pulse.enable = true;
+      # Full volume for a player's first time on an output, so the TV's
+      # own remote is the volume control. WirePlumber's default is 40%.
+      # Found on the first box 2026-10-06: a new player's sound was much
+      # quieter than the existing account's. Volumes changed later are
+      # kept per player, as before.
+      wireplumber.extraConfig.famidrive-volume."wireplumber.settings" = {
+        "device.routes.default-sink-volume" = 1.0;
+      };
     };
 
     # HDMI-CEC: turn the TV on and switch input on boot/resume.

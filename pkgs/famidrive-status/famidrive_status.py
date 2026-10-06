@@ -42,6 +42,9 @@ TEXT = {
                 "Steam prepares these once per game, and again after a game or driver update. "
                 "It makes the game run smoothly from the start."),
     "prompt": ("Steam needs you", "Answer Steam's question to continue."),
+    "installing": ("Setting up the game",
+                   "Steam is running the game's first-time setup, such as its publisher's launcher. "
+                   "If a window asks something, answer it; some need a mouse or keyboard."),
     "launching": ("Starting", "The game is loading."),
     "failed": ("Steam couldn't start the game", ""),
 }
