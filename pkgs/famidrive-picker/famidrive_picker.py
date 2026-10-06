@@ -28,9 +28,12 @@ os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 import pygame  # noqa: E402
 from pygame._sdl2 import controller  # noqa: E402
 
+# Art Book Next's OLED colors (colors.xml, "oled-original"): a black
+# background, its help text and help bar.
 WHITE = (255, 255, 255)
-DIM = (153, 153, 153)        # the theme's help text
-PANEL = (17, 17, 17, 230)    # its help bar
+BLACK = (0, 0, 0)
+DIM = (153, 153, 153)        # helpTextColor 999999
+PANEL = (0, 0, 0, 238)       # helpBackgroundColor 000000ee
 ERROR = (255, 140, 120)
 # One color per player, in order; the guest is grey.
 COLORS = [(214, 92, 120), (84, 140, 214), (96, 176, 120), (226, 160, 72),
@@ -156,9 +159,7 @@ def main():
     help_f = font(regular, int(24 * u))
 
     background = pygame.Surface((w, h), 0, 32)
-    for y in range(h):   # a dark vertical gradient
-        c = int(28 - 20 * y / h)
-        pygame.draw.line(background, (c, c, c + 4), (0, y), (w, y))
+    background.fill(BLACK)
 
     pads = {}
     stick_held = False
@@ -206,7 +207,7 @@ def main():
             if on:
                 r = int(r * 1.08)
                 pygame.draw.circle(screen, WHITE, (cx, cy), r + int(10 * u))
-                pygame.draw.circle(screen, (16, 16, 18), (cx, cy), r + int(4 * u))
+                pygame.draw.circle(screen, BLACK, (cx, cy), r + int(4 * u))
             color = GUEST if p["isGuest"] else COLORS[i % len(COLORS)]
             if not on:
                 color = tuple(int(c * 0.6) for c in color)
