@@ -60,6 +60,9 @@ let
       # Found on the first box 2026-10-05: Steam and Media showed the "pc"
       # theme's IBM PC logo.
       theme = mkOption { type = types.nullOr types.str; default = null; };
+      # Where it sits in ES-DE's system list, which is otherwise by full
+      # name: a sort key, never shown (frontend.nix). null = the full name.
+      sortName = mkOption { type = types.nullOr types.str; default = null; };
       # Sent to RomM with each save, so its web UI shows what made it.
       emulator = mkOption { type = types.nullOr types.str; default = null; };
       # Folder under dataDir/firmware/ this system's firmware lands in

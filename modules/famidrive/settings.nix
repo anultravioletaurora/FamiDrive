@@ -37,6 +37,7 @@ in
     famidrive.systems.settings = {
       fullname = "Settings";
       theme = "tools";   # Art Book Next's tools art
+      sortName = "zzzz";   # last in the system list, after every game system
       extensions = [ ".setting" ];
       command = ''
         case "$(cat "$ROM")" in

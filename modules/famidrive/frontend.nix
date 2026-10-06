@@ -65,6 +65,20 @@ let
     </systemList>
   '';
 
+  # ES-DE's custom system order: a sort key per system, by full name unless
+  # the system sets its own (Settings goes last).
+  esSystemsSortingXml = pkgs.writeText "es_systems_sorting.xml" ''
+    <?xml version="1.0"?>
+    <systemList>
+    ${lib.concatStrings (lib.mapAttrsToList (name: s: ''
+      <system>
+        <name>${name}</name>
+        <systemsortname>${if s.sortName != null then s.sortName else s.fullname}</systemsortname>
+      </system>
+    '') cfg.systems)}
+    </systemList>
+  '';
+
   theme = cfg.esde.theme;
 in
 {
@@ -128,6 +142,7 @@ in
     home-manager.users.${cfg.user} = { lib, ... }: {
       home.file = {
         "ES-DE/custom_systems/es_systems.xml".source = esSystemsXml;
+        "ES-DE/custom_systems/es_systems_sorting.xml".source = esSystemsSortingXml;
       } // lib.optionalAttrs (theme != null) {
         "ES-DE/themes/${theme.name}".source = theme.src;
       };

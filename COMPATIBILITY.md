@@ -61,18 +61,18 @@ different Eden profile.
 
 ### Cyberpunk 2077
 
-**Steam: 🟡 Playable.**
+**Steam: ✅ Works.**
 
 - **Runs on:** GE-Proton7-50, set in Steam.
 - **Mods:** through Vortex: Cyber Engine Tweaks, RED4ext and archive
   mods all load.
 - **Launch options:** `WINEDLLOVERRIDES="winmm,version=n,b" %command%`.
-- **Launching:** about 37 s pass between Steam starting it and its first
-  window. It kept dropping back to ES-DE with the game running behind it
-  (audible, and picking it again brought it forward). Steam swaps the
-  process it starts for another, three times in 40 s, and FamiDrive
-  followed only the first. It now follows the game until none of its
-  Steam processes is left. Fixed after `190714b`, not yet retested.
+- **Launching:** works. Steam's window shows briefly, then a black screen
+  for about 37 s while the game starts, then the game. It used to drop
+  back to ES-DE with the game running behind it: Steam swaps the process
+  it starts for another, three times in 40 s, and FamiDrive followed only
+  the first. Fixed in `ac82a59`. The black wait is the planned status
+  screen's job (see [Steam launches](#steam-launches)).
 - **Performance:** frame rate not measured yet (see
   [Measuring performance](#measuring-performance)). One sample, place in
   the game unknown: GPU 50–70% busy at 1.5 GHz and 105 W, 9 GB of video
