@@ -820,7 +820,11 @@ def cmd_save_push(system, rom_path, learn=True):
     newest = server_save(s, dev, entry["id"])
     if newest and not same_time(newest["updated_at"], entry.get("server_updated_at")):
         # Another box pushed since this one last pulled. Keep both; never
-        # silently overwrite. The copy here goes up beside it for a human.
+        # silently overwrite. The copy here goes up beside it for a human,
+        # once per version of it: found on the first box 2026-10-06, the
+        # 15-minute reconcile uploaded the same conflict copy every time.
+        if mine.get("conflict_pushed") == digest:
+            return
         slot = f"{SLOT}-conflict-{CFG['deviceName']}"
         print(f"conflict on {rom_path}: uploaded to slot {slot}", file=sys.stderr)
 
@@ -829,12 +833,20 @@ def cmd_save_push(system, rom_path, learn=True):
     r = s.post(API + EP_SAVES, timeout=120,
                params={"rom_id": entry["id"], "slot": slot, "device_id": dev,
                        "emulator": CFG["systems"][system].get("emulator"),
-                       "overwrite": "true"},
+                       "overwrite": "true",
+                       # RomM keeps the newest N in this slot and deletes the
+                       # rest (per user, game and slot: saves uploaded by
+                       # hand, in other slots, are never touched).
+                       "autocleanup": "true",
+                       "autocleanup_limit": CFG.get("saveHistory", 3)},
                files={"saveFile": (name, blob)})
     r.raise_for_status()
     if slot == SLOT:
         mine["pushed"] = digest
         mine["server_updated_at"] = r.json().get("updated_at")
+        mine.pop("conflict_pushed", None)
+    else:
+        mine["conflict_pushed"] = digest
     store_saves(saves)
 
 
