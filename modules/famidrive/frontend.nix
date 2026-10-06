@@ -91,7 +91,38 @@ in
     description = "ES-DE theme, symlinked in and selected. null = ES-DE's bundled default.";
   };
 
+  options.famidrive.esde.skipFolders = lib.mkOption {
+    type = lib.types.listOf lib.types.str;
+    # RomM's names for a game's extra folders, plus common variants.
+    default = [ "dlc" "update" "updates" "patch" "patches" "mod" "mods" "manual" "manuals" ];
+    description = ''
+      Folders, at any depth under a system's ROMs, that ES-DE shouldn't
+      list: a game's DLC, updates and the like, which the emulator installs
+      or applies, not something to launch. Matched by name, ignoring case.
+      Each one gets an empty `noload.txt`, ES-DE's own "skip this folder"
+      marker, at boot and on every switch.
+    '';
+  };
+
   config = lib.mkIf cfg.enable {
+    # Before the session: ES-DE only reads its folders at startup.
+    systemd.services.famidrive-skip-folders = lib.mkIf (cfg.esde.skipFolders != [ ]) {
+      description = "Hide DLC and update folders from ES-DE";
+      wantedBy = [ "display-manager.service" ];
+      before = [ "display-manager.service" ];
+      after = [ "local-fs.target" ];
+      serviceConfig = {
+        Type = "oneshot";
+        User = cfg.user;
+      };
+      # -L: systems from localRoms are symlinks to elsewhere.
+      script = ''
+        ${pkgs.findutils}/bin/find -L ${cfg.dataDir}/roms -mindepth 2 -type d \( ${
+          lib.concatMapStringsSep " -o " (n: "-iname ${lib.escapeShellArg n}") cfg.esde.skipFolders
+        } \) -prune -exec ${pkgs.coreutils}/bin/touch {}/noload.txt \; 2>/dev/null || true
+      '';
+    };
+
     environment.systemPackages = [ famidriveLaunch ];
 
     home-manager.users.${cfg.user} = { lib, ... }: {
