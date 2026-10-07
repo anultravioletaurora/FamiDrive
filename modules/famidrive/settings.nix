@@ -43,7 +43,7 @@ in
       command = ''
         case "$(cat "$ROM")" in
           ${lib.optionalString steam ''steam) exec ${pkgs.gamescope-fg}/bin/gamescope-fg --steam bigpicture ;;''}
-          ${lib.optionalString heroic ''heroic) ${pkgs.heroic}/bin/heroic --fullscreen --no-sandbox ;;''}
+          ${lib.optionalString heroic ''heroic) XDG_CURRENT_DESKTOP=FamiDrive ${pkgs.heroic}/bin/heroic --fullscreen --no-sandbox ;;''}
           ${lib.optionalString jellyfin ''jellyfin) ${cfg.systems.media.command} ;;''}
         esac
       '';

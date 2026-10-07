@@ -470,11 +470,29 @@ in
       # window and quits Heroic when the game ends (read in Heroic 2.22's
       # source, 2026-10-07), so the command lasts as long as the game.
       # The entry's file holds the game's app name in that store.
+      #
+      # XDG_CURRENT_DESKTOP: gamescope sets it to "gamescope", which Heroic
+      # takes for a Steam Deck in Game Mode, and then sends no desktop
+      # notifications. Under any other name it does, and they show as
+      # toasts (famidrive-toast). The same check otherwise only turns off
+      # Heroic's own MangoHud and gamescope wrappers and its fullscreen,
+      # which FamiDrive doesn't use or asks for itself.
+      #
+      # A GOG game's achievements unlock through Comet, which Heroic
+      # starts beside it; famidrive-cheevos shows them as toasts.
       (lib.mkIf (hasLane "heroic") (lib.mapAttrs (system: s: {
         inherit (s) fullname;
         extensions = [ ".${system}" ];
-        command = ''${pkgs.heroic}/bin/heroic --no-gui --no-sandbox "heroic://launch?appName=$(cat "$ROM")&runner=${s.runner}"'';
+        command = ''XDG_CURRENT_DESKTOP=FamiDrive ${pkgs.heroic}/bin/heroic --no-gui --no-sandbox "heroic://launch?appName=$(cat "$ROM")&runner=${s.runner}"'';
         theme = system;
+      } // lib.optionalAttrs (s.runner == "gog") {
+        before = ''
+          ${pkgs.famidrive-cheevos}/bin/famidrive-cheevos watch-comet "$ROM" &
+          cheevos_watch=$!
+        '';
+        after = ''
+          kill "$cheevos_watch" 2>/dev/null || true
+        '';
       }) heroicStores))
       (lib.mkIf (cfg.ports != { }) {
         ports = {

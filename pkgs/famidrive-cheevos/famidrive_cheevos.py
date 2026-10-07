@@ -2,6 +2,7 @@
 
     famidrive-cheevos setup SPEC.json
     famidrive-cheevos watch LOG SYSTEM ROM
+    famidrive-cheevos watch-comet ROM
 
 setup (at the start of each player's session): signs in to
 RetroAchievements with the player's username and password (the password
@@ -22,6 +23,14 @@ each unlock, with the achievement's description and points from
 RetroAchievements and the game's logo from ES-DE's media (a trophy when
 it has none). RetroArch's own unlock pop-up is turned off by setup, so
 there's one, in the player's theme; Dolphin has no switch for its own.
+
+watch-comet (beside each GOG game Heroic runs): GOG's own achievements,
+through Comet, the GOG Galaxy stand-in Heroic starts with every GOG game.
+Comet's output goes to Heroic's runner log (runners/comet.log, under
+Heroic's logs in $XDG_STATE_HOME); each "Unlocking achievement" there is a
+toast, with the achievement's name, description and unlocked icon from
+Comet's own database (gameplay.db). These are GOG's achievements, not
+RetroAchievements: no account to set up beyond Heroic's GOG login.
 
 SPEC (JSON, from Nix): {"username", "passwordFile", "hardcore",
 "retroarch": bool, "dolphin": bool, "pcsx2": bool}.
@@ -253,15 +262,21 @@ def toast_args(award, info, game, icon):
     return args + [title, detail]
 
 
-def follow(path, stop):
-    """Lines of a log as they're written, from its start (RetroArch makes
-    it anew each launch), until stop() says so."""
+def follow(path, stop, start=0):
+    """Lines of a log as they're written, from `start` (RetroArch makes its
+    log anew each launch; Heroic's Comet log goes on), until stop() says
+    so. A log that starts over (smaller than where we were) is read from
+    its top."""
     while not Path(path).exists():
         if stop():
             return
         time.sleep(0.5)
     with open(path, errors="replace") as f:
+        if start <= Path(path).stat().st_size:
+            f.seek(start)
         while not stop():
+            if f.tell() > Path(path).stat().st_size:
+                f.seek(0)
             line = f.readline()
             if line:
                 yield line
@@ -292,12 +307,99 @@ def cmd_watch(log, system, rom):
     return 0
 
 
+# --- GOG, through Comet ------------------------------------------------------
+
+COMET_UNLOCK = re.compile(r"Unlocking achievement:?\s+(\S+)")
+CACHE = HOME / ".cache/famidrive/achievements"
+
+
+def comet_log():
+    state = Path(os.environ.get("XDG_STATE_HOME") or HOME / ".local/state")
+    return state / "Heroic/logs/runners/comet.log"
+
+
+def comet_dbs():
+    """Comet's gameplay databases, newest first (one per game and user)."""
+    roots = [Path(os.environ.get("XDG_DATA_HOME") or HOME / ".local/share"), HOME / ".config"]
+    found = [p for r in roots if r.exists() for p in r.glob("**/comet/**/gameplay.db")]
+    return sorted(found, key=lambda p: p.stat().st_mtime, reverse=True)
+
+
+def comet_achievement(key, dbs=None):
+    """{"name", "description", "image"} for an achievement from Comet's
+    database, by its key (or numeric id); None when it isn't there."""
+    import sqlite3
+    for db in dbs if dbs is not None else comet_dbs():
+        con = None
+        try:
+            con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+            cols = {r[1] for r in con.execute("PRAGMA table_info(achievement)")}
+            want = [c for c in ("name", "description", "image_url_unlocked") if c in cols]
+            if not want:
+                continue
+            if key.isdigit():
+                row = con.execute(f"SELECT {', '.join(want)} FROM achievement WHERE key = ? OR id = ?", (key, int(key))).fetchone()
+            else:
+                row = con.execute(f"SELECT {', '.join(want)} FROM achievement WHERE key = ?", (key,)).fetchone()
+        except sqlite3.Error:
+            continue
+        finally:
+            if con:
+                con.close()
+        if row:
+            got = dict(zip(want, row))
+            return {"name": got.get("name"), "description": got.get("description"), "image": got.get("image_url_unlocked")}
+    return None
+
+
+def cached_image(url):
+    """A local copy of an achievement's icon, for the toast; None if it
+    can't be had."""
+    if not url:
+        return None
+    import hashlib
+    CACHE.mkdir(parents=True, exist_ok=True)
+    path = CACHE / (hashlib.sha256(url.encode()).hexdigest()[:24] + Path(url.split("?")[0]).suffix)
+    if not path.exists():
+        try:
+            r = requests.get(url, headers=AGENT, timeout=10)
+            r.raise_for_status()
+            path.write_bytes(r.content)
+        except requests.RequestException:
+            return None
+    return str(path)
+
+
+def comet_toast_args(key, info, icon):
+    if not info:
+        return ["--kind", "achievement", "Achievement unlocked", key]
+    args = ["--kind", "achievement"]
+    if icon:
+        args += ["--icon", icon]
+    return args + [info.get("name") or key, info.get("description") or ""]
+
+
+def cmd_watch_comet(rom):
+    log = comet_log()
+    start = log.stat().st_size if log.exists() else 0
+    parent = os.getppid()
+    for line in follow(log, lambda: os.getppid() != parent, start):
+        m = COMET_UNLOCK.search(line)
+        if m:
+            info = comet_achievement(m.group(1))
+            icon = cached_image(info.get("image")) if info else None
+            subprocess.run(["famidrive-toast", *comet_toast_args(m.group(1), info, icon)], check=False, timeout=5)
+    return 0
+
+
 def main():
     cmd, args = (sys.argv[1] if len(sys.argv) > 1 else ""), sys.argv[2:]
     if cmd == "setup" and len(args) == 1:
         sys.exit(cmd_setup(*args))
     if cmd == "watch" and len(args) == 3:
         sys.exit(cmd_watch(*args))
+    if cmd == "watch-comet" and len(args) == 1:
+        sys.exit(cmd_watch_comet(*args))
     sys.exit(__doc__)
 
 

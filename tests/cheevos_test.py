@@ -131,6 +131,36 @@ class Test(unittest.TestCase):
         self.assertTrue(self.c.logo("n64", "/roms/n64/Banjo-Kazooie (U) [!].z64").endswith("Banjo-Kazooie (U) [!].png"))
         self.assertIsNone(self.c.logo("n64", "/roms/n64/Other.z64"))
 
+    def test_gog_achievement_from_comets_database(self):
+        import sqlite3
+        db = self.home / ".local/share/comet/123/456/gameplay.db"
+        db.parent.mkdir(parents=True)
+        con = sqlite3.connect(db)
+        con.execute("CREATE TABLE achievement (id INTEGER PRIMARY KEY, key TEXT, name TEXT, description TEXT, image_url_unlocked TEXT)")
+        con.execute("INSERT INTO achievement VALUES (42, 'FIRST_BLOOD', 'First Blood', 'Win a fight', 'https://example.org/a.png')")
+        con.commit()
+        con.close()
+        self.assertEqual(self.c.comet_dbs(), [db])
+        info = self.c.comet_achievement("FIRST_BLOOD")
+        self.assertEqual(info, {"name": "First Blood", "description": "Win a fight", "image": "https://example.org/a.png"})
+        self.assertEqual(self.c.comet_achievement("42")["name"], "First Blood")
+        self.assertIsNone(self.c.comet_achievement("NOPE"))
+        self.assertEqual(self.c.comet_toast_args("FIRST_BLOOD", info, "/i.png"),
+                         ["--kind", "achievement", "--icon", "/i.png", "First Blood", "Win a fight"])
+        self.assertEqual(self.c.comet_toast_args("X", None, None), ["--kind", "achievement", "Achievement unlocked", "X"])
+        self.assertEqual(self.c.COMET_UNLOCK.search("[INFO] Unlocking achievement FIRST_BLOOD").group(1), "FIRST_BLOOD")
+
+    def test_following_a_log_from_where_it_was(self):
+        log = self.home / "comet.log"
+        log.write_text("old line\n")
+        start = log.stat().st_size
+        with open(log, "a") as f:
+            f.write("new line\n")
+        seen = []
+        for line in self.c.follow(log, lambda: len(seen) >= 1, start):
+            seen.append(line)
+        self.assertEqual(seen, ["new line\n"])
+
     def test_no_account_no_watching(self):
         self.assertEqual(self.c.cmd_watch(str(self.home / "log"), "n64", "x.z64"), 0)
 

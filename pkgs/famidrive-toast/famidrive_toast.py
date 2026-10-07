@@ -241,6 +241,83 @@ def send(toast):
         print(f"famidrive-toast: no toast daemon ({e}): {toast.get('title')}", file=sys.stderr)
 
 
+# --- Desktop notifications ---------------------------------------------------
+#
+# Apps on the box (Heroic, and anything else that uses libnotify or
+# Electron's notifications) send desktop notifications over D-Bus to
+# whatever owns org.freedesktop.Notifications. In the TV session that's
+# the toast daemon, so they show as toasts too.
+
+def strip_markup(text):
+    """The spec's body markup (<b>, <i>, <a href>...) and entities, gone."""
+    text = re.sub(r"<[^>]+>", "", text or "")
+    for a, b in (("&lt;", "<"), ("&gt;", ">"), ("&quot;", '"'), ("&apos;", "'"), ("&amp;", "&")):
+        text = text.replace(a, b)
+    return text.strip()
+
+
+def from_notification(app, replaces, icon, summary, body, hints, nid):
+    """A toast from a Notify call. Hints are {name: (signature, value)}.
+    Critical urgency is an alert; a "value" hint (0-100) is progress,
+    updated in place under the same notification id."""
+    hint = {k: v[1] if isinstance(v, tuple) else v for k, v in (hints or {}).items()}
+    toast = {"kind": "notice", "title": strip_markup(summary) or app or "Notification"}
+    detail = strip_markup(body)
+    if detail:
+        toast["detail"] = detail
+    if hint.get("urgency") == 2:
+        toast["kind"] = "alert"
+    if isinstance(hint.get("value"), int):
+        toast["kind"] = "progress"
+        toast["progress"] = max(0, min(100, hint["value"])) / 100
+        toast["done"] = hint["value"] >= 100
+    image = hint.get("image-path") or hint.get("image_path") or icon or ""
+    if image.startswith("file://"):
+        image = image[7:]
+    if image.startswith("/") and Path(image).exists():
+        toast["icon"] = image
+    toast["id"] = f"fdo-{replaces or nid}"
+    return toast
+
+
+def serve_notifications():
+    """Own org.freedesktop.Notifications on the session bus and hand each
+    notification to the daemon as a toast. Returns quietly when there's no
+    bus, jeepney, or another notification daemon already."""
+    try:
+        from jeepney import HeaderFields, MessageType, new_error, new_method_return
+        from jeepney.bus_messages import message_bus
+        from jeepney.io.blocking import open_dbus_connection
+        conn = open_dbus_connection(bus="SESSION")
+        if conn.send_and_get_reply(message_bus.RequestName("org.freedesktop.Notifications", 4)).body[0] != 1:
+            print("famidrive-toast: another notification daemon is running", file=sys.stderr)
+            return
+    except Exception as e:   # no session bus: toasts still work without it
+        print(f"famidrive-toast: no desktop notifications ({e})", file=sys.stderr)
+        return
+    next_id = 1
+    while True:
+        msg = conn.receive()
+        if msg.header.message_type != MessageType.method_call:
+            continue
+        member = msg.header.fields.get(HeaderFields.member)
+        if member == "Notify":
+            app, replaces, icon, summary, body, _actions, hints, _timeout = msg.body
+            nid = replaces or next_id
+            if not replaces:
+                next_id += 1
+            send(from_notification(app, replaces, icon, summary, body, hints, nid))
+            conn.send(new_method_return(msg, "u", (nid,)))
+        elif member == "GetCapabilities":
+            conn.send(new_method_return(msg, "as", (["body"],)))
+        elif member == "GetServerInformation":
+            conn.send(new_method_return(msg, "ssss", ("famidrive-toast", "FamiDrive", "1", "1.2")))
+        elif member == "CloseNotification":
+            conn.send(new_method_return(msg))
+        else:
+            conn.send(new_error(msg, "org.freedesktop.DBus.Error.UnknownMethod"))
+
+
 # --- The daemon -------------------------------------------------------------
 
 def daemon(spec_file, player):
@@ -439,6 +516,8 @@ def daemon(spec_file, player):
     srv.bind(str(path))
     os.chmod(path, 0o600)
     srv.listen(8)
+    import threading
+    threading.Thread(target=serve_notifications, daemon=True).start()
     xfd = d.fileno()
     snapshots = os.environ.get("FAMIDRIVE_TOAST_SNAPSHOT")
     drawn = None   # (x, y, w, h) on screen now
