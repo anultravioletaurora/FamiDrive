@@ -232,6 +232,9 @@ in
     (check "their session signs in, nobody else's"
       (lib.hasInfix "alice) " c.famidrive.sessionSetup && lib.hasInfix "famidrive-cheevos setup" c.famidrive.sessionSetup
         && !(lib.hasInfix "bob) " c.famidrive.sessionSetup)))
+    (check "PCSX2 starts without its setup wizard, with two pads mapped"
+      (let a = c.home-manager.users.alice.home.activation.famidriveEmulators.data; in
+        lib.hasInfix "SetupWizardIncomplete" a && lib.hasInfix "SDL-0/FaceSouth" a && lib.hasInfix "SDL-1/+RightTrigger" a))
     (check "Dolphin's own on-screen messages off, for every player (toasts instead)"
       (lib.all (u: lib.hasInfix "OnScreenDisplayMessages" c.home-manager.users.${u}.home.activation.famidriveEmulators.data) [ "alice" "bob" "guest" ]))
     (check "Heroic sends desktop notifications (not taken for Steam Deck Game Mode); GOG games have the Comet watcher"
