@@ -21,9 +21,20 @@ in
       example = "spinner";
       description = ''
         The Plymouth theme. `"bgrt"` (the default) shows the computer's
-        own logo, from its firmware, with a spinner; `"spinner"` is the
-        same without the logo. A theme from another package needs it in
+        own logo with a spinner, when its firmware provides a logo (not
+        every PC's does; the spinner alone shows otherwise). `"spinner"`
+        is the same without the logo. A theme from another package needs it in
         `themePackages` too.
+      '';
+    };
+
+    scale = mkOption {
+      type = types.ints.between 1 4;
+      default = 2;
+      description = ''
+        How large Plymouth draws the boot screen. It can't tell how far
+        away a TV is, so on a 4K TV it draws everything tiny at 1. Found
+        on the first box 2026-10-07: the spinner was barely visible.
       '';
     };
 
@@ -39,6 +50,7 @@ in
     boot.plymouth = {
       enable = true;
       inherit (splash) theme themePackages;
+      extraConfig = "DeviceScale=${toString splash.scale}";
     };
     # Plymouth from the start of boot, in the initrd, not halfway
     # through; a host with an initrd of its own can still say otherwise.

@@ -349,11 +349,21 @@ Whether to enable a boot screen (Plymouth) in place of console text while the bo
 - **Default:** `true`
 - **Example:** `true`
 
+### `famidrive.boot.splash.scale`
+
+How large Plymouth draws the boot screen. It can't tell how far
+away a TV is, so on a 4K TV it draws everything tiny at 1. Found
+on the first box 2026-10-07: the spinner was barely visible.
+
+- **Type:** integer between 1 and 4 (both inclusive)
+- **Default:** `2`
+
 ### `famidrive.boot.splash.theme`
 
 The Plymouth theme. `"bgrt"` (the default) shows the computer's
-own logo, from its firmware, with a spinner; `"spinner"` is the
-same without the logo. A theme from another package needs it in
+own logo with a spinner, when its firmware provides a logo (not
+every PC's does; the spinner alone shows otherwise). `"spinner"`
+is the same without the logo. A theme from another package needs it in
 `themePackages` too.
 
 - **Type:** string
