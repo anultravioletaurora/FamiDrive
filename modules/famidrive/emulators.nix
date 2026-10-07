@@ -48,7 +48,11 @@ let
   # rest (Saturn .bkr, Dreamcast VMUs, melonDS DS) wait until their save
   # files are mapped (roms.md "Mapping saves to games").
   ra = { coreName, saves ? true }: {
-    command = ''${retroarch}/bin/retroarch -f -L ${core coreName} "$ROM"'';
+    # The game's real path, not ES-DE's link to it: a .cue names its .bin
+    # next to itself, and the core looks beside whatever path it's given.
+    # Found on the first box 2026-10-07: every PlayStation game in a
+    # folder (Pepsiman/Pepsiman.cue, .bin) failed to find its .bin.
+    command = ''${retroarch}/bin/retroarch -f -L ${core coreName} "$(readlink -f "$ROM")"'';
     emulator = "retroarch-${coreName}";
     firmwareDir = "retroarch";
     saveSync = saves;

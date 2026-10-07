@@ -647,6 +647,17 @@ class Test(unittest.TestCase):
         self.assertFalse(os.path.lexists(eden / "load" / smash / "HDR"))
         self.assertFalse(os.path.lexists(eden / "sdmc/ultimate/mods/hdr/info.toml"))
         self.assertTrue((eden / "load" / smash / "60fps").is_symlink())
+    def test_a_retroarch_save_is_named_for_the_real_file_not_the_link(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        roms = box.home / "roms/snes"
+        (roms / "Game").mkdir(parents=True)
+        (roms / "Game/Game (USA).cue").write_text("FILE")
+        (roms / "Game.cue").symlink_to("Game/Game (USA).cue")      # what ES-DE lists
+        saves = box.home / ".config/retroarch/saves"
+        saves.mkdir(parents=True)
+        (saves / "Game (USA).srm").write_bytes(b"card")
+        self.assertEqual(a["save_paths"]("snes", {}, str(roms / "Game.cue")), ["Game (USA).srm"])
 
     def test_an_archive_is_checked_by_size_not_romms_hash(self):
         box = Box(self.base, "library", tokenFile=None)
