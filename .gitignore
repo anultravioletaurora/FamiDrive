@@ -7,3 +7,4 @@ result-*
 
 # Ignore NixOS interactive test driver history
 **/.nixos-test-history
+__pycache__/

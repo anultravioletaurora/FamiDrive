@@ -95,6 +95,7 @@ in
   clonehero = unit "clonehero" ../pkgs/famidrive-clonehero/famidrive_clonehero.py pkgs.python3;
   kodi = unit "kodi" ../pkgs/famidrive-kodi/famidrive_kodi.py pkgs.python3;
   prism = unit "prism" ../pkgs/famidrive-prism/famidrive_prism.py pkgs.python3;
+  ryujinx = unit "ryujinx" ../pkgs/famidrive-ryujinx/famidrive_ryujinx.py pkgs.python3;
   generators = unit "generators" ../pkgs/famidrive-generators/famidrive_generate.py pkgs.python3;
   picker = unit "picker" ../pkgs/famidrive-picker/famidrive_picker.py
     (pkgs.python3.withPackages (ps: [ ps.pygame-ce ]));
@@ -138,6 +139,7 @@ in
       };
       primaryPlayer = "alice";
       guest.enable = true;
+      switch.ryujinx.games = [ "01006A800016E000" ];
       endpoints.romm = "https://romm.example.org";
       endpoints.jellyfin = "https://jellyfin.example.org";
       media.jellyfin.enable = true;
@@ -175,6 +177,11 @@ in
         (lib.hasInfix "yarg)" c.famidrive.systems.ports.command
           && lib.hasInfix "clonehero)" c.famidrive.systems.ports.command
           && (etcJson c "famidrive/romm/alice.json").apps ? yarg))
+      (check "a Switch game listed for Ryujinx runs there, its save bridged through Eden's"
+        (lib.hasInfix "FAMIDRIVE_RYUJINX" c.famidrive.systems.switch.command
+          && lib.hasInfix "famidrive-ryujinx save-in" c.famidrive.systems.switch.before
+          && lib.hasInfix "famidrive-ryujinx save-out" c.famidrive.systems.switch.after
+          && (etcJson c "famidrive/romm/library.json").ryujinxGames == [ "01006A800016E000" ]))
       (check "Clone Hero is in Ports, songs come down as the library"
         (c.famidrive.systems ? ports
           && c.systemd.services.famidrive-clonehero-songs.serviceConfig.User == "famidrive-library"))

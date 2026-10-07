@@ -648,6 +648,25 @@ class Test(unittest.TestCase):
         self.assertFalse(os.path.lexists(eden / "sdmc/ultimate/mods/hdr/info.toml"))
         self.assertTrue((eden / "load" / smash / "60fps").is_symlink())
 
+    def test_ryujinx_games_get_every_mod_skyline_too(self):
+        smash = "01006A800016E000"
+        box = Box(self.base, "alice", ryujinxGames=[smash])
+        mod = box.data / "mods/switch" / smash / "HDR"
+        (mod / "atmosphere/contents" / smash / "romfs/skyline/plugins").mkdir(parents=True)
+        (mod / "ultimate/mods/hdr").mkdir(parents=True)
+        (mod / "ultimate/mods/hdr/info.toml").write_text("hdr")
+        a = box.agent()
+        a["cmd_textures"]()
+        ryu = box.home / ".config/Ryujinx"
+        self.assertEqual(Path(os.readlink(ryu / "mods/contents" / smash / "HDR")), mod / "atmosphere/contents" / smash)
+        self.assertEqual((ryu / "sdcard/ultimate/mods/hdr/info.toml").read_text(), "hdr")
+        self.assertFalse(os.path.lexists(box.home / ".local/share/eden/load" / smash / "HDR"))
+        box.cfg["ryujinxGames"] = []                              # back to Eden
+        a = box.agent()
+        a["cmd_textures"]()
+        self.assertFalse(os.path.lexists(ryu / "mods/contents" / smash / "HDR"))
+        self.assertFalse(os.path.lexists(ryu / "sdcard/ultimate/mods/hdr/info.toml"))
+
     def test_an_archive_is_checked_by_size_not_romms_hash(self):
         box = Box(self.base, "library", tokenFile=None)
         a = box.agent()

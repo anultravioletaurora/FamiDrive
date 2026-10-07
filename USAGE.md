@@ -19,6 +19,7 @@ is on; every other option is optional.
 - [RomM](#romm)
 - [TV and session](#tv-and-session)
 - [Menu](#menu)
+- [Switch](#switch)
 - [Controllers](#controllers)
 - [Steam](#steam)
 - [Media](#media)
@@ -418,6 +419,35 @@ The theme's files.
 
 - **Type:** absolute path
 - **Default:** none; required when used
+
+## Switch
+
+Switch games that run in Ryujinx instead of Eden.
+
+### `famidrive.switch.ryujinx.games`
+
+Switch games to run in Ryujinx instead of Eden, by title ID. For
+games, or mods, that only work there: HewDraw Remix for Smash
+Ultimate (`01006A800016E000`) needs Skyline plugins, which Eden
+can't run. Each player's save for the game is the same one Eden
+would use, so switching a game between the two keeps it.
+
+- **Type:** list of string matching the pattern 0100[0-9A-Fa-f]{12}
+- **Default:** `[ ]`
+- **Example:** 
+
+  ```nix
+  [
+    "01006A800016E000"
+  ]
+  ```
+
+### `famidrive.switch.ryujinx.package`
+
+The Ryujinx to run them with: nixpkgs' Ryubing, or a canary build.
+
+- **Type:** package
+- **Default:** `pkgs.ryubing`
 
 ## Controllers
 
