@@ -199,8 +199,9 @@ in
         # Box art and screenshots from RomM, for the systems it fills:
         # ES-DE's media folder for each is a link to the library's, which
         # the RomM pull keeps. Art scraped here before is moved aside, not
-        # deleted. Steam, GOG and the rest keep their own, and ES-DE's
-        # scraper still fills those.
+        # deleted. Steam, GOG and the rest keep their own: Steam's come
+        # from Steam (famidrive-generate steam-media), the rest from
+        # ES-DE's scraper.
         media="$HOME/ES-DE/downloaded_media"
         before="$HOME/ES-DE/downloaded_media-before-romm"
         mkdir -p "$media"

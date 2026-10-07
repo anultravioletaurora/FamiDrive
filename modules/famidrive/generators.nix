@@ -19,19 +19,36 @@ let
   };
 
   mkGenerator = p: lane: {
-    services."famidrive-gen-${lane}-${p.name}" = {
-      description = "Regenerate ${p.displayName}'s ES-DE placeholders for the ${lane} lane";
-      # Also once at boot, finished before the session starts: ES-DE only
-      # reads its folders at startup. Found on the first box 2026-10-05:
-      # with a tmpfs dataDir, ES-DE started 7 s before the path watch had
-      # written the Steam folder, so Steam was missing from the menu.
-      wantedBy = [ "display-manager.service" ];
-      before = [ "display-manager.service" ];
-      serviceConfig = {
-        Type = "oneshot";
-        User = p.user;
-        # Minecraft's entries live in the Ports system's folder.
-        ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate ${lane} ${(watched p).${lane}} ${p.roms}/${folder lane}";
+    services = {
+      "famidrive-gen-${lane}-${p.name}" = {
+        description = "Regenerate ${p.displayName}'s ES-DE placeholders for the ${lane} lane";
+        # Also once at boot, finished before the session starts: ES-DE only
+        # reads its folders at startup. Found on the first box 2026-10-05:
+        # with a tmpfs dataDir, ES-DE started 7 s before the path watch had
+        # written the Steam folder, so Steam was missing from the menu.
+        wantedBy = [ "display-manager.service" ];
+        before = [ "display-manager.service" ];
+        serviceConfig = {
+          Type = "oneshot";
+          User = p.user;
+          # Minecraft's entries live in the Ports system's folder.
+          ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate ${lane} ${(watched p).${lane}} ${p.roms}/${folder lane}";
+        };
+        # Steam's art and details for new games, once the menu entries
+        # are in place, without holding up the session: a first run can
+        # take a minute or two (a store lookup per game).
+        onSuccess = lib.optional (lane == "steam") "famidrive-steam-media-${p.name}.service";
+      };
+    } // lib.optionalAttrs (lane == "steam") {
+      "famidrive-steam-media-${p.name}" = {
+        description = "Steam's art and details for ${p.displayName}'s Steam games in ES-DE";
+        wants = [ "network-online.target" ];
+        after = [ "network-online.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          User = p.user;
+          ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate steam-media ${(watched p).steam} ${p.roms}/steam";
+        };
       };
     };
     # No MakeDirectory: it would make the folder as root inside the
