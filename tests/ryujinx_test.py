@@ -74,6 +74,38 @@ class Test(unittest.TestCase):
         self.run_tool("setup", json.dumps(spec))
         self.assertEqual(json.loads((self.ryu / "Config.json").read_text())["res_scale"], 2)
 
+    def test_firmware_fills_in_whatever_ryujinx_is_missing(self):
+        firmware = self.home / ".local/share/eden/nand/system/Contents/registered"
+        firmware.mkdir(parents=True)
+        (firmware / "aaa.nca").mkdir()                              # Eden's layout
+        (firmware / "aaa.nca/00").write_bytes(b"one")
+        (firmware / "bbb.nca").write_bytes(b"two")
+        reg = self.ryu / "bis/system/Contents/registered"
+        (reg / "zzz.nca").mkdir(parents=True)
+        (reg / "zzz.nca/00").write_bytes(b"ryujinx's own")         # there before
+        defaults = self.home / "defaults.json"
+        defaults.write_text("{}")
+        spec = {"library": "/lib", "faceButtons": "labels", "edenKeys": "~/nokeys",
+                "edenFirmware": str(firmware), "defaults": str(defaults), "sdl": "/nonexistent"}
+        self.run_tool("setup", json.dumps(spec))
+        self.assertEqual((reg / "aaa.nca/00").read_bytes(), b"one")
+        self.assertEqual((reg / "bbb.nca/00").read_bytes(), b"two")
+        self.assertEqual((reg / "zzz.nca/00").read_bytes(), b"ryujinx's own")
+
+    def test_the_newest_update_beside_the_game_is_selected(self):
+        lib = self.home / "library/switch"
+        game = lib / "Super Smash Bros. Ultimate"
+        (game / "update").mkdir(parents=True)
+        (game / "Super Smash Bros. Ultimate.nsp").write_bytes(b"game")
+        for name in ("Super Smash Bros. Ultimate - 13.0.1.nsp", "Super Smash Bros. Ultimate -  13.0.2.nsp"):
+            (game / "update" / name).write_bytes(b"u")
+        rom = lib / "Super Smash Bros. Ultimate.nsp"
+        rom.symlink_to("Super Smash Bros. Ultimate/Super Smash Bros. Ultimate.nsp")
+        self.run_tool("game", SMASH, str(rom))
+        meta = json.loads((self.ryu / "games/01006a800016e000/updates.json").read_text())
+        self.assertTrue(meta["selected"].endswith("13.0.2.nsp"))
+        self.assertEqual(len(meta["paths"]), 2)
+
     def test_a_pads_buttons_follow_face_buttons(self):
         import importlib.util
         spec = importlib.util.spec_from_file_location("fr", SCRIPT)

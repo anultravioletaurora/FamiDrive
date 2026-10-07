@@ -1,6 +1,7 @@
 """famidrive-ryujinx: Ryujinx (Ryubing) for the Switch games that need it.
 
     famidrive-ryujinx setup SPEC            before each Ryujinx launch
+    famidrive-ryujinx game TITLE_ID ROM     the game's newest update, from beside it
     famidrive-ryujinx save-in TITLE_ID      Eden's save -> Ryujinx's
     famidrive-ryujinx save-out TITLE_ID     Ryujinx's save -> Eden's
 
@@ -20,6 +21,7 @@ start with ~.
 import ctypes
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -148,19 +150,27 @@ def copy_keys(spec):
 def link_firmware(spec):
     """Eden's installed firmware, in Ryujinx's layout: each NCA as
     registered/<name>.nca/00. Hard links where they can be (the same
-    disk), so it costs no space. Only when Ryujinx has none yet."""
+    disk), so it costs no space. Any NCA Ryujinx is missing is added,
+    not just into an empty folder: found on the first box 2026-10-07,
+    Ryujinx had already put one file there, so no firmware was linked
+    and the game ran without it."""
     src = Path(spec["edenFirmware"]).expanduser()
     dest = ROOT / "bis/system/Contents/registered"
-    if not src.is_dir() or (dest.is_dir() and any(dest.iterdir())):
+    if not src.is_dir():
         return
-    dest.mkdir(parents=True, exist_ok=True)
     for nca in src.glob("*.nca"):
-        d = dest / nca.name
-        d.mkdir(exist_ok=True)
-        try:
-            os.link(nca, d / "00")
-        except OSError:
-            shutil.copyfile(nca, d / "00")
+        # Eden keeps them the same way (a folder per NCA, its data in 00,
+        # 01, ...), or as a plain file in older versions.
+        parts = sorted(p for p in nca.iterdir() if p.is_file()) if nca.is_dir() else [nca]
+        for i, part in enumerate(parts):
+            out = dest / nca.name / (part.name if nca.is_dir() else f"{i:02d}")
+            if out.exists():
+                continue
+            out.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                os.link(part, out)
+            except OSError:
+                shutil.copyfile(part, out)
 
 
 def cmd_setup(spec_json):
@@ -168,6 +178,35 @@ def cmd_setup(spec_json):
     write_config(spec, gamepads(spec["sdl"]))
     copy_keys(spec)
     link_firmware(spec)
+
+
+def version_key(path):
+    """An update file's version, from the numbers in its name
+    ("Game - 13.0.2.nsp", "Game [v1900544].nsp"), for picking the newest."""
+    nums = re.findall(r"\d+", re.sub(r"\[[0-9A-Fa-f]{16}\]", "", path.stem))
+    return tuple(int(n) for n in nums[-3:]) if nums else ()
+
+
+def cmd_game(tid, rom):
+    """The update Ryujinx runs the game with: the newest in the update/
+    folder beside it in the library (RomM's update/ files), written to
+    Ryujinx's games/<title ID>/updates.json. Ryujinx only finds updates
+    itself when it scans its game list, which --no-gui skips. Found on
+    the first box 2026-10-07: Smash ran as v1.0.0 and HewDraw Remix
+    crashed."""
+    folder = Path(rom).resolve().parent / "update"
+    updates = sorted((p for p in folder.glob("*.nsp") if p.is_file()), key=version_key)
+    if not updates:
+        return
+    meta = ROOT / "games" / tid.lower() / "updates.json"
+    want = {"selected": str(updates[-1]), "paths": [str(p) for p in updates]}
+    try:
+        if json.loads(meta.read_text()) == want:
+            return
+    except (OSError, ValueError):
+        pass
+    meta.parent.mkdir(parents=True, exist_ok=True)
+    meta.write_text(json.dumps(want, indent=2))
 
 
 # ---------------------------------------------------------------- saves
@@ -251,7 +290,7 @@ def cmd_save_out(tid):
 
 def main():
     cmd, *args = sys.argv[1:] or ["help"]
-    commands = {"setup": cmd_setup, "save-in": cmd_save_in, "save-out": cmd_save_out}
+    commands = {"setup": cmd_setup, "game": cmd_game, "save-in": cmd_save_in, "save-out": cmd_save_out}
     if cmd not in commands:
         print(__doc__)
         sys.exit(64)

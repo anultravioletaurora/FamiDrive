@@ -63,6 +63,8 @@ in
               defaults = pkgs.famidrive-ryujinx.defaultConfig;
               sdl = "${pkgs.SDL2}/lib/libSDL2.so";
             })} || echo "famidrive-launch: couldn't set up Ryujinx" >&2
+            ${pkgs.famidrive-ryujinx}/bin/famidrive-ryujinx game "$tid" "$ROM" \
+              || echo "famidrive-launch: Ryujinx won't have the game's update" >&2
             ${pkgs.famidrive-ryujinx}/bin/famidrive-ryujinx save-in "$tid" \
               || echo "famidrive-launch: save not copied into Ryujinx" >&2
             ;;
