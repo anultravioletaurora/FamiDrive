@@ -678,6 +678,17 @@ class Test(unittest.TestCase):
         self.assertFalse(os.path.lexists(ryu / "mods/contents" / smash / "HDR"))
         self.assertFalse(os.path.lexists(ryu / "sdcard/ultimate/mods/hdr/info.toml"))
 
+    def test_an_empty_save_is_not_a_save(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        root = box.home / "saves"
+        (root / "card").mkdir(parents=True)
+        (root / "Game.srm").write_bytes(b"")
+        (root / "card/empty.gci").write_bytes(b"")
+        self.assertTrue(a["save_is_empty"](root, ["Game.srm", "card", "missing.srm"]))
+        (root / "card/real.gci").write_bytes(b"save")
+        self.assertFalse(a["save_is_empty"](root, ["Game.srm", "card"]))
+
     def test_an_archive_is_checked_by_size_not_romms_hash(self):
         box = Box(self.base, "library", tokenFile=None)
         a = box.agent()

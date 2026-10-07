@@ -1540,6 +1540,17 @@ def cmd_save_pull(system, rom_path):
         SNAPSHOT.write_text(json.dumps(snapshot(root)))  # don't count the restore as play
 
 
+def save_is_empty(root, rels):
+    """True when every file of the save has no bytes in it (or there are
+    no files at all): something made the files and never wrote them."""
+    for rel in rels:
+        p = root / rel
+        files = [p] if p.is_file() else [f for f in p.rglob("*") if f.is_file()] if p.is_dir() else []
+        if any(f.stat().st_size > 0 for f in files):
+            return False
+    return True
+
+
 def cmd_save_push(system, rom_path, learn=True):
     kind, root, lay = layout(system)
     key = library_path(rom_path)
@@ -1557,6 +1568,12 @@ def cmd_save_push(system, rom_path, learn=True):
             store_saves(saves)
     if not rels:
         return  # nothing saved yet, or nothing we can attribute
+    if save_is_empty(root, rels):
+        # Found on the first box 2026-10-07: with the disk full,
+        # RetroArch made Pepsiman.srm and couldn't write to it, and the
+        # empty file went up as the save, ahead of the real one after.
+        print(f"{rom_path}: save is empty, not uploaded", file=sys.stderr)
+        return
 
     digest = files_hash(root, rels, lay)
     if digest == entry.get("pushed"):
