@@ -52,6 +52,7 @@ behave differently in each. For a console game it's the emulator.
   - [Super Smash Bros. Ultimate](#super-smash-bros-ultimate) (Switch)
   - [Team Fortress 2](#team-fortress-2) (PC)
   - [Titanfall 2](#titanfall-2) (PC)
+  - [Tomodachi Life: Living the Dream](#tomodachi-life-living-the-dream) (Switch)
   - [Valheim](#valheim) (PC)
   - [Wii Sports](#wii-sports) (Wii)
 - [Known problems across games](#known-problems-across-games)
@@ -427,6 +428,20 @@ launch with no changes for this game, then controllers and rumble.
   FamiDrive has no EA app lane, so those copies can't be played yet.
   EA Play bought through Steam plays as a Steam game.
 - **Northstar** (community servers and mods) is #31.
+
+### Tomodachi Life: Living the Dream
+
+**Switch, Eden 0.2.1: ❌ Crashes on a played save.** 2026-10-06, with
+update 1.0.3 from RomM.
+
+- **A new save** (one the game created in Eden): it starts.
+- **A played save** (one made in Ryujinx with update 1.0.2, with Miis,
+  photos and food creations): Eden crashes about 3.5 seconds after
+  booting, right after the game opens its save. The log just stops, with
+  no error.
+- **The save itself looks fine,** and it's kept in RomM.
+- **To try:** a newer Eden; the game at 1.0.2, the version the save was
+  made with.
 
 ### Valheim
 
