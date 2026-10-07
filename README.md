@@ -54,7 +54,7 @@ and never needs a desktop, and makes Steam just one entry on the menu.
 | Steam | Steam, started hidden | Your Steam library |
 | GOG | `gogdl` (not packaged yet) | Your GOG library |
 | Minecraft | Prism Launcher | Your Prism instances |
-| Media | [Kodi](https://kodi.tv) 21 with [Jellyfin for Kodi](https://github.com/jellyfin/jellyfin-kodi), or [Jellyfin MPV Shim](https://github.com/jellyfin/jellyfin-mpv-shim) 3.1 | Your Jellyfin server, and media folders on the box (an external drive) |
+| Media | [Kodi](https://kodi.tv) 21 with [JellyCon](https://github.com/jellyfin/jellycon), or [Jellyfin MPV Shim](https://github.com/jellyfin/jellyfin-mpv-shim) 3.1 | Your Jellyfin server, and media folders on the box (an external drive) |
 
 RetroArch runs everything it does well, so those systems share one
 controller setup and one save folder. The rest get the standalone emulator
@@ -180,7 +180,8 @@ planning doc for now and will move into this repo.
 - Wii games with real Wii Remotes and the Balance Board, and Minecraft
   instances declared in Nix (per player), with controller play through
   Controlify.
-- Kodi in Media (`famidrive.media.kodi`), with Jellyfin for Kodi, the
+- Kodi in Media (`famidrive.media.kodi`), with JellyCon (Jellyfin, live TV
+  included, the server filled in from `endpoints.jellyfin`), Up Next, the
   box's own media folders, HDR, and the house controllers mapped.
 
 **Still a sketch:**

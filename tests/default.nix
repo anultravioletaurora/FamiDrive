@@ -208,8 +208,11 @@ in
           && lib.hasInfix "Kodi.kodi" c.home-manager.users.bob.home.activation.famidriveMedia.data
           && lib.hasInfix "Jellyfin.jellyfin" c.home-manager.users.guest.home.activation.famidriveMedia.data
           && lib.hasInfix "/media/movies" c.famidrive.systems.media.command))
-      (check "Kodi has Up Next for everyone, and the box's own add-ons too"
-        (lib.hasInfix "service.upnext" c.famidrive.systems.media.command
+      (check "Kodi has JellyCon on the box's Jellyfin, Up Next, and the box's own add-ons"
+        (lib.hasInfix "plugin.video.jellycon" c.famidrive.systems.media.command
+          && lib.hasInfix "https://jellyfin.example.org" c.famidrive.systems.media.command
+          && !(lib.hasInfix "plugin.video.jellyfin" c.famidrive.systems.media.command)
+          && lib.hasInfix "service.upnext" c.famidrive.systems.media.command
           && lib.hasInfix "service.subtitles.a4ksubtitles" c.famidrive.systems.media.command))
       (check "new players start at full volume"
         (c.services.pipewire.wireplumber.extraConfig.famidrive-volume."wireplumber.settings"."device.routes.default-sink-volume" == 1.0))

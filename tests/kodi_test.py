@@ -42,7 +42,7 @@ class Test(unittest.TestCase):
         self.spec = {"sources": {
             "Movies": {"path": str(self.media / "movies"), "content": "movies"},
             "TV Shows": {"path": str(self.media / "tv") + "/", "content": "tvshows"},
-        }, "addons": ["plugin.video.jellyfin"]}
+        }, "addons": ["plugin.video.jellycon"]}
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -82,12 +82,29 @@ class Test(unittest.TestCase):
         self.db.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(self.db / "Addons33.db") as c:
             c.execute(INSTALLED_TABLE)
-            c.execute("INSERT INTO installed (addonID, enabled, disabledReason) VALUES ('plugin.video.jellyfin', 0, 1)")
+            c.execute("INSERT INTO installed (addonID, enabled, disabledReason) VALUES ('plugin.video.jellycon', 0, 1)")
             c.execute("INSERT INTO installed (addonID, enabled) VALUES ('something.else', 0)")
         self.run_tool("prepare", self.spec)
         with sqlite3.connect(self.db / "Addons33.db") as c:
             rows = dict(c.execute("SELECT addonID, enabled FROM installed"))
-        self.assertEqual(rows, {"plugin.video.jellyfin": 1, "something.else": 0})
+        self.assertEqual(rows, {"plugin.video.jellycon": 1, "something.else": 0})
+
+    def test_jellycon_gets_the_server_and_keeps_the_rest(self):
+        spec = dict(self.spec, addonSettings={
+            "plugin.video.jellycon": {"server_address": "https://jellyfin.example.org"}})
+        self.run_tool("prepare", spec)                      # before Kodi's first run
+        path = self.home / ".kodi/userdata/addon_data/plugin.video.jellycon/settings.xml"
+        root = ET.parse(path).getroot()
+        self.assertEqual(root.get("version"), "2")
+        self.assertEqual(root.find("setting[@id='server_address']").text, "https://jellyfin.example.org")
+        path.write_text('<settings version="2">\n'
+                        '  <setting id="server_address" default="true"></setting>\n'
+                        '  <setting id="username">alice</setting>\n</settings>\n')   # as Kodi writes it
+        self.run_tool("prepare", spec)
+        root = ET.parse(path).getroot()
+        server = root.find("setting[@id='server_address']")
+        self.assertEqual((server.text, server.get("default")), ("https://jellyfin.example.org", None))
+        self.assertEqual(root.find("setting[@id='username']").text, "alice")
 
     def test_folders_get_content_and_a_scan(self):
         (self.media / "movies").mkdir(parents=True)

@@ -4,7 +4,9 @@ Kodi on a FamiDrive box (modules/famidrive/media.nix), as each player.
 
 prepare: before Kodi starts. The box's media folders (famidrive.media.kodi
   .sources) go into Kodi's sources.xml next to any the player added, and
-  FamiDrive's add-ons are switched on in Kodi's add-on database.
+  FamiDrive's add-ons are switched on in Kodi's add-on database. Add-on
+  settings FamiDrive knows (JellyCon's server) go into each add-on's
+  settings.xml; the rest of each file stays the player's.
 
 library: while Kodi runs (started in the background by the Media entry).
   Kodi keeps what each folder holds ("Movies", "TV shows") and which
@@ -13,7 +15,8 @@ library: while Kodi runs (started in the background by the Media entry).
   folder's content and scraper (what "Set content" does by hand), and
   asks Kodi to scan, so new files on the drive turn up on their own.
 
-Spec: {"sources": {name: {"path", "content"}}, "addons": [ids]}.
+Spec: {"sources": {name: {"path", "content"}}, "addons": [ids],
+       "addonSettings": {addon id: {setting id: value}}}.
 """
 
 import json
@@ -109,10 +112,41 @@ def set_content(db, sources):
                       (s["content"], kind["scraper"], kind["recursive"], row[0]))
 
 
+def set_addon_settings(addon, values):
+    """Sets these settings in an add-on's userdata/addon_data/<id>/
+    settings.xml, in either of Kodi's formats (version 2's
+    <setting id="x">value</setting>, or the older value="..."
+    attribute). Every other setting stays as it is."""
+    path = USERDATA / "addon_data" / addon / "settings.xml"
+    try:
+        root = ET.parse(path).getroot()
+    except (OSError, ET.ParseError):
+        root = ET.Element("settings", version="2")
+    v2 = root.get("version") == "2"
+    found = {s.get("id"): s for s in root.findall("setting")}
+    for key, value in values.items():
+        el = found.get(key)
+        if el is None:
+            el = ET.SubElement(root, "setting", id=key)
+        if v2:
+            el.text = str(value)
+            el.attrib.pop("default", None)   # "default" means unset to Kodi
+        else:
+            el.set("value", str(value))
+    before = path.read_bytes() if path.exists() else None
+    ET.indent(root)
+    after = ET.tostring(root, encoding="utf-8") + b"\n"
+    if after != before:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(after)
+
+
 def cmd_prepare(spec):
     if spec["sources"]:
         write_sources(spec["sources"])
     enable_addons(spec.get("addons", []))
+    for addon, values in (spec.get("addonSettings") or {}).items():
+        set_addon_settings(addon, values)
 
 
 def cmd_library(spec, wait=120):
