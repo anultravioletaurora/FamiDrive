@@ -17,6 +17,17 @@ let
   perfUsers = lib.attrNames (lib.filterAttrs (_: o: o.performance.enable) cfg.overlays.resolved);
 
   famidriveSession = pkgs.writeShellScript "famidrive-session" ''
+    ${lib.optionalString (perfUsers != [ ]) ''
+      # MangoHud (gamescope --mangoapp, for players with the performance
+      # overlay on). gamescope hands mangoapp a config that says
+      # no_display, for Steam's quick-access menu to change, which this
+      # session doesn't have; the player's own goes there instead. Steam
+      # starts without STEAM_USE_MANGOAPP, so it never writes it back.
+      if [ -n "''${MANGOHUD_CONFIGFILE:-}" ] && [ -f "$HOME/.config/MangoHud/MangoHud.conf" ]; then
+        cp "$HOME/.config/MangoHud/MangoHud.conf" "$MANGOHUD_CONFIGFILE"
+        unset STEAM_USE_MANGOAPP
+      fi
+    ''}
     ${lib.optionalString cfg.display.hdr ''
       # Proton games only output HDR when asked; gamescope (--hdr-enabled)
       # carries it to the TV. SDR content is unaffected.
