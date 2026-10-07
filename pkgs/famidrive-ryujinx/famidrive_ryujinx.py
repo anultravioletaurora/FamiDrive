@@ -56,8 +56,10 @@ def locked(spec):
 
 def gamepads(sdl_path):
     """Connected gamepads as Ryujinx names them: "<n>-<SDL GUID as a .NET
-    Guid>", n counting up for a second pad of the same model, in SDL's
-    device order (Ryujinx.Input.SDL2's GenerateGamepadId)."""
+    Guid, its first 4 digits (SDL's name checksum) zeroed>", n counting
+    up for a second pad of the same model, in SDL's device order
+    (Ryujinx.Input.SDL2's GenerateGamepadId). Read from Ryubing 1.3.3's
+    own code on 2026-10-07: with the checksum left in, no pad matched."""
     class Guid(ctypes.Structure):
         _fields_ = [("data", ctypes.c_uint8 * 16)]
     try:
@@ -77,6 +79,7 @@ def gamepads(sdl_path):
             if raw == bytes(16):
                 continue
             guid = str(uuid.UUID(bytes_le=raw))     # .NET's Guid(byte[]) layout
+            guid = "0000" + guid[4:]
             n = 0
             while f"{n}-{guid}" in ids:
                 n += 1
