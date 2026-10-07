@@ -701,6 +701,38 @@ class Test(unittest.TestCase):
         empty = self.base / "fw-none"
         empty.mkdir()
         self.assertIsNone(a["pick_ps2_bios"](empty))
+    def test_the_pull_knows_when_a_game_is_running(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        proc = self.base / "proc"
+        for pid, args in {"10": [b"bash", b"/run/current-system/sw/bin/famidrive-launch", b"media", b"x.media"],
+                          "11": [b"python3", b"romm-agent", b"pull"]}.items():
+            (proc / pid).mkdir(parents=True)
+            (proc / pid / "cmdline").write_bytes(b"\0".join(args) + b"\0")
+        real = a["Path"]
+        a["Path"] = lambda p, *r: real(str(proc) if p == "/proc" else p, *r)
+        self.assertFalse(a["game_running"]())   # a film isn't a game
+        (proc / "12").mkdir()
+        (proc / "12" / "cmdline").write_bytes(b"\0".join([b"bash", b"/nix/store/x/bin/famidrive-launch", b"switch", b"g.nsp"]) + b"\0")
+        self.assertTrue(a["game_running"]())
+        a["Path"] = real
+
+    def test_cleanup_keeps_noload_and_noload_is_left_alone(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        d = self.base / "game"
+        (d / "dlc").mkdir(parents=True)
+        (d / "dlc" / "noload.txt").write_text("")
+        (d / "Game.nsp").write_bytes(b"x")
+        before = (d / "dlc" / "noload.txt").stat().st_mtime_ns
+        import time as _t
+        _t.sleep(0.01)
+        (d / "noload.txt").write_text("")
+        m = (d / "noload.txt").stat().st_mtime_ns
+        a["CFG"]["systems"]["switch"] = {"extensions": [".nsp"]}
+        a["launchable"](d, "switch")
+        self.assertEqual((d / "noload.txt").stat().st_mtime_ns, m)
+        self.assertEqual((d / "dlc" / "noload.txt").stat().st_mtime_ns, before)
 
     def test_an_empty_save_is_not_a_save(self):
         box = Box(self.base, "alice")
