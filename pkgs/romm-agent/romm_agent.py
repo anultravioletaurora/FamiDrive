@@ -8,7 +8,7 @@ Each player's own (run as that player):
     romm-agent gamelists               copy the library's newest gamelists into ES-DE
     romm-agent firmware-install        run emulator firmware installs (keys, PS3 firmware)
     romm-agent eden-profile            give a new Eden this player's profile, before it first runs
-    romm-agent textures                link the library's Dolphin texture packs into this player's Dolphin
+    romm-agent textures                link the library's Dolphin texture packs and Switch mods into this player's emulators
     romm-agent eden-gamedir            point this player's Eden at the library's Switch folder (updates, DLC)
     romm-agent save-pull SYSTEM ROM    newest save for ROM -> local (pre-launch)
     romm-agent save-push SYSTEM ROM    local save for ROM -> RomM (post-exit)
@@ -70,6 +70,12 @@ TEXTURES = DATA / "textures"
 TEXTURES_STATE = DATA / "textures.json"   # rom id -> RomM's updated_at, packs
 DOLPHIN_TEXTURES = Path.home() / ".local/share/dolphin-emu/Load/Textures"
 GAME_ID = re.compile(r"[A-Z0-9]{3}(?:[A-Z0-9]{3})?")
+# Switch mods: zips in a game's mod/ folder in RomM, unpacked once here
+# (switch/<title ID>/<mod>/) in an SD card's layout, linked into each
+# player's Eden (load/ and sdmc/).
+MODS = DATA / "mods"
+MODS_STATE = DATA / "mods.json"   # rom id -> RomM's updated_at, mods
+SWITCH_ID = re.compile(r"0100[0-9A-F]{12}")
 GAMELISTS = DATA / "gamelists"  # the library's; each player's ES-DE gets a copy
 # Shared, written by `pull` only: local ROM path -> {id, system, title_id}
 INDEX = DATA / "index.json"
@@ -89,6 +95,8 @@ SNAPSHOT = STATE / "save-snapshot.json"  # pre-launch mtimes for learn-by-diff
 EDEN = Path.home() / ".local/share/eden"
 EDEN_PROFILES = EDEN / "nand/system/save/8000000000000010/su/avators/profiles.dat"
 EDEN_CONFIG = Path.home() / ".config/eden/qt-config.ini"
+EDEN_LOAD = EDEN / "load"
+EDEN_SD = EDEN / "sdmc"
 EDEN_USER = 0xC8
 # In save archives, Eden's profile folder is written as this, and becomes
 # the box's own profile when unpacked: the same player's profile can have
@@ -538,13 +546,72 @@ def unpack_textures(archive, dest):
     return True
 
 
+def eden_systems():
+    return [n for n, d in CFG["systems"].items() if d.get("emulator") == "eden"]
+
+
+def unpack_switch_mod(archive, dest, tid):
+    """A Switch mod zip into dest, in an SD card's layout: the game's code
+    and files under atmosphere/contents/<title ID>/ (exefs, romfs), and
+    anything else as it is (ARCropolis's ultimate/mods/...). A yuzu-style
+    mod (exefs/ and romfs/ at the top) is moved under its title ID. One
+    folder around it all (the release's name) is dropped. False if it has
+    none of these: not a Switch mod."""
+    sd_tops = {"atmosphere", "ultimate", "exefs", "romfs"}
+    with zipfile.ZipFile(archive) as z:
+        files = [i for i in z.infolist() if not i.is_dir()
+                 and not i.filename.startswith("__MACOSX/") and not Path(i.filename).name.startswith("._")]
+        tops = {i.filename.split("/")[0] for i in files}
+        prefix = ""
+        if len(tops) == 1 and all("/" in i.filename for i in files) and next(iter(tops)).lower() not in sd_tops:
+            prefix = next(iter(tops)) + "/"
+        out = []
+        for i in files:
+            rel = Path(i.filename[len(prefix):])
+            if rel.is_absolute() or ".." in rel.parts or len(rel.parts) < 2:
+                continue
+            top = rel.parts[0].lower()
+            if top in ("exefs", "romfs"):
+                rel = Path("atmosphere/contents", tid, top, *rel.parts[1:])
+            elif top == "atmosphere":
+                rel = Path("atmosphere", *rel.parts[1:])
+            elif top not in sd_tops:
+                continue
+            out.append((i, rel))
+        if not out:
+            return False
+        tmp = dest.with_name(dest.name + ".unpacking")
+        shutil.rmtree(tmp, ignore_errors=True)
+        for i, rel in out:
+            path = tmp / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with z.open(i) as src, open(path, "wb") as f:
+                shutil.copyfileobj(src, f, 1 << 20)
+    shutil.rmtree(dest, ignore_errors=True)
+    tmp.rename(dest)
+    return True
+
+
 def sync_textures(s, rom, system, tid):
-    """This game's texture packs from RomM (zips in its mod/ folder), when
-    the game changed in RomM since the last look. A pack whose file changed
-    is unpacked again; one gone from RomM is removed."""
-    if system not in dolphin_systems() or not tid or not GAME_ID.fullmatch(tid):
+    """This game's texture packs (Dolphin) or mods (Switch) from RomM: zips
+    in its mod/ folder, when the game changed in RomM since the last look.
+    A pack whose file changed is unpacked again; one gone from RomM is
+    removed."""
+    if system in dolphin_systems() and tid and GAME_ID.fullmatch(tid):
+        root, state_file = TEXTURES, TEXTURES_STATE
+
+        def unpack(archive, dest):
+            return unpack_textures(archive, dest)
+        kind = "texture pack"
+    elif system in eden_systems() and tid and SWITCH_ID.fullmatch(tid):
+        root, state_file = MODS, MODS_STATE
+
+        def unpack(archive, dest):
+            return unpack_switch_mod(archive, dest, tid)
+        kind = "mod"
+    else:
         return
-    state = json.loads(TEXTURES_STATE.read_text()) if TEXTURES_STATE.exists() else {}
+    state = json.loads(state_file.read_text()) if state_file.exists() else {}
     key = str(rom["id"])
     have = state.get(key, {})
     if have.get("updated_at") == rom.get("updated_at"):
@@ -552,25 +619,25 @@ def sync_textures(s, rom, system, tid):
     files = get(s, EP_ROM.format(id=rom["id"])).json().get("files") or []
     mods = [f for f in files if f.get("category") == "mod"
             and f["file_name"].lower().endswith(".zip") and not f["file_name"].startswith(".")]
-    game = TEXTURES / system / tid
+    game = root / system / tid
     packs, keep = have.get("packs", {}), {}
     for f in mods:
         fid, old = str(f["id"]), have.get("packs", {}).get(str(f["id"]))
         if old and old.get("sha1") == f.get("sha1_hash") and (game / old["dir"]).is_dir():
             keep[fid] = old
             continue
-        tmp = TEXTURES / ".download" / f"{fid}.zip"
+        tmp = root / ".download" / f"{fid}.zip"
         download(s, EP_ROM_CONTENT.format(id=rom["id"], file_name=f["file_name"]), tmp,
                  f.get("sha1_hash"), f.get("file_size_bytes"), params={"file_ids": f["id"]})
         name = re.sub(r'[/\\:*?"<>|]', "_", Path(f["file_name"]).stem).strip() or fid
         if old:
             shutil.rmtree(game / old["dir"], ignore_errors=True)
         game.mkdir(parents=True, exist_ok=True)
-        if unpack_textures(tmp, game / name):
+        if unpack(tmp, game / name):
             keep[fid] = {"sha1": f.get("sha1_hash"), "dir": name}
-            print(f"texture pack for {rom['fs_name']}: {f['file_name']}", file=sys.stderr)
+            print(f"{kind} for {rom['fs_name']}: {f['file_name']}", file=sys.stderr)
         else:
-            print(f"{f['file_name']} ({rom['fs_name']}) has no Dolphin textures; left in RomM", file=sys.stderr)
+            print(f"{f['file_name']} ({rom['fs_name']}) isn't a {kind} FamiDrive knows; left in RomM", file=sys.stderr)
         tmp.unlink(missing_ok=True)
     for fid, old in packs.items():
         if fid not in keep:
@@ -578,7 +645,7 @@ def sync_textures(s, rom, system, tid):
     if game.is_dir() and not any(game.iterdir()):
         game.rmdir()
     state[key] = {"updated_at": rom.get("updated_at"), "packs": keep}
-    TEXTURES_STATE.write_text(json.dumps(state, indent=2))
+    state_file.write_text(json.dumps(state, indent=2))
 
 
 def cmd_textures():
@@ -611,6 +678,51 @@ def cmd_textures():
         if link.is_symlink():
             link.unlink()
         link.symlink_to(d)
+    if eden_systems():
+        link_switch_mods()
+
+
+def link_switch_mods():
+    """Each of the library's Switch mods, in this player's Eden: the game's
+    part (atmosphere/contents/<title ID>) as load/<title ID>/<mod>, which
+    Eden lists in the game's Add-ons, and the rest (ARCropolis's
+    ultimate/mods/...) on this player's SD card, linked file by file:
+    ARCropolis and the like write their own files beside them. A file of
+    the player's own in the way is kept as <name>.before-romm. Links to
+    what the library no longer has are removed."""
+    want = {}
+    for system in eden_systems():
+        for game in (MODS / system).iterdir() if (MODS / system).is_dir() else []:
+            if not (game.is_dir() and SWITCH_ID.fullmatch(game.name)):
+                continue
+            for mod in game.iterdir():
+                if not mod.is_dir():
+                    continue
+                code = mod / "atmosphere/contents" / game.name
+                if code.is_dir():
+                    want[EDEN_LOAD / game.name / mod.name] = code
+                for dirpath, dirs, names in os.walk(mod):
+                    rel = Path(dirpath).relative_to(mod)
+                    if rel.parts[:1] == ("atmosphere",):
+                        dirs[:] = []
+                        continue
+                    for n in names:
+                        want[EDEN_SD / rel / n] = Path(dirpath) / n
+    for base in (EDEN_LOAD, EDEN_SD):
+        for dirpath, dirs, names in os.walk(base):
+            for n in dirs + names:
+                p = Path(dirpath) / n
+                if p.is_symlink() and os.readlink(p).startswith(str(MODS) + "/") and p not in want:
+                    p.unlink()
+    for link, target in want.items():
+        if link.is_symlink():
+            if os.readlink(link) == str(target):
+                continue
+            link.unlink()
+        elif link.exists():
+            link.rename(link.with_name(link.name + ".before-romm"))
+        link.parent.mkdir(parents=True, exist_ok=True)
+        link.symlink_to(target)
 
 
 def cmd_pull():

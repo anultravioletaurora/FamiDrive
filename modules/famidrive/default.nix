@@ -345,6 +345,7 @@ in
       "d ${cfg.dataDir}/firmware 0750 famidrive-library famidrive -"
       "d ${cfg.dataDir}/media 0755 famidrive-library famidrive -"
       "d ${cfg.dataDir}/textures 0755 famidrive-library famidrive -"
+      "d ${cfg.dataDir}/mods 0755 famidrive-library famidrive -"
     ] ++ lib.mapAttrsToList (system: dir:
       "L+ ${cfg.dataDir}/roms/${system} - - - - ${dir}"
     ) cfg.localRoms;
