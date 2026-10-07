@@ -776,6 +776,14 @@ class Test(unittest.TestCase):
         os.utime(root / "PROFILE/0100000000010000/s.bin", None)
         self.assertEqual(a["learn_by_diff"](root, before, depth=2), ["PROFILE/0100000000010000"])
 
+    def test_saves_state_is_never_half_written(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        a["store_saves"]({"x": {"pushed": "1"}})
+        a["store_saves"]({"x": {"pushed": "2"}})
+        self.assertEqual(a["load_saves"](), {"x": {"pushed": "2"}})
+        self.assertEqual([p.name for p in a["STATE"].iterdir()], ["saves.json"])   # no temp files left
+
     def test_library_token_from_systemd(self):
         box = Box(self.base, "library", tokenFile=None)
         creds = self.base / "creds"
