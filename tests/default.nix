@@ -105,8 +105,15 @@ in
       enable = true;
       players.alice = { };
       romm.enable = false;
+      yarg.enable = true;
     };
   } (c: [
+    (check "YARG without Clone Hero still gets the box's songs"
+      (c.systemd.services ? famidrive-clonehero-songs
+        && !(lib.any (p: lib.getName p == "clonehero") c.environment.systemPackages)))
+    (check "YARG reads the box's songs, then the player's own"
+      (lib.hasInfix "/var/lib/famidrive/clonehero/songs"
+        c.home-manager.users.alice.home.activation.famidriveYarg.data))
     (check "autologin as the only player" (c.services.greetd.settings.initial_session.user == "alice"))
     (check "no picker" (c.services.greetd.settings.default_session.user == "alice"))
     (check "ES-DE's Quit menu (power off, reboot) is on"
@@ -144,6 +151,7 @@ in
         players = [ "alice" ];
         servers = [ { name = "Test"; address = "mc.example.org"; } ];
       };
+      yarg.enable = true;
       cloneHero = {
         enable = true;
         songs."AFI - Miss Murder" = "05185565cb931978c11de73d3048206e";
@@ -163,6 +171,10 @@ in
       (check "no autologin" (!(c.services.greetd.settings ? initial_session)))
       (check "a switch restarts the session when it changed" c.systemd.services.greetd.restartIfChanged)
       (check "a host's own cleanup choice wins" (c.nix.gc.options == "--delete-older-than 30d"))
+      (check "YARG is in Ports next to Clone Hero, scores saved under its RomM entry"
+        (lib.hasInfix "yarg)" c.famidrive.systems.ports.command
+          && lib.hasInfix "clonehero)" c.famidrive.systems.ports.command
+          && (etcJson c "famidrive/romm/alice.json").apps ? yarg))
       (check "Clone Hero is in Ports, songs come down as the library"
         (c.famidrive.systems ? ports
           && c.systemd.services.famidrive-clonehero-songs.serviceConfig.User == "famidrive-library"))

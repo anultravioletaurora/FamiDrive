@@ -54,7 +54,8 @@ in
       default = { };
       example = { "AFI - Miss Murder" = "05185565cb931978c11de73d3048206e"; };
       description = ''
-        Charts for every player on this box, by name (the file's name) and
+        Charts for every player on this box, in Clone Hero and in YARG
+        (`famidrive.yarg`), by name (the file's name) and
         Chorus Encore md5 (enchor.us: a chart's download is
         files.enchor.us/<md5>.sng). Downloaded to the library disk at boot
         and whenever this list changes. A changed md5 downloads again.
@@ -121,7 +122,39 @@ in
     };
   };
 
-  config = lib.mkIf (cfg.enable && ch.enable) {
+  config = lib.mkMerge [
+  # The song library: Clone Hero's, and YARG's too (yarg.nix), which reads
+  # the same chart formats.
+  (lib.mkIf (cfg.enable && (ch.enable || cfg.yarg.enable)) {
+    # songs/ is the managed library, local/ is for songs added by hand
+    # (any player can copy into it).
+    systemd.tmpfiles.rules = [
+      "d ${dir} 0755 famidrive-library famidrive -"
+      "d ${dir}/songs 0755 famidrive-library famidrive -"
+      "d ${dir}/local 2775 famidrive-library famidrive -"
+    ];
+
+    systemd.services.famidrive-clonehero-songs = {
+      description = "Download this box's Clone Hero and YARG songs";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network-online.target" ];
+      wants = [ "network-online.target" ];
+      unitConfig.RequiresMountsFor = cfg.dataDir;
+      restartTriggers = [ songsSpec ];   # again whenever the list changes
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        User = "famidrive-library";
+        Group = "famidrive";
+        Nice = 10;
+        IOSchedulingClass = "idle";
+        ExecStartPre = "+${config.systemd.package}/bin/systemd-tmpfiles --create --prefix=${dir}";
+        ExecStart = "${pkgs.famidrive-clonehero}/bin/famidrive-clonehero songs ${lib.escapeShellArg songsSpec}";
+      };
+    };
+  })
+
+  (lib.mkIf (cfg.enable && ch.enable) {
     environment.systemPackages = [ pkgs.clonehero pkgs.famidrive-clonehero ];
 
     # An entry in the Ports system (emulators.nix). Its setup and the
@@ -158,33 +191,9 @@ in
       '';
     };
 
-    # songs/ is the managed library, local/ is for songs added by hand
-    # (any player can copy into it), bindings the box's guitar bindings
-    # (any player writes them).
-    systemd.tmpfiles.rules = [
-      "d ${dir} 0755 famidrive-library famidrive -"
-      "d ${dir}/songs 0755 famidrive-library famidrive -"
-      "d ${dir}/local 2775 famidrive-library famidrive -"
-    ] ++ lib.optional ch.sharedBindings "f ${dir}/bindings 0664 famidrive-library famidrive -";
-
-    systemd.services.famidrive-clonehero-songs = {
-      description = "Download this box's Clone Hero songs";
-      wantedBy = [ "multi-user.target" ];
-      after = [ "network-online.target" ];
-      wants = [ "network-online.target" ];
-      unitConfig.RequiresMountsFor = cfg.dataDir;
-      restartTriggers = [ songsSpec ];   # again whenever the list changes
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-        User = "famidrive-library";
-        Group = "famidrive";
-        Nice = 10;
-        IOSchedulingClass = "idle";
-        ExecStartPre = "+${config.systemd.package}/bin/systemd-tmpfiles --create --prefix=${dir}";
-        ExecStart = "${pkgs.famidrive-clonehero}/bin/famidrive-clonehero songs ${lib.escapeShellArg songsSpec}";
-      };
-    };
+    # The box's guitar bindings (any player writes them).
+    systemd.tmpfiles.rules =
+      lib.optional ch.sharedBindings "f ${dir}/bindings 0664 famidrive-library famidrive -";
 
     famidrive.romm.apps = lib.mkIf sync {
       clonehero = { rom = ch.romm.entry; emulator = "clonehero"; inherit saveLayout; };
@@ -217,5 +226,6 @@ in
         }}
       '';
     };
-  };
+  })
+  ];
 }
