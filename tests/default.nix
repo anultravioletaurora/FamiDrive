@@ -193,6 +193,9 @@ in
       yarg.enable = true;
     };
   } (c: [
+    (check "a boot screen in place of console text"
+      (c.boot.plymouth.enable && c.boot.plymouth.theme == "bgrt" && c.boot.initrd.systemd.enable
+        && lib.elem "quiet" c.boot.kernelParams && lib.elem "splash" c.boot.kernelParams))
     (check "AMD and Intel by default, Intel's video decoder included, newest kernel"
       (lib.any (p: lib.getName p == "intel-media-driver") c.hardware.graphics.extraPackages
         && c.services.xserver.videoDrivers != [ "nvidia" ]

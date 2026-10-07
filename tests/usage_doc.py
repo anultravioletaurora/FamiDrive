@@ -27,7 +27,7 @@ SECTIONS = [
      "Optional: a box can also run from ROM folders already on it (`localRoms`)."),
     ("Hardware", ["famidrive.gpu"],
      "The box's graphics card. AMD is tested, Intel should just work, Nvidia is untested."),
-    ("TV and session", ["famidrive.display", "famidrive.session", "famidrive.cec"],
+    ("TV and session", ["famidrive.display", "famidrive.session", "famidrive.cec", "famidrive.boot"],
      "The picture, and what happens to the TV on a rebuild."),
     ("Menu", ["famidrive.esde"], "ES-DE, the menu everything launches from."),
     ("Switch", ["famidrive.switch"], "Switch games that run in Ryujinx instead of Eden."),
