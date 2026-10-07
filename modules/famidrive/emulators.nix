@@ -198,6 +198,16 @@ in
     famidrive.sessionSetup = lib.mkIf (hasLane "roms") ''
       sys="$HOME/.config/retroarch/system"
       mkdir -p "$sys"
+      # Links to files the library no longer has go, so a core can make
+      # its own folder there again. Found on the first box 2026-10-07:
+      # Mupen64plus pointed at a library folder gone after a firmware
+      # pull, the N64 core couldn't write its game database there, and
+      # Mario Party 3 got the wrong save type and wouldn't start.
+      for t in "$sys"/*; do
+        if [ -L "$t" ] && [ ! -e "$t" ]; then
+          case "$(readlink "$t")" in ${fw}/retroarch/*) rm -f "$t" ;; esac
+        fi
+      done
       for f in ${fw}/retroarch/*; do
         [ -e "$f" ] || continue
         t="$sys/$(basename "$f")"
