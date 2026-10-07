@@ -733,6 +733,20 @@ class Test(unittest.TestCase):
         a["launchable"](d, "switch")
         self.assertEqual((d / "noload.txt").stat().st_mtime_ns, m)
         self.assertEqual((d / "dlc" / "noload.txt").stat().st_mtime_ns, before)
+    def test_wii_u_keys_merge_into_cemus(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        fw = self.base / "fw-wiiu"
+        fw.mkdir()
+        (fw / "keys.txt").write_text("AAAA0000 # Game A\nbbbb1111 # Game B\n")
+        cemu = box.home / ".local/share/Cemu/keys.txt"
+        cemu.parent.mkdir(parents=True)
+        cemu.write_text("# mine\ncccc2222\naaaa0000 # already here\n")
+        a["install_cemu_keys"](fw)
+        lines = cemu.read_text().splitlines()
+        self.assertEqual(lines[:3], ["# mine", "cccc2222", "aaaa0000 # already here"])
+        self.assertIn("bbbb1111 # Game B", lines)
+        self.assertEqual(sum("aaaa0000" in l.lower() for l in lines), 1)
 
     def test_an_empty_save_is_not_a_save(self):
         box = Box(self.base, "alice")
