@@ -259,7 +259,14 @@ in
           # --fullscreen was taken as a game path and ignored, so gamescope
           # stretched the normal window, menu bar and status bar included.
           # In single-window mode, -f hides both.
-          command = ''QT_QPA_PLATFORM=xcb ${lib.getExe pkgs.eden} -f -g "$ROM"'';
+          # A game listed in switch.ryujinx.games runs in Ryujinx instead
+          # (ryujinx.nix's before hook sets $FAMIDRIVE_RYUJINX). --no-gui:
+          # no game list around it, and Ryujinx quits when the game does.
+          command = lib.optionalString (cfg.switch.ryujinx.games != [ ]) ''
+            if [ -n "''${FAMIDRIVE_RYUJINX:-}" ]; then
+              exec ${lib.getExe cfg.switch.ryujinx.package} --no-gui --fullscreen "$ROM"
+            fi
+          '' + ''QT_QPA_PLATFORM=xcb ${lib.getExe pkgs.eden} -f -g "$ROM"'';
           rommPlatform = "switch";
           emulator = "eden";
           # Updates and DLC from RomM, beside each game, where Eden reads

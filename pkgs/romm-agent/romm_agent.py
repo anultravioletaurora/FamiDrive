@@ -10,6 +10,7 @@ Each player's own (run as that player):
     romm-agent eden-profile            give a new Eden this player's profile, before it first runs
     romm-agent textures                link the library's Dolphin texture packs and Switch mods into this player's emulators
     romm-agent eden-gamedir            point this player's Eden at the library's Switch folder (updates, DLC)
+    romm-agent eden-save TITLE_ID      print where this player's Eden keeps that game's save
     romm-agent save-pull SYSTEM ROM    newest save for ROM -> local (pre-launch)
     romm-agent save-push SYSTEM ROM    local save for ROM -> RomM (post-exit)
     romm-agent reconcile               push every local save RomM doesn't have yet
@@ -97,6 +98,8 @@ EDEN_PROFILES = EDEN / "nand/system/save/8000000000000010/su/avators/profiles.da
 EDEN_CONFIG = Path.home() / ".config/eden/qt-config.ini"
 EDEN_LOAD = EDEN / "load"
 EDEN_SD = EDEN / "sdmc"
+# Ryujinx (Ryubing), for the few Switch games run there (ryujinx.nix).
+RYUJINX = Path.home() / ".config/Ryujinx"
 EDEN_USER = 0xC8
 # In save archives, Eden's profile folder is written as this, and becomes
 # the box's own profile when unpacked: the same player's profile can have
@@ -683,18 +686,27 @@ def cmd_textures():
 
 
 def link_switch_mods():
-    """Each of the library's Switch mods, in this player's Eden: the game's
-    part (atmosphere/contents/<title ID>) as load/<title ID>/<mod>, which
-    Eden lists in the game's Add-ons, and the rest (ARCropolis's
-    ultimate/mods/...) on this player's SD card, linked file by file:
-    ARCropolis and the like write their own files beside them. A file of
-    the player's own in the way is kept as <name>.before-romm. Links to
-    what the library no longer has are removed.
+    """Each of the library's Switch mods, in this player's emulators.
 
-    A mod built on Skyline plugins (romfs/skyline/plugins, as HewDraw
-    Remix is) is left out: Eden, like yuzu before it, can't run them, and
-    the game crashes as it starts. Found on the first box 2026-10-07:
-    Smash Ultimate with HDR hit a fatal error 4 s in."""
+    Eden: the game's part (atmosphere/contents/<title ID>) as
+    load/<title ID>/<mod>, which Eden lists in the game's Add-ons, and the
+    rest (ARCropolis's ultimate/mods/...) on its SD card, linked file by
+    file: ARCropolis and the like write their own files beside them. A
+    mod built on Skyline plugins (romfs/skyline/plugins, as HewDraw Remix
+    is) is left out: Eden, like yuzu before it, can't run them, and the
+    game crashes as it starts. Found on the first box 2026-10-07: Smash
+    Ultimate with HDR hit a fatal error 4 s in.
+
+    Ryujinx, for the games run there (switch.ryujinx.games): every mod,
+    Skyline ones too, as mods/contents/<title ID>/<mod> and on its own
+    SD card.
+
+    A file of the player's own in the way is kept as <name>.before-romm.
+    Links to what the library no longer has are removed."""
+    ryujinx_games = {t.upper() for t in CFG.get("ryujinxGames") or []}
+    targets = [(EDEN_LOAD, EDEN_SD, None)]
+    if ryujinx_games:
+        targets.append((RYUJINX / "mods/contents", RYUJINX / "sdcard", ryujinx_games))
     want = {}
     for system in eden_systems():
         for game in (MODS / system).iterdir() if (MODS / system).is_dir() else []:
@@ -704,24 +716,29 @@ def link_switch_mods():
                 if not mod.is_dir():
                     continue
                 code = mod / "atmosphere/contents" / game.name
-                if (code / "romfs/skyline/plugins").is_dir():
-                    print(f"{mod.name} needs Skyline, which Eden can't run; not added", file=sys.stderr)
-                    continue
-                if code.is_dir():
-                    want[EDEN_LOAD / game.name / mod.name] = code
-                for dirpath, dirs, names in os.walk(mod):
-                    rel = Path(dirpath).relative_to(mod)
-                    if rel.parts[:1] == ("atmosphere",):
-                        dirs[:] = []
+                skyline = (code / "romfs/skyline/plugins").is_dir()
+                for load, sd, games in targets:
+                    if games is None and skyline:
+                        print(f"{mod.name} needs Skyline, which Eden can't run; not added", file=sys.stderr)
                         continue
-                    for n in names:
-                        want[EDEN_SD / rel / n] = Path(dirpath) / n
-    for base in (EDEN_LOAD, EDEN_SD):
-        for dirpath, dirs, names in os.walk(base):
-            for n in dirs + names:
-                p = Path(dirpath) / n
-                if p.is_symlink() and os.readlink(p).startswith(str(MODS) + "/") and p not in want:
-                    p.unlink()
+                    if games is not None and game.name.upper() not in games:
+                        continue
+                    if code.is_dir():
+                        want[load / game.name / mod.name] = code
+                    for dirpath, dirs, names in os.walk(mod):
+                        rel = Path(dirpath).relative_to(mod)
+                        if rel.parts[:1] == ("atmosphere",):
+                            dirs[:] = []
+                            continue
+                        for n in names:
+                            want[sd / rel / n] = Path(dirpath) / n
+    for load, sd, _ in targets + [(RYUJINX / "mods/contents", RYUJINX / "sdcard", None)]:
+        for base in (load, sd):
+            for dirpath, dirs, names in os.walk(base):
+                for n in dirs + names:
+                    p = Path(dirpath) / n
+                    if p.is_symlink() and os.readlink(p).startswith(str(MODS) + "/") and p not in want:
+                        p.unlink()
     for link, target in want.items():
         if link.is_symlink():
             if os.readlink(link) == str(target):
@@ -1281,6 +1298,18 @@ def layout(system):
     return lay["kind"], Path(lay["root"]).expanduser(), lay
 
 
+def cmd_eden_save(tid):
+    """Where this player's Eden keeps a game's save (the profile's
+    folder for it, existing or not). A Switch game run in Ryujinx instead
+    is bridged through it (famidrive-ryujinx), so its save still syncs
+    from the one place."""
+    systems = eden_systems()
+    if not systems:
+        sys.exit("no Eden system on this box")
+    _, root, lay = layout(systems[0])
+    print(root / lay["profile"] / tid.upper())
+
+
 def save_paths(system, entry, rom_path):
     """Files/dirs under the layout root that make up this ROM's save.
 
@@ -1594,7 +1623,7 @@ def main():
         "save-pull": cmd_save_pull, "save-push": cmd_save_push,
         "gamelists": cmd_gamelists, "firmware-install": cmd_firmware_install,
         "eden-profile": cmd_eden_profile, "textures": cmd_textures,
-        "eden-gamedir": cmd_eden_gamedir,
+        "eden-gamedir": cmd_eden_gamedir, "eden-save": cmd_eden_save,
     }
     if cmd not in commands:
         print(__doc__)

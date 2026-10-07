@@ -31,6 +31,9 @@ let
     inherit (cfg.romm) platforms;
     dataDir = cfg.dataDir;
     firmwarePlatforms = cfg.romm.firmwarePlatforms;
+    # Read by `romm-agent textures`, which links mods for every player
+    # with this config.
+    ryujinxGames = cfg.switch.ryujinx.games;
     inherit systems;
   };
 

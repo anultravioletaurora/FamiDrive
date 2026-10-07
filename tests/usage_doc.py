@@ -28,6 +28,7 @@ SECTIONS = [
     ("TV and session", ["famidrive.display", "famidrive.session", "famidrive.cec"],
      "The picture, and what happens to the TV on a rebuild."),
     ("Menu", ["famidrive.esde"], "ES-DE, the menu everything launches from."),
+    ("Switch", ["famidrive.switch"], "Switch games that run in Ryujinx instead of Eden."),
     ("Controllers", ["famidrive.controllers"],
      "How controllers reach the emulators. Per-controller results are in [CONTROLLERS.md](CONTROLLERS.md)."),
     ("Steam", ["famidrive.steam"], "The Steam lane (`lanes` has `\"steam\"`)."),
