@@ -111,6 +111,9 @@ Found against RomM 5.3:
 - **A launch counts as started only when Steam's log says so**
   (`console_log.txt`). Install scripts run through the same launcher
   process first.
+- **The app manifest's `BytesDownloaded` isn't live.** It can sit at 0
+  for a whole download. Measure `steamapps/downloading/<appid>` against
+  `BytesToStage` instead, and use `content_log.txt` for the real speed.
 
 ## Audio
 

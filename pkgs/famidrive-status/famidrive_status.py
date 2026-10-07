@@ -51,13 +51,44 @@ TEXT = {
 
 
 def manifest(appid):
+    return manifest_and_library(appid)[0]
+
+
+def manifest_and_library(appid):
     for lib in [STEAM / "steamapps"] + [
             Path(p) / "steamapps" for p in re.findall(
                 r'"path"\s+"([^"]+)"', read(STEAM / "steamapps/libraryfolders.vdf"))]:
         text = read(lib / f"appmanifest_{appid}.acf")
         if text:
-            return text
-    return ""
+            return text, lib
+    return "", None
+
+
+def folder_size(path):
+    total = 0
+    for dirpath, _, names in os.walk(path):
+        for n in names:
+            try:
+                total += os.lstat(os.path.join(dirpath, n)).st_size
+            except OSError:
+                pass
+    return total
+
+
+def download_progress(appid):
+    """Bytes done and to do of the game's download. Steam doesn't keep the
+    manifest's BytesDownloaded current while it downloads (it can sit at 0
+    the whole time), so this measures what has landed in
+    steamapps/downloading/<appid> against BytesToStage, and only falls
+    back to the manifest's counters when there's no such folder. Found on
+    the first box 2026-10-06: Overwatch was at 28% in Steam's phone app
+    while the manifest still said 0 bytes."""
+    text, lib = manifest_and_library(appid)
+    staging = int(field(text, "BytesToStage") or 0)
+    if lib is not None and staging > 0 and (lib / "downloading" / str(appid)).is_dir():
+        done = max(folder_size(lib / "downloading" / str(appid)), int(field(text, "BytesStaged") or 0))
+        return min(done, staging), staging
+    return int(field(text, "BytesDownloaded") or 0), int(field(text, "BytesToDownload") or 0)
 
 
 def read(path):
@@ -232,11 +263,9 @@ def main():
 
         if state == "updating":
             now = time.monotonic()
-            if now >= next_read:   # Steam writes the manifest every few seconds
+            if now >= next_read:
                 next_read = now + 2
-                text = manifest(appid)
-                done = int(field(text, "BytesDownloaded") or 0)
-                total = int(field(text, "BytesToDownload") or 0)
+                done, total = download_progress(appid)
                 if last_bytes is not None and done > last_bytes:
                     r_now = (done - last_bytes) / (now - last_t)
                     rate = r_now if rate is None else 0.7 * rate + 0.3 * r_now
