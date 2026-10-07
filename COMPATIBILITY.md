@@ -149,13 +149,18 @@ options.
 
 ### Call of Duty: Infinite Warfare
 
-**Steam: ❔ Untested.**
+**Steam: ✅ Works.** Proton (Steam's choice), no launch options.
 
+- **2026-10-07:** launched without trouble, Steam's one-time setup
+  included. On first start the game asked whether to start in Safe Mode
+  and said it had found new hardware; the controller moved between
+  the dialogs' buttons fine (No to Safe Mode, Yes to reconfigure). Its
+  shaders then compile in the game, once.
 - **Modes:** like [WWII](#call-of-duty-wwii), the campaign and Zombies
   run from one program, and multiplayer from another, so expect Steam's
   chooser first.
-- **To check:** multiplayer under Proton, controllers and rumble in each
-  mode.
+- **To check:** the campaign past the shaders, multiplayer under Proton,
+  rumble in each mode.
 
 ### Call of Duty: Modern Warfare Remastered
 
