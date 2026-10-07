@@ -222,6 +222,23 @@ def logo(system, rom):
     return None
 
 
+# RetroAchievements' stand-in for a dump it doesn't know: a game titled
+# "Unsupported Game Version (<the game>)", with one fake achievement of the
+# same name that unlocks at once. Found on the first box 2026-10-07 with
+# Melee: it showed as an unlock.
+UNSUPPORTED = re.compile(r"^Unsupported Game Version \((.*)\)$")
+
+
+def unsupported_args(title):
+    """The alert for a copy RetroAchievements doesn't recognize, or None."""
+    m = UNSUPPORTED.match(title or "")
+    if not m:
+        return None
+    return ["--kind", "alert", "No achievements for this copy",
+            f"RetroAchievements doesn't recognize this copy of {m.group(1)}. "
+            "A fresh backup from the disc may match one it knows."]
+
+
 def toast_args(award, info, game, icon):
     title = award[1]
     detail = game or ""
@@ -257,14 +274,19 @@ def cmd_watch(log, system, rom):
         return 0   # this player has no RetroAchievements
     parent = os.getppid()
     icon = logo(system, rom)
-    game, info = None, {}
+    game, info, unsupported = None, {}, False
     for line in follow(log, lambda: os.getppid() != parent):
         m = GAME.search(line)
         if m:
+            alert = unsupported_args(m.group(2))
+            unsupported = alert is not None
+            if alert:
+                subprocess.run(["famidrive-toast", *alert], check=False, timeout=5)
+                continue
             game, info = m.group(2), achievements(m.group(1))
             continue
         m = AWARD.search(line)
-        if m:
+        if m and not unsupported:
             subprocess.run(["famidrive-toast", *toast_args(m.groups(), info.get(m.group(1)), game, icon)],
                            check=False, timeout=5)
     return 0

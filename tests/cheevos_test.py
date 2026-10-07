@@ -97,6 +97,27 @@ class Test(unittest.TestCase):
         self.assertEqual(self.c.toast_args(("12", "Jiggy Wiggy"), None, "Banjo-Kazooie", None),
                          ["--kind", "achievement", "Jiggy Wiggy", "Banjo-Kazooie"])
 
+    def test_an_unrecognized_copy_is_an_alert_not_an_unlock(self):
+        args = self.c.unsupported_args("Unsupported Game Version (Super Smash Bros. Melee)")
+        self.assertEqual(args[:3], ["--kind", "alert", "No achievements for this copy"])
+        self.assertIn("Super Smash Bros. Melee", args[3])
+        self.assertIsNone(self.c.unsupported_args("Super Smash Bros. Melee"))
+
+    def test_watching_a_log(self):
+        log = self.home / "dolphin.log"
+        log.write_text(
+            '05:28:277 Core/AchievementManager.cpp:79 I[RetroAchievements]: Identified game: 1000009602 '
+            '"Unsupported Game Version (Super Smash Bros. Melee)" (cc1d)\n'
+            "05:33:525 Core/AchievementManager.cpp:79 I[RetroAchievements]: Awarding achievement 101000001: Unsupported Game Version\n")
+        self.c.store_state({"username": "alice", "token": "T"})
+        sent = []
+        self.c.subprocess.run = lambda args, **kw: sent.append(args)
+        lines = iter(log.read_text().splitlines(keepends=True))
+        self.c.follow = lambda path, stop: lines
+        self.c.cmd_watch(str(log), "gc", "Melee.iso")
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0][1:3], ["--kind", "alert"])
+
     def test_log_lines(self):
         self.assertEqual(self.c.AWARD.search("[INFO] [RCHEEVOS] Awarding achievement 12345: Jiggy Wiggy").groups(),
                          ("12345", "Jiggy Wiggy"))
