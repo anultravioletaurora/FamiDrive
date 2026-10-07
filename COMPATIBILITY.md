@@ -252,6 +252,11 @@ here.
 
 **Steam: ❔ Untested.**
 
+- **2026-10-07, stopped at sign-in:** the first launch finished its update
+  (the status screen's progress was right, after #59), then opened
+  Microsoft's sign-in page. A controller could move between its fields,
+  but the email field needs a keyboard. Typing from the couch is #73.
+
 - **Anti-cheat:** Steam offers two ways to start it: with Easy
   Anti-Cheat (matchmaking) or with it off (campaigns, custom games,
   mods). That's another Steam chooser on screen before the game. Check
