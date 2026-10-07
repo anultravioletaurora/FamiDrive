@@ -379,19 +379,18 @@ joins the server straight from launch.
 
 ### Overwatch
 
-**Steam: ❔ Untested.** The Steam copy needs a Battle.net account linked
+**Steam: ✅ Works.** The Steam copy needs a Battle.net account linked
 on first launch, but not the Battle.net app.
 
+- **2026-10-07:** opened without trouble. The 8BitDo Ultimate 2 (2.4 GHz)
+  was detected right away, with the right button glyphs in the game's
+  UI. The 83 GB download beforehand is what showed that the status
+  screen's progress bar was stuck at 0% (fixed in #59).
+
 - **Other launchers:** Battle.net's own copy runs through the Battle.net
-  app. FamiDrive has no Battle.net lane, so only the Steam copy plays for
-  now. A Battle.net lane is worth an issue if this goes well. One account
-  can play through either.
-- **To check:**
-  - the Battle.net account link with a controller
-  - matchmaking under Proton
-  - controllers and rumble (Overwatch has full console-style controller
-    support)
-  - the shader compile on first start
+  app. FamiDrive has no Battle.net lane yet (#57), so only the Steam copy
+  plays for now. One account can play through either.
+- **Still to check:** matchmaking, rumble, and a second controller.
 
 ### Palworld
 
