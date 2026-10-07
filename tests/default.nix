@@ -306,6 +306,8 @@ in
           && lib.hasInfix "famidrive-ryujinx save-in" c.famidrive.systems.switch.before
           && lib.hasInfix "famidrive-ryujinx save-out" c.famidrive.systems.switch.after
           && (etcJson c "famidrive/romm/library.json").ryujinxGames == [ "01006A800016E000" ]))
+    (check "Ryujinx gets 8 GiB on its command line (it ignores Config.json's with --no-gui)"
+      (lib.hasInfix "--dram-size MemoryConfiguration8GiB" c.famidrive.systems.switch.command))
       (check "Clone Hero is in Ports, songs come down as the library"
         (c.famidrive.systems ? ports
           && c.systemd.services.famidrive-clonehero-songs.serviceConfig.User == "famidrive-library"))
