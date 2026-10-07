@@ -56,7 +56,7 @@ let
 in
 {
   romm-agent = unit "romm_agent" ../pkgs/romm-agent/romm_agent.py
-    (pkgs.python3.withPackages (ps: [ ps.requests ]));
+    (pkgs.python3.withPackages (ps: [ ps.requests ps.cryptography ]));
   valheim = unit "valheim" ../pkgs/famidrive-valheim/famidrive_valheim.py pkgs.python3;
   steam-config = unit "steam_config" ../pkgs/famidrive-steam-config/famidrive_steam_config.py pkgs.python3;
   clonehero = unit "clonehero" ../pkgs/famidrive-clonehero/famidrive_clonehero.py pkgs.python3;

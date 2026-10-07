@@ -719,6 +719,63 @@ class Test(unittest.TestCase):
         self.assertNotEqual(a["known_sha1"](game), first)
         self.assertEqual(len(calls), 2)                 # changed: hashed again
 
+    def nca(self, key, tid):
+        """An NCA's first 0x400 bytes, encrypted as Nintendo does."""
+        import struct
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+        plain = bytearray(0x400)
+        plain[0x200:0x204] = b"NCA3"
+        struct.pack_into("<Q", plain, 0x210, int(tid, 16))
+        return b"".join(Cipher(algorithms.AES(key), modes.XTS(n.to_bytes(16, "big"))).encryptor()
+                        .update(bytes(plain[n * 0x200:(n + 1) * 0x200])) for n in range(2))
+
+    def pfs(self, magic, entry_size, files):
+        import struct
+        table = b"".join(n.encode() + b"\0" for n, _ in files)
+        entries, data, name_at = b"", b"", 0
+        for n, blob in files:
+            entries += struct.pack("<QQI", len(data), len(blob), name_at).ljust(entry_size, b"\0")
+            data += blob
+            name_at += len(n) + 1
+        return magic + struct.pack("<II", len(files), len(table)) + bytes(4) + entries + table + data
+
+    def test_switch_title_id_from_nca_headers(self):
+        import struct
+        box = Box(self.base, "alice")
+        a = box.agent()
+        key = bytes(range(32))
+        # An NSP without tickets: the commonest ID ending in 000 wins.
+        nsp = self.base / "Game.nsp"
+        nsp.write_bytes(self.pfs(b"PFS0", 0x18, [("a.nca", self.nca(key, "0100F4C009322000")),
+                                                 ("b.cnmt.nca", self.nca(key, "0100F4C009322000")),
+                                                 ("c.nca", self.nca(key, "0100F4C009323001"))]))
+        self.assertEqual(a["switch_title_id_from_ncas"](nsp, key), "0100F4C009322000")
+        # An XCI, named .nsp: secure partition inside the root HFS0.
+        secure = self.pfs(b"HFS0", 0x40, [("x.nca", self.nca(key, "010048701995E000"))])
+        root = self.pfs(b"HFS0", 0x40, [("secure", secure)])
+        head = bytearray(0x200)
+        head[0x100:0x104] = b"HEAD"
+        struct.pack_into("<Q", head, 0x130, 0x200)
+        xci = self.base / "Tennis.nsp"
+        xci.write_bytes(bytes(head) + root)
+        self.assertEqual(a["switch_title_id_from_ncas"](xci, key), "010048701995E000")
+        self.assertIsNone(a["switch_title_id_from_ncas"](nsp, bytes(32)))   # wrong key: nothing
+
+    def test_eden_learns_one_game_not_the_profile(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        root = self.base / "save"
+        (root / "PROFILE/0100000000010000").mkdir(parents=True)
+        (root / "PROFILE/0100000000010000/s.bin").write_bytes(b"old")
+        (root / "PROFILE/0100152000022000").mkdir()
+        (root / "PROFILE/0100152000022000/s.bin").write_bytes(b"other game")
+        before = a["snapshot"](root)
+        import time
+        time.sleep(0.01)
+        (root / "PROFILE/0100000000010000/s.bin").write_bytes(b"new")
+        os.utime(root / "PROFILE/0100000000010000/s.bin", None)
+        self.assertEqual(a["learn_by_diff"](root, before, depth=2), ["PROFILE/0100000000010000"])
+
     def test_library_token_from_systemd(self):
         box = Box(self.base, "library", tokenFile=None)
         creds = self.base / "creds"
