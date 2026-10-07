@@ -51,7 +51,8 @@ in
       before = ''
         rom="$(readlink -f "$(dirname "$ROM")")/$(basename "$ROM")"
         tid=$(${pkgs.jq}/bin/jq -r --arg p "$rom" '.[$p].title_id // empty' ${lib.escapeShellArg "${cfg.dataDir}/index.json"} 2>/dev/null || true)
-        case " ${lib.toUpper (lib.concatStringsSep " " ryu.games)} " in
+        ryujinx_games=${lib.escapeShellArg " ${lib.toUpper (lib.concatStringsSep " " ryu.games)} "}
+        case "$ryujinx_games" in
           *" ''${tid^^} "*)
             export FAMIDRIVE_RYUJINX="$tid"
             ${pkgs.famidrive-ryujinx}/bin/famidrive-ryujinx setup ${lib.escapeShellArg (builtins.toJSON {
