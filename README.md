@@ -172,8 +172,10 @@ planning doc for now and will move into this repo.
   also works for PlayStation and N64 (RetroArch), and Switch mods kept
   in RomM (`mod/`) are linked into each player's emulator.
 - Ryujinx for the Switch games that need it (`switch.ryujinx.games`):
-  Smash Ultimate with HewDraw Remix runs there on the first box, with
-  its update, DLC and the player's save bridged from Eden's.
+  Smash Ultimate with HewDraw Remix gets there with its update, DLC and
+  the player's save bridged from Eden's. Its menus work on the first
+  box, but matches crash on Ryujinx 1.3.3 (see
+  [COMPATIBILITY.md](COMPATIBILITY.md#super-smash-bros-ultimate)).
 - The Steam lane, with Proton pins and Steam Input set from Nix, Steam's
   Big Picture as a Settings entry, a status screen while Steam
   updates, processes shaders or starts a game, and each game's art and
