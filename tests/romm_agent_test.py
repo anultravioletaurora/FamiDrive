@@ -748,6 +748,28 @@ class Test(unittest.TestCase):
         self.assertIn("bbbb1111 # Game B", lines)
         self.assertEqual(sum("aaaa0000" in l.lower() for l in lines), 1)
 
+    def test_gamecube_save_region_from_the_disc_header(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        def disc(name, gid, region, ciso=False):
+            body = bytearray(0x460)
+            body[0:6] = gid.encode()
+            body[0x458:0x45C] = region.to_bytes(4, "big")
+            if ciso:
+                body = bytearray(b"CISO" + (0x200000).to_bytes(4, "little") + b"\x01") + bytearray(0x8000 - 9) + body
+            p = self.base / name
+            p.write_bytes(bytes(body))
+            return str(p)
+        # A hack: a German-letter ID on a US disc. Dolphin goes by the header.
+        self.assertEqual(a["gc_region"](disc("dx.iso", "GMPDX2", 1), "GMPDX2"), "USA")
+        self.assertEqual(a["gc_region"](disc("pal.iso", "GAFP01", 2), "GAFP01"), "EUR")
+        self.assertEqual(a["gc_region"](disc("ac.ciso", "GAFE01", 1, ciso=True), "GAFE01"), "USA")
+        # No readable header (RVZ, or a missing file): the ID's letter, every PAL language counted.
+        rvz = self.base / "x.rvz"
+        rvz.write_bytes(b"RVZ\x01" + bytes(100))
+        self.assertEqual(a["gc_region"](str(rvz), "GZLD01"), "EUR")
+        self.assertEqual(a["gc_region"](str(self.base / "gone.iso"), "GZLE01"), "USA")
+
     def test_an_empty_save_is_not_a_save(self):
         box = Box(self.base, "alice")
         a = box.agent()

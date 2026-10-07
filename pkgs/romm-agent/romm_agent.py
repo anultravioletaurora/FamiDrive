@@ -1332,7 +1332,35 @@ def derive_id(system, rom_path):
 
 # ---------------------------------------------------------------- save layouts
 
-DOLPHIN_REGION = {"E": "USA", "P": "EUR", "J": "JAP"}
+# Dolphin keeps GameCube saves in a folder per region (GC/USA, EUR, JAP),
+# the region the disc's header says (offset 0x458), not its ID's 4th
+# letter. Found 2026-10-07: Mario Party 4 Deluxe is GMPDX2, D as in a
+# German disc, but its header is NTSC-U and its saves are in GC/USA.
+DISC_REGION = {0: "JAP", 1: "USA", 2: "EUR", 4: "JAP"}   # NTSC-J, NTSC-U, PAL, NTSC-K
+# For an image whose header can't be read (RVZ, GCZ, WIA): by the ID's
+# letter, every PAL language counted, not only P.
+DOLPHIN_REGION = {"E": "USA", "J": "JAP", "K": "JAP",
+                  **{c: "EUR" for c in "PDFSIHUXYZLMRVW"}}
+
+
+def gc_region(rom_path, tid):
+    """The GC/<region> folder Dolphin keeps this disc's saves in."""
+    try:
+        with open(Path(rom_path).resolve(), "rb") as f:
+            head = f.read(8)
+            base = 0
+            if head[:4] == b"CISO" and f.read(1) == b"\x01":   # first block present: the disc's start is at 0x8000
+                base = 0x8000
+                f.seek(base)
+                head = f.read(8)
+            if tid and head[:4] == tid[:4].encode():
+                f.seek(base + 0x458)
+                code = int.from_bytes(f.read(4), "big")
+                if code in DISC_REGION:
+                    return DISC_REGION[code]
+    except OSError:
+        pass
+    return DOLPHIN_REGION.get((tid or "    ")[3], "USA")
 
 
 def eden_folder(uid):
@@ -1476,7 +1504,7 @@ def save_paths(system, entry, rom_path):
         # the game's real path (emulators.nix), not ES-DE's link to it.
         found = [Path(rom_path).resolve().stem + ".srm"]
     elif kind == "dolphin-gci-folder" and tid:
-        card = Path(DOLPHIN_REGION.get(tid[3], "USA")) / "Card A"
+        card = Path(gc_region(rom_path, tid)) / "Card A"
         maker = tid[4:6] or "??"   # a game-only ID still finds its saves
         found = [str(card / p.name) for p in (root / card).glob(f"{maker}-{tid[:4]}-*.gci")]
     elif kind == "dolphin-wii-title" and tid:
