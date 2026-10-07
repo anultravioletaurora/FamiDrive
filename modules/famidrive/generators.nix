@@ -12,10 +12,22 @@ let
   # One generator per player and lane: each player's own Steam library and
   # Prism instances fill their own menu (their `roms` folder), so a game
   # installed in two players' homes shows up for each of them.
-  watched = p: {
+  # What each lane's generator reads, and the files whose changes
+  # trigger it.
+  source = p: {
     steam = "${p.home}/.local/share/Steam/steamapps";
-    gog = "${p.home}/.config/gogdl-cli";   # TODO: real gogdl-cli manifest dir
+    heroic = "${p.home}/.config/heroic";
     minecraft = "${p.home}/.local/share/PrismLauncher/instances";
+  };
+  watched = p: {
+    steam = [ (source p).steam ];
+    # Heroic's installed-games files, one per store (famidrive_generate.py).
+    heroic = map (f: "${(source p).heroic}/${f}") [
+      "gog_store/installed.json"
+      "legendaryConfig/legendary/installed.json"
+      "nile_config/nile/installed.json"
+    ];
+    minecraft = [ (source p).minecraft ];
   };
 
   mkGenerator = p: lane: {
@@ -32,7 +44,8 @@ let
           Type = "oneshot";
           User = p.user;
           # Minecraft's entries live in the Ports system's folder.
-          ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate ${lane} ${(watched p).${lane}} ${p.roms}/${folder lane}";
+          # Heroic's entries go in one folder per store (gog, epic, amazon).
+          ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate ${lane} ${(source p).${lane}} ${p.roms}${folder lane}";
         };
         # Steam's art and details for new games, once the menu entries
         # are in place, without holding up the session: a first run can
@@ -47,7 +60,7 @@ let
         serviceConfig = {
           Type = "oneshot";
           User = p.user;
-          ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate steam-media ${(watched p).steam} ${p.roms}/steam";
+          ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate steam-media ${(source p).steam} ${p.roms}/steam";
         };
       };
     };
@@ -60,9 +73,9 @@ let
     };
   };
 
-  folder = lane: { minecraft = "ports"; }.${lane} or lane;
+  folder = lane: { minecraft = "/ports"; heroic = ""; }.${lane} or "/${lane}";
 
-  lanes = lib.filter hasLane [ "steam" "gog" "minecraft" ];
+  lanes = lib.filter hasLane [ "steam" "heroic" "minecraft" ];
 in
 {
   config = lib.mkIf cfg.enable {

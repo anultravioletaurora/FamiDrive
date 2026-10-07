@@ -1,9 +1,13 @@
 """famidrive-generate LANE SOURCE_DIR OUT_DIR
+famidrive-generate heroic HEROIC_CONFIG_DIR ROMS_DIR
 famidrive-generate steam-media STEAMAPPS_DIR OUT_DIR
 
 Rewrite OUT_DIR so it holds exactly one placeholder per installed game in
 SOURCE_DIR. Each placeholder's *content* is the launch ID that famidrive-launch
 hands to the real launcher. Its filename is the display name ES-DE shows.
+
+heroic writes one folder per store Heroic Games Launcher brings (gog,
+epic, amazon) under ROMS_DIR, each with its installed games.
 
 steam-media gives those Steam placeholders Steam's own art and details,
 by app ID: the cover, logo and hero image Steam keeps on disk for its
@@ -36,9 +40,46 @@ def steam(src):
             yield name.group(1), appid.group(1)
 
 
-def gog(src):
-    # TODO: gogdl-cli's installed-games manifest format and location.
-    return iter(())
+# Heroic Games Launcher (~/.config/heroic), read from Heroic 2.22's
+# source on 2026-10-07. Installed games, per store:
+#   GOG:    gog_store/installed.json, {"installed": [{"appName", ...}]}
+#   Epic:   legendaryConfig/legendary/installed.json, {appName: {"title", ...}}
+#   Amazon: nile_config/nile/installed.json, [{"id", ...}]
+# and each store's library, with titles, in store_cache/<store>_library.json
+# (GOG's under "games", Epic's and Amazon's under "library"), entries with
+# "app_name" and "title". VERIFY against a signed-in Heroic.
+HEROIC_STORES = {
+    "gog": ("gog_store/installed.json", "gog_library", "games"),
+    "epic": ("legendaryConfig/legendary/installed.json", "legendary_library", "library"),
+    "amazon": ("nile_config/nile/installed.json", "nile_library", "library"),
+}
+
+
+def read_json(path):
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def heroic(src, store):
+    installed_file, cache, key = HEROIC_STORES[store]
+    installed = read_json(src / installed_file)
+    if isinstance(installed, dict) and "installed" in installed:
+        installed = installed["installed"]
+    if isinstance(installed, dict):          # Epic: keyed by app name
+        apps = {name: (info or {}).get("title") for name, info in installed.items()
+                if not (info or {}).get("is_dlc")}
+    elif isinstance(installed, list):        # GOG and Amazon
+        apps = {(g.get("appName") or g.get("id")): None for g in installed
+                if isinstance(g, dict) and not g.get("is_dlc")}
+    else:
+        return
+    library = read_json(src / "store_cache" / f"{cache}.json") or {}
+    titles = {g.get("app_name"): g.get("title") for g in library.get(key) or [] if isinstance(g, dict)}
+    for app, title in apps.items():
+        if app:
+            yield title or titles.get(app) or app, app
 
 
 def minecraft(src):
@@ -48,7 +89,7 @@ def minecraft(src):
         yield (name.group(1) if name else cfg.parent.name), cfg.parent.name
 
 
-LANES = {"steam": (steam, ".steam"), "gog": (gog, ".gog"), "minecraft": (minecraft, ".prism")}
+LANES = {"steam": (steam, ".steam"), "minecraft": (minecraft, ".prism")}
 
 
 def safe(name):
@@ -267,10 +308,17 @@ def main():
         print(f"Steam art and details: {time.monotonic() - started:.0f} s", file=sys.stderr)
         return
     lane, src, out = sys.argv[1], Path(sys.argv[2]), Path(sys.argv[3])
+    if lane == "heroic":
+        for store in HEROIC_STORES:
+            write_placeholders(out / store, "." + store, heroic(src, store))
+        return
     reader, ext = LANES[lane]
-    out.mkdir(parents=True, exist_ok=True)
+    write_placeholders(out, ext, reader(src))
 
-    wanted = {safe(name) + ext: launch_id for name, launch_id in reader(src)}
+
+def write_placeholders(out, ext, games):
+    out.mkdir(parents=True, exist_ok=True)
+    wanted = {safe(name) + ext: launch_id for name, launch_id in games}
     for existing in out.glob("*" + ext):
         if existing.name not in wanted:
             existing.unlink()  # uninstalled: drop the entry

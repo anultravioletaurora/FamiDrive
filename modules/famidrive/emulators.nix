@@ -7,6 +7,13 @@ let
   inherit (lib) mkOption types;
   cfg = config.famidrive;
   hasLane = l: lib.elem l cfg.lanes;
+
+  # The stores Heroic brings: ES-DE system -> its name and Heroic's runner.
+  heroicStores = {
+    gog = { fullname = "GOG"; runner = "gog"; };
+    epic = { fullname = "Epic Games Store"; runner = "legendary"; };
+    amazon = { fullname = "Amazon Games"; runner = "nile"; };
+  };
   seedLib = import ./lib/seed.nix { inherit lib pkgs; };
   fw = "${cfg.dataDir}/firmware";
 
@@ -433,13 +440,17 @@ in
           theme = "steam";
         };
       })
-      (lib.mkIf (hasLane "gog") {
-        gog = {
-          fullname = "GOG";
-          extensions = [ ".gog" ];
-          command = ''${pkgs.gogdl-cli}/bin/gogdl-cli launch "$(cat "$ROM")"'';   # TODO: verify subcommand
-        };
-      })
+      # GOG, the Epic Games Store and Amazon Games, each its own system,
+      # all through Heroic. --no-gui launches the game without Heroic's
+      # window and quits Heroic when the game ends (read in Heroic 2.22's
+      # source, 2026-10-07), so the command lasts as long as the game.
+      # The entry's file holds the game's app name in that store.
+      (lib.mkIf (hasLane "heroic") (lib.mapAttrs (system: s: {
+        inherit (s) fullname;
+        extensions = [ ".${system}" ];
+        command = ''${pkgs.heroic}/bin/heroic --no-gui --no-sandbox "heroic://launch?appName=$(cat "$ROM")&runner=${s.runner}"'';
+        theme = system;
+      }) heroicStores))
       (lib.mkIf (cfg.ports != { }) {
         ports = {
           fullname = "Ports";
@@ -469,7 +480,7 @@ in
     };
 
     environment.systemPackages =
-      lib.optionals (hasLane "gog") [ pkgs.gogdl-cli pkgs.tcli ]
+      lib.optionals (hasLane "heroic") [ pkgs.heroic ]
       ++ lib.optionals (hasLane "minecraft") [ pkgs.prismlauncher ];
 
     # Seeded/locked emulator settings. Only the keys this design depends

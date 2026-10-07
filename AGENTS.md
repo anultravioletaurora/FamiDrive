@@ -95,5 +95,5 @@ the exact commands.
   - Register a unit test in `tests/default.nix`.
   - For a module change, add a check to an example box (`box-one-player`,
     `box-family`).
-  - Packages are checked as `pkg-<name>`. `gogdl-cli` and `tcli` don't
-    build yet and are left out.
+  - Packages are checked as `pkg-<name>`. `tcli` doesn't build yet and
+    is left out.
