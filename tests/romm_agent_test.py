@@ -702,6 +702,23 @@ class Test(unittest.TestCase):
         a["cmd_eden_gamedir"]()
         self.assertIn(f"Paths\\gamedirs\\1\\path={lib}", cfg.read_text())
 
+    def test_a_checked_file_is_not_hashed_again_until_it_changes(self):
+        box = Box(self.base, "library", tokenFile=None)
+        a = box.agent()
+        g = a["known_sha1"].__globals__
+        calls = []
+        real = g["sha1"]
+        g["sha1"] = lambda p: calls.append(p) or real(p)
+        box.data.mkdir(parents=True, exist_ok=True)
+        game = box.data / "game.iso"
+        game.write_bytes(b"one")
+        first = a["known_sha1"](game)
+        self.assertEqual(a["known_sha1"](game), first)
+        self.assertEqual(len(calls), 1)                 # the second time from the cache
+        game.write_bytes(b"two!")
+        self.assertNotEqual(a["known_sha1"](game), first)
+        self.assertEqual(len(calls), 2)                 # changed: hashed again
+
     def test_library_token_from_systemd(self):
         box = Box(self.base, "library", tokenFile=None)
         creds = self.base / "creds"
