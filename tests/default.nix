@@ -221,7 +221,7 @@ in
       enable = true;
       romm.enable = false;
       guest.enable = true;
-      lanes = [ "roms" "steam" ];   # Steam: a system with no emulator
+      lanes = [ "roms" "steam" "heroic" ];   # Steam and Heroic: systems with no emulator
       players.alice.retroAchievements = { username = "alice-ra"; hardcore = true; };
       players.bob = { };
     };
@@ -234,6 +234,11 @@ in
         && !(lib.hasInfix "bob) " c.famidrive.sessionSetup)))
     (check "Dolphin's own on-screen messages off, for every player (toasts instead)"
       (lib.all (u: lib.hasInfix "OnScreenDisplayMessages" c.home-manager.users.${u}.home.activation.famidriveEmulators.data) [ "alice" "bob" "guest" ]))
+    (check "Heroic sends desktop notifications (not taken for Steam Deck Game Mode); GOG games have the Comet watcher"
+      (lib.hasInfix "XDG_CURRENT_DESKTOP=FamiDrive" c.famidrive.systems.gog.command
+        && lib.hasInfix "XDG_CURRENT_DESKTOP=FamiDrive" c.famidrive.systems.settings.command
+        && lib.hasInfix "watch-comet" c.famidrive.systems.gog.before
+        && !(lib.hasInfix "watch-comet" c.famidrive.systems.epic.before)))
     (check "RetroArch and Dolphin games have the unlock watcher; Eden's don't"
       (lib.hasInfix "famidrive-cheevos" c.famidrive.systems.psx.before
         && lib.hasInfix "--log-file" c.famidrive.systems.n64.command

@@ -124,6 +124,25 @@ class Queue(unittest.TestCase):
         self.assertEqual(q.tick(0)[0]["kind"], "notice")
 
 
+class Notifications(unittest.TestCase):
+    def test_markup_stripped(self):
+        self.assertEqual(t.strip_markup("<b>Cyberpunk</b> &amp; more"), "Cyberpunk & more")
+
+    def test_a_plain_notification(self):
+        self.assertEqual(t.from_notification("Heroic", 0, "", "Cyberpunk 2077", "Installed", {}, 7),
+                         {"kind": "notice", "title": "Cyberpunk 2077", "detail": "Installed", "id": "fdo-7"})
+
+    def test_critical_is_an_alert_and_value_is_progress(self):
+        self.assertEqual(t.from_notification("x", 0, "", "Failed", "", {"urgency": ("y", 2)}, 1)["kind"], "alert")
+        p = t.from_notification("x", 3, "", "Downloading", "", {"value": ("i", 40)}, 9)
+        self.assertEqual((p["kind"], p["progress"], p["done"], p["id"]), ("progress", 0.4, False, "fdo-3"))
+
+    def test_an_image_on_the_box_is_the_icon(self):
+        with tempfile.NamedTemporaryFile(suffix=".png") as f:
+            self.assertEqual(t.from_notification("x", 0, "file://" + f.name, "Hi", "", {}, 1)["icon"], f.name)
+        self.assertNotIn("icon", t.from_notification("x", 0, "dialog-information", "Hi", "", {}, 1))
+
+
 class Sending(unittest.TestCase):
     def test_arguments(self):
         self.assertEqual(t.parse_send(["--kind", "progress", "--id", "p", "--progress", "1.5", "Pulling", "2", "of", "5"]),

@@ -162,6 +162,18 @@ Found against RomM 5.3:
   Its default for `cheevos_hardcore_mode_enable` is true; FamiDrive sets
   it from the player's `hardcore`.
 
+- **Heroic sends no notifications under gamescope.** It takes
+  `XDG_CURRENT_DESKTOP=gamescope` (which gamescope sets) for a Steam Deck
+  in Game Mode. FamiDrive starts it with `XDG_CURRENT_DESKTOP=FamiDrive`.
+  The toast daemon owns `org.freedesktop.Notifications` on the session
+  bus, so those notifications become toasts.
+- **GOG achievements come through Comet**, which Heroic starts beside
+  each GOG game and logs to `~/.local/state/Heroic/logs/runners/comet.log`.
+  Its "Unlocking achievement" lines are read; names, descriptions and
+  icons come from Comet's `gameplay.db`. The exact line and the
+  database's location were read from Comet 0.2.0's binary, not a real
+  unlock yet.
+
 ## Steam
 
 - **Steam Input is off per game**, written into `localconfig.vdf` at
