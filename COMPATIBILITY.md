@@ -594,8 +594,19 @@ GameCube adapter doesn't show up through its SDL.
 
 ### Titanfall 2
 
-**Steam: ❔ Untested.** First try on 2026-10-06: a fresh install and first
-launch with no changes for this game, then controllers and rumble.
+**Steam: ✅ Works.** Proton (Steam's choice), no launch options.
+
+- **2026-10-07:** launched and played.
+  - **Dialog on launch:** one dialog to confirm with OK, which the
+    controller could tab to and press.
+  - **Shaders:** Steam processed them first, with the status screen's
+    progress bar up.
+  - **EA app:** already signed in, from an earlier session. It showed a
+    pop-up with the profile and stayed out of the way.
+  - **Controller:** the Xbox Wireless Controller (Bluetooth, xpadneo)
+    worked as expected, with every button and the game's UI showing
+    Xbox glyphs.
+  - **To check:** rumble, and the 8BitDo.
 
 - **2026-10-06, stopped during an update:** launching it started a Steam
   update, which FamiDrive's status screen showed with its progress bar.

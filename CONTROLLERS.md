@@ -28,7 +28,7 @@ yet is listed below as ❔ until someone does.
 |---|---|---|---|---|---|---|---|---|---|
 | [8BitDo Ultimate 2](#8bitdo-ultimate-2-24-ghz) | 2.4 GHz dongle | ✅ | ✅ | ✅ | ✅ as a GameCube pad | ✅ (Eden and Ryujinx) | ✅ | ✅ Dolphin | ✅ |
 | [8BitDo Ultimate 2](#8bitdo-ultimate-2-bluetooth) | Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
-| [Xbox Wireless Controller](#xbox-wireless-controller) | Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Xbox Wireless Controller](#xbox-wireless-controller) | Bluetooth | ✅ | ❔ | ❔ | ❔ | ❔ | ✅ | ❔ | ❔ |
 | [DualShock 4](#dualshock-4) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [DualSense](#dualsense) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Wii Remote](#wii-remote) | Bluetooth, through Dolphin | — | — | — | ✅ | — | — | ❔ | ❔ |
@@ -109,8 +109,13 @@ ports set by its short name) doesn't match it yet.
 
 ## Xbox Wireless Controller
 
-Over Bluetooth. ❔ No results recorded yet. It's in the test box's list
-and has been paired, but nothing about how it did was written down.
+Over Bluetooth.
+
+- **2026-10-07, ES-DE and Steam:** ✅ It drove the menu, then
+  [Titanfall 2](COMPATIBILITY.md#titanfall-2), with Steam Input off
+  (FamiDrive's default). Every button did what was expected, the game
+  showed Xbox glyphs, and the controller could tab to and press a
+  launch dialog's OK.
 
 - **Driver:** xpadneo, which the test box's host config turns on
   (`hardware.xpadneo.enable`). FamiDrive doesn't add it itself. Under
