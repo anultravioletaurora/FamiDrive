@@ -538,8 +538,18 @@ works.
     official `switch-package.zip` from HDR's releases. Its `hdr` and
     `hdr-assets` folders were empty, so only HDR's stages would load.
     Use the official zip as it comes.
-  - First try with the official zip, on Eden 0.2.1 with RomM's updates
-    (13.0.1 and 13.0.2) and every DLC: ❔ result to come.
+  - 2026-10-07, Eden 0.2.1: crashes about 4 s in. Eden, like yuzu, can't
+    run Skyline plugins, which HDR is built on. FamiDrive now leaves
+    Skyline mods out of Eden (#71) and runs Smash in Ryujinx instead
+    (`switch.ryujinx.games`, #72).
+  - 2026-10-07, Ryubing 1.3.3: Skyline and all six HDR plugins load, and
+    HDR's launcher steps aside on an emulator, as it should. Then
+    ARCropolis shows an error and the game crashes about 10 s in.
+    ARCropolis in HDR 0.49.11 says "cannot currently run on a Smash
+    version other than 13.0.4", and RomM had 13.0.1 and 13.0.2. **Needs
+    Smash's 13.0.4 update in RomM** (`update/`); FamiDrive picks the
+    newest. Along the way: Ryujinx needed the update chosen for it, all
+    of Eden's firmware, and controllers named its way (#80).
 
 ### Team Fortress 2
 
