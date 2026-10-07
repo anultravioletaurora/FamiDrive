@@ -59,7 +59,18 @@ let
     # next to itself, and the core looks beside whatever path it's given.
     # Found on the first box 2026-10-07: every PlayStation game in a
     # folder (Pepsiman/Pepsiman.cue, .bin) failed to find its .bin.
-    command = ''${retroarch}/bin/retroarch -f -L ${core coreName} "$(readlink -f "$ROM")"'';
+    #
+    # Logged (--verbose) to a file each launch, which famidrive-cheevos
+    # reads for RetroAchievements unlocks, to show them as toasts.
+    command = ''${retroarch}/bin/retroarch -f --verbose --log-file "''${XDG_RUNTIME_DIR:-/tmp}/famidrive-retroarch.log" -L ${core coreName} "$(readlink -f "$ROM")"'';
+    before = ''
+      rm -f "''${XDG_RUNTIME_DIR:-/tmp}/famidrive-retroarch.log"
+      ${pkgs.famidrive-cheevos}/bin/famidrive-cheevos watch "''${XDG_RUNTIME_DIR:-/tmp}/famidrive-retroarch.log" "$system" "$ROM" &
+      cheevos_watch=$!
+    '';
+    after = ''
+      kill "$cheevos_watch" 2>/dev/null || true
+    '';
     emulator = "retroarch-${coreName}";
     firmwareDir = "retroarch";
     saveSync = saves;

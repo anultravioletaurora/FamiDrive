@@ -187,6 +187,31 @@ different owners never do (multi-box.md "Per-user saves").
 - **Type:** string
 - **Default:** `"‹name›"`
 
+### `famidrive.players.<name>.retroAchievements.hardcore`
+
+Hardcore mode: unlocks count for more on RetroAchievements, and
+save states, rewind, slow motion and cheats are off.
+
+- **Type:** boolean
+- **Default:** `false`
+
+### `famidrive.players.<name>.retroAchievements.passwordFile`
+
+A file with their RetroAchievements password, readable by their account.
+
+- **Type:** null or absolute path
+- **Default:** their sops secret, `retroachievements-<name>`
+
+### `famidrive.players.<name>.retroAchievements.username`
+
+Their RetroAchievements username. Set, their RetroArch, Dolphin
+and PCSX2 are signed in at the start of each of their sessions,
+and unlocks show as toasts. Their password is a sops secret,
+`retroachievements-<name>`, unless `passwordFile` says otherwise.
+
+- **Type:** null or string
+- **Default:** `null`
+
 ### `famidrive.players.<name>.romm.tokenFile`
 
 Their RomM Client API Token (rmm_...), decrypted by sops-nix.

@@ -123,7 +123,7 @@ in
       script = builtins.unsafeDiscardStringContext (''
         #!/usr/bin/env bash
         set -euo pipefail
-        ROM="$1"; sync=""
+        ROM="$1"; system="$2"; sync=""
         case "$ROM" in
       '' + lib.concatStrings (lib.mapAttrsToList (name: s: ''
           ${name})
@@ -185,6 +185,8 @@ in
     (pkgs.python3.withPackages (ps: [ ps.pygame-ce ]));
 
   toast = unit "toast" ../pkgs/famidrive-toast/famidrive_toast.py pkgs.python3;
+  cheevos = unit "cheevos" ../pkgs/famidrive-cheevos/famidrive_cheevos.py
+    (pkgs.python3.withPackages (ps: [ ps.requests ]));
 
   # Overlays: the box's positions, a player's own, MangoHud for one player.
   box-overlays = expect "overlays" {
@@ -210,6 +212,29 @@ in
     (check "the toast daemon starts with every session"
       (lib.hasInfix "famidrive-toast daemon" c.famidrive.sessionSetup
         && lib.any (p: lib.getName p == "famidrive-toast") c.environment.systemPackages))
+  ]);
+
+  # RetroAchievements for one player of two: their secret, their session
+  # signing in, and the unlock watcher beside every RetroArch game.
+  box-retroachievements = expect "retroachievements" {
+    famidrive = {
+      enable = true;
+      romm.enable = false;
+      guest.enable = true;
+      players.alice.retroAchievements = { username = "alice-ra"; hardcore = true; };
+      players.bob = { };
+    };
+  } (c: [
+    (check "a password secret for the player with an account, owned by them, and none for the others"
+      (c.sops.secrets ? "retroachievements-alice" && c.sops.secrets."retroachievements-alice".owner == "alice"
+        && !(c.sops.secrets ? "retroachievements-bob") && !(c.sops.secrets ? "retroachievements-guest")))
+    (check "their session signs in, nobody else's"
+      (lib.hasInfix "alice) " c.famidrive.sessionSetup && lib.hasInfix "famidrive-cheevos setup" c.famidrive.sessionSetup
+        && !(lib.hasInfix "bob) " c.famidrive.sessionSetup)))
+    (check "RetroArch games log for the unlock watcher; Dolphin's don't"
+      (lib.hasInfix "famidrive-cheevos" c.famidrive.systems.psx.before
+        && lib.hasInfix "--log-file" c.famidrive.systems.n64.command
+        && !(lib.hasInfix "famidrive-cheevos" c.famidrive.systems.gc.before)))
   ]);
 
   # One person, ROMs only, no RomM: the smallest box.

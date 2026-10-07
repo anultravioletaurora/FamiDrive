@@ -153,6 +153,15 @@ Found against RomM 5.3:
   there as a PNG with its transparency. Screenshots of the X window lose
   the alpha.
 
+- **RetroAchievements unlocks are read from RetroArch's log.** RetroArch
+  runs with `--verbose --log-file $XDG_RUNTIME_DIR/famidrive-retroarch.log`;
+  rcheevos logs `Identified game: <id> "<title>"` and `Awarding
+  achievement <id>: <title>`. famidrive-cheevos looks the achievement's
+  description and points up with the player's token (`r=patch`).
+  RetroArch's own unlock pop-up is off (`cheevos_visibility_unlock`).
+  Its default for `cheevos_hardcore_mode_enable` is true; FamiDrive sets
+  it from the player's `hardcore`.
+
 ## Steam
 
 - **Steam Input is off per game**, written into `localconfig.vdf` at
