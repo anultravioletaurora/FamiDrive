@@ -105,6 +105,16 @@ class Test(unittest.TestCase):
         meta = json.loads((self.ryu / "games/01006a800016e000/updates.json").read_text())
         self.assertTrue(meta["selected"].endswith("13.0.2.nsp"))
         self.assertEqual(len(meta["paths"]), 2)
+        self.assertFalse((self.ryu / "games/01006a800016e000/dlc.json").exists())   # the agent couldn't say
+
+    def test_the_games_dlc_is_listed_for_ryujinx(self):
+        (self.home / "bin/romm-agent").write_text(
+            "#!/bin/sh\n"
+            "echo '[{\"path\": \"/lib/Game/dlc/Pack.nsp\", \"ncas\": [{\"name\": \"abc.nca\", \"title_id\": \"01006A800016F00C\"}]}]'\n")
+        self.run_tool("game", SMASH, str(self.home / "Game.nsp"))
+        dlc = json.loads((self.ryu / "games/01006a800016e000/dlc.json").read_text())
+        self.assertEqual(dlc, [{"path": "/lib/Game/dlc/Pack.nsp", "dlc_nca_list": [
+            {"path": "/abc.nca", "title_id": 0x01006A800016F00C, "is_enabled": True}]}])
 
     def test_a_pads_buttons_follow_face_buttons(self):
         import importlib.util

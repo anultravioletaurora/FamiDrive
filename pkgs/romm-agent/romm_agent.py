@@ -11,6 +11,7 @@ Each player's own (run as that player):
     romm-agent textures                link the library's Dolphin texture packs and Switch mods into this player's emulators
     romm-agent eden-gamedir            point this player's Eden at the library's Switch folder (updates, DLC)
     romm-agent eden-save TITLE_ID      print where this player's Eden keeps that game's save
+    romm-agent switch-dlc ROM          the game's DLC files and their content IDs, as JSON
     romm-agent save-pull SYSTEM ROM    newest save for ROM -> local (pre-launch)
     romm-agent save-push SYSTEM ROM    local save for ROM -> RomM (post-exit)
     romm-agent reconcile               push every local save RomM doesn't have yet
@@ -1087,10 +1088,13 @@ def eden_header_key():
     return bytes.fromhex(m.group(1)) if m else None
 
 
-def nca_program_id(f, offset, key):
-    """The title ID in an NCA's header: its first 0xC00 bytes are AES-XTS
-    encrypted with the header key, in 0x200-byte sectors whose tweak is the
-    sector number, big-endian. The ID is at 0x210, after the NCA3 magic."""
+def nca_header(f, offset, key):
+    """(title ID, content type) from an NCA's header: its first 0xC00
+    bytes are AES-XTS encrypted with the header key, in 0x200-byte
+    sectors whose tweak is the sector number, big-endian. After the NCA3
+    magic at 0x200: the content type at 0x205 (0 program, 1 meta,
+    2 control, 3 manual, 4 data, 5 public data: a DLC's content) and the
+    title ID at 0x210."""
     f.seek(offset)
     raw = f.read(0x400)
     if len(raw) < 0x400:
@@ -1100,7 +1104,32 @@ def nca_program_id(f, offset, key):
         for n in range(2))
     if plain[0x200:0x204] not in (b"NCA3", b"NCA2"):
         return None
-    return "%016X" % struct.unpack_from("<Q", plain, 0x210)[0]
+    return "%016X" % struct.unpack_from("<Q", plain, 0x210)[0], plain[0x205]
+
+
+def nca_program_id(f, offset, key):
+    header = nca_header(f, offset, key)
+    return header[0] if header else None
+
+
+def cmd_switch_dlc(rom):
+    """A Switch game's DLC from the library, for an emulator that needs it
+    listed (Ryujinx's dlc.json): each NSP in the dlc/ folder beside the
+    game, with its content NCAs (public data) and their title IDs, read
+    with this player's Eden keys. JSON on stdout."""
+    key = eden_header_key()
+    folder = Path(rom).resolve().parent / "dlc"
+    out = []
+    for nsp in sorted(folder.glob("*.nsp")) if key and folder.is_dir() else []:
+        ncas = []
+        with open(nsp, "rb") as f:
+            for name, at in pfs_entries(f, 0, b"PFS0", 0x18):
+                header = nca_header(f, at, key) if name.endswith(".nca") else None
+                if header and header[1] == 5:
+                    ncas.append({"name": name, "title_id": header[0]})
+        if ncas:
+            out.append({"path": str(nsp), "ncas": ncas})
+    print(json.dumps(out))
 
 
 def pfs_entries(f, offset, magic, entry_size):
@@ -1643,6 +1672,7 @@ def main():
         "gamelists": cmd_gamelists, "firmware-install": cmd_firmware_install,
         "eden-profile": cmd_eden_profile, "textures": cmd_textures,
         "eden-gamedir": cmd_eden_gamedir, "eden-save": cmd_eden_save,
+        "switch-dlc": cmd_switch_dlc,
     }
     if cmd not in commands:
         print(__doc__)
