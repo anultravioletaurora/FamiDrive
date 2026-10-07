@@ -11,9 +11,12 @@ for an achievement. Without one, each kind has its own: info for a notice,
 warning for an alert, download for progress, trophy for an achievement.
 
 The daemon runs once per player session, before ES-DE. It draws into a
-transparent window that gamescope composites over everything
-(GAMESCOPE_EXTERNAL_OVERLAY, what MangoHud's mangoapp uses), so a toast
-shows over the menu, a game or Kodi without ever taking focus or input.
+transparent window on gamescope's Steam overlay layer (STEAM_OVERLAY),
+which gamescope composites over everything, so a toast shows over the
+menu, a game or Kodi without ever taking focus or input. Not the external
+overlay layer: gamescope shows one external overlay at a time, and that
+one is MangoHud's (mangoapp). Found on the first box 2026-10-07: with the
+toast window there, MangoHud didn't show at all.
 
 Anything in the session sends one by running famidrive-toast, which hands
 the toast to the daemon over $XDG_RUNTIME_DIR/famidrive-toast.sock and
@@ -347,7 +350,7 @@ def daemon(spec_file, player):
                                  background_pixel=0, border_pixel=0, colormap=cmap,
                                  override_redirect=True, event_mask=X.ExposureMask)
     win.set_wm_name("famidrive-toast")
-    win.change_property(d.intern_atom("GAMESCOPE_EXTERNAL_OVERLAY"), Xatom.CARDINAL, 32, [1])
+    win.change_property(d.intern_atom("STEAM_OVERLAY"), Xatom.CARDINAL, 32, [1])
     win.map()
     gc = win.create_gc()
     d.flush()

@@ -143,11 +143,19 @@ Found against RomM 5.3:
     process ancestry, so they aren't hidden.
   - The game's own launcher is matched with `AppId=N( --|$)`.
 
-- **Overlays over games are gamescope's external overlay:** a
-  full-screen 32-bit window with `GAMESCOPE_EXTERNAL_OVERLAY` set, the
-  way mangoapp does it. gamescope draws it over the focused app without
-  focusing it. famidrive-toast writes premultiplied BGRA into it with
+- **gamescope has two overlay layers, and shows one window on each.**
+  The external overlay (`GAMESCOPE_EXTERNAL_OVERLAY`) is MangoHud's
+  (mangoapp). The Steam overlay (`STEAM_OVERLAY`) is unused in a FamiDrive
+  session (Steam runs hidden, without its gamepad UI), so toasts draw
+  there. A second window on the same layer hides the first. Both are
+  drawn over the focused app without focusing it. famidrive-toast's
+  window is full-screen and 32-bit; it writes premultiplied BGRA with
   `put_image`, in chunks under the X server's request limit.
+- **gamescope's `--mangoapp` starts MangoHud hidden.** It gives mangoapp
+  a temporary config (`$MANGOHUD_CONFIGFILE`) that says `no_display`, for
+  Steam's quick-access menu to fill in. The session copies the player's
+  MangoHud.conf into it before Steam starts, and starts Steam without
+  `STEAM_USE_MANGOAPP` so Steam never writes it back.
 - **Checking how a toast looks without the TV:** run the daemon under
   `xvfb-run` with `FAMIDRIVE_TOAST_SNAPSHOT=<dir>`; each toast is saved
   there as a PNG with its transparency. Screenshots of the X window lose
