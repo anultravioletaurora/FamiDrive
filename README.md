@@ -171,7 +171,10 @@ planning doc for now and will move into this repo.
   whole box, listed by their Chorus Encore md5 and downloaded to the
   library disk, a profile for every player plus guests, and the TV's
   calibration set once for everyone. Each player's scores and profiles
-  sync with RomM, under a "Clone Hero" entry added there by hand.
+  sync with RomM, under a "Clone Hero" entry added there by hand (see
+  [RomM entries to add by hand](#using-it)).
+- YARG in Ports too (`famidrive.yarg`), playing the same songs as Clone
+  Hero, with scores and profiles under a "YARG" entry in RomM.
 - Menu music: each player's `~/ES-DE/music`, shuffled behind ES-DE and
   paused while a game is open (ES-DE has no music of its own).
 - Wii games with real Wii Remotes and the Balance Board, and Minecraft
@@ -263,6 +266,19 @@ only secrets are in the host's `secrets.yaml`, encrypted with
 
 A box with `famidrive.romm.enable = false` needs no secrets and no sops
 setup at all.
+
+**RomM entries to add by hand.** RomM keeps saves only for games in its
+library, and some apps on the box aren't ROMs. To sync their saves, add
+one entry for each in RomM's web UI, once for the whole RomM server.
+Upload any small file to any platform this box doesn't pull, such as
+Windows, and give the entry exactly this name:
+
+| Turned on with | RomM entry | What syncs |
+|---|---|---|
+| `cloneHero.enable` | `Clone Hero` (`cloneHero.romm.entry`) | each player's scores and profiles |
+| `yarg.enable` | `YARG` (`yarg.romm.entry`) | each player's scores and profiles |
+
+Without its entry, an app still works, and its saves stay on the box.
 
 ## Players
 

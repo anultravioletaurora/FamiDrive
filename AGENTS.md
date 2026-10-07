@@ -65,6 +65,9 @@ the exact commands.
     A new top-level option group needs a section in `tests/usage_doc.py`,
     or it lands under "Everything else".
   - A default a host may want to change is `lib.mkDefault`.
+  - An app whose saves sync under a RomM entry made by hand
+    (`famidrive.romm.apps`, like Clone Hero and YARG) gets a row in the
+    README's "RomM entries to add by hand" table.
   - A renamed or removed option gets `mkRemovedOptionModule` or
     `mkRenamedOptionModule` with a message that says what to use instead.
 - **Players:**
