@@ -21,14 +21,18 @@ behave differently in each. For a console game it's the emulator.
 - **Games**
   - [Animal Crossing](#animal-crossing) (GameCube)
   - [Animal Crossing: New Horizons](#animal-crossing-new-horizons) (Switch)
+  - [Assassin's Creed Valhalla](#assassins-creed-valhalla) (PC)
   - [Back 4 Blood](#back-4-blood) (PC)
   - [Call of Duty: Black Ops III](#call-of-duty-black-ops-iii) (PC)
   - [Call of Duty: Infinite Warfare](#call-of-duty-infinite-warfare) (PC)
+  - [Call of Duty: Modern Warfare Remastered](#call-of-duty-modern-warfare-remastered) (PC)
   - [Call of Duty: WWII](#call-of-duty-wwii) (PC)
   - [Cyberpunk 2077](#cyberpunk-2077) (PC)
+  - [DiRT Rally](#dirt-rally) (PC)
   - [Fallout: New Vegas](#fallout-new-vegas) (PC)
   - [Gears 5](#gears-5) (PC)
   - [Tom Clancy's Ghost Recon Wildlands](#tom-clancys-ghost-recon-wildlands) (PC)
+  - [Grand Theft Auto V](#grand-theft-auto-v) (PC)
   - [Halo: The Master Chief Collection](#halo-the-master-chief-collection) (PC)
   - [Hell Let Loose](#hell-let-loose) (PC)
   - [Helldivers 2](#helldivers-2) (PC)
@@ -41,13 +45,17 @@ behave differently in each. For a console game it's the emulator.
   - [Mario Kart 8 Deluxe](#mario-kart-8-deluxe) (Switch)
   - [Mario Party 3](#mario-party-3) (N64)
   - [Minecraft (vanilla 26.2, a private server)](#minecraft-vanilla-262-a-private-server) (PC)
+  - [Need for Speed Heat](#need-for-speed-heat) (PC)
   - [Overwatch](#overwatch) (PC)
   - [Palworld](#palworld) (PC)
   - [Peak](#peak) (PC)
+  - [Risk of Rain 2](#risk-of-rain-2) (PC)
   - [Rocket League](#rocket-league) (PC)
   - [Street Fighter 6](#street-fighter-6) (PC)
+  - [Star Citizen](#star-citizen) (PC)
   - [Star Wars Jedi: Fallen Order](#star-wars-jedi-fallen-order) (PC)
   - [Star Wars Jedi: Survivor](#star-wars-jedi-survivor) (PC)
+  - [Stardew Valley](#stardew-valley) (PC)
   - [Super Smash Bros. Brawl](#super-smash-bros-brawl) (Wii)
   - [Super Smash Bros. Melee](#super-smash-bros-melee) (GameCube)
   - [Super Smash Bros. Ultimate](#super-smash-bros-ultimate) (Switch)
@@ -82,6 +90,21 @@ Select + Start quits, with a short flicker of Dolphin's window first.
 **Switch, Eden: ✅ Works.** Fullscreen with no menu or status bar
 (`-f -g`). The save loads; it didn't from Steam's old launcher, likely a
 different Eden profile.
+
+### Assassin's Creed Valhalla
+
+**Steam: ❔ Untested.**
+
+- **What to watch for:** the Steam copy starts Ubisoft Connect first,
+  which asks for a Ubisoft sign-in inside Proton. Check that sign-in
+  with a controller, and that Ubisoft Connect's windows count as the
+  game's (`gamescope-fg`), as the EA app's did for Star Wars Jedi:
+  Survivor.
+- **Other ways people own it:** Ubisoft Connect itself, and Ubisoft+.
+  FamiDrive has no Ubisoft Connect lane, so only the Steam copy plays
+  for now.
+- **To check:** controllers and rumble, HDR, and the shader compile on
+  first start.
 
 ### Back 4 Blood
 
@@ -119,6 +142,17 @@ options.
 - **To check:** multiplayer under Proton, controllers and rumble in each
   mode.
 
+### Call of Duty: Modern Warfare Remastered
+
+**Steam: ❔ Untested.** The 2016 remaster, which came with Infinite
+Warfare's Legacy Edition.
+
+- **To check:**
+  - the campaign, start to finish with a controller
+  - multiplayer: whether matchmaking still finds players, and whether
+    it lets a Proton player in
+  - rumble and aim assist
+
 ### Call of Duty: WWII
 
 **Steam: ❔ Untested.**
@@ -155,6 +189,17 @@ options.
 **GOG: ❔ Untested.** The planned home for it: DRM-free, with the
 same REDmod support.
 
+### DiRT Rally
+
+**Steam: ❔ Untested.** Which one (DiRT Rally or DiRT Rally 2.0) still to
+be noted when it's tried.
+
+- **Racing wheels:** the reason to test it. Both games support wheels
+  with force feedback. How wheels work on a FamiDrive box is in
+  [CONTROLLERS.md](CONTROLLERS.md#racing-wheels).
+- **To check:** a controller first (triggers for throttle and brake,
+  rumble), then a wheel if one is around.
+
 ### Fallout: New Vegas
 
 **Steam: ✅ Works.** Proton Experimental (Steam's choice), unmodded.
@@ -186,6 +231,22 @@ Multiplayer, split-screen, rumble and HDR are still to check.
   works under Proton.
 - **To check:** controllers and rumble, and whether Ubisoft Connect
   closes when the game does, so that quitting returns to ES-DE.
+
+### Grand Theft Auto V
+
+**Steam: ❔ Untested.** Story mode and GTA Online are different stories
+here.
+
+- **Story mode** should run under Proton. The Steam copy starts the
+  Rockstar Games Launcher first, which asks for a Rockstar sign-in;
+  check that with a controller, and that the launcher's windows count
+  as the game's (`gamescope-fg`).
+- **GTA Online:** expect ❌. Rockstar turned on BattlEye in September
+  2024 and blocked Linux and Steam Deck players from GTA Online, and
+  that's still the case as far as we know. Try it once and record what
+  happens.
+- **Enhanced and Legacy:** Steam has had two versions since 2025. Note
+  which one is tested.
 
 ### Halo: The Master Chief Collection
 
@@ -304,6 +365,18 @@ joins the server straight from launch.
 - **Fullscreen:** opened in a window at first. FamiDrive now starts
   every Prism instance fullscreen; confirmed.
 
+### Need for Speed Heat
+
+**Steam: ❔ Untested.**
+
+- **What to watch for:** the Steam copy goes through the EA app, which
+  installs and asks for an EA sign-in inside Proton on first launch, as
+  with [Titanfall 2](#titanfall-2).
+- **Racing wheels:** worth a try once the controller works; see
+  [CONTROLLERS.md](CONTROLLERS.md#racing-wheels).
+- **To check:** controllers and rumble, online (crews and races with
+  friends), and the EA app staying out of the way after sign-in.
+
 ### Overwatch
 
 **Steam: ❔ Untested.** The Steam copy needs a Battle.net account linked
@@ -337,6 +410,16 @@ on first launch, but not the Battle.net app.
   and voice chat (proximity voice) through the TV's audio and a mic, if
   there is one.
 
+### Risk of Rain 2
+
+**Steam: ❔ Untested.** Windows only, so it runs under Proton.
+
+- **Mods:** Thunderstore, through BepInEx, the same as Valheim. FamiDrive
+  already declares Valheim's mods in Nix (`famidrive.valheim.mods`); the
+  same could work here. Worth an issue once the plain game is tested.
+- **To check:** controllers and rumble, online co-op through Steam, and
+  modded play with friends who use r2modman.
+
 ### Rocket League
 
 **Steam: ✅ Works, with Steam Input off.**
@@ -365,6 +448,20 @@ on first launch, but not the Battle.net app.
 **Other stores:** none known. Street Fighter 6 on PC is sold as Steam
 keys only, including on Humble; there's no GOG or DRM-free version.
 
+### Star Citizen
+
+**RSI Launcher: ❔ Untested.** Not on Steam: it's played through Roberts
+Space Industries' own launcher, which FamiDrive has no lane for yet.
+Tracked with the other launchers in #57.
+
+- **What it needs on Linux:** the community's Linux Users Group keeps
+  it running under Wine (their LUG Helper sets it up). It wants a lot of
+  memory (16 GB plus swap at the least) and a raised `vm.max_map_count`.
+  Easy Anti-Cheat allows Linux for it.
+- **Controllers:** it's built for keyboard and mouse or flight sticks. A
+  gamepad works but isn't comfortable, so this is a test of how far a
+  controller-only box goes.
+
 ### Star Wars Jedi: Fallen Order
 
 **Steam: ❔ Untested.** Expect the same EA hurdle as
@@ -388,6 +485,18 @@ was in use; ES-DE listed it after the next session start.
   script's windows on top ("Setting up the game") and waits for them.
   The EA app's installer and sign-in want a mouse or keyboard.
 
+### Stardew Valley
+
+**Steam: ❔ Untested.** Native Linux build.
+
+- **Couch co-op:** up to four players on one screen (split-screen),
+  which makes it a good fit for a TV box.
+- **Mods:** SMAPI, the community's mod loader, also native. Declaring
+  SMAPI and mods in Nix, like Valheim's, is worth an issue once the
+  plain game is tested.
+- **To check:** controllers (one per player in split-screen), rumble,
+  and online co-op with friends.
+
 ### Super Smash Bros. Brawl
 
 **Wii, Dolphin: ✅ Works.** Played with the 8BitDo as a GameCube
@@ -401,8 +510,17 @@ works.
 
 ### Super Smash Bros. Ultimate
 
-**Switch, Eden: ✅ Works.** Face buttons by label. HewDraw Remix
-support is tracked in #4.
+**Switch, Eden: ✅ Works.** Face buttons by label.
+
+- **HewDraw Remix:** a Switch mod kept in RomM (the game's `mod/`
+  folder), unpacked once and linked into every player's Eden (#53).
+  Opting in per player is #4.
+  - 2026-10-06: the zip in RomM was 303 MB, against 1.34 GB for the
+    official `switch-package.zip` from HDR's releases. Its `hdr` and
+    `hdr-assets` folders were empty, so only HDR's stages would load.
+    Use the official zip as it comes.
+  - First try with the official zip, on Eden 0.2.1 with RomM's updates
+    (13.0.1 and 13.0.2) and every DLC: ❔ result to come.
 
 ### Team Fortress 2
 

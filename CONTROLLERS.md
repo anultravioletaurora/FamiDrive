@@ -8,6 +8,12 @@ test, and keep the old notes when a status changes.
 Every result comes from the test box in COMPATIBILITY.md unless an entry
 says otherwise.
 
+The goal: if a controller exists, within reason, it should work on a
+FamiDrive box and feel welcome there. Half the fun of a PC under the TV
+is the range of things you can plug into it: arcade sticks, guitars,
+wheels, old consoles' pads on adapters. A controller nobody has tried
+yet is listed below as ❔ until someone does.
+
 **Status:**
 
 - ✅ **Works**: no setup beyond pairing or plugging it in.
@@ -45,6 +51,8 @@ Clone Hero results for the guitars are in their own entries below.
 - [GameCube controllers on the official adapter](#gamecube-controllers-on-the-official-adapter)
 - [Wii guitar on a Raphnet adapter](#wii-guitar-on-a-raphnet-adapter)
 - [Xbox 360 guitar](#xbox-360-guitar)
+- [Racing wheels](#racing-wheels)
+- [Typing on the TV](#typing-on-the-tv)
 - [What to test](#what-to-test)
 
 ## 8BitDo Ultimate 2 (2.4 GHz)
@@ -185,6 +193,55 @@ presents the guitar as an ordinary USB gamepad.
 ## Xbox 360 guitar
 
 ❔ Being tested in Clone Hero.
+
+## Racing wheels
+
+❔ No wheel tried yet. Games to try one with:
+[DiRT Rally](COMPATIBILITY.md#dirt-rally) and
+[Need for Speed Heat](COMPATIBILITY.md#need-for-speed-heat).
+
+How a wheel is expected to work on a FamiDrive box, until one has:
+
+- **Steering, pedals and buttons** reach games as a plain joystick on any
+  wheel, with no driver needed. Racing games read wheels directly, which
+  suits FamiDrive's default of Steam Input off. Under Proton, games see
+  the wheel through Wine. Some games only accept wheels from their own
+  list of known models.
+- **Force feedback** needs a kernel driver for the wheel's maker:
+  - **Logitech G29, G920, G923** and older Logitech wheels: in the
+    kernel. The out-of-tree `new-lg4ff` driver adds more effects for
+    the older ones.
+  - **Thrustmaster** (T300RS, T248, TX and others): `hid-tmff2`, out of
+    tree.
+  - **Fanatec:** `hid-fanatecff`, out of tree.
+  - **Direct-drive bases** that use the standard USB force-feedback
+    protocol (Moza, Simucube, VRS, Cammus, ...): `hid-universal-pidff`,
+    in the kernel since 6.15.
+
+  nixpkgs packages the out-of-tree drivers, so FamiDrive can turn each
+  one on for the box. That option doesn't exist yet (#58): it's worth
+  adding once a wheel of that kind has been tried.
+- **Rotation range, centering and other settings** are usually set with
+  Oversteer, a desktop app. A TV box has no desktop, so FamiDrive would
+  set them from Nix.
+- **Emulators:** Dolphin can present a wheel to the GameCube as its
+  steering wheel accessory, for the few games that support it. Wii
+  racing games use the Wii Remote, in or out of a Wii Wheel shell.
+
+## Typing on the TV
+
+Sign-ins and search boxes are the hardest part of a box with no
+keyboard. What works today:
+
+- **On-screen keyboards:** Steam's (in Steam and in games started from
+  Steam), Kodi's, and ES-DE's own.
+- **A phone or another device:** most sign-ins on the box show a code to
+  enter elsewhere instead of a password: Prism (Minecraft) and Jellyfin's
+  Quick Connect do this. The phone apps for Steam and RomM handle a lot
+  without the TV at all: installing and removing Steam games, and
+  managing the library in RomM's web UI.
+- **A keyboard:** any USB or Bluetooth keyboard works, including small
+  ones that clip onto a controller.
 
 ## What to test
 
