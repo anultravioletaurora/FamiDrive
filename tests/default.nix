@@ -132,7 +132,7 @@ in
   box-family = expect "family" {
     famidrive = {
       enable = true;
-      lanes = [ "roms" "steam" "minecraft" ];
+      lanes = [ "roms" "steam" "heroic" "minecraft" ];
       players = {
         alice.romm.tokenFile = "/run/secrets/alice-token";
         bob.owner = "bobby";
@@ -242,6 +242,14 @@ in
           && !(c.systemd.timers ? romm-save-reconcile-guest)))
       (check "a Steam menu generator per player"
         (lib.all (p: c.systemd.services ? "famidrive-gen-steam-${p}") [ "alice" "bob" "guest" ]))
+      (check "GOG, Epic and Amazon are each a system, launched through Heroic"
+        (lib.all (s: c.famidrive.systems ? ${s} && lib.hasInfix "heroic://launch" c.famidrive.systems.${s}.command)
+          [ "gog" "epic" "amazon" ]))
+      (check "Heroic's menu entries follow its installed-games files, per player"
+        (lib.hasInfix "legendaryConfig/legendary/installed.json"
+          (toString c.systemd.paths.famidrive-gen-heroic-bob.pathConfig.PathChanged)))
+      (check "Heroic is in Settings, for sign-in and installs"
+        (lib.hasInfix "Heroic Games Launcher.setting" c.home-manager.users.alice.home.activation.famidriveSettings.data))
       (check "Steam's art and details after each Steam menu update, not before the session"
         (c.systemd.services.famidrive-gen-steam-alice.onSuccess == [ "famidrive-steam-media-alice.service" ]
           && !(lib.elem "display-manager.service" (c.systemd.services.famidrive-steam-media-alice.wantedBy or [ ]))))

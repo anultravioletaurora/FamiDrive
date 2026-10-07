@@ -4,6 +4,8 @@
 #
 #   Steam Settings          Steam's Big Picture (Proton per game, launch
 #                           options, Steam Input, downloads); steam lane
+#   Heroic Games Launcher   sign in to GOG, Epic and Amazon, install and
+#                           remove their games; heroic lane
 #   Jellyfin Media Player   the Jellyfin app, with its sign-in and its
 #                           own settings menu; media.jellyfin.enable
 { config, lib, pkgs, ... }:
@@ -11,11 +13,13 @@
 let
   cfg = config.famidrive;
   steam = lib.elem "steam" cfg.lanes;
+  heroic = lib.elem "heroic" cfg.lanes;
   jellyfin = cfg.media.jellyfin.enable;
 
   # Placeholder file name (what ES-DE shows) -> what it opens.
   entries =
     lib.optionalAttrs steam { "Steam Settings" = "steam"; }
+    // lib.optionalAttrs heroic { "Heroic Games Launcher" = "heroic"; }
     // lib.optionalAttrs jellyfin { "Jellyfin Media Player" = "jellyfin"; };
 
   gamelist = pkgs.writeText "gamelist.xml" ''
@@ -39,6 +43,7 @@ in
       command = ''
         case "$(cat "$ROM")" in
           ${lib.optionalString steam ''steam) exec ${pkgs.gamescope-fg}/bin/gamescope-fg --steam bigpicture ;;''}
+          ${lib.optionalString heroic ''heroic) ${pkgs.heroic}/bin/heroic --fullscreen --no-sandbox ;;''}
           ${lib.optionalString jellyfin ''jellyfin) ${cfg.systems.media.command} ;;''}
         esac
       '';
@@ -56,7 +61,7 @@ in
         '') entries)}
         ${lib.concatMapStrings (name: ''
           rm -f "$d/${name}.setting"
-        '') (lib.filter (n: !(entries ? ${n})) [ "Steam Settings" "Jellyfin Media Player" "Switch Player" ])}
+        '') (lib.filter (n: !(entries ? ${n})) [ "Steam Settings" "Heroic Games Launcher" "Jellyfin Media Player" "Switch Player" ])}
         ${lib.optionalString steam ''
           # ES-DE sorts by name; Steam Settings goes first by its sort name.
           # ES-DE rewrites gamelists itself (play counts), so this is only a

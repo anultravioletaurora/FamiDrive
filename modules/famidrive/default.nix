@@ -159,11 +159,22 @@ in
       only (no RomM), and Steam if they sign in to theirs'';
 
     lanes = mkOption {
-      type = types.listOf (types.enum [ "roms" "steam" "gog" "minecraft" ]);
+      # "gog" stays in the enum only so the assertion below can say what
+      # replaced it; the lane itself was never finished.
+      type = types.listOf (types.enum [ "roms" "steam" "heroic" "gog" "minecraft" ]);
       default = [ "roms" ];
       description = ''
-        Which launch lanes this box carries. An emulation-only box is
-        `[ "roms" ]` and skips Steam/Proton/gogdl/Prism entirely.
+        Which launch lanes this box carries:
+
+        - `"roms"`: the consoles, through their emulators.
+        - `"steam"`: each player's Steam library.
+        - `"heroic"`: each player's GOG, Epic Games Store and Amazon
+          Games libraries, through Heroic Games Launcher. Each store is
+          its own system in the menu.
+        - `"minecraft"`: Prism Launcher's instances, in Ports.
+
+        An emulation-only box is `[ "roms" ]` and skips Steam, Proton,
+        Heroic and Prism entirely.
       '';
     };
 
@@ -318,6 +329,9 @@ in
     } {
       assertion = !(cfg.romm.enable && lib.elem "roms" cfg.lanes) || cfg.primaryPlayer != null;
       message = "famidrive.primaryPlayer: with more than one player, say whose RomM token pulls the library.";
+    } {
+      assertion = !(lib.elem "gog" cfg.lanes);
+      message = "famidrive.lanes: \"gog\" is now \"heroic\", which brings GOG, the Epic Games Store and Amazon Games through Heroic Games Launcher.";
     }];
 
     # One Linux account per player. Group famidrive can read the shared

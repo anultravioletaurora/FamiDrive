@@ -55,7 +55,6 @@
         rpcs3 = unstable.rpcs3;
 
         es-de = final.callPackage ./pkgs/es-de { };
-        gogdl-cli = final.callPackage ./pkgs/gogdl-cli { };
         tcli = final.callPackage ./pkgs/tcli { };
         xenia-netplay = final.callPackage ./pkgs/xenia-netplay { };
         gamescope-fg = final.callPackage ./pkgs/gamescope-fg { };
@@ -122,17 +121,17 @@
       };
 
       packages.${system} = {
-        inherit (pkgs) es-de gogdl-cli tcli xenia-netplay gamescope-fg romm-agent famidrive-generators famidrive-quit famidrive-steam-config famidrive-prism famidrive-status famidrive-valheim famidrive-picker famidrive-end-session famidrive-clonehero famidrive-kodi famidrive-ryujinx
+        inherit (pkgs) es-de tcli xenia-netplay gamescope-fg romm-agent famidrive-generators famidrive-quit famidrive-steam-config famidrive-prism famidrive-status famidrive-valheim famidrive-picker famidrive-end-session famidrive-clonehero famidrive-kodi famidrive-ryujinx
           mpv-gamepad jellyfin-mpv-shim;
       };
 
       # `nix flake check`: unit tests, example boxes, and every package
       # built (tests/default.nix). Run on each pull request.
-      # gogdl-cli and tcli are placeholders (no source yet) until the GOG
-      # lane is finished, so they're left out.
+      # tcli is a placeholder (no source yet) until Valheim's mod profiles
+      # need it, so it's left out.
       checks.${system} = import ./tests { inherit self nixpkgs pkgs system; }
         // nixpkgs.lib.mapAttrs' (name: p: nixpkgs.lib.nameValuePair "pkg-${name}" p)
-          (removeAttrs self.packages.${system} [ "gogdl-cli" "tcli" ]);
+          (removeAttrs self.packages.${system} [ "tcli" ]);
 
       # What a box imports. Brings everything the famidrive module needs
       # (the overlay, home-manager, sops-nix), so a host only adds its own

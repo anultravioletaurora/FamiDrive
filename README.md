@@ -5,8 +5,8 @@
 FamiDrive is a free, TV-first game console you build out of NixOS. It boots
 straight into [ES-DE](https://es-de.org), runs inside
 [gamescope](https://github.com/ValveSoftware/gamescope), and puts every
-console emulator, your Steam and GOG games, Minecraft and Jellyfin behind
-one controller-driven menu. Nothing about the box is set up by hand: the
+console emulator, your Steam, GOG, Epic and Amazon games, Minecraft and
+Jellyfin behind one controller-driven menu. Nothing about the box is set up by hand: the
 emulators, their settings, the menu and where every game comes from are
 all one Nix flake. Your ROMs, firmware and saves can live in your own
 [RomM](https://github.com/rommapp/romm) server, so any number of boxes,
@@ -52,7 +52,7 @@ and never needs a desktop, and makes Steam just one entry on the menu.
 | Xbox 360 | Xenia (fork still undecided) | RomM |
 | Atari 2600 / 5200 / 7800 / Jaguar | RetroArch (Stella, Atari800, ProSystem, Virtual Jaguar) | RomM |
 | Steam | Steam, started hidden | Your Steam library |
-| GOG | `gogdl` (not packaged yet) | Your GOG library |
+| GOG, Epic Games Store, Amazon Games | [Heroic Games Launcher](https://heroicgameslauncher.com), each store its own system | Your libraries in each store |
 | Minecraft | Prism Launcher | Your Prism instances |
 | Media | [Kodi](https://kodi.tv) 21 with [Jellyfin for Kodi](https://github.com/jellyfin/jellyfin-kodi), or [Jellyfin MPV Shim](https://github.com/jellyfin/jellyfin-mpv-shim) 3.1 | Your Jellyfin server, and media folders on the box (an external drive) |
 
@@ -113,7 +113,7 @@ modules/famidrive/
   emulators.nix              famidrive.systems: the one table of systems, emulators and save layouts
   frontend.nix               es_systems.xml generated from famidrive.systems; famidrive-launch
   romm-agent.nix             library + firmware pull, save reconcile timer
-  generators.nix             Steam / GOG / Prism menu entries, regenerated when installs change
+  generators.nix             Steam / Heroic / Prism menu entries, regenerated when installs change
   pc-saves.nix               Syncthing for PC saves, the one thing RomM can't hold yet
   online.nix                 famidrive.online.enable fills in each emulator's netplay settings
   media.nix                  famidrive.media.kodi / .jellyfin: "Media" entries for Kodi and Jellyfin
@@ -126,7 +126,7 @@ pkgs/
   famidrive-picker/          "Who's playing?", greetd's greeter on a box with more than one player
   romm-agent/                Python: pull, firmware, save-pull/push, reconcile
   famidrive-generators/      Python: install manifests -> ES-DE menu entries
-  gogdl-cli/ tcli/           headless GOG and Thunderstore CLIs (unfinished)
+  tcli/                      Thunderstore's CLI (unfinished)
   xenia-netplay/             placeholder until the Xenia fork is picked
 ```
 
@@ -195,7 +195,9 @@ planning doc for now and will move into this repo.
   the library and firmware half shouldn't.
 - Launch flags for the standalone emulators added later (Azahar, PPSSPP,
   Cemu) and the RetroArch core file names are unverified.
-- The GOG lane's packages have placeholder hashes.
+- The Heroic lane (GOG, Epic, Amazon) hasn't run against a signed-in
+  Heroic yet. The installed-games files it reads were taken from
+  Heroic's source and are marked `VERIFY`.
 - Online play needs servers that don't exist yet.
 - The "home" button (back to the menu, or straight into Jellyfin, from
   inside a game) has no design yet.
@@ -252,7 +254,7 @@ FamiDrive with `nix flake update famidrive` first. Every option, with
 what it does and its default, is in [USAGE.md](USAGE.md).
 
 **Secrets.** Server addresses aren't secret and go in `configuration.nix`.
-Logins for Jellyfin, Steam and GOG happen once in each app, on the TV. The
+Logins for Jellyfin, Steam and Heroic's stores (GOG, Epic, Amazon) happen once in each app, on the TV. The
 only secrets are in the host's `secrets.yaml`, encrypted with
 [sops](https://github.com/getsops/sops) to the box's age key plus yours:
 
@@ -306,6 +308,9 @@ famidrive = {
   their menu, so a game both play is downloaded twice. Steam Family lets
   a family share one copy of each *purchase* (each account still keeps
   its own download).
+- **GOG, Epic and Amazon:** each player signs in to their own stores once,
+  in Settings → Heroic Games Launcher, and installs games there. Each
+  store's games show up in its own system in the menu.
 - **The guest:** no RomM, so their saves stay on this box. They can sign
   in to their own Steam or play without it.
 - **Switching and turning off:** ES-DE's Quit menu (Start → Quit) has

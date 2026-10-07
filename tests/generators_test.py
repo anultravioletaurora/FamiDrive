@@ -104,6 +104,34 @@ class Test(unittest.TestCase):
         self.run_tool("steam-media", str(self.steamapps), str(self.out))
         self.assertEqual((self.home / "ES-DE/downloaded_media/steam/covers/PEAK.jpg").read_bytes(), b"peak cover")
 
+    def test_heroic_stores_each_get_their_installed_games(self):
+        heroic = self.home / ".config/heroic"
+        for path, data in {
+            "gog_store/installed.json": {"installed": [
+                {"appName": "1207658924", "platform": "windows", "install_path": "/x"},
+                {"appName": "1", "is_dlc": True}]},
+            "store_cache/gog_library.json": {"games": [{"app_name": "1207658924", "title": "Hollow Knight: Voidheart"}]},
+            "legendaryConfig/legendary/installed.json": {"Fortnite": {"app_name": "Fortnite", "title": "Fortnite"}},
+            "nile_config/nile/installed.json": [{"id": "amzn1.adg.product.abc", "path": "/y"}],
+            "store_cache/nile_library.json": {"library": [{"app_name": "amzn1.adg.product.abc", "title": "Some Prime Game"}]},
+        }.items():
+            (heroic / path).parent.mkdir(parents=True, exist_ok=True)
+            (heroic / path).write_text(json.dumps(data))
+        roms = self.home / "roms"
+        (roms / "epic").mkdir(parents=True)
+        (roms / "epic/Uninstalled.epic").write_text("gone")
+        self.run_tool("heroic", str(heroic), str(roms))
+        self.assertEqual((roms / "gog/Hollow Knight_ Voidheart.gog").read_text(), "1207658924")
+        self.assertEqual(sorted(p.name for p in (roms / "gog").iterdir()), ["Hollow Knight_ Voidheart.gog"])
+        self.assertEqual((roms / "epic/Fortnite.epic").read_text(), "Fortnite")
+        self.assertFalse((roms / "epic/Uninstalled.epic").exists())
+        self.assertEqual((roms / "amazon/Some Prime Game.amazon").read_text(), "amzn1.adg.product.abc")
+
+    def test_heroic_never_signed_in_gives_empty_stores(self):
+        roms = self.home / "roms"
+        self.run_tool("heroic", str(self.home / ".config/heroic"), str(roms))
+        self.assertEqual([list((roms / s).iterdir()) for s in ("gog", "epic", "amazon")], [[], [], []])
+
     def test_a_game_the_store_doesnt_know_still_gets_its_art(self):
         self.install(1, "Some Delisted Game")
         self.store(1, {})
