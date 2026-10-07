@@ -62,6 +62,7 @@ in
   clonehero = unit "clonehero" ../pkgs/famidrive-clonehero/famidrive_clonehero.py pkgs.python3;
   kodi = unit "kodi" ../pkgs/famidrive-kodi/famidrive_kodi.py pkgs.python3;
   prism = unit "prism" ../pkgs/famidrive-prism/famidrive_prism.py pkgs.python3;
+  generators = unit "generators" ../pkgs/famidrive-generators/famidrive_generate.py pkgs.python3;
   picker = unit "picker" ../pkgs/famidrive-picker/famidrive_picker.py
     (pkgs.python3.withPackages (ps: [ ps.pygame-ce ]));
 
@@ -186,6 +187,9 @@ in
           && !(c.systemd.timers ? romm-save-reconcile-guest)))
       (check "a Steam menu generator per player"
         (lib.all (p: c.systemd.services ? "famidrive-gen-steam-${p}") [ "alice" "bob" "guest" ]))
+      (check "Steam's art and details after each Steam menu update, not before the session"
+        (c.systemd.services.famidrive-gen-steam-alice.onSuccess == [ "famidrive-steam-media-alice.service" ]
+          && !(lib.elem "display-manager.service" (c.systemd.services.famidrive-steam-media-alice.wantedBy or [ ]))))
       (check "the TV can power off and reboot without a password"
         (lib.hasInfix "org.freedesktop.login1.power-off" c.security.polkit.extraConfig
           && lib.hasInfix "isInGroup(\"famidrive\")" c.security.polkit.extraConfig))
