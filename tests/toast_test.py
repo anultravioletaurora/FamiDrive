@@ -150,6 +150,38 @@ class Sending(unittest.TestCase):
         with self.assertRaises(SystemExit):
             t.parse_send(["--done"])
 
+    def test_outside_a_session_it_reaches_the_tv_through_the_shared_folder(self):
+        import socket
+        import threading
+        with tempfile.TemporaryDirectory() as d:
+            shared = Path(d) / "shared"
+            shared.mkdir()
+            srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            srv.bind(str(shared / "alice.sock"))
+            srv.listen(1)
+            got = []
+
+            def accept():
+                conn, _ = srv.accept()
+                with conn:
+                    got.append(conn.recv(65536))
+            th = threading.Thread(target=accept)
+            th.start()
+            old_shared, old_env = t.SHARED, os.environ.get("XDG_RUNTIME_DIR")
+            t.SHARED = shared
+            os.environ["XDG_RUNTIME_DIR"] = str(Path(d) / "no-session")
+            try:
+                t.send({"kind": "progress", "title": "Downloading games"})
+            finally:
+                t.SHARED = old_shared
+                if old_env is None:
+                    os.environ.pop("XDG_RUNTIME_DIR", None)
+                else:
+                    os.environ["XDG_RUNTIME_DIR"] = old_env
+            th.join(5)
+            srv.close()
+            self.assertIn(b"Downloading games", got[0])
+
     def test_no_daemon_is_not_an_error(self):
         with tempfile.TemporaryDirectory() as d:
             r = subprocess.run([sys.executable, str(SCRIPT), "Hello"], capture_output=True, text=True,

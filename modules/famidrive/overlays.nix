@@ -83,6 +83,11 @@ in
     famidrive.overlays.resolved = lib.mapAttrs' (_: p: lib.nameValuePair p.user (resolve p)) cfg.allPlayers;
 
     environment.systemPackages = [ pkgs.famidrive-toast ];
+    # Where the box's own services (the library pull) reach whoever is on
+    # the TV: each session's toast daemon puts a socket here. setgid, so
+    # the sockets are group famidrive, which players and the library
+    # account share; nobody else can send.
+    systemd.tmpfiles.rules = [ "d /run/famidrive-toast 2770 root famidrive -" ];
 
     # Before ES-DE, so the session's own work can toast. It ends with the
     # session: gamescope's X server going away closes it.

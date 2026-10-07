@@ -77,6 +77,9 @@ in
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
       environment.ROMM_AGENT_CONFIG = "/etc/famidrive/romm/library.json";
+      # Its progress as a toast on the TV, through the shared folder every
+      # player's toast daemon listens in (overlays.nix).
+      path = [ pkgs.famidrive-toast ];
       # The library disk, and its folders with the right owners first.
       # Found on the first box 2026-10-06: a freshly formatted library disk
       # was mounted after tmpfiles had run, so dataDir was root's and the

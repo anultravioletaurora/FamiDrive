@@ -65,6 +65,12 @@ DEFAULT_COLORS = {
 }
 
 
+# Where the box's own services (the library pull, which runs as its own
+# account, outside any session) reach whoever is on the TV: each session's
+# daemon also listens here, group famidrive (overlays.nix makes the folder).
+SHARED = Path("/run/famidrive-toast")
+
+
 def sock_path():
     return Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}") / "famidrive-toast.sock"
 
@@ -234,14 +240,30 @@ def parse_send(argv):
     return toast
 
 
+def send_to(path, toast):
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+        s.settimeout(2)
+        s.connect(str(path))
+        s.sendall(json.dumps(toast).encode() + b"\n")
+
+
 def send(toast):
+    """To this session's daemon; from outside a session (a system service),
+    to every player's session on the TV through the shared folder."""
     try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
-            s.settimeout(2)
-            s.connect(str(sock_path()))
-            s.sendall(json.dumps(toast).encode() + b"\n")
+        send_to(sock_path(), toast)
+        return
     except OSError as e:
-        print(f"famidrive-toast: no toast daemon ({e}): {toast.get('title')}", file=sys.stderr)
+        err = e
+    sent = 0
+    for path in sorted(SHARED.glob("*.sock")) if SHARED.is_dir() else []:
+        try:
+            send_to(path, toast)
+            sent += 1
+        except OSError:
+            pass
+    if not sent:
+        print(f"famidrive-toast: no toast daemon ({err}): {toast.get('title')}", file=sys.stderr)
 
 
 # --- Desktop notifications ---------------------------------------------------
@@ -519,6 +541,18 @@ def daemon(spec_file, player):
     srv.bind(str(path))
     os.chmod(path, 0o600)
     srv.listen(8)
+    servers = [srv]
+    if SHARED.is_dir() and os.access(SHARED, os.W_OK):
+        shared = SHARED / f"{player}.sock"
+        try:
+            shared.unlink(missing_ok=True)
+            pub = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            pub.bind(str(shared))
+            os.chmod(shared, 0o660)   # the folder's group (famidrive) can send
+            pub.listen(8)
+            servers.append(pub)
+        except OSError as e:
+            print(f"famidrive-toast: no shared socket ({e})", file=sys.stderr)
     import threading
     threading.Thread(target=serve_notifications, daemon=True).start()
     xfd = d.fileno()
@@ -530,9 +564,9 @@ def daemon(spec_file, player):
         now = time.monotonic()
         toast, age, left = queue.tick(now)
         busy = toast is not None
-        ready, _, _ = select.select([srv, xfd], [], [], 1 / 30 if busy else None)
-        if srv in ready:
-            conn, _ = srv.accept()
+        ready, _, _ = select.select([*servers, xfd], [], [], 1 / 30 if busy else None)
+        for server in (x for x in servers if x in ready):
+            conn, _ = server.accept()
             with conn:
                 conn.settimeout(1)
                 buf = b""
