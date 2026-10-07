@@ -72,6 +72,7 @@
         famidrive-ryujinx = final.callPackage ./pkgs/famidrive-ryujinx { };
         famidrive-hardware = final.callPackage ./pkgs/famidrive-hardware { };
         famidrive-toast = final.callPackage ./pkgs/famidrive-toast { };
+        famidrive-cheevos = final.callPackage ./pkgs/famidrive-cheevos { };
 
         # libmpv with SDL2 gamepad input compiled in. nixpkgs builds mpv
         # with sdl2Support = false, and without it the shim's gamepad
@@ -123,7 +124,7 @@
       };
 
       packages.${system} = {
-        inherit (pkgs) es-de tcli xenia-netplay gamescope-fg romm-agent famidrive-generators famidrive-quit famidrive-steam-config famidrive-prism famidrive-status famidrive-valheim famidrive-picker famidrive-end-session famidrive-clonehero famidrive-kodi famidrive-ryujinx famidrive-hardware famidrive-toast
+        inherit (pkgs) es-de tcli xenia-netplay gamescope-fg romm-agent famidrive-generators famidrive-quit famidrive-steam-config famidrive-prism famidrive-status famidrive-valheim famidrive-picker famidrive-end-session famidrive-clonehero famidrive-kodi famidrive-ryujinx famidrive-hardware famidrive-toast famidrive-cheevos
           mpv-gamepad jellyfin-mpv-shim;
       };
 

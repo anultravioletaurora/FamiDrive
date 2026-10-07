@@ -184,6 +184,14 @@ planning doc for now and will move into this repo.
   each: a save going up to RomM, or not. Toasts show bottom right by
   default, and MangoHud's performance overlay, off by default, middle
   left; each player can move either (`famidrive.overlays`).
+- RetroAchievements per player (`players.<name>.retroAchievements`):
+  RetroArch, Dolphin and PCSX2 signed in to the player's own account at
+  the start of their session, from a password in their sops secret.
+  Unlocks in RetroArch and Dolphin show as toasts, with the
+  achievement's description and points; Dolphin's own on-screen messages
+  are off. RomM shows each player's progress itself once their
+  RetroAchievements username is linked in their RomM profile; the box
+  sends RomM nothing about achievements.
 - Clone Hero in a Ports system (`famidrive.cloneHero`): songs for the
   whole box, listed by their Chorus Encore md5 and downloaded to the
   library disk, a profile for every player plus guests, and the TV's

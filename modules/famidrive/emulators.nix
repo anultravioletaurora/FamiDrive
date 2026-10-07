@@ -59,11 +59,36 @@ let
     # next to itself, and the core looks beside whatever path it's given.
     # Found on the first box 2026-10-07: every PlayStation game in a
     # folder (Pepsiman/Pepsiman.cue, .bin) failed to find its .bin.
-    command = ''${retroarch}/bin/retroarch -f -L ${core coreName} "$(readlink -f "$ROM")"'';
+    #
+    # Logged (--verbose) to a file each launch, which famidrive-cheevos
+    # reads for RetroAchievements unlocks, to show them as toasts.
+    command = ''${retroarch}/bin/retroarch -f --verbose --log-file "''${XDG_RUNTIME_DIR:-/tmp}/famidrive-retroarch.log" -L ${core coreName} "$(readlink -f "$ROM")"'';
+    before = ''
+      rm -f "''${XDG_RUNTIME_DIR:-/tmp}/famidrive-retroarch.log"
+      ${pkgs.famidrive-cheevos}/bin/famidrive-cheevos watch "''${XDG_RUNTIME_DIR:-/tmp}/famidrive-retroarch.log" "$system" "$ROM" &
+      cheevos_watch=$!
+    '';
+    after = ''
+      kill "$cheevos_watch" 2>/dev/null || true
+    '';
     emulator = "retroarch-${coreName}";
     firmwareDir = "retroarch";
     saveSync = saves;
     saveLayout = { kind = "retroarch-srm"; root = "~/.config/retroarch/saves"; };
+  };
+
+  # Dolphin's RetroAchievements unlocks as toasts: famidrive-cheevos
+  # turns on its log channel for the player (Logger.ini) and reads the
+  # log beside each game, as for RetroArch above.
+  dolphinCheevos = let log = "$HOME/.local/share/dolphin-emu/Logs/dolphin.log"; in {
+    before = ''
+      rm -f "${log}"
+      ${pkgs.famidrive-cheevos}/bin/famidrive-cheevos watch "${log}" "$system" "$ROM" &
+      cheevos_watch=$!
+    '';
+    after = ''
+      kill "$cheevos_watch" 2>/dev/null || true
+    '';
   };
 
   systemType = types.submodule {
@@ -240,7 +265,7 @@ in
 
     famidrive.systems = lib.mkMerge [
       (lib.mkIf (hasLane "roms") {
-        gc = {
+        gc = dolphinCheevos // {
           fullname = "Nintendo GameCube";
           extensions = [ ".iso" ".rvz" ".gcz" ".ciso" ];
           command = ''${pkgs.dolphin-emu}/bin/dolphin-emu --batch --exec="$ROM"'';
@@ -250,7 +275,7 @@ in
           platform = "gc";
           saveLayout = { kind = "dolphin-gci-folder"; root = "~/.local/share/dolphin-emu/GC"; };
         };
-        wii = {
+        wii = dolphinCheevos // {
           fullname = "Nintendo Wii";
           extensions = [ ".iso" ".rvz" ".wbfs" ];
           command = ''${pkgs.dolphin-emu}/bin/dolphin-emu --batch --exec="$ROM"'';
@@ -496,6 +521,10 @@ in
             # Without this, GameCube saves can't map to per-ROM RomM saves.
             SlotA = 8;   # TODO: verify the enum value for "GCI Folder"
           };
+          # No on-screen messages of Dolphin's own: what a player needs to
+          # know (RetroAchievements unlocks) comes as a FamiDrive toast,
+          # in their theme. Decided 2026-10-07 for every player.
+          keys.Interface.OnScreenDisplayMessages = "False";
         }}
         ${seedLib.lockKeys {
           format = "ini";
