@@ -32,38 +32,44 @@ and never needs a desktop, and makes Steam just one entry on the menu.
 
 ## What's in the box
 
-| Lane | How it plays | Where the games come from |
-|---|---|---|
-| Game Boy / Color / Advance | RetroArch + mGBA | RomM |
-| SNES | RetroArch + Snes9x | RomM |
-| Nintendo 64 / 64DD | RetroArch + Mupen64Plus-Next | RomM |
-| DS / DSi | RetroArch + melonDS DS | RomM |
-| 3DS / New 3DS | Azahar | RomM |
-| GameCube / Wii | Dolphin | RomM, or a local folder |
-| Wii U | Cemu | RomM |
-| Switch | Eden | RomM, or a local folder |
-| Genesis / Master System / Game Gear | RetroArch + Genesis Plus GX | RomM |
-| Saturn | RetroArch + Beetle Saturn | RomM |
-| Dreamcast | RetroArch + Flycast | RomM |
-| PlayStation | RetroArch + SwanStation | RomM |
-| PlayStation 2 | PCSX2 | RomM |
-| PlayStation 3 | RPCS3 | RomM |
-| PSP | PPSSPP | RomM |
-| Xbox 360 | Xenia (fork still undecided) | RomM |
-| Atari 2600 / 5200 / 7800 / Jaguar | RetroArch (Stella, Atari800, ProSystem, Virtual Jaguar) | RomM |
-| Steam | Steam, started hidden | Your Steam library |
-| GOG, Epic Games Store, Amazon Games | [Heroic Games Launcher](https://heroicgameslauncher.com), each store its own system | Your libraries in each store |
-| Minecraft | Prism Launcher | Your Prism instances |
-| Media | [Kodi](https://kodi.tv) 21 with [JellyCon](https://github.com/jellyfin/jellycon), or [Jellyfin MPV Shim](https://github.com/jellyfin/jellyfin-mpv-shim) 3.1 | Your Jellyfin server, and media folders on the box (an external drive) |
+| System | Plays with | nixpkgs | Save sync | Where the games come from |
+|---|---|---|---|---|
+| Game Boy / Color / Advance | [RetroArch](https://www.retroarch.com) + [mGBA](https://mgba.io) | [`libretro.mgba`](https://search.nixos.org/packages?channel=26.05&show=libretro.mgba) | ✅ | RomM |
+| SNES | [RetroArch](https://www.retroarch.com) + [Snes9x](https://www.snes9x.com) | [`libretro.snes9x`](https://search.nixos.org/packages?channel=26.05&show=libretro.snes9x) | ✅ | RomM |
+| Nintendo 64 | [RetroArch](https://www.retroarch.com) + [Mupen64Plus-Next](https://github.com/libretro/mupen64plus-libretro-nx) | [`libretro.mupen64plus`](https://search.nixos.org/packages?channel=26.05&show=libretro.mupen64plus) | ✅ | RomM |
+| Nintendo 64DD | [RetroArch](https://www.retroarch.com) + [Mupen64Plus-Next](https://github.com/libretro/mupen64plus-libretro-nx) | [`libretro.mupen64plus`](https://search.nixos.org/packages?channel=26.05&show=libretro.mupen64plus) | — | RomM |
+| DS / DSi | [RetroArch](https://www.retroarch.com) + [melonDS DS](https://github.com/JesseTG/melonds-ds) | [`libretro.melondsds`](https://search.nixos.org/packages?channel=26.05&show=libretro.melondsds) | — | RomM |
+| 3DS / New 3DS | [Azahar](https://azahar-emu.org) | [`azahar`](https://search.nixos.org/packages?channel=26.05&show=azahar) | — | RomM |
+| GameCube / Wii | [Dolphin](https://dolphin-emu.org) | [`dolphin-emu`](https://search.nixos.org/packages?channel=26.05&show=dolphin-emu) | ✅ | RomM |
+| Wii U | [Cemu](https://cemu.info) | [`cemu`](https://search.nixos.org/packages?channel=26.05&show=cemu) | — | RomM |
+| Switch | [Eden](https://eden-emu.dev), or [Ryubing](https://ryujinx.app) (Ryujinx) for the games listed in `switch.ryujinx.games` | [`eden`](https://search.nixos.org/packages?channel=unstable&show=eden), [`ryubing`](https://search.nixos.org/packages?channel=26.05&show=ryubing) | ✅ | RomM, with each game's update and DLC |
+| Genesis / Master System / Game Gear | [RetroArch](https://www.retroarch.com) + [Genesis Plus GX](https://github.com/libretro/Genesis-Plus-GX) | [`libretro.genesis-plus-gx`](https://search.nixos.org/packages?channel=26.05&show=libretro.genesis-plus-gx) | ✅ | RomM |
+| Saturn | [RetroArch](https://www.retroarch.com) + [Beetle Saturn](https://github.com/libretro/beetle-saturn-libretro) | [`libretro.beetle-saturn`](https://search.nixos.org/packages?channel=26.05&show=libretro.beetle-saturn) | — | RomM |
+| Dreamcast | [RetroArch](https://www.retroarch.com) + [Flycast](https://github.com/flyinghead/flycast) | [`libretro.flycast`](https://search.nixos.org/packages?channel=26.05&show=libretro.flycast) | — | RomM |
+| PlayStation | [RetroArch](https://www.retroarch.com) + [SwanStation](https://github.com/libretro/swanstation) | [`libretro.swanstation`](https://search.nixos.org/packages?channel=26.05&show=libretro.swanstation) | ✅ | RomM |
+| PlayStation 2 | [PCSX2](https://pcsx2.net) | [`pcsx2`](https://search.nixos.org/packages?channel=26.05&show=pcsx2) | ✅ | RomM |
+| PlayStation 3 | [RPCS3](https://rpcs3.net) | [`rpcs3`](https://search.nixos.org/packages?channel=unstable&show=rpcs3) | ✅ | RomM |
+| PSP | [PPSSPP](https://www.ppsspp.org) | [`ppsspp-sdl`](https://search.nixos.org/packages?channel=26.05&show=ppsspp-sdl) | — | RomM |
+| Xbox 360 | [Xenia](https://xenia.jp) (fork still undecided) | FamiDrive's own ([`pkgs/xenia-netplay`](pkgs/xenia-netplay)) | ✅ | RomM |
+| Atari 2600 / 5200 / 7800 / Jaguar | [RetroArch](https://www.retroarch.com) + [Stella](https://stella-emu.github.io), [Atari800](https://github.com/libretro/libretro-atari800), [ProSystem](https://github.com/libretro/prosystem-libretro), [Virtual Jaguar](https://github.com/libretro/virtualjaguar-libretro) | [`libretro.stella`](https://search.nixos.org/packages?channel=26.05&show=libretro.stella), [`libretro.atari800`](https://search.nixos.org/packages?channel=26.05&show=libretro.atari800), [`libretro.prosystem`](https://search.nixos.org/packages?channel=26.05&show=libretro.prosystem), [`libretro.virtualjaguar`](https://search.nixos.org/packages?channel=26.05&show=libretro.virtualjaguar) | — | RomM |
+| Steam | [Steam](https://store.steampowered.com), started hidden, with [Proton-GE](https://github.com/GloriousEggroll/proton-ge-custom) available | [`steam`](https://search.nixos.org/packages?channel=26.05&show=steam), [`proton-ge-bin`](https://search.nixos.org/packages?channel=26.05&show=proton-ge-bin) | Steam Cloud | Your Steam library |
+| GOG, Epic Games Store, Amazon Games | [Heroic Games Launcher](https://heroicgameslauncher.com), each store its own system | [`heroic`](https://search.nixos.org/packages?channel=26.05&show=heroic) | Each store's cloud saves | Your libraries in each store |
+| Minecraft | [Prism Launcher](https://prismlauncher.org) | [`prismlauncher`](https://search.nixos.org/packages?channel=26.05&show=prismlauncher) | — | Your Prism instances, and ones declared in Nix |
+| Clone Hero, YARG | [Clone Hero](https://clonehero.net) and [YARG](https://yarg.in), in the Ports system | [`clonehero`](https://search.nixos.org/packages?channel=26.05&show=clonehero), [`yarg`](https://search.nixos.org/packages?channel=26.05&show=yarg) | ✅ (scores and profiles) | Songs declared in Nix, downloaded once for the box |
+| Media | [Kodi](https://kodi.tv) 21 with [JellyCon](https://github.com/jellyfin/jellycon), or [Jellyfin MPV Shim](https://github.com/jellyfin/jellyfin-mpv-shim) 3.1 | [`kodi`](https://search.nixos.org/packages?channel=26.05&show=kodi), [`jellyfin-mpv-shim`](https://search.nixos.org/packages?channel=unstable&show=jellyfin-mpv-shim) | — | Your Jellyfin server, and media folders on the box (an external drive) |
 
 RetroArch runs everything it does well, so those systems share one
 controller setup and one save folder. The rest get the standalone emulator
 that's best for them. Platforms RomM can hold but FamiDrive leaves out:
 Windows/PC and classic Mac/Apple II (computers, not consoles), iOS, Xbox
 Series and Switch 2 (no emulator on Linux), and the original Xbox (later).
-Save sync is on for every system whose save files are mapped so far (all
-the cartridge systems, PlayStation 1–3, GameCube, Wii, Switch); the others
-keep their saves locally until theirs are.
+Save sync is on for every system whose save files are mapped so far
+(✅ above, through RomM); the others (—) keep their saves on the box until theirs are.
+Every console system can also play from a folder already on the box
+instead of RomM (`localRoms`). The menu itself is
+[ES-DE](https://es-de.org), packaged in FamiDrive
+([`pkgs/es-de`](pkgs/es-de)), in a [gamescope](https://github.com/ValveSoftware/gamescope)
+session ([`gamescope`](https://search.nixos.org/packages?channel=26.05&show=gamescope)).
 
 A few ideas run through all of it:
 
