@@ -771,7 +771,8 @@ def cmd_pull():
         tid = title_id(system, rom, prev, launch)
         if tid and not rom.get("title_id"):
             teach_romm(s, rom["id"], tid)
-        index[str(launch)] = {"id": rom["id"], "system": system, "title_id": tid}
+        index[str(launch)] = {"id": rom["id"], "system": system, "title_id": tid,
+                              "name": rom.get("name") or rom.get("fs_name_no_ext")}
         try:
             rel = Path(launch).relative_to(DATA / "roms" / system)
         except ValueError:
@@ -953,6 +954,23 @@ def cmd_gamelists():
 # roms.md "Mapping saves to games". IDs are only needed to pick which
 # local files belong to a ROM when pushing. Pulling a save never needs
 # one, because the archive carries its own relative paths and manifest.
+
+
+def toast(*args):
+    """A toast on the TV (famidrive-toast), when the player's session has
+    one to show it. Never fails the caller."""
+    exe = shutil.which("famidrive-toast")
+    if exe:
+        try:
+            subprocess.run([exe, *args], timeout=5, check=False,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+
+def game_name(key, entry):
+    """The game's name from RomM, or its file's without the tags."""
+    return entry.get("name") or re.sub(r"\s*[\(\[].*$", "", Path(key).stem) or Path(key).name
 
 
 def load_index():
@@ -1639,8 +1657,11 @@ def cmd_save_push(system, rom_path, learn=True):
         mine["pushed"] = digest
         mine["server_updated_at"] = r.json().get("updated_at")
         mine.pop("conflict_pushed", None)
+        toast("--kind", "notice", "--icon", "save", "Saved to RomM", game_name(key, entry))
     else:
         mine["conflict_pushed"] = digest
+        toast("--kind", "alert", "Save kept beside a newer one",
+              f"{game_name(key, entry)}: another box saved since this one last loaded. RomM has both.")
     store_saves(saves)
 
 

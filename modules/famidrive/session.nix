@@ -13,6 +13,9 @@ let
 
   picker = lib.length (lib.attrNames cfg.allPlayers) > 1;
 
+  # Players with MangoHud's performance overlay on (overlays.nix).
+  perfUsers = lib.attrNames (lib.filterAttrs (_: o: o.performance.enable) cfg.overlays.resolved);
+
   famidriveSession = pkgs.writeShellScript "famidrive-session" ''
     ${lib.optionalString cfg.display.hdr ''
       # Proton games only output HDR when asked; gamescope (--hdr-enabled)
@@ -109,6 +112,7 @@ let
     "${pkgs.gamescope}/bin/gamescope"
     "-f"                  # fullscreen
     "-e"                  # Steam-integration mode, needed for STEAM_GAME focus atoms
+    "\"\${overlay[@]}\""   # the player's performance overlay (famidrive-start)
   ] ++ gamescopeFlags ++ [
     "--"
     "${famidriveSession}"
@@ -121,6 +125,14 @@ let
     log="$HOME/.local/state/famidrive"
     mkdir -p "$log"
     [ -f "$log/session.log" ] && mv "$log/session.log" "$log/session.log.1"
+    # MangoHud over everything, for players who turned it on
+    # (overlays.nix); gamescope starts mangoapp itself.
+    overlay=()
+    ${lib.optionalString (perfUsers != [ ]) ''
+      case "$(id -un)" in
+        ${lib.concatStringsSep "|" perfUsers}) overlay=(--mangoapp) ;;
+      esac
+    ''}
     exec ${gamescopeCmd} > "$log/session.log" 2>&1
   ''}";
 
