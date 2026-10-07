@@ -31,6 +31,7 @@ is on; every other option is optional.
 - [PC saves](#pc-saves)
 - [Online play](#online-play)
 - [Systems](#systems)
+- [Everything else](#everything-else)
 
 ## The box
 
@@ -141,6 +142,40 @@ say which one is real.
 - **Type:** null or string
 - **Default:** `null`
 - **Example:** `"63CA1C4C81D775E24288780D17344942"`
+
+### `famidrive.players.<name>.overlays.performance.enable`
+
+MangoHud's performance overlay (frame rate, frame times, CPU and
+GPU load and temperatures) over every game and the menu, through
+gamescope's `--mangoapp`. Takes effect at the player's next
+session.
+
+- **Type:** null or boolean
+- **Default:** the box's (`famidrive.overlays`)
+
+### `famidrive.players.<name>.overlays.performance.position`
+
+Where the performance overlay shows up.
+
+- **Type:** null or one of "top-left", "top-center", "top-right", "middle-left", "middle-right", "bottom-left", "bottom-center", "bottom-right"
+- **Default:** the box's (`famidrive.overlays`)
+
+### `famidrive.players.<name>.overlays.toasts.hide`
+
+Kinds of toast not to show: `"notice"` (a save uploaded and the
+like), `"alert"` (something went wrong), `"progress"` (downloads
+and other background work), `"achievement"` (RetroAchievements
+unlocks). Toasts are always on; this is how to quiet some.
+
+- **Type:** null or (list of (one of "notice", "alert", "progress", "achievement"))
+- **Default:** the box's (`famidrive.overlays`)
+
+### `famidrive.players.<name>.overlays.toasts.position`
+
+Where toasts show up.
+
+- **Type:** null or one of "top-left", "top-center", "top-right", "middle-left", "middle-right", "bottom-left", "bottom-center", "bottom-right"
+- **Default:** the box's (`famidrive.overlays`)
 
 ### `famidrive.players.<name>.owner`
 
@@ -1244,3 +1279,39 @@ The ES-DE theme folder for its logo and art. null: the platform's.
 
 - **Type:** null or string
 - **Default:** `null`
+
+## Everything else
+
+### `famidrive.overlays.performance.enable`
+
+MangoHud's performance overlay (frame rate, frame times, CPU and
+GPU load and temperatures) over every game and the menu, through
+gamescope's `--mangoapp`. Takes effect at the player's next
+session.
+
+- **Type:** boolean
+- **Default:** `false`
+
+### `famidrive.overlays.performance.position`
+
+Where the performance overlay shows up.
+
+- **Type:** one of "top-left", "top-center", "top-right", "middle-left", "middle-right", "bottom-left", "bottom-center", "bottom-right"
+- **Default:** `"middle-left"`
+
+### `famidrive.overlays.toasts.hide`
+
+Kinds of toast not to show: `"notice"` (a save uploaded and the
+like), `"alert"` (something went wrong), `"progress"` (downloads
+and other background work), `"achievement"` (RetroAchievements
+unlocks). Toasts are always on; this is how to quiet some.
+
+- **Type:** list of (one of "notice", "alert", "progress", "achievement")
+- **Default:** `[ ]`
+
+### `famidrive.overlays.toasts.position`
+
+Where toasts show up.
+
+- **Type:** one of "top-left", "top-center", "top-right", "middle-left", "middle-right", "bottom-left", "bottom-center", "bottom-right"
+- **Default:** `"bottom-right"`

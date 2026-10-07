@@ -30,7 +30,7 @@ let
   #   3. push the save back to RomM after the emulator exits
   famidriveLaunch = pkgs.writeShellApplication {
     name = "famidrive-launch";
-    runtimeInputs = [ pkgs.romm-agent pkgs.gamescope-fg ];
+    runtimeInputs = [ pkgs.romm-agent pkgs.gamescope-fg pkgs.famidrive-toast ];
     # Each emulator command is single-quoted on purpose: $ROM is exported and
     # expands inside the game's own shell, not here.
     excludeShellChecks = [ "SC2016" ];
@@ -52,7 +52,7 @@ let
           rc=0
           gamescope-fg bash -c ${lib.escapeShellArg s.command} || rc=$?
           ${s.after}
-          ${lib.optionalString (s.saveSync && cfg.romm.enable) ''[ -z "$sync" ] || romm-agent save-push ${name} "$ROM" || echo "famidrive-launch: save push failed, timer reconcile will retry" >&2''}
+          ${lib.optionalString (s.saveSync && cfg.romm.enable) ''[ -z "$sync" ] || romm-agent save-push ${name} "$ROM" || { echo "famidrive-launch: save push failed, timer reconcile will retry" >&2; famidrive-toast --kind alert "Save not uploaded" "It stays on this box, and FamiDrive tries RomM again within 15 minutes."; }''}
           exit "$rc"
           ;;
       '') cfg.systems)}

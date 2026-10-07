@@ -184,6 +184,34 @@ in
   picker = unit "picker" ../pkgs/famidrive-picker/famidrive_picker.py
     (pkgs.python3.withPackages (ps: [ ps.pygame-ce ]));
 
+  toast = unit "toast" ../pkgs/famidrive-toast/famidrive_toast.py pkgs.python3;
+
+  # Overlays: the box's positions, a player's own, MangoHud for one player.
+  box-overlays = expect "overlays" {
+    famidrive = {
+      enable = true;
+      romm.enable = false;
+      guest.enable = true;
+      overlays.toasts.position = "top-left";
+      players.alice.overlays = {
+        toasts = { position = "bottom-right"; hide = [ "progress" ]; };
+        performance = { enable = true; position = "top-right"; };
+      };
+      players.bob = { };
+    };
+  } (c: let r = c.famidrive.overlays.resolved; in [
+    (check "a player's own toast position and hidden kinds, the box's for the rest"
+      (r.alice.toasts == { position = "bottom-right"; hide = [ "progress" ]; }
+        && r.bob.toasts.position == "top-left" && r.guest.toasts.position == "top-left"))
+    (check "MangoHud only for the player who turned it on, where they put it"
+      (r.alice.performance.enable && !r.bob.performance.enable
+        && lib.hasInfix "position=top-right" c.home-manager.users.alice.xdg.configFile."MangoHud/MangoHud.conf".text
+        && !(c.home-manager.users.bob.xdg.configFile ? "MangoHud/MangoHud.conf")))
+    (check "the toast daemon starts with every session"
+      (lib.hasInfix "famidrive-toast daemon" c.famidrive.sessionSetup
+        && lib.any (p: lib.getName p == "famidrive-toast") c.environment.systemPackages))
+  ]);
+
   # One person, ROMs only, no RomM: the smallest box.
   box-one-player = expect "one-player" {
     famidrive = {

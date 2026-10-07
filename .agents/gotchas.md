@@ -143,6 +143,16 @@ Found against RomM 5.3:
     process ancestry, so they aren't hidden.
   - The game's own launcher is matched with `AppId=N( --|$)`.
 
+- **Overlays over games are gamescope's external overlay:** a
+  full-screen 32-bit window with `GAMESCOPE_EXTERNAL_OVERLAY` set, the
+  way mangoapp does it. gamescope draws it over the focused app without
+  focusing it. famidrive-toast writes premultiplied BGRA into it with
+  `put_image`, in chunks under the X server's request limit.
+- **Checking how a toast looks without the TV:** run the daemon under
+  `xvfb-run` with `FAMIDRIVE_TOAST_SNAPSHOT=<dir>`; each toast is saved
+  there as a PNG with its transparency. Screenshots of the X window lose
+  the alpha.
+
 ## Steam
 
 - **Steam Input is off per game**, written into `localconfig.vdf` at
