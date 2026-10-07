@@ -26,7 +26,7 @@ yet is listed below as ❔ until someone does.
 
 | Controller | Connection | ES-DE menus | RetroArch | Dolphin (GameCube) | Dolphin (Wii) | Eden (Switch) | Steam games | Rumble | Select + Start quits |
 |---|---|---|---|---|---|---|---|---|---|
-| [8BitDo Ultimate 2](#8bitdo-ultimate-2-24-ghz) | 2.4 GHz dongle | ✅ | ✅ | ✅ | ✅ as a GameCube pad | ✅ | ✅ | ✅ Dolphin | ✅ |
+| [8BitDo Ultimate 2](#8bitdo-ultimate-2-24-ghz) | 2.4 GHz dongle | ✅ | ✅ | ✅ | ✅ as a GameCube pad | ✅ (Eden and Ryujinx) | ✅ | ✅ Dolphin | ✅ |
 | [8BitDo Ultimate 2](#8bitdo-ultimate-2-bluetooth) | Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Xbox Wireless Controller](#xbox-wireless-controller) | Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [DualShock 4](#dualshock-4) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
@@ -168,6 +168,11 @@ To test:
 - the menus
 - other emulators, in PC mode
 - rumble, which needs the adapter's second USB plug for power
+
+- **Ryujinx (Switch):** ❌ not seen (2026-10-07). Ryujinx uses its own
+  bundled SDL, which doesn't pick up the official adapter, so Smash
+  Ultimate in Ryujinx can't use GameCube controllers yet. Dolphin and the
+  system's SDL see it fine.
 
 ## Wii guitar on a Raphnet adapter
 

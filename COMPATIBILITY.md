@@ -531,6 +531,12 @@ works.
 
 **Switch, Eden: ✅ Works.** Face buttons by label.
 
+**Switch, Ryujinx (Ryubing 1.3.3), with HewDraw Remix 0.49.11: ✅ Works**
+(2026-10-07). HDR loaded with the player's save from Eden (Ness already
+unlocked), on update 13.0.4 (`switch.ryujinx.games`). DLC wasn't loaded
+on the first run: Ryujinx needs its own DLC list (#88). Only the 8BitDo
+reached Ryujinx; the GameCube adapter doesn't show up through its SDL.
+
 - **HewDraw Remix:** a Switch mod kept in RomM (the game's `mod/`
   folder), unpacked once and linked into every player's Eden (#53).
   Opting in per player is #4.

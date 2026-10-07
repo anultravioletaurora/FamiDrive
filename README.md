@@ -162,10 +162,17 @@ planning doc for now and will move into this repo.
   game's `mod/` folder) are unpacked once and loaded for every player.
   Switch games come with their newest update and every DLC from RomM,
   one copy for the whole box that Eden reads in place, and a game's
-  console-side (device) save syncs along with the player's.
+  console-side (device) save syncs along with the player's. Save sync
+  also works for PlayStation and N64 (RetroArch), and Switch mods kept
+  in RomM (`mod/`) are linked into each player's emulator.
+- Ryujinx for the Switch games that need it (`switch.ryujinx.games`):
+  Smash Ultimate with HewDraw Remix runs there on the first box, with
+  its update, DLC and the player's save bridged from Eden's.
 - The Steam lane, with Proton pins and Steam Input set from Nix, Steam's
-  Big Picture as a Settings entry, and a status screen while Steam
-  updates, processes shaders or starts a game. Results per game are in
+  Big Picture as a Settings entry, a status screen while Steam
+  updates, processes shaders or starts a game, and each game's art and
+  details from Steam itself. GOG, Epic and Amazon through Heroic
+  (`lanes` has `"heroic"`). Results per game are in
   [COMPATIBILITY.md](COMPATIBILITY.md).
 - Clone Hero in a Ports system (`famidrive.cloneHero`): songs for the
   whole box, listed by their Chorus Encore md5 and downloaded to the
@@ -183,6 +190,8 @@ planning doc for now and will move into this repo.
 - Kodi in Media (`famidrive.media.kodi`), with JellyCon (Jellyfin, live TV
   included, the server filled in from `endpoints.jellyfin`), Up Next, the
   box's own media folders, HDR, and the house controllers mapped.
+- A boot screen (Plymouth) in place of console text, and graphics card
+  setup (`famidrive.gpu`; see below).
 
 **Still a sketch:**
 

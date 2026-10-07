@@ -76,6 +76,39 @@ Found against RomM 5.3:
   it was played).
 - **Save archives** store the profile folder as `@profile`, and the
   hashes are computed over the archived paths, not the local ones.
+- **Eden can't run Skyline plugins** (like yuzu). A Skyline mod (HewDraw
+  Remix) crashes the game about 4 s in, so those mods are left out of
+  Eden and their games go to Ryujinx (`switch.ryujinx.games`).
+- **Eden keeps installed firmware as one folder per NCA**
+  (`registered/<id>.nca/00`, `01`, ...), not as files.
+
+## Ryujinx (Ryubing 1.3.3)
+
+- **`--no-gui` skips Ryujinx's game list scan,** and the scan is what
+  finds updates and DLC. FamiDrive writes `games/<title id>/updates.json`
+  (`selected`, `paths`) and `dlc.json` (each NSP with its content NCAs
+  by `/name.nca` and decimal title ID) itself, before each launch.
+- **Controller IDs:** `<n>-<SDL GUID as a .NET Guid>`, with the first 4
+  digits (SDL's name checksum) replaced by `0000`, as 1.3.3's
+  `SDL2GamepadDriver.GenerateGamepadId` does. Older Ryujinx code didn't
+  zero them.
+- **Ryujinx loads its own bundled libSDL2**
+  (`lib/ryubing/runtimes/linux-x64/native/`), not the system's
+  sdl2-compat. Enumerate pads through that one: the system's sees them
+  differently, and inside the TV session it found none. The bundled one
+  doesn't see the official GameCube adapter.
+- **Save folders** are numbered (`bis/user/save/<n>/0`, committed copy);
+  each one's `ExtraData0` starts with the title ID, little-endian.
+  FamiDrive bridges a game's save through Eden's folder before and after
+  each launch, so RomM syncs from one place.
+- **Its log is the debugger:** `~/.config/Ryujinx/Logs/`. A guest crash
+  shows as `InvalidAccessHandler` with a register dump; `Hid Remap: No
+  matching controllers found` means the input IDs are wrong;
+  `Using Firmware Version:` with nothing after it means no firmware.
+- **Skyline logs over TCP** on `127.0.0.1:6969` (Ryujinx uses the host's
+  network). Connect as soon as it opens (about 3 s in) to see which
+  plugins loaded. HDR 0.49.11's ARCropolis needs Smash 13.0.4 exactly
+  ("cannot currently run on a Smash version other than 13.0.4").
 
 ## ES-DE
 
@@ -91,6 +124,10 @@ Found against RomM 5.3:
     real folders.
 - **Quitting ES-DE ends the session.** `ShowQuitMenu` is on, and quitting
   runs `famidrive-end-session`, which takes you back to "Who's playing?".
+- **ES-DE reads launch commands once, at start.** After a switch that
+  changes `es_systems.xml` but not the session, the running ES-DE still
+  launches through the old famidrive-launch (#82). When testing a
+  rebuild, Quit ES-DE and pick the player again.
 
 ## gamescope and the TV
 
@@ -114,6 +151,16 @@ Found against RomM 5.3:
 - **The app manifest's `BytesDownloaded` isn't live.** It can sit at 0
   for a whole download. Measure `steamapps/downloading/<appid>` against
   `BytesToStage` instead, and use `content_log.txt` for the real speed.
+- **A full disk pauses Steam's queue for good.** Downloads that hit
+  "Disk write failure" are marked paused (`StateFlags` 1538) and only
+  resume when someone resumes them (the phone app's download queue).
+- **Stopping and starting Steam by hand:** stop it by its exact process
+  (`ps -C steam`), and start it again as the session does
+  (`steam -silent`) with the session's environment (copy it from the
+  ES-DE wrapper's `/proc/<pid>/environ`), or games launched later miss
+  gamescope's variables.
+- **GTA V on Steam is two apps:** Legacy (271590) and Enhanced (3240220),
+  each with its own install folder.
 
 ## Audio
 
@@ -164,11 +211,41 @@ See [CONTROLLERS.md](../CONTROLLERS.md) for per-controller results.
 
 - **RPCS3 installs firmware only through its window,** which waits for a
   click before and after (#48). Never run `--installfw` unattended.
+- **RetroArch sorts saves into a folder per core by default**
+  (`sort_savefiles_enable`). FamiDrive turns that off so `<game>.srm`
+  sits in `saves/`, where the agent looks.
+- **RetroArch names a save after the path it was given.** ES-DE hands
+  over a link for folder games, and a `.cue` looks for its `.bin` beside
+  that path, so RetroArch gets the real path (`readlink -f`).
+- **SwanStation looks for its BIOS by one name per region**
+  (`scph5501.bin` US, `scph5502.bin` Europe, `scph5500.bin` Japan).
+  FamiDrive links whatever the library has under those names.
+- **A dangling link in RetroArch's system folder** (`Mupen64plus`
+  pointing into the library after a firmware pull removed it) stopped
+  the N64 core writing its game database, so Mario Party 3 got the wrong
+  save type and wouldn't start. Stale firmware links are removed at
+  session start.
+
+## Heroic, JellyCon
+
+- **Heroic's installed games** are in `gog_store/installed.json`,
+  `legendaryConfig/legendary/installed.json` and
+  `nile_config/nile/installed.json` under `~/.config/heroic`; titles are
+  in `store_cache/<store>_library.json`. `heroic --no-gui
+  "heroic://launch?appName=…&runner=…"` exits when the game does.
+- **JellyCon's server** is `server_address` in its settings.xml.
+  Add-ons from outside Kodi's repository ask to be enabled once on
+  Kodi's first start.
 
 ## The box
 
 - **A full system disk:** Steam's download queue filled the first box's
-  root disk (1.5 TB of Steam). Watch `df` before blaming anything else.
+  root disk twice (#90). Watch `df` before blaming anything else: a full
+  disk showed up as an empty save (which went to RomM, now refused,
+  #85), a black Heroic window and a paused Steam queue.
+- **`pgrep -f` from SSH matches its own command line** when the pattern
+  is in it. Killing by such a pattern killed the SSH session. Use
+  `ps -C <name>` or a PID you've checked.
 - **Two agent runs at once:** reconcile, save-pull and save-push take a
   lock per player. Don't run two by hand in parallel to test.
 
@@ -185,3 +262,15 @@ See [CONTROLLERS.md](../CONTROLLERS.md) for per-controller results.
   package, so packages are checked as `pkg-<name>`.
 - **Defining one attribute twice:** set `systemd.services` and similar
   attributes once per module, or combine the pieces with `lib.mkMerge`.
+  `//` is shallow: `{ services.a = …; } // { services.b = …; }` drops `a`.
+- **Example boxes are only evaluated,** so shell that fails ShellCheck
+  only at build time used to pass CI. `box-family-launch` runs ShellCheck
+  over every system's hooks and command. A `case` on a constant word is
+  SC2194.
+- **USAGE.md is generated:** regenerate it after any option change, and
+  after rebasing a PR over another that changed options (merges can
+  leave it stale). Write the build output to a temp file and check it's
+  non-empty before copying, or a failed build empties USAGE.md.
+- **Testing a branch on the box** without merging:
+  `nixos-rebuild switch --flake /etc/nixos#<host> --override-input
+  famidrive github:<owner>/FamiDrive/<branch>`. Then Quit ES-DE (#82).
