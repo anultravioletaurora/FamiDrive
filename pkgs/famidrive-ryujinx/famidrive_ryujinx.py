@@ -14,8 +14,8 @@ same save follows the player whichever emulator runs it.
 SPEC (JSON): {"root": Ryujinx's data folder, "library": the library's
 Switch folder, "faceButtons": "labels" | "positions", "edenKeys": the
 player's Eden keys folder, "edenFirmware": Eden's installed firmware, "defaults": a full
-Config.json to start from, "sdl": the libSDL2 Ryujinx uses}. Paths may
-start with ~.
+Config.json to start from, "ryujinx": the Ryujinx package, whose own
+libSDL2 is used to see the controllers}. Paths may start with ~.
 """
 
 import ctypes
@@ -176,9 +176,19 @@ def link_firmware(spec):
                 shutil.copyfile(part, out)
 
 
+def ryujinx_sdl(package):
+    """The libSDL2 Ryujinx loads: its own, shipped inside it
+    (lib/ryubing/runtimes/linux-x64/native in Ryubing 1.3.3). Found on
+    the first box 2026-10-07: the system's SDL (sdl2-compat) sees the
+    controllers differently, and inside the TV's session not at all."""
+    found = sorted(Path(package).glob("lib/*/runtimes/linux-x64/native/libSDL2*.so*")) if package else []
+    return str(found[0]) if found else None
+
+
 def cmd_setup(spec_json):
     spec = json.loads(spec_json)
-    write_config(spec, gamepads(spec["sdl"]))
+    sdl = spec.get("sdl") or ryujinx_sdl(spec.get("ryujinx"))
+    write_config(spec, gamepads(sdl) if sdl else [])
     copy_keys(spec)
     link_firmware(spec)
 

@@ -61,7 +61,8 @@ in
               edenKeys = "~/.local/share/eden/keys";   # expanded by famidrive-ryujinx
               edenFirmware = "~/.local/share/eden/nand/system/Contents/registered";
               defaults = pkgs.famidrive-ryujinx.defaultConfig;
-              sdl = "${pkgs.SDL2}/lib/libSDL2.so";
+              # Ryujinx's own SDL: it ships one, and only its GUIDs match.
+              ryujinx = "${ryu.package}";
             })} || echo "famidrive-launch: couldn't set up Ryujinx" >&2
             ${pkgs.famidrive-ryujinx}/bin/famidrive-ryujinx game "$tid" "$ROM" \
               || echo "famidrive-launch: Ryujinx won't have the game's update" >&2

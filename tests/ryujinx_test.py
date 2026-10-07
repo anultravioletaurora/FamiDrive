@@ -60,7 +60,7 @@ class Test(unittest.TestCase):
         (firmware / "abc.nca").write_bytes(b"nca")
         spec = {"library": "/lib/switch", "faceButtons": "labels", "edenKeys": "~/.local/share/eden/keys",
                 "edenFirmware": "~/.local/share/eden/nand/system/Contents/registered",
-                "defaults": str(defaults), "sdl": "/nonexistent/libSDL2.so"}
+                "defaults": str(defaults), "ryujinx": "/nonexistent"}
         self.run_tool("setup", json.dumps(spec))
         cfg = json.loads((self.ryu / "Config.json").read_text())
         self.assertEqual(cfg["game_dirs"], ["/lib/switch"])
