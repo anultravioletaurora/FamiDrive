@@ -689,6 +689,19 @@ class Test(unittest.TestCase):
         (root / "card/real.gci").write_bytes(b"save")
         self.assertFalse(a["save_is_empty"](root, ["Game.srm", "card"]))
 
+    def test_switch_dlc_needs_the_players_keys(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        game = box.data / "roms/switch/Game"
+        (game / "dlc").mkdir(parents=True)
+        (game / "dlc/Pack.nsp").write_bytes(b"PFS0" + bytes(12))
+        import contextlib
+        import io
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            a["cmd_switch_dlc"](str(game / "Game.nsp"))       # no Eden keys yet
+        self.assertEqual(json.loads(out.getvalue()), [])
+
     def test_an_archive_is_checked_by_size_not_romms_hash(self):
         box = Box(self.base, "library", tokenFile=None)
         a = box.agent()

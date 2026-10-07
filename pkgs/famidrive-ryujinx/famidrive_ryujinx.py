@@ -1,7 +1,7 @@
 """famidrive-ryujinx: Ryujinx (Ryubing) for the Switch games that need it.
 
     famidrive-ryujinx setup SPEC            before each Ryujinx launch
-    famidrive-ryujinx game TITLE_ID ROM     the game's newest update, from beside it
+    famidrive-ryujinx game TITLE_ID ROM     the game's newest update and its DLC, from beside it
     famidrive-ryujinx save-in TITLE_ID      Eden's save -> Ryujinx's
     famidrive-ryujinx save-out TITLE_ID     Ryujinx's save -> Eden's
 
@@ -209,17 +209,40 @@ def cmd_game(tid, rom):
     crashed."""
     folder = Path(rom).resolve().parent / "update"
     updates = sorted((p for p in folder.glob("*.nsp") if p.is_file()), key=version_key)
-    if not updates:
-        return
-    meta = ROOT / "games" / tid.lower() / "updates.json"
-    want = {"selected": str(updates[-1]), "paths": [str(p) for p in updates]}
+    if updates:
+        write_json(ROOT / "games" / tid.lower() / "updates.json",
+                   {"selected": str(updates[-1]), "paths": [str(p) for p in updates]})
+    dlc = game_dlc(rom)
+    if dlc is not None:
+        write_json(ROOT / "games" / tid.lower() / "dlc.json", dlc)
+
+
+def game_dlc(rom):
+    """The game's DLC (the dlc/ folder beside it in the library) as
+    Ryujinx's dlc.json lists it: each NSP, with its content NCAs by their
+    path inside it and title ID, all on. The RomM agent reads them, with
+    the player's Eden keys. None when it can't (no agent, no keys).
+    Found on the first box 2026-10-07: Smash in Ryujinx had none of its
+    DLC, which Eden finds by itself."""
     try:
-        if json.loads(meta.read_text()) == want:
+        r = subprocess.run(["romm-agent", "switch-dlc", rom], capture_output=True, text=True, check=True)
+        found = json.loads(r.stdout)
+    except (OSError, subprocess.CalledProcessError, ValueError):
+        return None
+    return [{"path": c["path"],
+             "dlc_nca_list": [{"path": "/" + n["name"], "title_id": int(n["title_id"], 16), "is_enabled": True}
+                              for n in c["ncas"]]}
+            for c in found]
+
+
+def write_json(path, value):
+    try:
+        if json.loads(path.read_text()) == value:
             return
     except (OSError, ValueError):
         pass
-    meta.parent.mkdir(parents=True, exist_ok=True)
-    meta.write_text(json.dumps(want, indent=2))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2))
 
 
 # ---------------------------------------------------------------- saves
