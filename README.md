@@ -355,6 +355,127 @@ famidrive = {
   comes back, plus Reboot and Power Off. "Who's playing?" has Power Off
   too, below the players. Who played last starts out selected.
 
+## Installing from scratch
+
+For a PC with no operating system yet, or one running something else
+(Windows, SteamOS, another Linux) that FamiDrive will replace. Installing
+**erases the disk you install to**, so copy off anything you want to keep
+first. Keeping another system beside FamiDrive (dual boot) works with
+NixOS, but isn't covered here.
+
+**You'll need:**
+- a 64-bit PC (x86_64) with an AMD or Intel graphics card. Nvidia should
+  work, but it's untested ([#77](https://github.com/anultravioletaurora/FamiDrive/issues/77)).
+- a USB stick of 4 GB or more
+- a keyboard for the install (only for the install: the box is played
+  with controllers after)
+- an internet connection, wired if you can
+- optionally, a second disk for the game library, and another computer to
+  SSH in from, which makes editing the config much easier
+
+1. **Download NixOS 26.05:** the graphical installer ISO from
+   [nixos.org/download](https://nixos.org/download/#nixos-iso). Write it
+   to the USB stick with [Fedora Media Writer](https://flathub.org/apps/org.fedoraproject.MediaWriter),
+   [balenaEtcher](https://etcher.balena.io) or `dd`.
+2. **Set up the PC's firmware** (its BIOS or UEFI settings, usually Del
+   or F2 at power-on). Boot in **UEFI mode**, and turn **Secure Boot off**:
+   the NixOS installer isn't signed for it. Then boot from the USB stick
+   (often F12 or F8 for a boot menu).
+3. **Install NixOS.** The installer opens on its own. Choices that matter
+   for FamiDrive:
+   - **Location and language:** your real ones. FamiDrive's time zone,
+     and later its language ([#100](https://github.com/anultravioletaurora/FamiDrive/issues/100)),
+     come from them.
+   - **Desktop:** **No desktop.** FamiDrive brings its own TV session.
+   - **Unfree software:** allow it. Steam and some drivers need it.
+   - **Users:** create the first player's account, with the name you'll
+     use for them in FamiDrive (`alice` below), and a password. The TV
+     never asks for it, but SSH and `sudo` do.
+   - **Computer name:** what the box is called on your network, and the
+     name its config is built under (`tv` below).
+   - **Partitions:** erase the disk. Leave encryption off: a box that asks
+     for a password at every boot has no keyboard to type it on.
+
+   Reboot when it's done, and take the USB stick out.
+4. **Log in** on the text console as the account you made. On Wi-Fi,
+   connect with `nmcli device wifi connect "<network>" password "<password>"`
+   (the installer turns on NetworkManager). `ip a` shows the box's
+   address, for SSH from another computer.
+5. **Make `/etc/nixos` a FamiDrive box.** The installer left
+   `configuration.nix` and `hardware-configuration.nix` there. Add a
+   `flake.nix` beside them, as in [Using it](#using-it), with
+   `nixosConfigurations.tv` named after the computer name. In
+   `configuration.nix`, keep everything the installer wrote, especially
+   `system.stateVersion`, the boot loader, networking, time zone and the
+   user account, and add a `famidrive` block:
+
+   ```nix
+   famidrive = {
+     enable = true;
+     players.alice = { };          # the account the installer made
+     lanes = [ "roms" "steam" ];
+     romm.enable = false;          # or true, with the steps below
+     localRoms.gc = "/srv/roms/gamecube";   # games already on the box, by system
+   };
+   ```
+
+   Every option is in [USAGE.md](USAGE.md).
+   - **Without a RomM server:** keep `romm.enable = false`. No secrets
+     are needed. Games come from folders on the box (`localRoms`);
+     plugging in a drive and having it just work is
+     [#99](https://github.com/anultravioletaurora/FamiDrive/issues/99).
+   - **With RomM:** set `endpoints.romm`, and give the box its age key
+     and each player's token:
+     ```sh
+     sudo mkdir -p /var/lib/sops-nix
+     sudo nix --extra-experimental-features 'nix-command flakes' run nixpkgs#age -- -keygen -o /var/lib/sops-nix/key.txt
+     ```
+     The command prints the box's public key (`age1…`). Put it in
+     `/etc/nixos/.sops.yaml` (with yours, if you'll edit secrets from
+     another computer):
+     ```yaml
+     creation_rules:
+       - path_regex: secrets\.yaml$
+         age: age1…
+     ```
+     Then add `romm-token-alice: rmm_…` to `secrets.yaml` with
+     `sudo env SOPS_AGE_KEY_FILE=/var/lib/sops-nix/key.txt nix --extra-experimental-features 'nix-command flakes' run nixpkgs#sops -- /etc/nixos/secrets.yaml`,
+     and the two `sops.` lines from [Using it](#using-it) to
+     `configuration.nix`. [Secrets](#using-it) lists the token's scopes.
+   - **A second disk for the library:** `sudo mkfs.ext4 -L famidrive /dev/<disk>`,
+     and mount it at `/var/lib/famidrive` in `configuration.nix`:
+     ```nix
+     fileSystems."/var/lib/famidrive" = {
+       device = "/dev/disk/by-label/famidrive";
+       options = [ "nofail" ];
+     };
+     ```
+6. **Build and switch:**
+   ```sh
+   sudo nixos-rebuild switch --flake /etc/nixos#tv --extra-experimental-features 'nix-command flakes'
+   ```
+   The first build downloads several gigabytes (Steam, the emulators,
+   ES-DE). FamiDrive turns flakes on, so later rebuilds don't need the
+   last flag. If `/etc/nixos` is a git repository, `git add` new files
+   first: flakes only see what git tracks.
+7. **Reboot.** After the boot screen, the TV shows ES-DE, or "Who's
+   playing?" with more than one player.
+8. **First run, on the TV:**
+   - **Controllers:** 2.4 GHz dongles and wired pads work as they are.
+     Pair Bluetooth pads once with `bluetoothctl` over SSH
+     (`scan on`, then `pair`, `trust` and `connect` with the pad's
+     address). [CONTROLLERS.md](CONTROLLERS.md) has each pad's notes.
+   - **Steam:** sign in under Settings → Steam Settings.
+   - **GOG, Epic, Amazon:** sign in under Settings → Heroic Games
+     Launcher, if `lanes` has `"heroic"`.
+   - **Jellyfin:** sign in once in Media.
+   - **RomM:** with a token, the library pull starts by itself (every
+     30 minutes). `sudo systemctl start romm-library-pull` starts it now.
+
+Updating later is the same everywhere:
+`cd /etc/nixos && sudo nix flake update famidrive && sudo nixos-rebuild switch --flake /etc/nixos#tv`.
+If an update misbehaves, pick the previous generation in the boot menu.
+
 ## Moving an existing NixOS box over
 
 This is the path the first box takes: an existing NixOS gaming box whose
