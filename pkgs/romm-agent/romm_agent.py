@@ -9,6 +9,7 @@ Each player's own (run as that player):
     romm-agent firmware-install        run emulator firmware installs (keys, PS3 firmware)
     romm-agent eden-profile            give a new Eden this player's profile, before it first runs
     romm-agent textures                link the library's Dolphin texture packs into this player's Dolphin
+    romm-agent eden-gamedir            point this player's Eden at the library's Switch folder (updates, DLC)
     romm-agent save-pull SYSTEM ROM    newest save for ROM -> local (pre-launch)
     romm-agent save-push SYSTEM ROM    local save for ROM -> RomM (post-exit)
     romm-agent reconcile               push every local save RomM doesn't have yet
@@ -178,7 +179,10 @@ def download(s, path, dest, expected_sha1=None, expected_size=None, params=None)
     if expected_sha1 and sha1(part) != expected_sha1:
         part.unlink()
         raise RuntimeError(f"hash mismatch for {dest}, discarded")
-    if dest.suffix.lower() in ARCHIVES and expected_size and part.stat().st_size != expected_size:
+    # By size: archives (RomM's hash is of their contents), and single
+    # files fetched by id that RomM has no hash for (Switch content).
+    by_size = dest.suffix.lower() in ARCHIVES or (not expected_sha1 and params)
+    if by_size and expected_size and part.stat().st_size != expected_size:
         part.unlink()
         raise RuntimeError(f"size mismatch for {dest}, discarded")
     part.rename(dest)
@@ -238,11 +242,66 @@ def library(s):
     return all_roms(s, params)
 
 
+VERSION = re.compile(r"\bv(\d+(?:\.\d+)*)", re.I)
+
+
+def newest(files):
+    """The highest-versioned of several updates for one game ("… update
+    v3.0.5.nsp" over v3.0.4); all of them when versions can't be read."""
+    def version(f):
+        m = VERSION.search(f["file_name"])
+        return tuple(int(x) for x in m.group(1).split(".")) if m else None
+    if len(files) < 2 or any(version(f) is None for f in files):
+        return files
+    return [max(files, key=version)]
+
+
+def fetch_with_content(s, rom, system, categories):
+    """A game whose folder in RomM holds more than the game: an update/
+    and a dlc/ folder (RomM's file categories), say, for a Switch game.
+    Each wanted file is fetched on its own (file_ids), never the folder as
+    one zip: RomM has no hashes for these, and a 500 GB library must
+    resume file by file. The folder keeps RomM's layout, which is what
+    Eden reads updates and DLC from (ext_content_from_game_dirs), so they
+    load for every player without installing anything. Returns the
+    folder, or None when RomM has no game file for it (only an update)."""
+    files = get(s, EP_ROM.format(id=rom["id"])).json().get("files") or []
+    exts = {e.lower() for e in CFG["systems"][system].get("extensions", [])}
+    games = [f for f in files if f.get("category") == "game"
+             and Path(f["file_name"]).suffix.lower() in exts and not f["file_name"].startswith(".")]
+    if not games:
+        return None
+    wanted = [(max(games, key=lambda f: f.get("file_size_bytes") or 0), Path())]
+    for cat in categories:
+        found = [f for f in files if f.get("category") == cat and Path(f["file_name"]).suffix.lower() in exts]
+        wanted += [(f, Path(cat)) for f in (newest(found) if cat == "update" else found)]
+    folder = DATA / "roms" / system / rom["fs_name"]
+    keep = set()
+    for f, sub in wanted:
+        dest = folder / sub / f["file_name"]
+        keep.add(dest)
+        download(s, EP_ROM_CONTENT.format(id=rom["id"], file_name=f["file_name"]), dest,
+                 f.get("sha1_hash") or None, f.get("file_size_bytes"), params={"file_ids": f["id"]})
+    # An update RomM has replaced (or a DLC it dropped) goes, so the
+    # library doesn't keep every version.
+    for cat in categories:
+        for old in (folder / cat).glob("*") if (folder / cat).is_dir() else []:
+            if old.is_file() and old not in keep and not old.name.endswith(".part"):
+                old.unlink()
+    return folder
+
+
 def fetch_rom(s, rom, system):
     """Single-file ROMs land as-is. Multi-file ROMs (Switch updates/DLC,
     PS3 and Wii U folders, multi-disc sets) come back from RomM as a zip and
     are unpacked into a folder of the same name. VERIFY per platform that
     ES-DE launches the folder the way each emulator expects."""
+    categories = CFG["systems"][system].get("contentCategories") or []
+    if categories and not rom.get("fs_extension"):
+        folder = fetch_with_content(s, rom, system, categories)
+        if folder is None:
+            raise RuntimeError("RomM has no game file for it (only updates or DLC)")
+        return folder
     dest = DATA / "roms" / system / rom["fs_name"]
     path = EP_ROM_CONTENT.format(id=rom["id"], file_name=rom["fs_name"])
     if not rom.get("has_multiple_files"):
@@ -341,12 +400,21 @@ def romm_title_id(system, tid):
     return tid
 
 
+def switch_game_id(tid):
+    return bool(tid) and re.fullmatch(r"0100[0-9A-Fa-f]{12}", tid) is not None
+
+
 def title_id(system, rom, prev, path):
     """RomM's ID (rule 2), else what this box had, else read from the ROM.
     GameCube and Wii saves are named by the full six-character ID (game
     and maker), so a shorter one from RomM is completed from the disc."""
     tid = romm_title_id(system, rom.get("title_id"))
     had = romm_title_id(system, prev.get("title_id"))
+    if system == "switch":
+        # Only a game's own ID (0100…000-style) names its save folder.
+        # Found on the first box 2026-10-06: RomM had 0105661981816000.
+        tid = tid if switch_game_id(tid) else None
+        had = had if switch_game_id(had) else None
     if system in ("gc", "wii") and (not tid or len(tid) != 6):
         # What this box worked out before counts only if it's complete:
         # an earlier pull may have kept RomM's hex as it was.
@@ -788,6 +856,51 @@ def sfo_title_id(sfo):
 SWITCH_TID = re.compile(r"\[(0100[0-9A-Fa-f]{12})\]")
 
 
+def pfs0_names(path):
+    """The file names inside an NSP (a PFS0 archive), from its header."""
+    with open(path, "rb") as f:
+        head = f.read(16)
+        if len(head) < 16 or head[:4] != b"PFS0":
+            return []
+        count, strings = struct.unpack_from("<II", head, 4)
+        if count > 100000 or strings > 1 << 24:
+            return []
+        entries = f.read(count * 0x18)
+        table = f.read(strings)
+    names = []
+    for i in range(count):
+        _, _, at, _ = struct.unpack_from("<QQII", entries, i * 0x18)
+        end = table.find(b"\0", at)
+        names.append(table[at:end if end >= 0 else None].decode("utf-8", "replace"))
+    return names
+
+
+def switch_title_id(game):
+    """A Switch game's title ID from its NSP: a ticket is named after its
+    rights ID, which starts with the title ID. RomM's Switch file names
+    don't carry it (found on the first box 2026-10-06). An XCI has no
+    tickets; then its update's (update/*.nsp, title ID + 0x800) gives the
+    game's."""
+    def from_tickets(path, update=False):
+        for name in pfs0_names(path):
+            m = re.fullmatch(r"([0-9A-Fa-f]{16})[0-9A-Fa-f]{16}\.tik", name)
+            if m:
+                tid = m.group(1).upper()
+                return tid[:-3] + "000" if update else tid
+        return None
+    try:
+        tid = from_tickets(game)
+        if tid:
+            return tid
+        for upd in sorted((game.parent / "update").glob("*.nsp")):
+            tid = from_tickets(upd, update=True)
+            if tid:
+                return tid
+    except OSError:
+        pass
+    return None
+
+
 def derive_id(system, rom_path):
     """Local fallback when RomM has no title_id. None means learn by diff."""
     try:
@@ -807,7 +920,10 @@ def derive_id(system, rom_path):
             # Scene-style names carry it: "Game [01006BB00C6F0000][v0].nsp".
             # 62 of the TV box's 114 Switch files do.
             m = SWITCH_TID.search(Path(rom_path).name)
-            return m.group(1).upper() if m else None
+            if m:
+                return m.group(1).upper()
+            # Else the NSP's ticket, or its update's, next to it.
+            return switch_title_id(Path(rom_path).resolve())
     except (subprocess.CalledProcessError, struct.error, FileNotFoundError):
         pass
     return None  # xbox360 and anything unreadable: rule 3
@@ -852,6 +968,36 @@ def eden_profile():
         m = None
     i = int(m.group(1)) if m else 0
     return users[i] if i < len(users) else users[0]
+
+
+def cmd_eden_gamedir():
+    """This player's Eden reads the library's Switch folder, deep-scanned,
+    for the updates and DLC beside each game (ext_content_from_game_dirs).
+    Added to Eden's game folder list (a Qt settings array) if it isn't
+    there; the player's other folders stay. Before Eden's first run there
+    is no config: one with just this folder, which Eden fills in."""
+    folder = str(DATA / "roms" / "switch")
+    try:
+        text = EDEN_CONFIG.read_text(errors="replace")
+    except OSError:
+        text = ""
+    if re.search(rf"^Paths\\gamedirs\\\d+\\path={re.escape(folder)}$", text, re.M):
+        return
+    m = re.search(r"^Paths\\gamedirs\\size=(\d+)$", text, re.M)
+    n = int(m.group(1)) + 1 if m else 1
+    entry = (f"Paths\\gamedirs\\{n}\\path={folder}\n"
+             f"Paths\\gamedirs\\{n}\\deep_scan\\default=false\n"
+             f"Paths\\gamedirs\\{n}\\deep_scan=true\n"
+             f"Paths\\gamedirs\\{n}\\expanded\\default=true\n"
+             f"Paths\\gamedirs\\{n}\\expanded=true\n")
+    if m:
+        text = text[:m.start()] + f"Paths\\gamedirs\\size={n}\n" + entry + text[m.end() + 1:]
+    elif "[UI]" in text:
+        text = text.replace("[UI]\n", f"[UI]\nPaths\\gamedirs\\size={n}\n" + entry, 1)
+    else:
+        text += f"\n[UI]\nPaths\\gamedirs\\size={n}\n" + entry
+    EDEN_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    EDEN_CONFIG.write_text(text)
 
 
 def cmd_eden_profile():
@@ -1194,6 +1340,7 @@ def main():
         "save-pull": cmd_save_pull, "save-push": cmd_save_push,
         "gamelists": cmd_gamelists, "firmware-install": cmd_firmware_install,
         "eden-profile": cmd_eden_profile, "textures": cmd_textures,
+        "eden-gamedir": cmd_eden_gamedir,
     }
     if cmd not in commands:
         print(__doc__)

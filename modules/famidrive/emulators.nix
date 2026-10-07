@@ -68,6 +68,9 @@ let
       # Found on the first box 2026-10-06: Clone Hero's score push and
       # bindings save were in its command, and a quit skipped them.
       before = mkOption { type = types.lines; default = ""; };
+      # RomM file categories (its subfolders) pulled along with the game
+      # into its folder: a Switch game's update/ and dlc/.
+      contentCategories = mkOption { type = types.listOf types.str; default = [ ]; };
       after = mkOption { type = types.lines; default = ""; };
       # RomM platform slug this system is pulled from (null = PC lane, not RomM-backed).
       rommPlatform = mkOption { type = types.nullOr types.str; default = null; };
@@ -190,6 +193,9 @@ in
           command = ''QT_QPA_PLATFORM=xcb ${lib.getExe pkgs.eden} -f -g "$ROM"'';
           rommPlatform = "switch";
           emulator = "eden";
+          # Updates and DLC from RomM, beside each game, where Eden reads
+          # them (romm-agent eden-gamedir): one copy for every player.
+          contentCategories = [ "update" "dlc" ];
           saveSync = true;
           platform = "switch";
           # One folder per game, named by title ID, under the profile's folder:

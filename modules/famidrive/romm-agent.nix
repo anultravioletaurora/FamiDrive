@@ -18,7 +18,7 @@ let
   cfg = config.famidrive;
 
   systems = lib.mapAttrs (_: s: {
-    inherit (s) rommPlatform saveSync saveLayout extensions emulator firmwareDir;
+    inherit (s) rommPlatform saveSync saveLayout extensions emulator firmwareDir contentCategories;
   }) (lib.filterAttrs (_: s: s.rommPlatform != null) cfg.systems);
 
   # Everything the agent needs to know, generated from the same
