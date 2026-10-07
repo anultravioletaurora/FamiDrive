@@ -76,8 +76,73 @@ let
     pkgs.runCommand "USAGE.md" { nativeBuildInputs = [ pkgs.python3 ]; } ''
       python3 ${./usage_doc.py} ${builtins.toFile "famidrive-options.json" json} > $out
     '';
+  # A family: two players with RomM, a guest, every lane.
+  familyHost = {
+    famidrive = {
+      enable = true;
+      lanes = [ "roms" "steam" "heroic" "minecraft" ];
+      players = {
+        alice.romm.tokenFile = "/run/secrets/alice-token";
+        bob.owner = "bobby";
+      };
+      primaryPlayer = "alice";
+      guest.enable = true;
+      switch.ryujinx.games = [ "01006A800016E000" ];
+      endpoints.romm = "https://romm.example.org";
+      endpoints.jellyfin = "https://jellyfin.example.org";
+      media.jellyfin.enable = true;
+      media.kodi = {
+        enable = true;
+        sources.Movies = { path = "/media/movies"; content = "movies"; };
+        addons = p: [ p.a4ksubtitles ];
+      };
+      minecraft.instances."Test Server" = {
+        minecraft = "26.2";
+        players = [ "alice" ];
+        servers = [ { name = "Test"; address = "mc.example.org"; } ];
+      };
+      yarg.enable = true;
+      cloneHero = {
+        enable = true;
+        songs."AFI - Miss Murder" = "05185565cb931978c11de73d3048206e";
+        audioOffset = 200;
+      };
+      valheim.mods."ValheimModding-Jotunn-2.30.2" = "sha256-iq6S2ivg62ggzUz1fi9sHWrQ1zjUkVlm58PXqU6amw8=";
+    };
+    nix.gc.options = "--delete-older-than 30d";   # a host's own choice wins
+  };
 in
 {
+  # Every system's launch shell on the family box, through ShellCheck as
+  # famidrive-launch's build does (writeShellApplication), without
+  # building the box's emulators. Found 2026-10-07: a Ryujinx hook that
+  # evaluated fine failed the first box's build.
+  box-family-launch =
+    let
+      systems = (box familyHost).config.famidrive.systems;
+      script = builtins.unsafeDiscardStringContext (''
+        #!/usr/bin/env bash
+        set -euo pipefail
+        ROM="$1"; sync=""
+        case "$ROM" in
+      '' + lib.concatStrings (lib.mapAttrsToList (name: s: ''
+          ${name})
+            ${s.before}
+            bash -c ${lib.escapeShellArg s.command}
+            ${s.after}
+            ;;
+      '') systems) + ''
+        esac
+      '');
+    in
+    pkgs.runCommand "test-box-family-launch" { nativeBuildInputs = [ pkgs.shellcheck ]; } ''
+      shellcheck -e SC2016 ${builtins.toFile "famidrive-launch.sh" script}
+      ${lib.concatStrings (lib.mapAttrsToList (name: s: ''
+        shellcheck -s bash -e SC2016 ${builtins.toFile "command-${name}.sh" (builtins.unsafeDiscardStringContext s.command)}
+      '') systems)}
+      touch $out
+    '';
+
   # USAGE.md is generated: this fails when it's out of date.
   usage-doc = pkgs.runCommand "test-usage-doc" { passthru.doc = usageDoc; } ''
     if ! diff -u ${../USAGE.md} ${usageDoc}; then
@@ -128,41 +193,7 @@ in
         && c.boot.loader.systemd-boot.configurationLimit == 10))
   ]);
 
-  # A family: two players with RomM, a guest, every lane.
-  box-family = expect "family" {
-    famidrive = {
-      enable = true;
-      lanes = [ "roms" "steam" "heroic" "minecraft" ];
-      players = {
-        alice.romm.tokenFile = "/run/secrets/alice-token";
-        bob.owner = "bobby";
-      };
-      primaryPlayer = "alice";
-      guest.enable = true;
-      switch.ryujinx.games = [ "01006A800016E000" ];
-      endpoints.romm = "https://romm.example.org";
-      endpoints.jellyfin = "https://jellyfin.example.org";
-      media.jellyfin.enable = true;
-      media.kodi = {
-        enable = true;
-        sources.Movies = { path = "/media/movies"; content = "movies"; };
-        addons = p: [ p.a4ksubtitles ];
-      };
-      minecraft.instances."Test Server" = {
-        minecraft = "26.2";
-        players = [ "alice" ];
-        servers = [ { name = "Test"; address = "mc.example.org"; } ];
-      };
-      yarg.enable = true;
-      cloneHero = {
-        enable = true;
-        songs."AFI - Miss Murder" = "05185565cb931978c11de73d3048206e";
-        audioOffset = 200;
-      };
-      valheim.mods."ValheimModding-Jotunn-2.30.2" = "sha256-iq6S2ivg62ggzUz1fi9sHWrQ1zjUkVlm58PXqU6amw8=";
-    };
-    nix.gc.options = "--delete-older-than 30d";   # a host's own choice wins
-  } (c:
+  box-family = expect "family" familyHost (c:
     let
       picker = c.services.greetd.settings.default_session;
       pam = c.security.pam.services.greetd.rules.auth;
