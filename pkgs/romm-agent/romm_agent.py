@@ -33,6 +33,7 @@ a real server; those spots say VERIFY.
 
 import getpass
 import hashlib
+import fcntl
 import io
 import json
 import os
@@ -830,8 +831,12 @@ def load_saves():
 
 
 def store_saves(saves):
+    """Written whole and then put in place, so another run never reads a
+    half-written file."""
     STATE.mkdir(parents=True, exist_ok=True)
-    SAVES.write_text(json.dumps(saves, indent=2))
+    tmp = SAVES.with_name(SAVES.name + f".{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(saves, indent=2))
+    tmp.replace(SAVES)
 
 
 def app_id(name):
@@ -1459,6 +1464,9 @@ def cmd_reconcile():
             print(f"push failed for {name}: {e}", file=sys.stderr)
 
 
+SAVE_COMMANDS = {"reconcile", "save-pull", "save-push"}
+
+
 def main():
     cmd, *args = sys.argv[1:] or ["help"]
     commands = {
@@ -1471,6 +1479,16 @@ def main():
     if cmd not in commands:
         print(__doc__)
         sys.exit(64)
+    if cmd in SAVE_COMMANDS:
+        # One save sync at a time per player: the 15-minute reconcile and
+        # the push after a game can start in the same second. Found on the
+        # first box 2026-10-06: both uploaded the same save, and one read
+        # saves.json while the other was writing it.
+        STATE.mkdir(parents=True, exist_ok=True)
+        with open(STATE / "lock", "w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            commands[cmd](*args)
+        return
     commands[cmd](*args)
 
 
