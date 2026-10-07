@@ -52,10 +52,19 @@ Whether to enable FamiDrive.
 
 ### `famidrive.lanes`
 
-Which launch lanes this box carries. An emulation-only box is
-`[ "roms" ]` and skips Steam/Proton/gogdl/Prism entirely.
+Which launch lanes this box carries:
 
-- **Type:** list of (one of "roms", "steam", "gog", "minecraft")
+- `"roms"`: the consoles, through their emulators.
+- `"steam"`: each player's Steam library.
+- `"heroic"`: each player's GOG, Epic Games Store and Amazon
+  Games libraries, through Heroic Games Launcher. Each store is
+  its own system in the menu.
+- `"minecraft"`: Prism Launcher's instances, in Ports.
+
+An emulation-only box is `[ "roms" ]` and skips Steam, Proton,
+Heroic and Prism entirely.
+
+- **Type:** list of (one of "roms", "steam", "heroic", "gog", "minecraft")
 - **Default:** 
 
   ```nix
