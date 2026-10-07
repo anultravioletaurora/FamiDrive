@@ -16,7 +16,7 @@ let
       displayName = mkOption {
         type = types.str;
         default = lib.toUpper (lib.substring 0 1 name) + lib.substring 1 (-1) name;
-        defaultText = "the name, capitalized";
+        defaultText = lib.literalMD "the name, capitalized";
         description = "What the \"Who's playing?\" screen calls them.";
       };
       owner = mkOption {
@@ -32,7 +32,7 @@ let
       romm.tokenFile = mkOption {
         type = types.nullOr types.path;
         default = null;
-        defaultText = "their sops secret, romm-token-<name>";
+        defaultText = lib.literalMD "their sops secret, `romm-token-<name>`";
         description = "Their RomM Client API Token (rmm_...), decrypted by sops-nix.";
       };
       # Revised 2026-10-06: no longer needed by hand. A player's new Eden
@@ -58,6 +58,7 @@ let
       xeniaXuid = mkOption {
         type = types.str;
         readOnly = true;
+        internal = true;
         # Offline profiles use the E0... range. VERIFY against the chosen Xenia fork.
         default = lib.toUpper ("E0" + builtins.substring 0 14 (builtins.hashString "sha256" "famidrive-xenia:${config.owner}"));
       };
@@ -141,7 +142,7 @@ in
       type = types.nullOr types.str;
       default = if lib.length (lib.attrNames config.famidrive.players) == 1
         then lib.head (lib.attrNames config.famidrive.players) else null;
-      defaultText = "the only player, when there's one";
+      defaultText = lib.literalMD "the only player, when there's one";
       example = "alice";
       description = ''
         The box's main player. Their RomM token is the one the shared
@@ -180,7 +181,8 @@ in
       url = mkOption {
         type = types.str;
         default = config.famidrive.endpoints.romm;
-        description = "RomM base URL. Reached over HTTPS through Traefik from anywhere.";
+        defaultText = lib.literalExpression "config.famidrive.endpoints.romm";
+        description = "The RomM server this box uses. Set `endpoints.romm` instead; this is for a box that uses a different RomM than the rest.";
       };
 
       collection = mkOption {
@@ -230,7 +232,7 @@ in
         type = types.listOf types.str;
         default = lib.unique (lib.filter (s: s != null)
           (lib.mapAttrsToList (_: s: s.rommPlatform) config.famidrive.systems));
-        defaultText = "every RomM platform this box has a system for";
+        defaultText = lib.literalMD "every RomM platform this box has a system for";
         description = "RomM platform slugs whose firmware gets pulled. A platform with none in RomM costs one empty request.";
       };
     };

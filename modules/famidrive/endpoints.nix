@@ -33,31 +33,38 @@ in
     rpcn = mkOption {
       type = types.str;
       example = "rpcn.example.com:31313";             # port-forwarded (P2P signaling)
+      description = "RPCN server (PS3 online, RPCS3), host and port. Needs a port forward: it signals peer-to-peer connections.";
     };
     edenRoomHost = mkOption {
       type = types.str;
       example = "eden.example.com";
-      description = "Eden room server (`eden-room`, ships in nixpkgs' eden). Revised 2026-10-05: replaces Ryubing's LDN server.";
+      # Revised 2026-10-05: replaces Ryubing's LDN server.
+      description = "Eden room server (Switch online), `eden-room`, which ships with nixpkgs' eden.";
     };
     edenRoomPort = mkOption {
       type = types.port;
       default = 24872;                                 # Eden's default room port; exposure (proxy vs. forward) unverified
+      description = "The Eden room server's port.";
     };
     xeniaWebServices = mkOption {
       type = types.str;
       example = "https://xenia.example.com";           # reverse proxy (plain REST API)
+      description = "Xenia web services (Xbox 360 online), a plain REST API behind the reverse proxy.";
     };
     retroarchTunnel = mkOption {
       type = types.str;
       example = "netplay.example.com:55435";           # reverse-proxy TCP/UDP entrypoint (pure relay)
+      description = "RetroArch netplay relay (its MITM tunnel server), host and port.";
     };
     dolphinTraversal = mkOption {
       type = types.str;
       example = "traversal.example.com";               # port-forwarded (NAT traversal)
+      description = "Dolphin's traversal server (GameCube and Wii netplay). Needs a port forward: it sees players' real addresses.";
     };
     dolphinTraversalPort = mkOption {
       type = types.port;
       default = 6262;
+      description = "The Dolphin traversal server's port.";
     };
   };
 }

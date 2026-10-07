@@ -57,42 +57,95 @@ let
 
   systemType = types.submodule {
     options = {
-      fullname = mkOption { type = types.str; };
-      extensions = mkOption { type = types.listOf types.str; };
-      # Emulator command. "$ROM" is substituted by famidrive-launch.
-      command = mkOption { type = types.str; };
-      # Shell run by famidrive-launch just before and just after the
-      # command, outside it. Quitting (Select + Start) ends the command's
-      # whole process group, so anything that must still happen after a
-      # quit (pushing a save) goes in `after`, never in the command.
+      fullname = mkOption {
+        type = types.str;
+        description = "The system's name in ES-DE's menu.";
+      };
+      extensions = mkOption {
+        type = types.listOf types.str;
+        description = "File extensions ES-DE lists as games for this system, with the dot.";
+      };
+      command = mkOption {
+        type = types.str;
+        description = "The emulator's command line. `$ROM` is replaced with the game's path.";
+      };
       # Found on the first box 2026-10-06: Clone Hero's score push and
       # bindings save were in its command, and a quit skipped them.
-      before = mkOption { type = types.lines; default = ""; };
-      # RomM file categories (its subfolders) pulled along with the game
-      # into its folder: a Switch game's update/ and dlc/.
-      contentCategories = mkOption { type = types.listOf types.str; default = [ ]; };
-      after = mkOption { type = types.lines; default = ""; };
-      # RomM platform slug this system is pulled from (null = PC lane, not RomM-backed).
-      rommPlatform = mkOption { type = types.nullOr types.str; default = null; };
-      # Pull/push saves through RomM's sync API around each launch. Consoles only.
-      saveSync = mkOption { type = types.bool; default = false; };
-      # Where this emulator keeps saves, and how a ROM maps to its save
-      # path. Read by the RomM agent. Per-emulator layout mapping is still
-      # an open question (roms.md "Console saves: RomM sync API only").
-      saveLayout = mkOption { type = types.nullOr types.attrs; default = null; };
-      platform = mkOption { type = types.str; default = "pc"; };   # ES-DE scraper platform
-      # ES-DE theme folder for the system's logo and art (default: platform).
+      before = mkOption {
+        type = types.lines;
+        default = "";
+        description = "Shell run just before the command, outside it.";
+      };
+      after = mkOption {
+        type = types.lines;
+        default = "";
+        description = ''
+          Shell run just after the command, outside it. Quitting (Select +
+          Start) ends the command's whole process group, so anything that
+          must still happen after a quit (pushing a save) goes here, never
+          in the command.
+        '';
+      };
+      contentCategories = mkOption {
+        type = types.listOf types.str;
+        default = [ ];
+        description = ''
+          RomM file categories (its subfolders) pulled along with the game
+          into its folder, such as a Switch game's `update` and `dlc`.
+        '';
+      };
+      rommPlatform = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "The RomM platform (its slug) this system's games come from. null: not from RomM.";
+      };
+      saveSync = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Pull each game's save from RomM before it starts and push it back after.";
+      };
+      # Per-emulator layout mapping is still an open question (roms.md
+      # "Console saves: RomM sync API only").
+      saveLayout = mkOption {
+        type = types.nullOr types.attrs;
+        default = null;
+        description = ''
+          Where the emulator keeps saves and how a game maps to its save,
+          for the RomM agent: `{ kind; root; }`, with a kind the agent
+          knows (`dolphin-gci-folder`, `eden-title-id`, `retroarch-srm`, ...).
+        '';
+      };
+      platform = mkOption {
+        type = types.str;
+        default = "pc";
+        description = "ES-DE's platform for it, which picks its scraper.";
+      };
       # Found on the first box 2026-10-05: Steam and Media showed the "pc"
       # theme's IBM PC logo.
-      theme = mkOption { type = types.nullOr types.str; default = null; };
-      # Where it sits in ES-DE's system list, which is otherwise by full
-      # name: a sort key, never shown (frontend.nix). null = the full name.
-      sortName = mkOption { type = types.nullOr types.str; default = null; };
-      # Sent to RomM with each save, so its web UI shows what made it.
-      emulator = mkOption { type = types.nullOr types.str; default = null; };
-      # Folder under dataDir/firmware/ this system's firmware lands in
-      # (default: the RomM platform slug). RetroArch systems share "retroarch".
-      firmwareDir = mkOption { type = types.nullOr types.str; default = null; };
+      theme = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "The ES-DE theme folder for its logo and art. null: the platform's.";
+      };
+      sortName = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Where it sits in ES-DE's system list, which is otherwise by full name. Never shown. null: the full name.";
+      };
+      emulator = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "The emulator's name, sent to RomM with each save so its web UI shows what made it.";
+      };
+      firmwareDir = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = ''
+          The folder under the library's `firmware/` this system's firmware
+          goes to. null: the RomM platform. RetroArch systems share
+          `retroarch`.
+        '';
+      };
     };
   };
 in
@@ -100,6 +153,11 @@ in
   options.famidrive.systems = mkOption {
     type = types.attrsOf systemType;
     default = { };
+    description = ''
+      The systems in ES-DE's menu, by ES-DE's folder name for them. Every
+      console FamiDrive supports is already here (with the `roms` lane);
+      set one's fields to change it, or add a system of your own.
+    '';
   };
 
   # One Ports system for everything that isn't a console or a store:
@@ -109,9 +167,20 @@ in
   options.famidrive.ports = mkOption {
     type = types.attrsOf (types.submodule {
       options = {
-        command = mkOption { type = types.lines; };
-        before = mkOption { type = types.lines; default = ""; };
-        after = mkOption { type = types.lines; default = ""; };
+        command = mkOption {
+          type = types.lines;
+          description = "Shell that runs the entry. `$ROM` is the entry's file.";
+        };
+        before = mkOption {
+          type = types.lines;
+          default = "";
+          description = "Shell run just before the command, outside it.";
+        };
+        after = mkOption {
+          type = types.lines;
+          default = "";
+          description = "Shell run just after the command, outside it, even when the player quits with Select + Start.";
+        };
       };
     });
     default = { };

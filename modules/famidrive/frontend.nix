@@ -122,6 +122,8 @@ in
         hash = "sha256-9yfLa1g5t2+bH4qyYQv2zX5QA/X5t0Jhs9gQ4J8jrlk=";
       };
     };
+    defaultText = lib.literalMD "[Art Book Next](https://github.com/anthonycaccese/art-book-next-es-de), pinned";
+    example = lib.literalExpression ''{ name = "my-theme"; src = ./themes/my-theme; }'';
     description = "ES-DE theme, symlinked in and selected. null = ES-DE's bundled default.";
   };
 

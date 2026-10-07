@@ -8,10 +8,11 @@ straight into [ES-DE](https://es-de.org), runs inside
 console emulator, your Steam and GOG games, Minecraft and Jellyfin behind
 one controller-driven menu. Nothing about the box is set up by hand: the
 emulators, their settings, the menu and where every game comes from are
-all one Nix flake. Your ROMs, firmware and saves live in your own
+all one Nix flake. Your ROMs, firmware and saves can live in your own
 [RomM](https://github.com/rommapp/romm) server, so any number of boxes,
 including ones outside your house, are just more clients of the same
-library.
+library, and RomM's web UI is where you manage it. RomM is optional: a
+box can also play ROM folders already on its own disks.
 
 It exists because a console where Steam is the whole interface makes
 everything that isn't a Steam game a guest: emulators get imported as
@@ -23,7 +24,8 @@ and never needs a desktop, and makes Steam just one entry on the menu.
 > **Status: early.** FamiDrive runs on its first box: it boots into ES-DE
 > at 4K120 with HDR, and GameCube and Switch games launch, take focus and
 > quit back to the menu from the controller. Steam games launch, with rough
-> edges. RomM sync and most of the emulators haven't been tried yet. See
+> edges. RomM sync works for GameCube, Wii, Switch and Clone Hero; most of
+> the other emulators haven't been tried yet. See
 > [Status](#status) for what's real and what's a placeholder, and
 > [COMPATIBILITY.md](COMPATIBILITY.md) for game-by-game results.
 
@@ -243,7 +245,8 @@ It usually lives in `/etc/nixos`.
 from the same FamiDrive revision runs the same emulator builds, which
 netplay needs. Build with
 `sudo nixos-rebuild switch --flake /etc/nixos#tv`, and pick up a newer
-FamiDrive with `nix flake update famidrive` first.
+FamiDrive with `nix flake update famidrive` first. Every option, with
+what it does and its default, is in [USAGE.md](USAGE.md).
 
 **Secrets.** Server addresses aren't secret and go in `configuration.nix`.
 Logins for Jellyfin, Steam and GOG happen once in each app, on the TV. The
