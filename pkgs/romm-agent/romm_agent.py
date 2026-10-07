@@ -1321,7 +1321,9 @@ def save_paths(system, entry, rom_path):
     found = []
 
     if kind == "retroarch-srm":
-        found = [Path(rom_path).stem + ".srm"]
+        # RetroArch names the save after the file it was given, which is
+        # the game's real path (emulators.nix), not ES-DE's link to it.
+        found = [Path(rom_path).resolve().stem + ".srm"]
     elif kind == "dolphin-gci-folder" and tid:
         card = Path(DOLPHIN_REGION.get(tid[3], "USA")) / "Card A"
         maker = tid[4:6] or "??"   # a game-only ID still finds its saves

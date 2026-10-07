@@ -48,7 +48,11 @@ let
   # rest (Saturn .bkr, Dreamcast VMUs, melonDS DS) wait until their save
   # files are mapped (roms.md "Mapping saves to games").
   ra = { coreName, saves ? true }: {
-    command = ''${retroarch}/bin/retroarch -f -L ${core coreName} "$ROM"'';
+    # The game's real path, not ES-DE's link to it: a .cue names its .bin
+    # next to itself, and the core looks beside whatever path it's given.
+    # Found on the first box 2026-10-07: every PlayStation game in a
+    # folder (Pepsiman/Pepsiman.cue, .bin) failed to find its .bin.
+    command = ''${retroarch}/bin/retroarch -f -L ${core coreName} "$(readlink -f "$ROM")"'';
     emulator = "retroarch-${coreName}";
     firmwareDir = "retroarch";
     saveSync = saves;
@@ -194,11 +198,36 @@ in
     famidrive.sessionSetup = lib.mkIf (hasLane "roms") ''
       sys="$HOME/.config/retroarch/system"
       mkdir -p "$sys"
+      # Links to files the library no longer has go, so a core can make
+      # its own folder there again. Found on the first box 2026-10-07:
+      # Mupen64plus pointed at a library folder gone after a firmware
+      # pull, the N64 core couldn't write its game database there, and
+      # Mario Party 3 got the wrong save type and wouldn't start.
+      for t in "$sys"/*; do
+        if [ -L "$t" ] && [ ! -e "$t" ]; then
+          case "$(readlink "$t")" in ${fw}/retroarch/*) rm -f "$t" ;; esac
+        fi
+      done
       for f in ${fw}/retroarch/*; do
         [ -e "$f" ] || continue
         t="$sys/$(basename "$f")"
         if [ -e "$t" ] && [ ! -L "$t" ]; then continue; fi
         ln -sfn "$f" "$t"
+      done
+      # SwanStation (PlayStation) looks for its BIOS by one name per
+      # region, scph5501.bin for the US, and nothing else. Found on the
+      # first box 2026-10-07: RomM's BIOS was SCPH1001.BIN, the original
+      # US one, and every game failed to start. Any BIOS of the region,
+      # whatever its name or case, is linked under the expected name.
+      for want in "scph5501.bin:scph5501 scph7001 scph7501 scph1001 scph101 scph9001" \
+                  "scph5502.bin:scph5502 scph7502 scph7002 scph1002 scph102 scph9002" \
+                  "scph5500.bin:scph5500 scph7000 scph7500 scph1000 scph3000 scph3500"; do
+        name="''${want%%:*}"
+        [ -e "$sys/$name" ] && continue
+        for b in ''${want#*:}; do
+          f=$(find "$sys" -maxdepth 1 -iname "$b.bin" -print -quit)
+          if [ -n "$f" ]; then ln -sfn "$(basename "$f")" "$sys/$name"; break; fi
+        done
       done
     '';
 

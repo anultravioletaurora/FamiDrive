@@ -196,6 +196,8 @@ in
       (check "Dolphin loads the library's texture packs, for every player"
         (lib.elem "d /var/lib/famidrive/textures 0755 famidrive-library famidrive -" c.systemd.tmpfiles.rules
           && lib.hasInfix "HiresTextures" c.home-manager.users.guest.home.activation.famidriveEmulators.data))
+      (check "PlayStation's BIOS under the names SwanStation looks for"
+        (lib.hasInfix "scph5501.bin" c.famidrive.sessionSetup))
       (check "RetroArch saves straight in saves/, where save sync looks"
         (lib.hasInfix "sort_savefiles_enable" c.home-manager.users.bob.home.activation.famidriveEmulators.data
           && c.famidrive.systems.psx.saveSync))
