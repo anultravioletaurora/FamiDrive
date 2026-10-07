@@ -5,7 +5,7 @@
 
 let
   agent = writers.writePython3Bin "romm-agent" {
-    libraries = [ python3Packages.requests ];
+    libraries = [ python3Packages.requests python3Packages.cryptography ];   # cryptography: Switch NCA headers
     flakeIgnore = [ "E501" "E127" "E128" "W503" "W504" ];   # line-length + continuation style only
   } (builtins.readFile ./romm_agent.py);
 in

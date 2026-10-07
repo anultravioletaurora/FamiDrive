@@ -51,6 +51,7 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 
 import requests
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 CFG = json.loads(Path(os.environ.get("ROMM_AGENT_CONFIG")
                       or f"/etc/famidrive/romm/{getpass.getuser()}.json").read_text())
@@ -934,6 +935,80 @@ def switch_title_id(game):
     return None
 
 
+def eden_header_key():
+    """The NCA header key from this player's Eden keys, or None."""
+    try:
+        text = (EDEN / "keys" / "prod.keys").read_text(errors="replace")
+    except OSError:
+        return None
+    m = re.search(r"^header_key\s*=\s*([0-9A-Fa-f]{64})\s*$", text, re.M)
+    return bytes.fromhex(m.group(1)) if m else None
+
+
+def nca_program_id(f, offset, key):
+    """The title ID in an NCA's header: its first 0xC00 bytes are AES-XTS
+    encrypted with the header key, in 0x200-byte sectors whose tweak is the
+    sector number, big-endian. The ID is at 0x210, after the NCA3 magic."""
+    f.seek(offset)
+    raw = f.read(0x400)
+    if len(raw) < 0x400:
+        return None
+    plain = b"".join(
+        Cipher(algorithms.AES(key), modes.XTS(n.to_bytes(16, "big"))).decryptor().update(raw[n * 0x200:(n + 1) * 0x200])
+        for n in range(2))
+    if plain[0x200:0x204] not in (b"NCA3", b"NCA2"):
+        return None
+    return "%016X" % struct.unpack_from("<Q", plain, 0x210)[0]
+
+
+def pfs_entries(f, offset, magic, entry_size):
+    """(name, data offset) of each file in a PFS0 or HFS0 at offset."""
+    f.seek(offset)
+    head = f.read(16)
+    if head[:4] != magic:
+        return []
+    count, strings = struct.unpack_from("<II", head, 4)
+    if count > 100000 or strings > 1 << 24:
+        return []
+    table_at = offset + 16 + count * entry_size
+    entries = f.read(count * entry_size)
+    f.seek(table_at)
+    table = f.read(strings)
+    data_at = table_at + strings
+    out = []
+    for i in range(count):
+        at, _size, name_at = struct.unpack_from("<QQI", entries, i * entry_size)
+        end = table.find(b"\0", name_at)
+        out.append((table[name_at:end if end >= 0 else None].decode("utf-8", "replace"), data_at + at))
+    return out
+
+
+def switch_title_id_from_ncas(game, key):
+    """A Switch game's title ID from its NCAs' headers, for an NSP or XCI
+    without tickets (a cartridge dump). The base game's is the commonest
+    one ending in 000. Found on the first box 2026-10-06: 17 of 67 games
+    had no ticket to read it from."""
+    ids = []
+    with open(game, "rb") as f:
+        # By what's in the file, not its name: Mario Tennis Aces in the
+        # first box's RomM is an XCI named .nsp.
+        f.seek(0x100)
+        if f.read(4) == b"HEAD":
+            f.seek(0x130)
+            root, = struct.unpack("<Q", f.read(8))
+            secure = dict(pfs_entries(f, root, b"HFS0", 0x40)).get("secure")
+            ncas = pfs_entries(f, secure, b"HFS0", 0x40) if secure is not None else []
+        else:
+            ncas = pfs_entries(f, 0, b"PFS0", 0x18)
+        for name, at in ncas:
+            if name.endswith(".nca"):
+                tid = nca_program_id(f, at, key)
+                if tid:
+                    ids.append(tid)
+    base = [i for i in ids if i.endswith("000")]
+    return max(set(base), key=base.count) if base else None
+
+
 def derive_id(system, rom_path):
     """Local fallback when RomM has no title_id. None means learn by diff."""
     try:
@@ -1123,10 +1198,12 @@ def snapshot(root):
             for p in root.rglob("*") if p.is_file()} if root.exists() else {}
 
 
-def learn_by_diff(root, before):
-    """Rule 3: top-level save entries that changed during the session."""
-    changed = {Path(rel).parts[0] for rel, mt in snapshot(root).items()
-               if before.get(rel) != mt}
+def learn_by_diff(root, before, depth=1):
+    """Rule 3: save entries that changed during the session, `depth`
+    levels down: 2 for Eden, whose top level is a whole profile (every
+    game's saves), never one game's."""
+    changed = {"/".join(Path(rel).parts[:depth]) for rel, mt in snapshot(root).items()
+               if before.get(rel) != mt and len(Path(rel).parts) > depth}
     return sorted(changed)
 
 
@@ -1235,6 +1312,21 @@ def entry_for(key):
     mine = dict(my_state(load_saves(), key, entry["id"]))
     entry.update({k: v for k, v in mine.items() if k != "title_id"})
     entry["title_id"] = entry.get("title_id") or mine.get("title_id")
+    if not entry["title_id"] and entry.get("system") == "switch" and not key.startswith("app:"):
+        # The library can't read every Switch game's ID (no keys there);
+        # this player's Eden has them. Worked out once, kept with the
+        # player's save state.
+        tid, hk = None, eden_header_key()
+        if hk:
+            try:
+                tid = switch_title_id_from_ncas(Path(key).resolve(), hk)
+            except (OSError, struct.error, ValueError):
+                tid = None
+        if tid:
+            entry["title_id"] = tid
+            saves = load_saves()
+            my_state(saves, key, entry["id"])["title_id"] = tid
+            store_saves(saves)
     return entry
 
 
@@ -1302,7 +1394,8 @@ def cmd_save_push(system, rom_path, learn=True):
 
     rels = save_paths(system, entry, key)
     if rels is None and learn and SNAPSHOT.exists():
-        rels = learn_by_diff(root, json.loads(SNAPSHOT.read_text())) or None
+        rels = learn_by_diff(root, json.loads(SNAPSHOT.read_text()),
+                             depth=2 if kind == "eden-title-id" else 1) or None
         if rels:
             mine["learned"] = rels
             store_saves(saves)
