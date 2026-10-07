@@ -577,6 +577,20 @@ would use, so switching a game between the two keeps it.
   ]
   ```
 
+### `famidrive.switch.ryujinx.memory`
+
+The memory Ryujinx gives the Switch it emulates. A real Switch has
+4 GiB; modded games need more. Found on the first box 2026-10-07:
+Smash Ultimate with HewDraw Remix and all its DLC ran out at 4 GiB
+(`MapPhysicalMemory() = LimitReached` in Ryujinx's log) and crashed
+on the character select screen. HDR's own guides ask for 8 GiB.
+
+Passed as `--dram-size`: started with `--no-gui`, Ryujinx takes
+its settings from the command line, not from Config.json.
+
+- **Type:** one of "4GiB", "6GiB", "8GiB", "12GiB"
+- **Default:** `"8GiB"`
+
 ### `famidrive.switch.ryujinx.package`
 
 The Ryujinx to run them with: nixpkgs' Ryubing, or a canary build.
