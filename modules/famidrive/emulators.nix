@@ -469,9 +469,23 @@ in
             system_directory = "~/.config/retroarch/system";
             savefile_directory = "~/.config/retroarch/saves";   # RetroArch expands ~ itself
             sort_savefiles_by_content_enable = "false";
+            # Every save straight in saves/, where the RomM agent's
+            # retroarch-srm layout looks (<game>.srm). RetroArch's own
+            # default puts each core's in a folder of its own. Found on the
+            # first box 2026-10-07: Mario Party 3's save was in
+            # saves/Mupen64Plus-Next/, so it had never synced.
+            sort_savefiles_enable = "false";
             video_fullscreen = "true";
           };
         }}
+        # Saves already sorted into a core's folder move up next to the
+        # rest. One already there is newer (RetroArch wrote it with
+        # sorting off), so the sorted copy is left where it is.
+        for f in "$HOME/.config/retroarch/saves"/*/*.srm; do
+          [ -e "$f" ] || continue
+          to="$HOME/.config/retroarch/saves/$(basename "$f")"
+          [ -e "$to" ] || mv "$f" "$to"
+        done
         ${seedLib.lockKeys {
           format = "ini";
           target = "$HOME/.config/PCSX2/inis/PCSX2.ini";
