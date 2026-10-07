@@ -25,6 +25,8 @@ SECTIONS = [
     ("RomM", ["famidrive.romm"],
      "The game library, firmware and console saves, from your own [RomM](https://github.com/rommapp/romm). "
      "Optional: a box can also run from ROM folders already on it (`localRoms`)."),
+    ("Hardware", ["famidrive.gpu"],
+     "The box's graphics card. AMD is tested, Intel should just work, Nvidia is untested."),
     ("TV and session", ["famidrive.display", "famidrive.session", "famidrive.cec"],
      "The picture, and what happens to the TV on a rebuild."),
     ("Menu", ["famidrive.esde"], "ES-DE, the menu everything launches from."),

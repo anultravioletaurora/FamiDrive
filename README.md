@@ -203,6 +203,11 @@ planning doc for now and will move into this repo.
 - The "home" button (back to the menu, or straight into Jellyfin, from
   inside a game) has no design yet.
 
+**Graphics cards:** AMD is tested (the first box's Radeon RX 7900 XTX).
+Intel Arc should just work, the same as AMD. Nvidia is supported
+(`famidrive.gpu = "nvidia"`) but untested, and testers are wanted (#77).
+[COMPATIBILITY.md](COMPATIBILITY.md#graphics-cards) has the details.
+
 **Not in scope yet:** original Xbox, HDMI-CEC power-on (sketched behind
 `famidrive.cec.enable`, off), and waking the box with a controller.
 
