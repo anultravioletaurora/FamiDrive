@@ -327,10 +327,14 @@ def fetch_with_content(s, rom, system, categories):
         download(s, EP_ROM_CONTENT.format(id=rom["id"], file_name=f["file_name"]), dest,
                  f.get("sha1_hash") or None, f.get("file_size_bytes"), params={"file_ids": f["id"]})
     # An update RomM has replaced (or a DLC it dropped) goes, so the
-    # library doesn't keep every version.
+    # library doesn't keep every version. Only game files: the folder also
+    # holds famidrive-skip-folders' noload.txt. Found on the first box
+    # 2026-10-07: every pull deleted it, the folder changed, and Eden,
+    # which watches the library, rescanned it in the middle of a game and
+    # crashed.
     for cat in categories:
         for old in (folder / cat).glob("*") if (folder / cat).is_dir() else []:
-            if old.is_file() and old not in keep and not old.name.endswith(".part"):
+            if old.is_file() and old not in keep and old.suffix.lower() in exts:
                 old.unlink()
     return folder
 
@@ -420,7 +424,8 @@ def launchable(dest, system):
     main = launch_file(dest, system)
     if main is None:
         return dest   # nothing recognizable: ES-DE shows the folder
-    (dest / "noload.txt").touch()
+    if not (dest / "noload.txt").exists():   # unchanged when there: emulators watch these folders
+        (dest / "noload.txt").touch()
     link = dest.with_name(dest.name + main.suffix)
     target = f"{dest.name}/{main.name}"
     if not (link.is_symlink() and os.readlink(link) == target):
@@ -751,7 +756,41 @@ def link_switch_mods():
         link.symlink_to(target)
 
 
+# Running in famidrive-launch, these aren't games: the pull doesn't wait
+# for a film to end.
+NOT_GAMES = {"media", "settings"}
+
+
+def game_running():
+    """Whether any player is in a game: a famidrive-launch process for a
+    system that isn't Media or Settings. Read from /proc, since the pull
+    runs as its own account and can't see players' runtime folders."""
+    for cmdline in Path("/proc").glob("[0-9]*/cmdline"):
+        try:
+            args = cmdline.read_bytes().split(b"\0")
+        except OSError:
+            continue
+        for i, a in enumerate(args):
+            if a.endswith(b"/famidrive-launch") and i + 1 < len(args):
+                if args[i + 1].decode(errors="replace") not in NOT_GAMES:
+                    return True
+    return False
+
+
+def wait_for_games(poll=60, limit=6 * 3600):
+    """Hold the pull while someone plays: it writes into the library,
+    which emulators watch (Eden rescans its game list on any change), and
+    it competes with the game for the disk and the network."""
+    waited = 0
+    while game_running() and waited < limit:
+        if waited == 0:
+            print("a game is running: the pull waits until it ends", file=sys.stderr)
+        time.sleep(poll)
+        waited += poll
+
+
 def cmd_pull():
+    wait_for_games()
     s = session()
     old = load_index()
     index, by_system, folders = {}, {}, set()
