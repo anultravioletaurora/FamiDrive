@@ -41,7 +41,7 @@ let
       fabricLoader = mkOption {
         type = types.nullOr types.str;
         default = if config.controller then "0.19.5" else null;
-        defaultText = ''"0.19.5" when `controller` is on, else null'';
+        defaultText = lib.literalMD ''`"0.19.5"` when `controller` is on, else `null`'';
         description = "Fabric Loader version, or null for vanilla Minecraft (no mods).";
       };
 
@@ -86,14 +86,14 @@ let
       java = mkOption {
         type = types.package;
         default = pkgs.jdk25;
-        defaultText = "pkgs.jdk25";
+        defaultText = lib.literalExpression "pkgs.jdk25";
         description = "Java to run it with. Minecraft 26 needs 25; older versions want older ones (1.20.5 to 1.21: jdk21).";
       };
 
       players = mkOption {
         type = types.listOf types.str;
         default = lib.attrNames cfg.players;
-        defaultText = "every player (not the guest)";
+        defaultText = lib.literalMD "every player (not the guest)";
         example = [ "alice" ];
         description = ''
           The players (`famidrive.players`) who get this instance. Each

@@ -53,8 +53,41 @@ let
       '');
   check = what: ok: { inherit what ok; };
   etcJson = c: name: builtins.fromJSON c.environment.etc.${name}.text;
+
+  # USAGE.md, from every option a box can set (not internal or hidden
+  # ones). A value that can't be shown without a real box (a default
+  # computed from another option) comes out as null.
+  usageDoc =
+    let
+      safe = v: let r = builtins.tryEval (builtins.deepSeq v v); in if r.success then r.value else null;
+      all = lib.optionAttrSetToDocList (box { }).options;
+      hidden = map (o: o.name) (lib.filter (o: o.visible == false || o.internal) all);
+      options = lib.filter (o: lib.hasPrefix "famidrive." o.name && !lib.hasInfix "._module." o.name
+          && !lib.any (h: o.name == h || lib.hasPrefix "${h}." o.name) hidden)
+        all;
+      json = builtins.unsafeDiscardStringContext (builtins.toJSON (map (o: {
+        inherit (o) name type readOnly;
+        description = safe (o.description or null);
+        hasDefault = o ? default;
+        default = safe (o.default or null);
+        example = safe (o.example or null);
+      }) options));
+    in
+    pkgs.runCommand "USAGE.md" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+      python3 ${./usage_doc.py} ${builtins.toFile "famidrive-options.json" json} > $out
+    '';
 in
 {
+  # USAGE.md is generated: this fails when it's out of date.
+  usage-doc = pkgs.runCommand "test-usage-doc" { passthru.doc = usageDoc; } ''
+    if ! diff -u ${../USAGE.md} ${usageDoc}; then
+      echo "USAGE.md is out of date. Regenerate it:" >&2
+      echo "  nix build .#checks.x86_64-linux.usage-doc.doc && cp result USAGE.md" >&2
+      exit 1
+    fi
+    touch $out
+  '';
+
   romm-agent = unit "romm_agent" ../pkgs/romm-agent/romm_agent.py
     (pkgs.python3.withPackages (ps: [ ps.requests ps.cryptography ]));
   valheim = unit "valheim" ../pkgs/famidrive-valheim/famidrive_valheim.py pkgs.python3;

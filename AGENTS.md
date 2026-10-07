@@ -58,6 +58,12 @@ the exact commands.
 - **Options:**
   - A host sets everything under `famidrive.*`, and every option gets a
     description.
+  - [USAGE.md](USAGE.md) is generated from the options and CI fails
+    when it's out of date. After adding or changing an option, rebuild
+    it on an x86_64-linux machine:
+    `nix build .#checks.x86_64-linux.usage-doc.doc && cp result USAGE.md`.
+    A new top-level option group needs a section in `tests/usage_doc.py`,
+    or it lands under "Everything else".
   - A default a host may want to change is `lib.mkDefault`.
   - A renamed or removed option gets `mkRemovedOptionModule` or
     `mkRenamedOptionModule` with a message that says what to use instead.
