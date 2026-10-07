@@ -957,13 +957,13 @@ def install_cemu_keys(d):
     stay; each key is added once."""
     new = []
     for f in sorted(d.glob("*.txt")):
-        new += [l.strip() for l in f.read_text(errors="replace").splitlines() if l.strip()]
+        new += [line.strip() for line in f.read_text(errors="replace").splitlines() if line.strip()]
     if not new:
         return
     dest = Path.home() / ".local/share/Cemu/keys.txt"
     dest.parent.mkdir(parents=True, exist_ok=True)
-    have = [l.rstrip("\n") for l in dest.read_text(errors="replace").splitlines()] if dest.exists() else []
-    seen = {l.split("#")[0].strip().lower() for l in have}
+    have = dest.read_text(errors="replace").splitlines() if dest.exists() else []
+    seen = {line.split("#")[0].strip().lower() for line in have}
     for line in new:
         key = line.split("#")[0].strip().lower()
         if key and key not in seen:
