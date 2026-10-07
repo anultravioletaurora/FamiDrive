@@ -730,9 +730,12 @@ def merge_gamelist(library, mine):
 # ---------------------------------------------------------------- firmware
 
 INSTALLERS = {
-    # RPCS3 installs firmware from the PUP. Re-run when RomM's copy changes.
-    "ps3": lambda d: [subprocess.run(["rpcs3", "--installfw", str(p)], check=True)
-                      for p in d.glob("*.PUP")],
+    # No PS3 entry: RPCS3 installs firmware only through its window, which
+    # asks "Install?" first and says "Success" after, and both wait for a
+    # click. Found on the first box 2026-10-06: run at each session start,
+    # under ES-DE, the window never showed and RPCS3 waited forever, a new
+    # one every session; offscreen it installed nothing. Until there's a
+    # way without the window (#48), install it once from RPCS3 itself.
     # Eden reads prod.keys/title.keys from its keys dir (seen on Eden 0.2.1).
     # Firmware goes into nand/system; installing it non-interactively: TODO.
     "switch": lambda d: [
