@@ -161,6 +161,25 @@ in
   kodi = unit "kodi" ../pkgs/famidrive-kodi/famidrive_kodi.py pkgs.python3;
   prism = unit "prism" ../pkgs/famidrive-prism/famidrive_prism.py pkgs.python3;
   ryujinx = unit "ryujinx" ../pkgs/famidrive-ryujinx/famidrive_ryujinx.py pkgs.python3;
+  hardware = unit "hardware" ../pkgs/famidrive-hardware/famidrive_hardware.py pkgs.python3;
+
+  # An Nvidia box: the proprietary driver, set up for gamescope.
+  box-nvidia = expect "nvidia" {
+    famidrive = {
+      enable = true;
+      players.alice = { };
+      romm.enable = false;
+      gpu = "nvidia";
+    };
+  } (c: [
+    (check "Nvidia's driver, open kernel module, with modesetting for gamescope"
+      (lib.elem "nvidia" c.services.xserver.videoDrivers && c.hardware.nvidia.open
+        && c.hardware.nvidia.modesetting.enable))
+    (check "the long-term kernel, which Nvidia's driver keeps up with"
+      (c.boot.kernelPackages.kernel.version == pkgs.linuxPackages.kernel.version))
+    (check "the boot check knows the box is set up for Nvidia"
+      (lib.hasInfix "check nvidia" c.systemd.services.famidrive-hardware-check.serviceConfig.ExecStart))
+  ]);
   generators = unit "generators" ../pkgs/famidrive-generators/famidrive_generate.py pkgs.python3;
   picker = unit "picker" ../pkgs/famidrive-picker/famidrive_picker.py
     (pkgs.python3.withPackages (ps: [ ps.pygame-ce ]));
@@ -174,6 +193,10 @@ in
       yarg.enable = true;
     };
   } (c: [
+    (check "AMD and Intel by default, Intel's video decoder included, newest kernel"
+      (lib.any (p: lib.getName p == "intel-media-driver") c.hardware.graphics.extraPackages
+        && c.services.xserver.videoDrivers != [ "nvidia" ]
+        && c.boot.kernelPackages.kernel.version == pkgs.linuxPackages_latest.kernel.version))
     (check "YARG without Clone Hero still gets the box's songs"
       (c.systemd.services ? famidrive-clonehero-songs
         && !(lib.any (p: lib.getName p == "clonehero") c.environment.systemPackages)))

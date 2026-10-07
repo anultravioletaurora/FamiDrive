@@ -17,6 +17,7 @@ is on; every other option is optional.
 - [Players](#players)
 - [Servers](#servers)
 - [RomM](#romm)
+- [Hardware](#hardware)
 - [TV and session](#tv-and-session)
 - [Menu](#menu)
 - [Switch](#switch)
@@ -313,6 +314,28 @@ The RomM server this box uses. Set `endpoints.romm` instead; this is for a box t
 
 - **Type:** string
 - **Default:** `config.famidrive.endpoints.romm`
+
+## Hardware
+
+The box's graphics card. AMD is tested, Intel should just work, Nvidia is untested.
+
+### `famidrive.gpu`
+
+The box's graphics card, for its drivers. `famidrive-hardware` on
+the box lists its cards and the setting to use.
+
+- `"auto"` (the default): AMD and Intel cards, both through Mesa,
+  plus Intel's video decoder for Kodi. Nothing to choose for either.
+- `"amd"`, `"intel"`: the same as `"auto"`, said outright.
+  AMD is what FamiDrive is tested on; Intel should just work.
+- `"nvidia"`: Nvidia's own driver (its open kernel module, for RTX
+  20-series cards and newer), with kernel modesetting, which
+  gamescope needs, its video decoder, and the long-term kernel,
+  which Nvidia's driver keeps up with. Untested: results welcome
+  in COMPATIBILITY.md.
+
+- **Type:** one of "auto", "amd", "intel", "nvidia"
+- **Default:** `"auto"`
 
 ## TV and session
 

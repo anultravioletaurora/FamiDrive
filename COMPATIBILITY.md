@@ -18,6 +18,7 @@ behave differently in each. For a console game it's the emulator.
 ## Contents
 
 - [Test box](#test-box)
+- [Graphics cards](#graphics-cards)
 - **Games**
   - [Animal Crossing](#animal-crossing) (GameCube)
   - [Animal Crossing: New Horizons](#animal-crossing-new-horizons) (Switch)
@@ -77,6 +78,20 @@ Every result below comes from this box, unless a game says otherwise.
 | Display | 4K TV, 120 Hz, HDR on (`display.hdr = true`, `display.refresh = 120`) |
 | Controllers | 8BitDo Ultimate 2 (2.4 GHz dongle), Xbox Wireless Controller (Bluetooth), first-party Wii Remotes ([CONTROLLERS.md](CONTROLLERS.md)) |
 | FamiDrive | `f2b8769` and later, October 2026 |
+
+## Graphics cards
+
+Which cards FamiDrive has run on, set with `famidrive.gpu`. On a box,
+`famidrive-hardware` lists its cards and the setting to use. AMD and
+Intel need nothing chosen (`"auto"`): both use Mesa. Nvidia's driver is
+proprietary and has to be set (`"nvidia"`), and a check at boot says so
+in the journal when an Nvidia card has no driver.
+
+| Vendor | Driver | Status |
+|---|---|---|
+| AMD | Mesa (RADV), `amdgpu` | ✅ **Tested.** Radeon RX 7900 XTX on the [test box](#test-box): 4K120, HDR, VRR, Steam, every emulator so far. |
+| Intel Arc | Mesa (ANV), `i915` or `xe`, plus Intel's video decoder | ❔ **Untested, should just work.** The same Mesa path as AMD. Some DirectX 12 games run slower on Arc under Proton than on AMD. |
+| Nvidia | Nvidia's driver (open kernel module), modesetting, the long-term kernel | ❔ **Untested. Help wanted:** #77 lists what to try. Gamescope, HDR and VRR on Nvidia are the least certain parts. |
 
 ## Games
 
