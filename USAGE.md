@@ -352,11 +352,17 @@ Whether to enable a boot screen (Plymouth) in place of console text while the bo
 ### `famidrive.boot.splash.scale`
 
 How large Plymouth draws the boot screen. It can't tell how far
-away a TV is, so on a 4K TV it draws everything tiny at 1. Found
-on the first box 2026-10-07: the spinner was barely visible.
+away a TV is, so on a 4K TV it draws everything tiny at 1. The
+default, 4, is for a 4K TV; use 2 on a 1080p one.
+
+Until the graphics driver loads, a few seconds in, the screen is
+the firmware's, usually a lower resolution, so the spinner is
+larger then and shrinks when the driver takes over. Found on the
+first box 2026-10-07: at 2 the spinner looked right on the
+firmware's screen and tiny at 4K.
 
 - **Type:** integer between 1 and 4 (both inclusive)
-- **Default:** `2`
+- **Default:** `4`
 
 ### `famidrive.boot.splash.theme`
 

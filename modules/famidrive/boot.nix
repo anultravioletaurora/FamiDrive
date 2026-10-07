@@ -30,11 +30,17 @@ in
 
     scale = mkOption {
       type = types.ints.between 1 4;
-      default = 2;
+      default = 4;
       description = ''
         How large Plymouth draws the boot screen. It can't tell how far
-        away a TV is, so on a 4K TV it draws everything tiny at 1. Found
-        on the first box 2026-10-07: the spinner was barely visible.
+        away a TV is, so on a 4K TV it draws everything tiny at 1. The
+        default, 4, is for a 4K TV; use 2 on a 1080p one.
+
+        Until the graphics driver loads, a few seconds in, the screen is
+        the firmware's, usually a lower resolution, so the spinner is
+        larger then and shrinks when the driver takes over. Found on the
+        first box 2026-10-07: at 2 the spinner looked right on the
+        firmware's screen and tiny at 4K.
       '';
     };
 
