@@ -536,11 +536,14 @@ works.
 
 **Switch, Eden: ✅ Works.** Face buttons by label.
 
-**Switch, Ryujinx (Ryubing 1.3.3), with HewDraw Remix 0.49.11: ✅ Works**
-(2026-10-07). HDR loaded with the player's save from Eden (Ness already
-unlocked), on update 13.0.4 (`switch.ryujinx.games`). DLC wasn't loaded
-on the first run: Ryujinx needs its own DLC list (#88). Only the 8BitDo
-reached Ryujinx; the GameCube adapter doesn't show up through its SDL.
+**Switch, Ryujinx (Ryubing 1.3.3), with HewDraw Remix 0.49.11: ❌ Broken
+in matches** (2026-10-07). HDR's menus work: it loads with the player's
+save from Eden (Ness already unlocked), on update 13.0.4, with all 99 DLC
+(`switch.ryujinx.games`, #88), and character select works with 8 GiB
+(#102). Every match then crashes as the stage loads, whoever is picked
+(Samus against Kirby on Battlefield, too). This was marked ✅ earlier the
+same day from the menus alone. Only the 8BitDo reaches Ryujinx; the
+GameCube adapter doesn't show up through its SDL.
 
 - **HewDraw Remix:** a Switch mod kept in RomM (the game's `mod/`
   folder), unpacked once and linked into every player's Eden (#53).
@@ -561,6 +564,22 @@ reached Ryujinx; the GameCube adapter doesn't show up through its SDL.
     Smash's 13.0.4 update in RomM** (`update/`); FamiDrive picks the
     newest. Along the way: Ryujinx needed the update chosen for it, all
     of Eden's firmware, and controllers named its way (#80).
+  - 2026-10-07, with all 99 DLC: the game crashed on the character
+    select screen, every time, after `MapPhysicalMemory() =
+    LimitReached`. Ryujinx gave it a stock Switch's 4 GiB; started with
+    `--no-gui`, Ryujinx ignores Config.json's `dram_size`. FamiDrive now
+    passes `--dram-size` (`switch.ryujinx.memory`, 8 GiB, #102), and
+    character select works. The DLC files themselves were fine: every
+    NCA matched its hash.
+  - 2026-10-07, in a match: an invalid memory access in the game's
+    `WorkModule::get_param_float`, called through code that isn't the
+    game's (HDR's plugins, which Skyline loads). Every run also logs
+    `ControlCodeMemory() = InvalidEnumValue` about 4 s in: Ryujinx 1.3.3
+    refuses a kind of code-memory call HDR's Smashline plugin makes to
+    set up its fighter scripts, which only run once a match starts.
+    **Likely needs a newer Ryujinx** (Ryubing's canary builds, through
+    `switch.ryujinx.package`). Their site, git.ryujinx.app, was down,
+    so that's untried.
 
 ### Team Fortress 2
 
