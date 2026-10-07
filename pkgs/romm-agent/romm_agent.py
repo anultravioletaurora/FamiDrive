@@ -949,8 +949,32 @@ def install_ps2_bios(d):
     ini.write_text("\n".join(out) + "\n")
 
 
+def install_cemu_keys(d):
+    """Wii U disc keys (keys.txt, a firmware file in RomM) merged into
+    Cemu's own keys.txt, where it looks for them (its data folder, as
+    Cemu 2 lays it out on Linux): .wud and .wux discs are encrypted, and
+    Cemu can't open one without its key. Lines a player added by hand
+    stay; each key is added once."""
+    new = []
+    for f in sorted(d.glob("*.txt")):
+        new += [l.strip() for l in f.read_text(errors="replace").splitlines() if l.strip()]
+    if not new:
+        return
+    dest = Path.home() / ".local/share/Cemu/keys.txt"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    have = [l.rstrip("\n") for l in dest.read_text(errors="replace").splitlines()] if dest.exists() else []
+    seen = {l.split("#")[0].strip().lower() for l in have}
+    for line in new:
+        key = line.split("#")[0].strip().lower()
+        if key and key not in seen:
+            have.append(line)
+            seen.add(key)
+    dest.write_text("\n".join(have) + "\n")
+
+
 INSTALLERS = {
     "ps2": install_ps2_bios,
+    "wiiu": install_cemu_keys,
     # No PS3 entry: RPCS3 installs firmware only through its window, which
     # asks "Install?" first and says "Success" after, and both wait for a
     # click. Found on the first box 2026-10-06: run at each session start,
