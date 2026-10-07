@@ -630,6 +630,24 @@ class Test(unittest.TestCase):
         self.assertFalse(os.path.lexists(eden / "load" / smash / "HDR"))
         self.assertFalse(os.path.lexists(eden / "sdmc/ultimate/mods/hdr/info.toml"))
 
+    def test_skyline_mods_are_left_out_of_eden(self):
+        box = Box(self.base, "alice")
+        smash = "01006A800016E000"
+        mod = box.data / "mods/switch" / smash / "HDR"
+        (mod / "atmosphere/contents" / smash / "romfs/skyline/plugins").mkdir(parents=True)
+        (mod / "ultimate/mods/hdr").mkdir(parents=True)
+        (mod / "ultimate/mods/hdr/info.toml").write_text("hdr")
+        plain = box.data / "mods/switch" / smash / "60fps"
+        (plain / "atmosphere/contents" / smash / "exefs").mkdir(parents=True)
+        a = box.agent()
+        eden = box.home / ".local/share/eden"
+        (eden / "load" / smash).mkdir(parents=True)
+        (eden / "load" / smash / "HDR").symlink_to(mod / "atmosphere/contents" / smash)   # linked before
+        a["cmd_textures"]()
+        self.assertFalse(os.path.lexists(eden / "load" / smash / "HDR"))
+        self.assertFalse(os.path.lexists(eden / "sdmc/ultimate/mods/hdr/info.toml"))
+        self.assertTrue((eden / "load" / smash / "60fps").is_symlink())
+
     def test_an_archive_is_checked_by_size_not_romms_hash(self):
         box = Box(self.base, "library", tokenFile=None)
         a = box.agent()

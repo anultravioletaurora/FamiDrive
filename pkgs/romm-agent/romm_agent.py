@@ -689,7 +689,12 @@ def link_switch_mods():
     ultimate/mods/...) on this player's SD card, linked file by file:
     ARCropolis and the like write their own files beside them. A file of
     the player's own in the way is kept as <name>.before-romm. Links to
-    what the library no longer has are removed."""
+    what the library no longer has are removed.
+
+    A mod built on Skyline plugins (romfs/skyline/plugins, as HewDraw
+    Remix is) is left out: Eden, like yuzu before it, can't run them, and
+    the game crashes as it starts. Found on the first box 2026-10-07:
+    Smash Ultimate with HDR hit a fatal error 4 s in."""
     want = {}
     for system in eden_systems():
         for game in (MODS / system).iterdir() if (MODS / system).is_dir() else []:
@@ -699,6 +704,9 @@ def link_switch_mods():
                 if not mod.is_dir():
                     continue
                 code = mod / "atmosphere/contents" / game.name
+                if (code / "romfs/skyline/plugins").is_dir():
+                    print(f"{mod.name} needs Skyline, which Eden can't run; not added", file=sys.stderr)
+                    continue
                 if code.is_dir():
                     want[EDEN_LOAD / game.name / mod.name] = code
                 for dirpath, dirs, names in os.walk(mod):
