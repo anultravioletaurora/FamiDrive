@@ -38,6 +38,7 @@ behave differently in each. For a console game it's the emulator.
   - [The Legend of Zelda: Breath of the Wild](#the-legend-of-zelda-breath-of-the-wild) (Switch)
   - [Left 4 Dead 2](#left-4-dead-2) (PC)
   - [Mario Kart: Double Dash!!](#mario-kart-double-dash) (GameCube)
+  - [Mario Kart 8 Deluxe](#mario-kart-8-deluxe) (Switch)
   - [Mario Party 3](#mario-party-3) (N64)
   - [Minecraft (vanilla 26.2, a private server)](#minecraft-vanilla-262-a-private-server) (PC)
   - [Overwatch](#overwatch) (PC)
@@ -267,6 +268,17 @@ content loads.
 ### Mario Kart: Double Dash!!
 
 **GameCube, Dolphin: ✅ Works.** The 8BitDo's rumble works.
+
+### Mario Kart 8 Deluxe
+
+**Switch, Eden 0.2.1: 🟡 Graphics glitches.** 2026-10-06, with update
+3.0.5 and the Booster Course Pass from RomM, played on a save carried
+over from Ryujinx with everything unlocked.
+
+- **Glitches:** during a cup, lots of stray textures (spiky polygons)
+  cover the track. Menus are fine.
+- **To try:** Eden's GPU accuracy (Normal and High), its asynchronous
+  shader option, and Vulkan against OpenGL.
 
 ### Mario Party 3
 
