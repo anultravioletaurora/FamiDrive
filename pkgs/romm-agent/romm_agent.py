@@ -152,6 +152,29 @@ def sha1(path):
 
 
 ARCHIVES = {".zip", ".7z", ".rar"}
+# path -> [size, mtime_ns, sha1] of files already checked. Found on the
+# first box 2026-10-06: every pull re-read the whole library (121 GB) to
+# hash files it had checked the pull before.
+HASHES = DATA / "hashes.json"
+
+
+def known_sha1(path):
+    """A file's sha1, read again only if it changed since it was hashed."""
+    try:
+        cache = json.loads(HASHES.read_text())
+    except (OSError, ValueError):
+        cache = {}
+    st = path.stat()
+    have = cache.get(str(path))
+    if have and have[0] == st.st_size and have[1] == st.st_mtime_ns:
+        return have[2]
+    digest = sha1(path)
+    cache[str(path)] = [st.st_size, st.st_mtime_ns, digest]
+    try:
+        HASHES.write_text(json.dumps(cache))
+    except OSError:
+        pass   # a player's run can't write the library's cache; fine
+    return digest
 
 
 def download(s, path, dest, expected_sha1=None, expected_size=None, params=None):
@@ -162,7 +185,7 @@ def download(s, path, dest, expected_sha1=None, expected_size=None, params=None)
         # checked. Found on the first box 2026-10-06, with a texture pack.
         expected_sha1 = None
     if dest.exists():
-        if expected_sha1 and sha1(dest) == expected_sha1:
+        if expected_sha1 and known_sha1(dest) == expected_sha1:
             return False
         if not expected_sha1 and (expected_size is None or dest.stat().st_size == expected_size):
             return False
@@ -176,7 +199,7 @@ def download(s, path, dest, expected_sha1=None, expected_size=None, params=None)
         with open(part, mode) as f:
             for chunk in r.iter_content(1 << 20):
                 f.write(chunk)
-    if expected_sha1 and sha1(part) != expected_sha1:
+    if expected_sha1 and known_sha1(part) != expected_sha1:
         part.unlink()
         raise RuntimeError(f"hash mismatch for {dest}, discarded")
     # By size: archives (RomM's hash is of their contents), and single
@@ -186,6 +209,13 @@ def download(s, path, dest, expected_sha1=None, expected_size=None, params=None)
         part.unlink()
         raise RuntimeError(f"size mismatch for {dest}, discarded")
     part.rename(dest)
+    if expected_sha1:
+        try:   # the hash just checked is the finished file's: keep it
+            cache = json.loads(HASHES.read_text())
+            cache[str(dest)] = cache.pop(str(part))
+            HASHES.write_text(json.dumps(cache))
+        except (OSError, ValueError, KeyError):
+            pass
     return True
 
 
