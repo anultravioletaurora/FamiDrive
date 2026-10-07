@@ -870,7 +870,48 @@ def merge_gamelist(library, mine):
 
 # ---------------------------------------------------------------- firmware
 
+def pick_ps2_bios(d):
+    """The BIOS file in the library's PS2 firmware: the 4 MiB main image
+    (a console's .rom1/.rom2/.erom/.nvm files sit beside it), preferring
+    one named as US (BIOS dumps usually say their region), then by name.
+    None if there isn't one."""
+    bios = [p for p in d.iterdir() if p.is_file() and p.stat().st_size == 4 * 1024 * 1024]
+    if not bios:
+        return None
+    return sorted(bios, key=lambda p: (not re.search(r"(?<![a-z])usa?(?![a-z])", p.name, re.I), p.name))[0]
+
+
+def install_ps2_bios(d):
+    """PCSX2 runs nothing until a BIOS is picked, by file name, in
+    PCSX2.ini ([Filenames] BIOS); its folder is the library's (Nix sets
+    that). Set here, since the name is only known once RomM has one."""
+    bios = pick_ps2_bios(d)
+    if not bios:
+        return
+    ini = Path.home() / ".config/PCSX2/inis/PCSX2.ini"
+    ini.parent.mkdir(parents=True, exist_ok=True)
+    lines = ini.read_text(errors="replace").splitlines() if ini.exists() else []
+    out, inside, done = [], False, False
+    for line in lines:
+        s = line.strip()
+        if s.startswith("[") and s.endswith("]"):
+            if inside and not done:
+                out.append(f"BIOS = {bios.name}")
+                done = True
+            inside = s == "[Filenames]"
+        elif inside and line.split("=", 1)[0].strip() == "BIOS":
+            line, done = f"BIOS = {bios.name}", True
+        out.append(line)
+    if inside and not done:
+        out.append(f"BIOS = {bios.name}")
+        done = True
+    if not done:
+        out += ["", "[Filenames]", f"BIOS = {bios.name}"]
+    ini.write_text("\n".join(out) + "\n")
+
+
 INSTALLERS = {
+    "ps2": install_ps2_bios,
     # No PS3 entry: RPCS3 installs firmware only through its window, which
     # asks "Install?" first and says "Success" after, and both wait for a
     # click. Found on the first box 2026-10-06: run at each session start,

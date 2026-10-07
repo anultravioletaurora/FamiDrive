@@ -678,6 +678,30 @@ class Test(unittest.TestCase):
         self.assertFalse(os.path.lexists(ryu / "mods/contents" / smash / "HDR"))
         self.assertFalse(os.path.lexists(ryu / "sdcard/ultimate/mods/hdr/info.toml"))
 
+    def test_ps2_bios_picked_in_pcsx2(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        fw = self.base / "fw-ps2"
+        fw.mkdir()
+        (fw / "README.md").write_text("firmware goes here")
+        (fw / "SCPH-70004_BIOS_V12_EUR_200.BIN").write_bytes(bytes(4 * 1024 * 1024))
+        (fw / "SCPH-70012_BIOS_V12_USA_200.BIN").write_bytes(bytes(4 * 1024 * 1024))
+        (fw / "SCPH-70012_BIOS_V12_USA_200.NVM").write_bytes(bytes(1024))
+        ini = box.home / ".config/PCSX2/inis/PCSX2.ini"
+        ini.parent.mkdir(parents=True)
+        ini.write_text("[Folders]\nBios = /lib/fw/ps2\n\n[Filenames]\nBIOS = old.bin\n[UI]\nX = 1\n")
+        a["install_ps2_bios"](fw)
+        text = ini.read_text()
+        self.assertIn("BIOS = SCPH-70012_BIOS_V12_USA_200.BIN", text)
+        self.assertNotIn("old.bin", text)
+        self.assertIn("[UI]\nX = 1", text)
+        ini.write_text("[Folders]\nBios = /lib/fw/ps2\n")
+        a["install_ps2_bios"](fw)
+        self.assertIn("[Filenames]\nBIOS = SCPH-70012", ini.read_text())
+        empty = self.base / "fw-none"
+        empty.mkdir()
+        self.assertIsNone(a["pick_ps2_bios"](empty))
+
     def test_an_empty_save_is_not_a_save(self):
         box = Box(self.base, "alice")
         a = box.agent()

@@ -77,6 +77,20 @@ let
     saveLayout = { kind = "retroarch-srm"; root = "~/.config/retroarch/saves"; };
   };
 
+  # A DualShock 2 in PCSX2.ini, on SDL controller n.
+  ps2Pad = n: let b = x: "SDL-${toString n}/${x}"; in {
+    Type = "DualShock2";
+    Up = b "DPadUp"; Right = b "DPadRight"; Down = b "DPadDown"; Left = b "DPadLeft";
+    Triangle = b "FaceNorth"; Circle = b "FaceEast"; Cross = b "FaceSouth"; Square = b "FaceWest";
+    Select = b "Back"; Start = b "Start";
+    L1 = b "LeftShoulder"; L2 = b "+LeftTrigger"; R1 = b "RightShoulder"; R2 = b "+RightTrigger";
+    L3 = b "LeftStick"; R3 = b "RightStick";
+    LUp = b "-LeftY"; LRight = b "+LeftX"; LDown = b "+LeftY"; LLeft = b "-LeftX";
+    RUp = b "-RightY"; RRight = b "+RightX"; RDown = b "+RightY"; RLeft = b "-RightX";
+    Analog = b "Guide";
+    LargeMotor = b "LargeMotor"; SmallMotor = b "SmallMotor";
+  };
+
   # Dolphin's RetroAchievements unlocks as toasts: famidrive-cheevos
   # turns on its log channel for the player (Logger.ini) and reads the
   # log beside each game, as for RetroArch above.
@@ -586,6 +600,17 @@ in
           keys = {
             Folders.Bios = "${fw}/ps2";
             EmuCore.McdFolderAutoManage = "true";   # per-game folder memcards; TODO: verify key
+            # PCSX2's first-run wizard (language, BIOS, controllers) can't be
+            # clicked through on the TV; FamiDrive sets what it would. The
+            # BIOS file itself is picked at session start (romm-agent
+            # firmware-install), once RomM's is known.
+            UI.SetupWizardIncomplete = "false";
+            InputSources.SDL = "true";
+            # The first two controllers as DualShock 2s, by position, the
+            # way PCSX2's own automatic mapping does it. Out of the box
+            # PCSX2 maps the keyboard. Names read from PCSX2 2.8.2.
+            Pad1 = ps2Pad 0;
+            Pad2 = ps2Pad 1;
           };
         }}
         ${seedLib.lockKeys {
