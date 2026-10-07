@@ -151,13 +151,16 @@ planning doc for now and will move into this repo.
 - "Who's playing?" with two players and a guest, each with their own
   saves, Steam and RomM account, and powering off from the controller.
 - The RomM agent against RomM 5.3 on the first box: the library pull
-  (single files, folders and nested files), firmware, and GameCube save
-  sync both ways, with conflict copies and a short save history. Each
+  (single files, folders and nested files), firmware, and save sync both
+  ways for GameCube, Wii, Switch and Clone Hero, with conflict copies
+  and a short save history. Each
   game's details and box art come from RomM, with each player's
   favorites and play counts kept. A box can mirror some platforms only
   (`romm.platforms`). Dolphin HD texture packs kept in RomM (a zip in the
   game's `mod/` folder) are unpacked once and loaded for every player.
-  Switch saves are next.
+  Switch games come with their newest update and every DLC from RomM,
+  one copy for the whole box that Eden reads in place, and a game's
+  console-side (device) save syncs along with the player's.
 - The Steam lane, with Proton pins and Steam Input set from Nix, Steam's
   Big Picture as a Settings entry, and a status screen while Steam
   updates, processes shaders or starts a game. Results per game are in
@@ -170,13 +173,18 @@ planning doc for now and will move into this repo.
 - Menu music: each player's `~/ES-DE/music`, shuffled behind ES-DE and
   paused while a game is open (ES-DE has no music of its own).
 - Wii games with real Wii Remotes and the Balance Board, and Minecraft
-  instances declared in Nix, with controller play through Controlify.
+  instances declared in Nix (per player), with controller play through
+  Controlify.
+- Kodi in Media (`famidrive.media.kodi`), with Jellyfin for Kodi, the
+  box's own media folders, HDR, and the house controllers mapped.
 
 **Still a sketch:**
 
-- The RomM agent's save sync for systems other than GameCube hasn't run
-  against a real server yet. Field values it hasn't seen are marked
-  `VERIFY`.
+- The RomM agent's save sync for systems other than GameCube, Wii and
+  Switch hasn't run against a real server yet. Field values it hasn't
+  seen are marked `VERIFY`.
+- PS3 firmware isn't installed automatically: RPCS3 only installs it
+  through its own window (#48).
 - RomM's save sync is being redesigned ("Save Sync v2", a draft as of
   2026-09-23). The agent's save half will need rewriting when it lands;
   the library and firmware half shouldn't.

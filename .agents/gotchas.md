@@ -32,6 +32,21 @@ Found against RomM 5.3:
 - **Renames:** a renamed ROM gets a new key in `saves.json`. `my_state`
   carries the old key's sync history over. Without it, the next push is
   a false conflict.
+- **RomM hashes what's inside an archive,** not the archive (a zipped
+  ROM then matches its known checksums). Zips are checked by size.
+- **RomM has no hashes for Switch files,** and its file names carry no
+  title IDs. Switch content is fetched file by file (`file_ids`) and
+  checked by size.
+- **A folder with extras:** RomM serves the whole folder as one zip
+  unless asked for one file (`/roms/{id}/content/<file>?file_ids=<id>`).
+- **RomM's file categories are its subfolder names:** `game`, `update`,
+  `dlc`, `mod`, `hack`, `manual`, and so on. FamiDrive uses `update` and
+  `dlc` (Switch, `contentCategories`), `mod` zips with Dolphin textures
+  (texture packs), and leaves `hack` to #44.
+- **RomM's `path_cover_large` can 404** (a cover it has no file for).
+  Its `url_cover` is the fallback.
+- **Pulls hash once:** `hashes.json` keeps each file's sha1 by size and
+  mtime. Without it, every pull re-read the whole library.
 - **Tokens need write scopes** for save upload. A read-only token pulls
   fine and then fails on push.
 
@@ -44,6 +59,21 @@ Found against RomM 5.3:
 - **The active profile** is `current_user` in Eden's settings.
 - **New profiles:** FamiDrive derives a new profile's ID from the RomM
   owner, so the same player gets the same ID on every box.
+- **Device saves:** some games keep their save on the console, not in a
+  profile (Animal Crossing's island, part of Mario Kart 8's), under the
+  all-zero user. They sync as they are.
+- **Updates and DLC:** Eden loads them from a deep-scanned game folder
+  (`ext_content_from_game_dirs`), so nothing is installed per player
+  (`romm-agent eden-gamedir`).
+- **Title IDs:** from a ticket's name in the NSP, else from the NCA
+  headers, decrypted with the player's `header_key`. Read the file's
+  contents, not its extension: one "NSP" was an XCI.
+- **Learn-by-diff on Eden** must look two levels down: the top level is a
+  whole profile, every game's saves.
+- **Migrating saves:** "newest wins" is wrong when the game has just
+  created a fresh, empty save. Check the contents (Tomodachi Life's
+  played save had photos and creations; Smash's Mii numbers show how far
+  it was played).
 - **Save archives** store the profile folder as `@profile`, and the
   hashes are computed over the archived paths, not the local ones.
 
@@ -118,6 +148,26 @@ See [CONTROLLERS.md](../CONTROLLERS.md) for per-controller results.
 - **RomM keeps saves only for entries in its library.** Clone Hero's
   saves live under an entry added by hand, which the agent finds by name
   (`famidrive.romm.apps`).
+
+## Kodi
+
+- **Kodi never sets `_NET_WM_PID`.** gamescope-fg finds its window's
+  process through the X server (XRes, `xrestop`).
+- **The joystick add-on has no maps for xpad or xpadneo pads** under
+  their own names. FamiDrive seeds maps (the Xbox 360 pad's layout).
+- **HDR works under gamescope.**
+
+## Other emulators
+
+- **RPCS3 installs firmware only through its window,** which waits for a
+  click before and after (#48). Never run `--installfw` unattended.
+
+## The box
+
+- **A full system disk:** Steam's download queue filled the first box's
+  root disk (1.5 TB of Steam). Watch `df` before blaming anything else.
+- **Two agent runs at once:** reconcile, save-pull and save-push take a
+  lock per player. Don't run two by hand in parallel to test.
 
 ## Nix and CI
 
