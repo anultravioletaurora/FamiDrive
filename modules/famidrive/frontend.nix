@@ -68,6 +68,13 @@ let
   # every launch has to go through famidrive-launch for save sync and focus.
   # A custom_systems entry with the same <name> replaces the bundled one.
   # The exact command-template syntax is still an open item in roms.md and pc-games.md.
+  #
+  # Commands name famidrive-launch through /run/current-system, not its
+  # store path. ES-DE reads this file once, when it starts, so a store
+  # path kept a running ES-DE launching through the previous build's
+  # hooks after a switch until the player quit ES-DE (#82). The system's
+  # link always points at the newest build (environment.systemPackages
+  # below), so a switch reaches the next launch from the menu.
   esSystemsXml = pkgs.writeText "es_systems.xml" ''
     <?xml version="1.0"?>
     <systemList>
@@ -77,7 +84,7 @@ let
         <fullname>${s.fullname}</fullname>
         <path>%ROMPATH%/${name}</path>
         <extension>${lib.concatStringsSep " " (s.extensions ++ map lib.toUpper s.extensions)}</extension>
-        <command label="${s.fullname}">${famidriveLaunch}/bin/famidrive-launch ${name} %ROM%</command>
+        <command label="${s.fullname}">/run/current-system/sw/bin/famidrive-launch ${name} %ROM%</command>
         <platform>${s.platform}</platform>
         <theme>${if s.theme != null then s.theme else s.platform}</theme>
       </system>
