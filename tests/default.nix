@@ -195,7 +195,7 @@ in
   } (c: [
     (check "a boot screen in place of console text"
       (c.boot.plymouth.enable && c.boot.plymouth.theme == "bgrt" && c.boot.initrd.systemd.enable
-        && lib.hasInfix "DeviceScale=2" c.boot.plymouth.extraConfig
+        && lib.hasInfix "DeviceScale=4" c.boot.plymouth.extraConfig
         && lib.elem "quiet" c.boot.kernelParams && lib.elem "splash" c.boot.kernelParams))
     (check "AMD and Intel by default, Intel's video decoder included, newest kernel"
       (lib.any (p: lib.getName p == "intel-media-driver") c.hardware.graphics.extraPackages
