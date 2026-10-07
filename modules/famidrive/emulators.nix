@@ -200,6 +200,21 @@ in
         if [ -e "$t" ] && [ ! -L "$t" ]; then continue; fi
         ln -sfn "$f" "$t"
       done
+      # SwanStation (PlayStation) looks for its BIOS by one name per
+      # region, scph5501.bin for the US, and nothing else. Found on the
+      # first box 2026-10-07: RomM's BIOS was SCPH1001.BIN, the original
+      # US one, and every game failed to start. Any BIOS of the region,
+      # whatever its name or case, is linked under the expected name.
+      for want in "scph5501.bin:scph5501 scph7001 scph7501 scph1001 scph101 scph9001" \
+                  "scph5502.bin:scph5502 scph7502 scph7002 scph1002 scph102 scph9002" \
+                  "scph5500.bin:scph5500 scph7000 scph7500 scph1000 scph3000 scph3500"; do
+        name="''${want%%:*}"
+        [ -e "$sys/$name" ] && continue
+        for b in ''${want#*:}; do
+          f=$(find "$sys" -maxdepth 1 -iname "$b.bin" -print -quit)
+          if [ -n "$f" ]; then ln -sfn "$(basename "$f")" "$sys/$name"; break; fi
+        done
+      done
     '';
 
     famidrive.systems = lib.mkMerge [
