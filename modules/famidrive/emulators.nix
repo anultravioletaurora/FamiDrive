@@ -325,7 +325,7 @@ in
           # no game list around it, and Ryujinx quits when the game does.
           command = lib.optionalString (cfg.switch.ryujinx.games != [ ]) ''
             if [ -n "''${FAMIDRIVE_RYUJINX:-}" ]; then
-              exec ${lib.getExe cfg.switch.ryujinx.package} --no-gui --fullscreen "$ROM"
+              exec ${lib.getExe cfg.switch.ryujinx.package} --no-gui --fullscreen --dram-size MemoryConfiguration${cfg.switch.ryujinx.memory} "$ROM"
             fi
           '' + ''QT_QPA_PLATFORM=xcb ${lib.getExe pkgs.eden} -f -g "$ROM"'';
           rommPlatform = "switch";
