@@ -631,7 +631,10 @@ own mapping.
 What's in each GameCube port in Dolphin, port 1 first. Ports left off
 the end are empty. Each entry is one of:
 
-- `"gamepad"`: a modern controller, whichever one Dolphin picks.
+- `"gamepad"`: whichever controller is connected when the game
+  starts: the first `"gamepad"` port gets the first pad, and so on,
+  modern pads before GameCube controllers on the official adapter.
+  Any model works; nothing is tied to one pad.
 - a known controller's short name, such as `"8bitdo-ultimate-2"`. Name
   the same model twice for two of them; the first one connected is
   the lower port.
