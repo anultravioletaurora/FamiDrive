@@ -16,12 +16,12 @@ The token is kept in ~/.local/state/famidrive/retroachievements.json, so a
 session that starts with RetroAchievements unreachable still signs in.
 One token serves every emulator: it's the account's, not an emulator's.
 
-watch (beside each RetroArch game, from famidrive-launch): reads
-RetroArch's log as it's written and shows a toast (famidrive-toast) for
+watch (beside each RetroArch and Dolphin game, from famidrive-launch):
+reads the emulator's log as it's written and shows a toast (famidrive-toast) for
 each unlock, with the achievement's description and points from
 RetroAchievements and the game's logo from ES-DE's media (a trophy when
 it has none). RetroArch's own unlock pop-up is turned off by setup, so
-there's one, in the player's theme.
+there's one, in the player's theme; Dolphin has no switch for its own.
 
 SPEC (JSON, from Nix): {"username", "passwordFile", "hardcore",
 "retroarch": bool, "dolphin": bool, "pcsx2": bool}.
@@ -164,6 +164,12 @@ def configure(spec, token):
             "ApiToken": token,
             "HardcoreEnabled": "True" if hard else "False",
         })
+        # Its RetroAchievements log channel, at info level and to a file,
+        # where watch reads unlocks. Every other channel stays as it was
+        # (all off unless someone turned one on).
+        logger = HOME / ".config/dolphin-emu/Logger.ini"
+        set_ini(logger, "Logs", {"RetroAchievements": "True"})
+        set_ini(logger, "Options", {"WriteToFile": "True", "Verbosity": "4"})
     if spec.get("pcsx2"):
         set_ini(HOME / ".config/PCSX2/inis/PCSX2.ini", "Achievements", {
             "Enabled": "true",

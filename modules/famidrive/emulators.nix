@@ -77,6 +77,20 @@ let
     saveLayout = { kind = "retroarch-srm"; root = "~/.config/retroarch/saves"; };
   };
 
+  # Dolphin's RetroAchievements unlocks as toasts: famidrive-cheevos
+  # turns on its log channel for the player (Logger.ini) and reads the
+  # log beside each game, as for RetroArch above.
+  dolphinCheevos = let log = "$HOME/.local/share/dolphin-emu/Logs/dolphin.log"; in {
+    before = ''
+      rm -f "${log}"
+      ${pkgs.famidrive-cheevos}/bin/famidrive-cheevos watch "${log}" "$system" "$ROM" &
+      cheevos_watch=$!
+    '';
+    after = ''
+      kill "$cheevos_watch" 2>/dev/null || true
+    '';
+  };
+
   systemType = types.submodule {
     options = {
       fullname = mkOption {
@@ -251,7 +265,7 @@ in
 
     famidrive.systems = lib.mkMerge [
       (lib.mkIf (hasLane "roms") {
-        gc = {
+        gc = dolphinCheevos // {
           fullname = "Nintendo GameCube";
           extensions = [ ".iso" ".rvz" ".gcz" ".ciso" ];
           command = ''${pkgs.dolphin-emu}/bin/dolphin-emu --batch --exec="$ROM"'';
@@ -261,7 +275,7 @@ in
           platform = "gc";
           saveLayout = { kind = "dolphin-gci-folder"; root = "~/.local/share/dolphin-emu/GC"; };
         };
-        wii = {
+        wii = dolphinCheevos // {
           fullname = "Nintendo Wii";
           extensions = [ ".iso" ".rvz" ".wbfs" ];
           command = ''${pkgs.dolphin-emu}/bin/dolphin-emu --batch --exec="$ROM"'';

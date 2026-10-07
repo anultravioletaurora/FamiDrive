@@ -232,10 +232,12 @@ in
     (check "their session signs in, nobody else's"
       (lib.hasInfix "alice) " c.famidrive.sessionSetup && lib.hasInfix "famidrive-cheevos setup" c.famidrive.sessionSetup
         && !(lib.hasInfix "bob) " c.famidrive.sessionSetup)))
-    (check "RetroArch games log for the unlock watcher; Dolphin's don't"
+    (check "RetroArch and Dolphin games have the unlock watcher; Eden's don't"
       (lib.hasInfix "famidrive-cheevos" c.famidrive.systems.psx.before
         && lib.hasInfix "--log-file" c.famidrive.systems.n64.command
-        && !(lib.hasInfix "famidrive-cheevos" c.famidrive.systems.gc.before)))
+        && lib.hasInfix "dolphin.log" c.famidrive.systems.gc.before
+        && lib.hasInfix "dolphin.log" c.famidrive.systems.wii.before
+        && !(lib.hasInfix "famidrive-cheevos" c.famidrive.systems.switch.before)))
   ]);
 
   # One person, ROMs only, no RomM: the smallest box.
