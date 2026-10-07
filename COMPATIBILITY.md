@@ -545,6 +545,12 @@ launch with no changes for this game, then controllers and rumble.
   either the reported speed or the update itself was off. Not yet looked
   into: try again, and check Steam's `content_log.txt` for the update's
   real speed and any stalls.
+- **Probably explained (2026-10-06):** the status screen's progress
+  came from the app manifest's `BytesDownloaded`, which Steam doesn't
+  keep current during a download. Overwatch showed the same thing: 0% on
+  the TV, 28% in Steam's phone app. The 6.1 GB was likely a stale
+  counter, not the real progress. The screen now measures the download
+  folder itself (#59).
 
 - **What to watch for:** Steam's copy still needs an EA account. On the
   first launch the EA app installs and asks for a sign-in inside
