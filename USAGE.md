@@ -341,6 +341,33 @@ the box lists its cards and the setting to use.
 
 The picture, and what happens to the TV on a rebuild.
 
+### `famidrive.boot.splash.enable`
+
+Whether to enable a boot screen (Plymouth) in place of console text while the box starts.
+
+- **Type:** boolean
+- **Default:** `true`
+- **Example:** `true`
+
+### `famidrive.boot.splash.theme`
+
+The Plymouth theme. `"bgrt"` (the default) shows the computer's
+own logo, from its firmware, with a spinner; `"spinner"` is the
+same without the logo. A theme from another package needs it in
+`themePackages` too.
+
+- **Type:** string
+- **Default:** `"bgrt"`
+- **Example:** `"spinner"`
+
+### `famidrive.boot.splash.themePackages`
+
+Packages with more Plymouth themes, for `theme`.
+
+- **Type:** list of package
+- **Default:** `[ ]`
+- **Example:** `[ (pkgs.adi1090x-plymouth-themes.override { selected_themes = [ "rings" ]; }) ]`
+
 ### `famidrive.cec.enable`
 
 Whether to enable HDMI-CEC TV power-on. Deferred to project phase 2 (spec.md); off by
