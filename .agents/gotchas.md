@@ -124,10 +124,13 @@ Found against RomM 5.3:
     real folders.
 - **Quitting ES-DE ends the session.** `ShowQuitMenu` is on, and quitting
   runs `famidrive-end-session`, which takes you back to "Who's playing?".
-- **ES-DE reads launch commands once, at start.** After a switch that
-  changes `es_systems.xml` but not the session, the running ES-DE still
-  launches through the old famidrive-launch (#82). When testing a
-  rebuild, Quit ES-DE and pick the player again.
+- **ES-DE reads launch commands once, at start.** Its commands name
+  `/run/current-system/sw/bin/famidrive-launch`, never a store path, so
+  a switch reaches the next launch without restarting ES-DE (#82). A
+  store path there would keep the running ES-DE on the previous build's
+  hooks. Adding or removing a system still needs ES-DE restarted (Quit
+  ES-DE, pick the player again), since the system list itself is read
+  once.
 
 ## gamescope and the TV
 
@@ -273,4 +276,4 @@ See [CONTROLLERS.md](../CONTROLLERS.md) for per-controller results.
   non-empty before copying, or a failed build empties USAGE.md.
 - **Testing a branch on the box** without merging:
   `nixos-rebuild switch --flake /etc/nixos#<host> --override-input
-  famidrive github:<owner>/FamiDrive/<branch>`. Then Quit ES-DE (#82).
+  famidrive github:<owner>/FamiDrive/<branch>`.
