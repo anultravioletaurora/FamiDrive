@@ -685,16 +685,18 @@ shim keeps its own login token afterwards; nothing secret is here.
 ### `famidrive.media.kodi.addons`
 
 More Kodi add-ons from nixpkgs' kodiPackages, for every player.
-Jellyfin for Kodi, controller support and inputstream.adaptive
-are always there.
+JellyCon (Jellyfin), controller support, inputstream.adaptive
+and Up Next are always there.
 
 - **Type:** function that evaluates to a(n) list of package
 - **Default:** `p: [ ]`
-- **Example:** `p: [ p.upnext p.a4ksubtitles p.pvr-hdhomerun ]`
+- **Example:** `p: [ p.a4ksubtitles p.sendtokodi p.pvr-hdhomerun ]`
 
 ### `famidrive.media.kodi.enable`
 
-Whether to enable Kodi as a Media entry in ES-DE, with Jellyfin for Kodi.
+Whether to enable Kodi as a Media entry in ES-DE, with Jellyfin through JellyCon
+(movies, shows, music and live TV), already pointed at
+`endpoints.jellyfin` when that's set.
 
 - **Type:** boolean
 - **Default:** `false`

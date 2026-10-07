@@ -3,8 +3,8 @@
 # gamescope-fg, quit -> ES-DE.
 #
 #   - Kodi (media.kodi): the box's own media folders (an external drive)
-#     in its library, Jellyfin through the Jellyfin for Kodi add-on, and
-#     any other add-on from nixpkgs' kodiPackages
+#     in its library, Jellyfin through the JellyCon add-on, and any other
+#     add-on from nixpkgs' kodiPackages
 #   - Jellyfin MPV Shim (media.jellyfin): Jellyfin's own 10-foot browser,
 #     playing through mpv
 #
@@ -19,7 +19,15 @@ let
   jellyfin = cfg.media.jellyfin;
   seedLib = import ./lib/seed.nix { inherit lib pkgs; };
 
-  kodiAddons = p: [ p.jellyfin p.joystick p.inputstream-adaptive ] ++ kodi.addons p;
+  # Jellyfin through JellyCon, which browses the server live (live TV
+  # included) rather than syncing it into Kodi's library the way Jellyfin
+  # for Kodi does, which has no live TV. Revised 2026-10-07. Up Next: the
+  # "next episode in 10 seconds" prompt at the end of an episode.
+  kodiAddons = p: lib.unique ([ p.jellycon p.joystick p.inputstream-adaptive p.upnext ] ++ kodi.addons p);
+
+  # The box's Jellyfin, filled into JellyCon before Kodi first starts, so
+  # signing in is just Quick Connect.
+  jellyfinUrl = if options.famidrive.endpoints.jellyfin.isDefined then cfg.endpoints.jellyfin else null;
 
   # Kodi's power menu says "Exit" for leaving Kodi, which on a FamiDrive
   # box goes back to the home screen. Estuary's power menu is the only
@@ -99,11 +107,17 @@ let
     # To switch on: Kodi can leave add-ons it didn't install itself off.
     # VERIFY on the first box.
     addons = map (a: a.namespace) (lib.filter (a: a ? namespace) (kodiAddons pkgs.kodiPackages));
+    addonSettings = lib.optionalAttrs (jellyfinUrl != null) {
+      "plugin.video.jellycon".server_address = jellyfinUrl;
+    };
   };
 in
 {
   options.famidrive.media.kodi = {
-    enable = mkEnableOption "Kodi as a Media entry in ES-DE, with Jellyfin for Kodi";
+    enable = mkEnableOption ''
+      Kodi as a Media entry in ES-DE, with Jellyfin through JellyCon
+      (movies, shows, music and live TV), already pointed at
+      `endpoints.jellyfin` when that's set'';
 
     sources = mkOption {
       type = types.attrsOf (types.submodule {
@@ -147,11 +161,11 @@ in
       type = types.functionTo (types.listOf types.package);
       default = _: [ ];
       defaultText = lib.literalExpression "p: [ ]";
-      example = lib.literalExpression "p: [ p.upnext p.a4ksubtitles p.pvr-hdhomerun ]";
+      example = lib.literalExpression "p: [ p.a4ksubtitles p.sendtokodi p.pvr-hdhomerun ]";
       description = ''
         More Kodi add-ons from nixpkgs' kodiPackages, for every player.
-        Jellyfin for Kodi, controller support and inputstream.adaptive
-        are always there.
+        JellyCon (Jellyfin), controller support, inputstream.adaptive
+        and Up Next are always there.
       '';
     };
   };
