@@ -582,6 +582,54 @@ class Test(unittest.TestCase):
         a["cmd_textures"]()
         self.assertFalse(os.path.lexists(mine / "GAFE01"))
 
+    def test_switch_mods_unpacked_in_an_sd_cards_layout(self):
+        box = Box(self.base, "library", tokenFile=None)
+        a = box.agent()
+        smash = "01006A800016E000"
+        release, yuzu, other = (self.base / n for n in ("hdr.zip", "y.zip", "o.zip"))
+        self.texture_zip(release, [  # HewDrawRemix's release zip, trimmed
+            "Hewdraw Remix - 0.49.11-beta/atmosphere/contents/01006A800016E000/exefs/subsdk9",
+            "Hewdraw Remix - 0.49.11-beta/atmosphere/contents/01006A800016E000/romfs/skyline/plugins/libarcropolis.nro",
+            "Hewdraw Remix - 0.49.11-beta/ultimate/mods/hdr/info.toml",
+            "Hewdraw Remix - 0.49.11-beta/README.txt"])
+        self.texture_zip(yuzu, ["exefs/main.npdm", "romFs/Audio/a.bin"])
+        self.texture_zip(other, ["notes/readme.txt"])
+        dest = box.data / "mods/switch" / smash
+        self.assertTrue(a["unpack_switch_mod"](release, dest / "HDR", smash))
+        self.assertTrue((dest / "HDR/atmosphere/contents" / smash / "exefs/subsdk9").exists())
+        self.assertTrue((dest / "HDR/ultimate/mods/hdr/info.toml").exists())
+        self.assertFalse((dest / "HDR/README.txt").exists())
+        self.assertTrue(a["unpack_switch_mod"](yuzu, dest / "Y", smash))
+        self.assertTrue((dest / "Y/atmosphere/contents" / smash / "romfs/Audio/a.bin").exists())
+        self.assertFalse(a["unpack_switch_mod"](other, dest / "O", smash))
+        self.assertFalse((dest / "O").exists())
+
+    def test_switch_mods_linked_into_each_players_eden(self):
+        box = Box(self.base, "alice")
+        smash = "01006A800016E000"
+        mod = box.data / "mods/switch" / smash / "HDR"
+        (mod / "atmosphere/contents" / smash / "exefs").mkdir(parents=True)
+        (mod / "ultimate/mods/hdr").mkdir(parents=True)
+        (mod / "ultimate/mods/hdr/info.toml").write_text("hdr")
+        a = box.agent()
+        eden = box.home / ".local/share/eden"
+        (eden / "sdmc/ultimate/arcropolis").mkdir(parents=True)  # ARCropolis's own
+        (eden / "sdmc/ultimate/mods/hdr").mkdir(parents=True)
+        (eden / "sdmc/ultimate/mods/hdr/info.toml").write_text("mine")   # installed by hand before
+        a["cmd_textures"]()
+        self.assertEqual(Path(os.readlink(eden / "load" / smash / "HDR")), mod / "atmosphere/contents" / smash)
+        self.assertEqual((eden / "sdmc/ultimate/mods/hdr/info.toml").read_text(), "hdr")
+        self.assertFalse((eden / "sdmc/ultimate").is_symlink())
+        self.assertEqual((eden / "sdmc/ultimate/mods/hdr/info.toml.before-romm").read_text(), "mine")
+        self.assertTrue((eden / "sdmc/ultimate/arcropolis").is_dir())
+        a["cmd_textures"]()                                      # again: nothing changes
+        self.assertEqual((eden / "sdmc/ultimate/mods/hdr/info.toml").read_text(), "hdr")
+        import shutil
+        shutil.rmtree(box.data / "mods/switch" / smash)          # the library dropped it
+        a["cmd_textures"]()
+        self.assertFalse(os.path.lexists(eden / "load" / smash / "HDR"))
+        self.assertFalse(os.path.lexists(eden / "sdmc/ultimate/mods/hdr/info.toml"))
+
     def test_an_archive_is_checked_by_size_not_romms_hash(self):
         box = Box(self.base, "library", tokenFile=None)
         a = box.agent()
