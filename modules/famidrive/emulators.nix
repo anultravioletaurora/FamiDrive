@@ -521,6 +521,10 @@ in
             # Without this, GameCube saves can't map to per-ROM RomM saves.
             SlotA = 8;   # TODO: verify the enum value for "GCI Folder"
           };
+          # No on-screen messages of Dolphin's own: what a player needs to
+          # know (RetroAchievements unlocks) comes as a FamiDrive toast,
+          # in their theme. Decided 2026-10-07 for every player.
+          keys.Interface.OnScreenDisplayMessages = "False";
         }}
         ${seedLib.lockKeys {
           format = "ini";

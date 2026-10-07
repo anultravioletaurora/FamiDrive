@@ -232,6 +232,8 @@ in
     (check "their session signs in, nobody else's"
       (lib.hasInfix "alice) " c.famidrive.sessionSetup && lib.hasInfix "famidrive-cheevos setup" c.famidrive.sessionSetup
         && !(lib.hasInfix "bob) " c.famidrive.sessionSetup)))
+    (check "Dolphin's own on-screen messages off, for every player (toasts instead)"
+      (lib.all (u: lib.hasInfix "OnScreenDisplayMessages" c.home-manager.users.${u}.home.activation.famidriveEmulators.data) [ "alice" "bob" "guest" ]))
     (check "RetroArch and Dolphin games have the unlock watcher; Eden's don't"
       (lib.hasInfix "famidrive-cheevos" c.famidrive.systems.psx.before
         && lib.hasInfix "--log-file" c.famidrive.systems.n64.command
