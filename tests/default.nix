@@ -221,6 +221,7 @@ in
       enable = true;
       romm.enable = false;
       guest.enable = true;
+      lanes = [ "roms" "steam" ];   # Steam: a system with no emulator
       players.alice.retroAchievements = { username = "alice-ra"; hardcore = true; };
       players.bob = { };
     };

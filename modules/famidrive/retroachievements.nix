@@ -22,7 +22,8 @@ let
   spec = name: p: pkgs.writeText "famidrive-cheevos-${name}.json" (builtins.toJSON {
     inherit (p.retroAchievements) username hardcore;
     passwordFile = toString (passwordFile name p);
-    retroarch = lib.any (s: lib.hasPrefix "retroarch-" s.emulator) (lib.attrValues cfg.systems);
+    # Steam, Heroic and other launchers have no emulator.
+    retroarch = lib.any (s: s.emulator != null && lib.hasPrefix "retroarch-" s.emulator) (lib.attrValues cfg.systems);
     dolphin = has "gc" || has "wii";
     pcsx2 = has "ps2";
   });
