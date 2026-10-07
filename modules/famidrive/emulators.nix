@@ -584,6 +584,35 @@ in
             # saves/Mupen64Plus-Next/, so it had never synced.
             sort_savefiles_enable = "false";
             video_fullscreen = "true";
+            # Nothing of RetroArch's own over the game: no "controller
+            # connected", no achievements sign-in or "0/40 unlocked"
+            # summary, no save-state or fast-forward notices. What a player
+            # needs to know comes as a FamiDrive toast. video_font_enable
+            # is the master switch; the rest stay off if it's ever turned
+            # back on. Decided 2026-10-07.
+            video_font_enable = "false";
+            notification_show_autoconfig = "false";
+            notification_show_autoconfig_fails = "false";
+            notification_show_cheats_applied = "false";
+            notification_show_config_override_load = "false";
+            notification_show_disk_control = "false";
+            notification_show_fast_forward = "false";
+            notification_show_patch_applied = "false";
+            notification_show_refresh_rate = "false";
+            notification_show_remap_load = "false";
+            notification_show_save_state = "false";
+            notification_show_screenshot = "false";
+            notification_show_set_initial_disk = "false";
+            cheevos_visibility_account = "false";
+            cheevos_visibility_summary = "0";
+            cheevos_visibility_unlock = "false";
+            cheevos_visibility_mastery = "false";
+            cheevos_visibility_progress_tracker = "false";
+            cheevos_visibility_lboard_start = "false";
+            cheevos_visibility_lboard_submit = "false";
+            cheevos_visibility_lboard_cancel = "false";
+            cheevos_visibility_lboard_trackers = "false";
+            cheevos_challenge_indicators = "false";
           };
         }}
         # Saves already sorted into a core's folder move up next to the
@@ -611,7 +640,32 @@ in
             # PCSX2 maps the keyboard. Names read from PCSX2 2.8.2.
             Pad1 = ps2Pad 0;
             Pad2 = ps2Pad 1;
+            # No on-screen messages or achievement pop-ups of PCSX2's own
+            # (toasts instead, as for RetroArch above). OsdMessagesPos 0 is
+            # "None". Key names read from PCSX2's binary 2026-10-07.
+            "EmuCore/GS".OsdMessagesPos = "0";
+            Achievements = { Notifications = "false"; Overlays = "false"; };
           };
+        }}
+        ${seedLib.lockKeys {
+          format = "yaml";
+          target = "$HOME/.config/rpcs3/config.yml";
+          # RPCS3's pop-ups and hints over the game, off (toasts instead).
+          # Its fatal-error hint stays: that one is worth seeing. Key names
+          # read from RPCS3's binary 2026-10-07.
+          # yq needs brackets for keys with spaces (.a["b c"], not .a."b c").
+          keys = lib.genAttrs (map (k: ".Miscellaneous[\"${k}\"]") [
+            "Show trophy popups"
+            "Show RPCN popups"
+            "Show netplay popups"
+            "Show shader compilation hint"
+            "Show PPU compilation hint"
+            "Show autosave/autoload hint"
+            "Show pressure intensity toggle hint"
+            "Show analog limiter toggle hint"
+            "Show mouse and keyboard toggle hint"
+            "Show capture hint"
+          ]) (_: false);
         }}
         ${seedLib.lockKeys {
           format = "ini";

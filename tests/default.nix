@@ -235,6 +235,10 @@ in
     (check "PCSX2 starts without its setup wizard, with two pads mapped"
       (let a = c.home-manager.users.alice.home.activation.famidriveEmulators.data; in
         lib.hasInfix "SetupWizardIncomplete" a && lib.hasInfix "SDL-0/FaceSouth" a && lib.hasInfix "SDL-1/+RightTrigger" a))
+    (check "RetroArch, PCSX2 and RPCS3 show nothing of their own over a game"
+      (let a = c.home-manager.users.alice.home.activation.famidriveEmulators.data; in
+        lib.hasInfix "video_font_enable" a && lib.hasInfix "cheevos_visibility_summary" a
+          && lib.hasInfix "OsdMessagesPos" a && lib.hasInfix ''.Miscellaneous["Show trophy popups"] = false'' a))
     (check "Dolphin's own on-screen messages off, for every player (toasts instead)"
       (lib.all (u: lib.hasInfix "OnScreenDisplayMessages" c.home-manager.users.${u}.home.activation.famidriveEmulators.data) [ "alice" "bob" "guest" ]))
     (check "Heroic sends desktop notifications (not taken for Steam Deck Game Mode); GOG games have the Comet watcher"
