@@ -33,6 +33,8 @@ SECTIONS = [
     ("Steam", ["famidrive.steam"], "The Steam lane (`lanes` has `\"steam\"`)."),
     ("Media", ["famidrive.media"], "Video apps in ES-DE's Media system."),
     ("Clone Hero", ["famidrive.cloneHero"], "Clone Hero, in the Ports system."),
+    ("YARG", ["famidrive.yarg"],
+     "YARG (Yet Another Rhythm Game), in the Ports system, playing the same songs as Clone Hero."),
     ("Minecraft", ["famidrive.minecraft"],
      "Minecraft through Prism Launcher, in the Ports system (`lanes` has `\"minecraft\"`)."),
     ("Valheim", ["famidrive.valheim"], "Valheim mods, for playing on a modded server."),

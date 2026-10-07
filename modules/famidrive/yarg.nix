@@ -1,0 +1,104 @@
+# YARG (Yet Another Rhythm Game), in ES-DE's Ports system, next to Clone
+# Hero. It reads the same chart formats, so it plays the box's Clone Hero
+# library (clonehero.nix): the same songs for every player, listed once
+# in `cloneHero.songs`, whether or not Clone Hero itself is on. Profiles,
+# scores and settings are each player's; scores and profiles sync with
+# RomM like a console game's save.
+#
+# YARG 0.14 (nixpkgs) keeps everything in
+# ~/.config/unity3d/YARC/YARG/release/: settings.json, profiles/
+# (profiles.json, bindings.json), scores/ (scores.db, replays/). Seen on
+# the first box 2026-10-07, running it once in a scratch home. A
+# settings.json holding only SongFolders loads, and YARG scans them.
+{ config, lib, pkgs, ... }:
+
+let
+  inherit (lib) mkOption mkEnableOption types;
+  cfg = config.famidrive;
+  y = cfg.yarg;
+  seedLib = import ./lib/seed.nix { inherit lib pkgs; };
+  songs = "${cfg.dataDir}/clonehero";
+  data = ".config/unity3d/YARC/YARG/release";
+
+  sync = cfg.romm.enable && y.romm.entry != null;
+
+  # Scores and profiles: what a player would miss on another box.
+  # Bindings stay on this box (they belong to its instruments), and so do
+  # replays, which grow with every song played.
+  saveLayout = {
+    kind = "files";
+    root = "~";
+    paths = [
+      "${data}/scores/scores.db"
+      "${data}/profiles/profiles.json"
+    ];
+  };
+in
+{
+  options.famidrive.yarg = {
+    enable = mkEnableOption ''
+      YARG (Yet Another Rhythm Game), in ES-DE's Ports system: guitar,
+      bass, drums, keys and vocals, with the box's Clone Hero songs
+      (`cloneHero.songs`)'';
+
+    romm.entry = mkOption {
+      type = types.nullOr types.str;
+      default = "YARG";
+      description = ''
+        The RomM entry each player's YARG scores and profiles are saved
+        under, by name. RomM keeps saves only for games in its library, so
+        add one by hand (any platform this box doesn't pull, and any small
+        file), as for Clone Hero. null keeps scores on this box only.
+      '';
+    };
+  };
+
+  config = lib.mkIf (cfg.enable && y.enable) {
+    environment.systemPackages = [ pkgs.yarg ];
+
+    # Another kind of Ports entry, like Clone Hero's: a .port file whose
+    # content says which. The commands add to Clone Hero's (types.lines),
+    # each case only acting on its own entry.
+    famidrive.ports.".port" = {
+      before = lib.optionalString sync ''
+        if [ "$(cat "$ROM")" = yarg ]; then
+          [ -z "$sync" ] || romm-agent save-pull yarg app:yarg \
+            || echo "famidrive-launch: YARG scores not pulled" >&2
+        fi
+      '';
+      command = ''
+        case "$(cat "$ROM")" in
+          yarg) ${pkgs.yarg}/bin/yarg ;;
+        esac
+      '';
+      after = lib.optionalString sync ''
+        if [ "$(cat "$ROM")" = yarg ]; then
+          [ -z "$sync" ] || romm-agent save-push yarg app:yarg \
+            || echo "famidrive-launch: YARG scores not pushed, reconcile will retry" >&2
+        fi
+      '';
+    };
+
+    famidrive.romm.apps = lib.mkIf sync {
+      yarg = { rom = y.romm.entry; emulator = "yarg"; inherit saveLayout; };
+    };
+
+    famidrive.playerHome = { lib, famidrivePlayer, ... }: {
+      home.activation.famidriveYarg = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        mkdir -p ${lib.escapeShellArg "${famidrivePlayer.roms}/ports"}
+        printf yarg > ${lib.escapeShellArg "${famidrivePlayer.roms}/ports/YARG.port"}
+        mkdir -p "$HOME/YARG Songs"
+        ${seedLib.lockKeys {
+          format = "json";
+          target = "$HOME/${data}/settings.json";
+          # The box's songs, then hand-added ones, then the player's own.
+          keys.".SongFolders" = [
+            "${songs}/songs"
+            "${songs}/local"
+            "${famidrivePlayer.home}/YARG Songs"
+          ];
+        }}
+      '';
+    };
+  };
+}

@@ -23,6 +23,7 @@ is on; every other option is optional.
 - [Steam](#steam)
 - [Media](#media)
 - [Clone Hero](#clone-hero)
+- [YARG](#yarg)
 - [Minecraft](#minecraft)
 - [Valheim](#valheim)
 - [PC saves](#pc-saves)
@@ -772,7 +773,8 @@ bindings the next time it starts. They're kept on the library disk
 
 ### `famidrive.cloneHero.songs`
 
-Charts for every player on this box, by name (the file's name) and
+Charts for every player on this box, in Clone Hero and in YARG
+(`famidrive.yarg`), by name (the file's name) and
 Chorus Encore md5 (enchor.us: a chart's download is
 files.enchor.us/<md5>.sng). Downloaded to the library disk at boot
 and whenever this list changes. A changed md5 downloads again.
@@ -793,6 +795,30 @@ Clone Hero's video calibration in milliseconds, the same for every player. null 
 
 - **Type:** null or signed integer
 - **Default:** `null`
+
+## YARG
+
+YARG (Yet Another Rhythm Game), in the Ports system, playing the same songs as Clone Hero.
+
+### `famidrive.yarg.enable`
+
+Whether to enable YARG (Yet Another Rhythm Game), in ES-DE's Ports system: guitar,
+bass, drums, keys and vocals, with the box's Clone Hero songs
+(`cloneHero.songs`).
+
+- **Type:** boolean
+- **Default:** `false`
+- **Example:** `true`
+
+### `famidrive.yarg.romm.entry`
+
+The RomM entry each player's YARG scores and profiles are saved
+under, by name. RomM keeps saves only for games in its library, so
+add one by hand (any platform this box doesn't pull, and any small
+file), as for Clone Hero. null keeps scores on this box only.
+
+- **Type:** null or string
+- **Default:** `"YARG"`
 
 ## Minecraft
 
