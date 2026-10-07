@@ -144,7 +144,7 @@ in
       media.kodi = {
         enable = true;
         sources.Movies = { path = "/media/movies"; content = "movies"; };
-        addons = p: [ p.upnext ];
+        addons = p: [ p.a4ksubtitles ];
       };
       minecraft.instances."Test Server" = {
         minecraft = "26.2";
@@ -208,6 +208,9 @@ in
           && lib.hasInfix "Kodi.kodi" c.home-manager.users.bob.home.activation.famidriveMedia.data
           && lib.hasInfix "Jellyfin.jellyfin" c.home-manager.users.guest.home.activation.famidriveMedia.data
           && lib.hasInfix "/media/movies" c.famidrive.systems.media.command))
+      (check "Kodi has Up Next for everyone, and the box's own add-ons too"
+        (lib.hasInfix "service.upnext" c.famidrive.systems.media.command
+          && lib.hasInfix "service.subtitles.a4ksubtitles" c.famidrive.systems.media.command))
       (check "new players start at full volume"
         (c.services.pipewire.wireplumber.extraConfig.famidrive-volume."wireplumber.settings"."device.routes.default-sink-volume" == 1.0))
       (check "players log in without a password from greetd"

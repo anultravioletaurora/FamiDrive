@@ -19,7 +19,9 @@ let
   jellyfin = cfg.media.jellyfin;
   seedLib = import ./lib/seed.nix { inherit lib pkgs; };
 
-  kodiAddons = p: [ p.jellyfin p.joystick p.inputstream-adaptive ] ++ kodi.addons p;
+  # Up Next: the "next episode in 10 seconds" prompt at the end of an
+  # episode, which Jellyfin for Kodi works with.
+  kodiAddons = p: lib.unique ([ p.jellyfin p.joystick p.inputstream-adaptive p.upnext ] ++ kodi.addons p);
 
   # Kodi's power menu says "Exit" for leaving Kodi, which on a FamiDrive
   # box goes back to the home screen. Estuary's power menu is the only
@@ -147,11 +149,11 @@ in
       type = types.functionTo (types.listOf types.package);
       default = _: [ ];
       defaultText = lib.literalExpression "p: [ ]";
-      example = lib.literalExpression "p: [ p.upnext p.a4ksubtitles p.pvr-hdhomerun ]";
+      example = lib.literalExpression "p: [ p.a4ksubtitles p.sendtokodi p.pvr-hdhomerun ]";
       description = ''
         More Kodi add-ons from nixpkgs' kodiPackages, for every player.
-        Jellyfin for Kodi, controller support and inputstream.adaptive
-        are always there.
+        Jellyfin for Kodi, controller support, inputstream.adaptive and
+        Up Next are always there.
       '';
     };
   };
