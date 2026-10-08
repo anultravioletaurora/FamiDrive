@@ -143,6 +143,63 @@ class Notifications(unittest.TestCase):
         self.assertNotIn("icon", t.from_notification("x", 0, "dialog-information", "Hi", "", {}, 1))
 
 
+class Controllers(unittest.TestCase):
+    def test_pads_and_batteries_from_sys(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            hid = root / "devices/hid0"
+            (hid / "input/input5").mkdir(parents=True)
+            (hid / "input/input5/name").write_text("Xbox Wireless Controller\n")
+            (root / "class/input").mkdir(parents=True)
+            (root / "class/input/js0").mkdir()
+            os.symlink(hid / "input/input5", root / "class/input/js0/device")
+            ps = root / "class/power_supply/xpadneo_battery"
+            ps.mkdir(parents=True)
+            (ps / "scope").write_text("Device\n")
+            (ps / "capacity").write_text("15\n")
+            os.symlink(hid, ps / "device")
+            laptop = root / "class/power_supply/BAT0"
+            laptop.mkdir()
+            (laptop / "scope").write_text("System\n")
+            pads = t.connected_pads(root / "class")
+            self.assertEqual(list(pads.values()), ["Xbox Wireless Controller"])
+            self.assertEqual(list(t.pad_batteries(root / "class").values()), [("Xbox Wireless Controller", 15)])
+
+    def test_connected_and_disconnected(self):
+        a = {"/d/1": "8BitDo Ultimate 2"}
+        b = {"/d/2": "Xbox Wireless Controller"}
+        toasts = t.pad_changes(a, b, playing=False)
+        self.assertEqual([(x["title"], x["detail"]) for x in toasts],
+                         [("Controller connected", "Xbox Wireless Controller"), ("Controller disconnected", "8BitDo Ultimate 2")])
+        gone = t.pad_changes(b, {}, playing=True)[0]
+        self.assertEqual(gone["kind"], "alert")
+        self.assertIn("Select + Start", gone["detail"])
+
+    def test_low_battery_once_until_charged(self):
+        warned = set()
+        self.assertEqual(len(t.battery_changes(warned, {"x": ("Pad", 18)})), 1)
+        self.assertEqual(t.battery_changes(warned, {"x": ("Pad", 12)}), [])
+        t.battery_changes(warned, {"x": ("Pad", 80)})
+        self.assertEqual(len(t.battery_changes(warned, {"x": ("Pad", 19)})), 1)
+
+
+class Sockets(unittest.TestCase):
+    def test_a_live_socket_is_left_alone_and_a_dead_one_replaced(self):
+        import socket
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "x.sock"
+            first = t.listen(path, 0o600)
+            self.assertIsNotNone(first)
+            self.assertIsNone(t.listen(path, 0o600))   # live: not taken over
+            first.close()                               # dead file left behind
+            second = t.listen(path, 0o600)
+            self.assertIsNotNone(second)
+            t.release([(path, os.stat(path).st_ino)])
+            self.assertFalse(path.exists())
+            second.close()
+            del socket
+
+
 class Sending(unittest.TestCase):
     def test_arguments(self):
         self.assertEqual(t.parse_send(["--kind", "progress", "--id", "p", "--progress", "1.5", "Pulling", "2", "of", "5"]),

@@ -157,7 +157,9 @@ Found against RomM 5.3:
   MangoHud.conf into it before Steam starts, and starts Steam without
   `STEAM_USE_MANGOAPP` so Steam never writes it back.
 - **Checking how a toast looks without the TV:** run the daemon under
-  `xvfb-run` with `FAMIDRIVE_TOAST_SNAPSHOT=<dir>`; each toast is saved
+  `xvfb-run` with `FAMIDRIVE_TOAST_SNAPSHOT=<dir>` and
+  `FAMIDRIVE_TOAST_NO_SHARED=1` (or a test daemon would answer for the
+  player on the shared socket, as one did on 2026-10-07); each toast is saved
   there as a PNG with its transparency. Screenshots of the X window lose
   the alpha.
 
@@ -181,6 +183,13 @@ Found against RomM 5.3:
   icons come from Comet's `gameplay.db`. The exact line and the
   database's location were read from Comet 0.2.0's binary, not a real
   unlock yet.
+
+- **Controller pop-ups are FamiDrive's.** ES-DE's `InputDeviceNotifications`
+  is off; the toast daemon watches `/sys/class/input/js*` (and batteries
+  with scope `Device`) and toasts changes, in a session and on "Who's
+  playing?" (the greeter has no runtime folder, so its socket is in /tmp).
+  Dolphin, Eden, Cemu and Ryujinx bind pads at launch, so a pad that
+  appears mid-game needs the game restarted; the disconnect toast says so.
 
 ## Steam
 
