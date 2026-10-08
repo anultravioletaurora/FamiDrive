@@ -570,6 +570,11 @@ works.
 **GameCube, Dolphin: ✅ Works.** Face buttons by label
 (`controllers.faceButtons`). The 8BitDo's rumble works.
 
+- **RetroAchievements:** ✅ achievements unlock, with their toasts
+  (2026-10-08). It needs a copy that matches one of RetroAchievements'
+  hashes for the game: the first copy on the box didn't ("Unsupported
+  Game Version"), and a fresh copy from RomM did.
+
 ### Super Smash Bros. Ultimate
 
 **Switch, Eden: ✅ Works.** Face buttons by label.
