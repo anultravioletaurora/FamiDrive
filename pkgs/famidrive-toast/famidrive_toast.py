@@ -48,12 +48,11 @@ POSITIONS = ("top-left", "top-center", "top-right", "middle-left", "middle-right
              "bottom-left", "bottom-center", "bottom-right")
 # Every toast has an icon: --icon names one of these (drawn here, in the
 # theme's text color), or gives an image (a game's logo). Without one, or
-# when the image can't be read, the kind's own.
+# when the image can't be read, the kind's own. A success is always the
+# checkmark.
 ICONS = ("save", "warning", "trophy", "download", "info", "controller", "check")
 KIND_ICON = {"notice": "info", "alert": "warning", "progress": "download", "achievement": "trophy",
              "success": "check"}
-ICONS = ("save", "warning", "trophy", "download", "info", "controller")
-KIND_ICON = {"notice": "info", "alert": "warning", "progress": "download", "achievement": "trophy"}
 ALERT = (230, 160, 40, 255)
 SUCCESS = (76, 187, 106, 255)
 GOLD = (232, 184, 64, 255)
@@ -186,7 +185,18 @@ def layout(position, screen, sizes, margin, gap):
     return out
 
 
+def icon_name(toast):
+    """One of ICONS, or an image's path. A progress toast turned into a
+    success in place keeps the icon it was sent with, so a success's is
+    decided here, not taken from it."""
+    kind = toast.get("kind", "notice")
+    if kind == "success":
+        return "check"
+    return toast.get("icon") or KIND_ICON.get(kind, "info")
+
+
 # --- The queue ----------------------------------------------------------------
+
 
 class Queue:
     """Toasts waiting and showing, up to `slots` at once (a stack in the
@@ -621,13 +631,12 @@ def daemon(spec_file, player):
         return pygame.transform.smoothscale(c, (size, size))
 
     def icon_for(toast, size, colors):
-        icon = toast.get("icon") or ""
-        if icon and icon not in ICONS:
-            img = image_icon(icon, size)
+        name = icon_name(toast)
+        if name not in ICONS:
+            img = image_icon(name, size)
             if img:
                 return img
-            icon = ""
-        name = icon or KIND_ICON.get(toast["kind"], "info")
+            name = KIND_ICON.get(toast["kind"], "info")
         color = {"warning": ALERT, "trophy": GOLD, "check": SUCCESS}.get(name, colors["text"])
         return drawn_icon(name, size, color)
 
