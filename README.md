@@ -38,7 +38,9 @@ of games you own. See [Your games](#your-games).
 | System | Plays with | nixpkgs | Save sync | Where the games come from |
 |---|---|---|---|---|
 | Game Boy / Color / Advance | [RetroArch](https://www.retroarch.com) + [mGBA](https://mgba.io) | [`libretro.mgba`](https://search.nixos.org/packages?channel=26.05&show=libretro.mgba) | ✅ | RomM |
-| NES | [RetroArch](https://www.retroarch.com) + [Mesen](https://www.mesen.ca) | [`libretro.mesen`](https://search.nixos.org/packages?channel=26.05&show=libretro.mesen) | ✅ | RomM |
+| NES / Famicom | [RetroArch](https://www.retroarch.com) + [Mesen](https://www.mesen.ca) | [`libretro.mesen`](https://search.nixos.org/packages?channel=26.05&show=libretro.mesen) | ✅ | RomM |
+| Famicom Disk System | [RetroArch](https://www.retroarch.com) + [Mesen](https://www.mesen.ca) | [`libretro.mesen`](https://search.nixos.org/packages?channel=26.05&show=libretro.mesen) | — | RomM |
+| Virtual Boy | [RetroArch](https://www.retroarch.com) + [Beetle VB](https://github.com/libretro/beetle-vb-libretro) | [`libretro.beetle-vb`](https://search.nixos.org/packages?channel=26.05&show=libretro.beetle-vb) | ✅ | RomM |
 | SNES | [RetroArch](https://www.retroarch.com) + [Snes9x](https://www.snes9x.com) | [`libretro.snes9x`](https://search.nixos.org/packages?channel=26.05&show=libretro.snes9x) | ✅ | RomM |
 | Nintendo 64 | [RetroArch](https://www.retroarch.com) + [Mupen64Plus-Next](https://github.com/libretro/mupen64plus-libretro-nx) | [`libretro.mupen64plus`](https://search.nixos.org/packages?channel=26.05&show=libretro.mupen64plus) | ✅ | RomM |
 | Nintendo 64DD | [RetroArch](https://www.retroarch.com) + [Mupen64Plus-Next](https://github.com/libretro/mupen64plus-libretro-nx) | [`libretro.mupen64plus`](https://search.nixos.org/packages?channel=26.05&show=libretro.mupen64plus) | — | RomM |
@@ -47,15 +49,26 @@ of games you own. See [Your games](#your-games).
 | GameCube / Wii | [Dolphin](https://dolphin-emu.org) | [`dolphin-emu`](https://search.nixos.org/packages?channel=26.05&show=dolphin-emu) | ✅ | RomM |
 | Wii U | [Cemu](https://cemu.info) | [`cemu`](https://search.nixos.org/packages?channel=26.05&show=cemu) | — | RomM |
 | Switch | [Eden](https://eden-emu.dev), or [Ryubing](https://ryujinx.app) (Ryujinx) for the games listed in `switch.ryujinx.games` | [`eden`](https://search.nixos.org/packages?channel=unstable&show=eden), [`ryubing`](https://search.nixos.org/packages?channel=26.05&show=ryubing) | ✅ | RomM, with each game's update and DLC |
-| Genesis / Master System / Game Gear | [RetroArch](https://www.retroarch.com) + [Genesis Plus GX](https://github.com/libretro/Genesis-Plus-GX) | [`libretro.genesis-plus-gx`](https://search.nixos.org/packages?channel=26.05&show=libretro.genesis-plus-gx) | ✅ | RomM |
+| Genesis / Master System / Game Gear / SG-1000 | [RetroArch](https://www.retroarch.com) + [Genesis Plus GX](https://github.com/libretro/Genesis-Plus-GX) | [`libretro.genesis-plus-gx`](https://search.nixos.org/packages?channel=26.05&show=libretro.genesis-plus-gx) | ✅ | RomM |
+| Sega CD | [RetroArch](https://www.retroarch.com) + [Genesis Plus GX](https://github.com/libretro/Genesis-Plus-GX) | [`libretro.genesis-plus-gx`](https://search.nixos.org/packages?channel=26.05&show=libretro.genesis-plus-gx) | — | RomM |
+| 32X | [RetroArch](https://www.retroarch.com) + [PicoDrive](https://github.com/libretro/picodrive) | [`libretro.picodrive`](https://search.nixos.org/packages?channel=26.05&show=libretro.picodrive) | ✅ | RomM |
 | Saturn | [RetroArch](https://www.retroarch.com) + [Beetle Saturn](https://github.com/libretro/beetle-saturn-libretro) | [`libretro.beetle-saturn`](https://search.nixos.org/packages?channel=26.05&show=libretro.beetle-saturn) | — | RomM |
 | Dreamcast | [RetroArch](https://www.retroarch.com) + [Flycast](https://github.com/flyinghead/flycast) | [`libretro.flycast`](https://search.nixos.org/packages?channel=26.05&show=libretro.flycast) | — | RomM |
+| TurboGrafx-16 / PC Engine, TurboGrafx-CD | [RetroArch](https://www.retroarch.com) + [Beetle PCE Fast](https://github.com/libretro/beetle-pce-fast-libretro) | [`libretro.beetle-pce-fast`](https://search.nixos.org/packages?channel=26.05&show=libretro.beetle-pce-fast) | — | RomM |
+| PC Engine SuperGrafx | [RetroArch](https://www.retroarch.com) + [Beetle SuperGrafx](https://github.com/libretro/beetle-supergrafx-libretro) | [`libretro.beetle-supergrafx`](https://search.nixos.org/packages?channel=26.05&show=libretro.beetle-supergrafx) | — | RomM |
+| Neo Geo Pocket / Color | [RetroArch](https://www.retroarch.com) + [Beetle NeoPop](https://github.com/libretro/beetle-ngp-libretro) | [`libretro.beetle-ngp`](https://search.nixos.org/packages?channel=26.05&show=libretro.beetle-ngp) | ✅ | RomM |
+| WonderSwan / Color | [RetroArch](https://www.retroarch.com) + [Beetle Cygne](https://github.com/libretro/beetle-wswan-libretro) | [`libretro.beetle-wswan`](https://search.nixos.org/packages?channel=26.05&show=libretro.beetle-wswan) | ✅ | RomM |
+| 3DO | [RetroArch](https://www.retroarch.com) + [Opera](https://github.com/libretro/opera-libretro) | [`libretro.opera`](https://search.nixos.org/packages?channel=26.05&show=libretro.opera) | — | RomM |
+| Intellivision | [RetroArch](https://www.retroarch.com) + [FreeIntv](https://github.com/libretro/FreeIntv) | [`libretro.freeintv`](https://search.nixos.org/packages?channel=26.05&show=libretro.freeintv) | — | RomM |
+| Arcade, Neo Geo | [RetroArch](https://www.retroarch.com) + [FinalBurn Neo](https://github.com/finalburnneo/FBNeo) | [`libretro.fbneo`](https://search.nixos.org/packages?channel=26.05&show=libretro.fbneo) | — | RomM |
+| Neo Geo CD | [RetroArch](https://www.retroarch.com) + [NeoCD](https://github.com/libretro/neocd_libretro) | [`libretro.neocd`](https://search.nixos.org/packages?channel=26.05&show=libretro.neocd) | — | RomM |
 | PlayStation | [RetroArch](https://www.retroarch.com) + [SwanStation](https://github.com/libretro/swanstation) | [`libretro.swanstation`](https://search.nixos.org/packages?channel=26.05&show=libretro.swanstation) | ✅ | RomM |
 | PlayStation 2 | [PCSX2](https://pcsx2.net) | [`pcsx2`](https://search.nixos.org/packages?channel=26.05&show=pcsx2) | ✅ | RomM |
 | PlayStation 3 | [RPCS3](https://rpcs3.net) | [`rpcs3`](https://search.nixos.org/packages?channel=unstable&show=rpcs3) | ✅ | RomM |
 | PSP | [PPSSPP](https://www.ppsspp.org) | [`ppsspp-sdl`](https://search.nixos.org/packages?channel=26.05&show=ppsspp-sdl) | — | RomM |
 | Xbox 360 | [Xenia](https://xenia.jp) (fork still undecided) | FamiDrive's own ([`pkgs/xenia-netplay`](pkgs/xenia-netplay)) | ✅ | RomM |
 | Atari 2600 / 5200 / 7800 / Jaguar | [RetroArch](https://www.retroarch.com) + [Stella](https://stella-emu.github.io), [Atari800](https://github.com/libretro/libretro-atari800), [ProSystem](https://github.com/libretro/prosystem-libretro), [Virtual Jaguar](https://github.com/libretro/virtualjaguar-libretro) | [`libretro.stella`](https://search.nixos.org/packages?channel=26.05&show=libretro.stella), [`libretro.atari800`](https://search.nixos.org/packages?channel=26.05&show=libretro.atari800), [`libretro.prosystem`](https://search.nixos.org/packages?channel=26.05&show=libretro.prosystem), [`libretro.virtualjaguar`](https://search.nixos.org/packages?channel=26.05&show=libretro.virtualjaguar) | — | RomM |
+| Atari Lynx | [RetroArch](https://www.retroarch.com) + [Handy](https://github.com/libretro/libretro-handy) | [`libretro.handy`](https://search.nixos.org/packages?channel=26.05&show=libretro.handy) | — | RomM |
 | Steam | [Steam](https://store.steampowered.com), started hidden, with [Proton-GE](https://github.com/GloriousEggroll/proton-ge-custom) available | [`steam`](https://search.nixos.org/packages?channel=26.05&show=steam), [`proton-ge-bin`](https://search.nixos.org/packages?channel=26.05&show=proton-ge-bin) | Steam Cloud | Your Steam library |
 | GOG, Epic Games Store, Amazon Games | [Heroic Games Launcher](https://heroicgameslauncher.com), each store its own system | [`heroic`](https://search.nixos.org/packages?channel=26.05&show=heroic) | Each store's cloud saves | Your libraries in each store |
 | Minecraft | [Prism Launcher](https://prismlauncher.org) | [`prismlauncher`](https://search.nixos.org/packages?channel=26.05&show=prismlauncher) | — | Your Prism instances, and ones declared in Nix |
@@ -66,7 +79,13 @@ RetroArch runs everything it does well, so those systems share one
 controller setup and one save folder. The rest get the standalone emulator
 that's best for them. Platforms RomM can hold but FamiDrive leaves out:
 Windows/PC and classic Mac/Apple II (computers, not consoles), iOS, Xbox
-Series and Switch 2 (no emulator on Linux), and the original Xbox (later).
+Series and Switch 2 (no emulator on Linux), the original Xbox (later), and
+ColecoVision (its one core in nixpkgs, blueMSX, also needs blueMSX's own
+machine database beside its BIOS; not set up yet). Systems need a BIOS
+from RomM where the real console had one (Sega CD, TurboGrafx-CD, Disk
+System, Lynx, Intellivision, 3DO, Neo Geo CD): the firmware pull puts it
+where the core looks. Arcade ROMs must be a FinalBurn Neo romset, and Neo
+Geo games need `neogeo.zip` beside them.
 Save sync is on for every system whose save files are mapped so far
 (✅ above, through RomM); the others (—) keep their saves on the box until theirs are.
 Every console system can also play from a folder already on the box

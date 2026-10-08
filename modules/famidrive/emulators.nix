@@ -24,6 +24,17 @@ let
     swanstation = [ swanstation "swanstation" ];
     mgba = [ mgba "mgba" ];
     mesen = [ mesen "mesen" ];
+    picodrive = [ picodrive "picodrive" ];
+    pce = [ beetle-pce-fast "mednafen_pce_fast" ];
+    supergrafx = [ beetle-supergrafx "mednafen_supergrafx" ];
+    fbneo = [ fbneo "fbneo" ];
+    neocd = [ neocd "neocd" ];
+    vb = [ beetle-vb "mednafen_vb" ];
+    ngp = [ beetle-ngp "mednafen_ngp" ];
+    wswan = [ beetle-wswan "mednafen_wswan" ];
+    handy = [ handy "handy" ];
+    freeintv = [ freeintv "freeintv" ];
+    opera = [ opera "opera" ];
     snes9x = [ snes9x "snes9x" ];
     mupen64plus = [ mupen64plus "mupen64plus_next" ];
     genesis = [ genesis-plus-gx "genesis_plus_gx" ];
@@ -389,6 +400,16 @@ in
           fullname = "Nintendo Entertainment System"; rommPlatform = "nes"; platform = "nes";
           extensions = [ ".nes" ".unf" ".unif" ".zip" ];
         };
+        famicom = ra { coreName = "mesen"; } // {
+          fullname = "Nintendo Famicom"; rommPlatform = "famicom"; platform = "famicom";
+          extensions = [ ".nes" ".unf" ".unif" ".zip" ];
+        };
+        fds = ra { coreName = "mesen"; saves = false; } // {
+          # Needs the Disk System BIOS (disksys.rom) from RomM. Saves are
+          # written to the disk side, not mapped yet.
+          fullname = "Famicom Disk System"; rommPlatform = "fds"; platform = "fds";
+          extensions = [ ".fds" ".zip" ];
+        };
         snes = ra { coreName = "snes9x"; } // {
           fullname = "Super Nintendo"; rommPlatform = "snes"; platform = "snes";
           extensions = [ ".sfc" ".smc" ".zip" ];
@@ -415,6 +436,20 @@ in
           fullname = "Sega Game Gear"; rommPlatform = "gamegear"; platform = "gamegear";
           extensions = [ ".gg" ".zip" ];
         };
+        segacd = ra { coreName = "genesis"; saves = false; } // {
+          # Needs the Sega CD BIOS (bios_CD_U.bin and its region siblings)
+          # from RomM. Its backup RAM is one file for every game: not mapped.
+          fullname = "Sega CD"; rommPlatform = "segacd"; platform = "segacd";
+          extensions = [ ".chd" ".cue" ".iso" ".m3u" ];
+        };
+        sega32x = ra { coreName = "picodrive"; } // {
+          fullname = "Sega 32X"; rommPlatform = "sega32"; platform = "sega32x";
+          extensions = [ ".32x" ".bin" ".zip" ];
+        };
+        sg-1000 = ra { coreName = "genesis"; saves = false; } // {
+          fullname = "Sega SG-1000"; rommPlatform = "sg1000"; platform = "sg-1000";
+          extensions = [ ".sg" ".bin" ".zip" ];
+        };
         saturn = ra { coreName = "saturn"; saves = false; } // {
           fullname = "Sega Saturn"; rommPlatform = "saturn"; platform = "saturn";   # BIOS from RomM
           extensions = [ ".chd" ".cue" ".m3u" ];
@@ -431,6 +466,11 @@ in
           fullname = "Atari 5200"; rommPlatform = "atari5200"; platform = "atari5200";   # BIOS from RomM
           extensions = [ ".a52" ".bin" ".zip" ];
         };
+        atarilynx = ra { coreName = "handy"; saves = false; } // {
+          # Needs the Lynx boot ROM (lynxboot.img) from RomM.
+          fullname = "Atari Lynx"; rommPlatform = "lynx"; platform = "atarilynx";
+          extensions = [ ".lnx" ".zip" ];
+        };
         atari7800 = ra { coreName = "prosystem"; saves = false; } // {
           fullname = "Atari 7800"; rommPlatform = "atari7800"; platform = "atari7800";
           extensions = [ ".a78" ".bin" ".zip" ];
@@ -438,6 +478,75 @@ in
         atarijaguar = ra { coreName = "virtualjaguar"; saves = false; } // {
           fullname = "Atari Jaguar"; rommPlatform = "jaguar"; platform = "atarijaguar";
           extensions = [ ".j64" ".jag" ".zip" ];
+        };
+        tg16 = ra { coreName = "pce"; saves = false; } // {
+          fullname = "TurboGrafx-16 / PC Engine"; rommPlatform = "tg16"; platform = "tg16";
+          extensions = [ ".pce" ".zip" ];
+        };
+        tg-cd = ra { coreName = "pce"; saves = false; } // {
+          # Needs the System Card 3.0 BIOS (syscard3.pce) from RomM.
+          fullname = "TurboGrafx-CD / PC Engine CD"; rommPlatform = "turbografx-cd"; platform = "tg-cd";
+          extensions = [ ".chd" ".cue" ".ccd" ".m3u" ];
+        };
+        supergrafx = ra { coreName = "supergrafx"; saves = false; } // {
+          fullname = "PC Engine SuperGrafx"; rommPlatform = "supergrafx"; platform = "supergrafx";
+          extensions = [ ".sgx" ".pce" ".zip" ];
+        };
+        virtualboy = ra { coreName = "vb"; } // {
+          fullname = "Nintendo Virtual Boy"; rommPlatform = "virtualboy"; platform = "virtualboy";
+          extensions = [ ".vb" ".vboy" ".zip" ];
+        };
+        ngp = ra { coreName = "ngp"; } // {
+          fullname = "Neo Geo Pocket"; rommPlatform = "neo-geo-pocket"; platform = "ngp";
+          extensions = [ ".ngp" ".zip" ];
+        };
+        ngpc = ra { coreName = "ngp"; } // {
+          fullname = "Neo Geo Pocket Color"; rommPlatform = "neo-geo-pocket-color"; platform = "ngpc";
+          extensions = [ ".ngc" ".ngp" ".zip" ];
+        };
+        wonderswan = ra { coreName = "wswan"; } // {
+          fullname = "Bandai WonderSwan"; rommPlatform = "wonderswan"; platform = "wonderswan";
+          extensions = [ ".ws" ".zip" ];
+        };
+        wonderswancolor = ra { coreName = "wswan"; } // {
+          fullname = "Bandai WonderSwan Color"; rommPlatform = "wonderswan-color"; platform = "wonderswancolor";
+          extensions = [ ".wsc" ".ws" ".zip" ];
+        };
+        intellivision = ra { coreName = "freeintv"; saves = false; } // {
+          # Needs the Intellivision BIOS (exec.bin, grom.bin) from RomM.
+          fullname = "Mattel Intellivision"; rommPlatform = "intellivision"; platform = "intellivision";
+          extensions = [ ".int" ".bin" ".rom" ".zip" ];
+        };
+        "3do" = ra { coreName = "opera"; saves = false; } // {
+          # Needs a 3DO BIOS (panafz10.bin, say) from RomM. Saves go to one
+          # NVRAM for every game: not mapped.
+          fullname = "3DO Interactive Multiplayer"; rommPlatform = "3do"; platform = "3do";
+          extensions = [ ".iso" ".chd" ".cue" ];
+        };
+
+        # Arcade: FinalBurn Neo. Its romsets must match the FBNeo version
+        # (romsets named for it, a "FBNeo" set). Neo Geo games need
+        # neogeo.zip next to them in the same folder. NVRAM and hiscores
+        # stay on the box (not mapped).
+        arcade = ra { coreName = "fbneo"; saves = false; } // {
+          fullname = "Arcade"; rommPlatform = "arcade"; platform = "arcade";
+          extensions = [ ".zip" ".7z" ];
+        };
+        neogeo = ra { coreName = "fbneo"; saves = false; } // {
+          fullname = "Neo Geo"; rommPlatform = "neogeomvs"; platform = "neogeo";
+          extensions = [ ".zip" ".7z" ];
+        };
+        neogeoaes = ra { coreName = "fbneo"; saves = false; } // {
+          fullname = "Neo Geo AES"; rommPlatform = "neogeoaes"; platform = "neogeo";
+          extensions = [ ".zip" ".7z" ];
+        };
+        neogeocd = ra { coreName = "neocd"; saves = false; } // {
+          # Needs the Neo Geo CD BIOS from RomM. NeoCD looks for it in a
+          # neocd folder inside RetroArch's system folder, not beside the
+          # other cores' firmware.
+          fullname = "Neo Geo CD"; rommPlatform = "neo-geo-cd"; platform = "neogeocd";
+          extensions = [ ".chd" ".cue" ];
+          firmwareDir = "retroarch/neocd";
         };
         nds = ra { coreName = "melondsds"; saves = false; } // {
           fullname = "Nintendo DS"; rommPlatform = "nds"; platform = "nds";
