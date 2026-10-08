@@ -247,6 +247,8 @@ in
         && lib.hasInfix "libSDL3.so.0" c.famidrive.systems.gc.before))
     (check "Cemu starts without its getting-started wizard"
       (lib.hasInfix "Cemu/settings.xml" c.home-manager.users.alice.home.activation.famidriveEmulators.data))
+    (check "controller toasts instead of ES-DE's pop-ups"
+      (lib.hasInfix "InputDeviceNotifications" c.home-manager.users.alice.home.activation.famidriveEsSettings.data))
     (check "Dolphin's own on-screen messages off, for every player (toasts instead)"
       (lib.all (u: lib.hasInfix "OnScreenDisplayMessages" c.home-manager.users.${u}.home.activation.famidriveEmulators.data) [ "alice" "bob" "guest" ]))
     (check "Heroic sends desktop notifications (not taken for Steam Deck Game Mode); GOG games have the Comet watcher"

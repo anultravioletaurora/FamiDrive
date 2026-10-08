@@ -65,6 +65,12 @@ let
 in
 {
   options.famidrive.overlays = overlayOptions false // {
+    toastSpec = mkOption {
+      type = types.path;
+      internal = true;
+      readOnly = true;
+      description = "The toast daemon's settings, for the sessions and \"Who's playing?\".";
+    };
     resolved = mkOption {
       type = types.attrsOf types.anything;
       internal = true;
@@ -81,6 +87,7 @@ in
 
   config = lib.mkIf cfg.enable {
     famidrive.overlays.resolved = lib.mapAttrs' (_: p: lib.nameValuePair p.user (resolve p)) cfg.allPlayers;
+    famidrive.overlays.toastSpec = toastSpec;
 
     environment.systemPackages = [ pkgs.famidrive-toast ];
     # Where the box's own services (the library pull) reach whoever is on

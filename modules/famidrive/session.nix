@@ -160,10 +160,17 @@ let
     theme = if cfg.esde.theme != null then "${cfg.esde.theme.src}" else null;
     powerOff = [ "${config.systemd.package}/bin/systemctl" "poweroff" ];
   });
+  # "Who's playing?" with a toast daemon of its own, so controllers
+  # connecting and going flat show there too. The greeter has no runtime
+  # folder; famidrive-toast falls back to /tmp for it.
+  pickerSession = pkgs.writeShellScript "famidrive-picker-session" ''
+    ${pkgs.famidrive-toast}/bin/famidrive-toast daemon ${cfg.overlays.toastSpec} greeter &
+    exec ${pkgs.famidrive-picker}/bin/famidrive-picker ${pickerSpec}
+  '';
   pickerCmd = lib.concatStringsSep " " ([
     "${pkgs.gamescope}/bin/gamescope" "-f"
   ] ++ gamescopeFlags ++ [
-    "--" "${pkgs.famidrive-picker}/bin/famidrive-picker" "${pickerSpec}"
+    "--" "${pickerSession}"
   ]);
 in
 {

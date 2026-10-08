@@ -182,6 +182,13 @@ Found against RomM 5.3:
   database's location were read from Comet 0.2.0's binary, not a real
   unlock yet.
 
+- **Controller pop-ups are FamiDrive's.** ES-DE's `InputDeviceNotifications`
+  is off; the toast daemon watches `/sys/class/input/js*` (and batteries
+  with scope `Device`) and toasts changes, in a session and on "Who's
+  playing?" (the greeter has no runtime folder, so its socket is in /tmp).
+  Dolphin, Eden, Cemu and Ryujinx bind pads at launch, so a pad that
+  appears mid-game needs the game restarted; the disconnect toast says so.
+
 ## Steam
 
 - **Steam Input is off per game**, written into `localconfig.vdf` at

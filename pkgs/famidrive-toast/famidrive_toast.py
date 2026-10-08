@@ -49,7 +49,7 @@ POSITIONS = ("top-left", "top-center", "top-right", "middle-left", "middle-right
 # Every toast has an icon: --icon names one of these (drawn here, in the
 # theme's text color), or gives an image (a game's logo). Without one, or
 # when the image can't be read, the kind's own.
-ICONS = ("save", "warning", "trophy", "download", "info")
+ICONS = ("save", "warning", "trophy", "download", "info", "controller")
 KIND_ICON = {"notice": "info", "alert": "warning", "progress": "download", "achievement": "trophy"}
 ALERT = (230, 160, 40, 255)
 GOLD = (232, 184, 64, 255)
@@ -72,7 +72,12 @@ SHARED = Path("/run/famidrive-toast")
 
 
 def sock_path():
-    return Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}") / "famidrive-toast.sock"
+    """This session's socket: in its runtime folder, or for an account
+    without one (the greeter, which runs "Who's playing?"), in /tmp."""
+    run = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+    if not os.path.isdir(run):
+        return Path("/tmp") / f"famidrive-toast-{os.getuid()}.sock"
+    return Path(run) / "famidrive-toast.sock"
 
 
 def read(path):
@@ -343,6 +348,92 @@ def serve_notifications():
             conn.send(new_error(msg, "org.freedesktop.DBus.Error.UnknownMethod"))
 
 
+# --- Controllers ------------------------------------------------------------
+#
+# Controllers coming and going, and running low, as toasts: on "Who's
+# playing?", in the menu and in a game, in place of ES-DE's own pop-ups
+# (InputDeviceNotifications, off). Read from the kernel's joystick devices
+# and their batteries, so any pad counts, whatever drives it.
+
+SYS = Path("/sys/class")
+LOW = 20   # percent: warn once at or below, again after charging past LOW + 10
+
+
+def connected_pads(sys_class=SYS):
+    """{device path: name} for each joystick the kernel has (jsN)."""
+    pads = {}
+    for js in sorted((sys_class / "input").glob("js*")):
+        try:
+            dev = os.path.realpath(js / "device")
+            pads[dev] = (Path(dev) / "name").read_text().strip() or "Controller"
+        except OSError:
+            continue
+    return pads
+
+
+def pad_batteries(sys_class=SYS):
+    """{power supply: (pad name, percent)} for batteries that belong to a
+    device (scope Device) with a joystick-like input under it."""
+    out = {}
+    for ps in sorted((sys_class / "power_supply").glob("*")):
+        try:
+            if (ps / "scope").read_text().strip() != "Device":
+                continue
+            cap = int((ps / "capacity").read_text().strip())
+        except (OSError, ValueError):
+            continue
+        names = sorted(Path(os.path.realpath(ps / "device")).glob("input/input*/name"))
+        if names:
+            out[str(ps)] = (names[0].read_text().strip() or "Controller", cap)
+    return out
+
+
+def in_game():
+    """Whether a game is running in this session (gamescope-fg's marker)."""
+    return (sock_path().parent / "famidrive-game.pgid").exists()
+
+
+def pad_changes(before, after, playing):
+    """The toasts for pads that came and went between two scans."""
+    toasts = []
+    for dev, name in sorted(after.items()):
+        if dev not in before:
+            toasts.append({"kind": "notice", "icon": "controller", "title": "Controller connected", "detail": name})
+    for dev, name in sorted(before.items()):
+        if dev not in after:
+            detail = name
+            if playing:
+                detail += ". To play on with another controller, quit with Select + Start and start the game again."
+            toasts.append({"kind": "alert" if playing else "notice", "icon": "controller",
+                           "title": "Controller disconnected", "detail": detail})
+    return toasts
+
+
+def battery_changes(warned, now):
+    """Low-battery toasts, once per pad until it's charged again."""
+    toasts = []
+    for ps, (name, cap) in now.items():
+        if cap <= LOW and ps not in warned:
+            warned.add(ps)
+            toasts.append({"kind": "alert", "icon": "controller", "title": "Controller battery low",
+                           "detail": f"{name}: {cap}%"})
+        elif cap > LOW + 10:
+            warned.discard(ps)
+    return toasts
+
+
+def watch_controllers(interval=1.5):
+    """Scan for pads every so often and toast what changed. Pads already
+    connected when the session starts aren't announced."""
+    before, warned = connected_pads(), set()
+    while True:
+        time.sleep(interval)
+        after = connected_pads()
+        for t in pad_changes(before, after, in_game()) + battery_changes(warned, pad_batteries()):
+            send(t)
+        before = after
+
+
 # --- The daemon -------------------------------------------------------------
 
 def daemon(spec_file, player):
@@ -436,6 +527,14 @@ def daemon(spec_file, player):
             pygame.draw.rect(c, color, (n * .45, n * .55, n * .1, n * .18))
             pygame.draw.rect(c, color, (n * .3, n * .72, n * .4, n * .08), border_radius=n // 40)
             pygame.draw.rect(c, color, (n * .24, n * .8, n * .52, n * .1), border_radius=n // 40)
+        elif name == "controller":   # a gamepad: body, grips, d-pad, two buttons
+            pygame.draw.rect(c, color, (n * .14, n * .30, n * .72, n * .34), border_radius=int(n * .17))
+            pygame.draw.circle(c, color, (n * .26, n * .62), n * .14)
+            pygame.draw.circle(c, color, (n * .74, n * .62), n * .14)
+            pygame.draw.rect(c, clear, (n * .21, n * .44, n * .16, n * .05))
+            pygame.draw.rect(c, clear, (n * .265, n * .385, n * .05, n * .16))
+            pygame.draw.circle(c, clear, (n * .66, n * .43), n * .04)
+            pygame.draw.circle(c, clear, (n * .74, n * .51), n * .04)
         elif name == "download":   # an arrow down into a tray
             pygame.draw.rect(c, color, (n * .43, n * .08, n * .14, n * .42))
             pygame.draw.polygon(c, color, [(n * .25, n * .46), (n * .75, n * .46), (n * .5, n * .70)])
@@ -555,6 +654,7 @@ def daemon(spec_file, player):
             print(f"famidrive-toast: no shared socket ({e})", file=sys.stderr)
     import threading
     threading.Thread(target=serve_notifications, daemon=True).start()
+    threading.Thread(target=watch_controllers, daemon=True).start()
     xfd = d.fileno()
     snapshots = os.environ.get("FAMIDRIVE_TOAST_SNAPSHOT")
     drawn = None   # (x, y, w, h) on screen now

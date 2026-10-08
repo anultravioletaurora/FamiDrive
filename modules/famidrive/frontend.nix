@@ -244,6 +244,10 @@ in
             # Reboot system, Power off system. The way to turn the box off
             # from a controller.
             ShowQuitMenu = { type = "bool"; value = "true"; };
+            # Controllers coming and going show as FamiDrive toasts
+            # (famidrive-toast), the same in the menu, in a game and on
+            # "Who's playing?". ES-DE's own pop-up would say it twice.
+            InputDeviceNotifications = { type = "bool"; value = "false"; };
           } // lib.optionalAttrs (theme != null) {
             # Locked, so a rebuild always brings the chosen theme back. The
             # theme's own options (color scheme, aspect ratio) stay editable.
