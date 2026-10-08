@@ -30,6 +30,7 @@ behave differently in each. For a console game it's the emulator.
   - [Call of Duty: WWII](#call-of-duty-wwii) (PC)
   - [Cyberpunk 2077](#cyberpunk-2077) (PC)
   - [DiRT Rally](#dirt-rally) (PC)
+  - [DOOM](#doom) (PC)
   - [Fallout: New Vegas](#fallout-new-vegas) (PC)
   - [Gears 5](#gears-5) (PC)
   - [Tom Clancy's Ghost Recon Wildlands](#tom-clancys-ghost-recon-wildlands) (PC)
@@ -220,6 +221,21 @@ be noted when it's tried.
 - **To check:** a controller first (triggers for throttle and brake,
   rumble), then a wheel if one is around.
 
+### DOOM
+
+The 2016 one.
+
+**Steam: ✅ Works** with an 8BitDo Ultimate 2, with Steam Input on for
+it (`famidrive.steam.steamInputGames`).
+
+- **Controllers:** it listens only to the first pad it finds. With
+  Steam Input off (FamiDrive's default), the first pad was a Raphnet
+  adapter (a guitar's, for YARG) and the 8BitDo did nothing in its menus.
+  With Steam Input on, Steam hands it the pads in Steam's own order.
+- **First launch:** it needed an update, then its install script ran.
+  FamiDrive used to ask Steam to launch it again before the script had
+  run, and the launch sat on "updating" for hours. Fixed in #118.
+
 ### Fallout: New Vegas
 
 **Steam: ✅ Works.** Proton Experimental (Steam's choice), unmodded.
@@ -241,12 +257,15 @@ Multiplayer, split-screen, rumble and HDR are still to check.
 
 ### Tom Clancy's Ghost Recon Wildlands
 
-**Steam: ❔ Untested.**
+**Steam: ❔ Untested.** 2026-10-08: first launch under way.
 
-- **Ubisoft Connect** starts first and wants a sign-in, like the EA app
-  for EA's games. Expect the same first-launch hurdles: its installer and
-  sign-in window, probably wanting a mouse or keyboard
-  ([Star Wars Jedi: Survivor](#star-wars-jedi-survivor)).
+- **EULA:** Steam shows the game's EULA before the first launch. Accepted
+  with the controller as a mouse
+  ([Steam's prompts](CONTROLLERS.md#steams-prompts)). Steam then
+  processed its Vulkan shaders.
+- **Ubisoft Connect** starts first and wants an email and password
+  ("Remember me" keeps the sign-in, in this game's Proton prefix only).
+  That needs a keyboard for now; an on-screen keyboard is #119.
 - **Multiplayer** (co-op, Ghost War) uses BattlEye. Check whether it
   works under Proton.
 - **To check:** controllers and rumble, and whether Ubisoft Connect
