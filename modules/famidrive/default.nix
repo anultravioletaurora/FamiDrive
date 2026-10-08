@@ -111,7 +111,7 @@ in
     ./clonehero.nix
     ./yarg.nix
     ./osu.nix
-    ./supertuxkart.nix
+    ./tux.nix
     ./ryujinx.nix
     ./gpu.nix
     ./boot.nix
