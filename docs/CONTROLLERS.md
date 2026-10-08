@@ -403,7 +403,8 @@ games. ES-DE's menus need more buttons than it has.
 ## Meta Quest Touch Plus controllers
 
 ❌ Not usable. They connect only to their Quest headset, not to a PC
-on their own, and VR isn't something FamiDrive does.
+on their own. They'd work along with the headset, once FamiDrive
+supports VR ([#128](https://github.com/anultravioletaurora/FamiDrive/issues/128)).
 
 ## NES Zapper
 
