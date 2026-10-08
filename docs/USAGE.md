@@ -27,7 +27,7 @@ is on; every other option is optional.
 - [Clone Hero](#clone-hero)
 - [YARG](#yarg)
 - [osu!](#osu)
-- [SuperTuxKart](#supertuxkart)
+- [Tux games](#tux-games)
 - [Minecraft](#minecraft)
 - [Valheim](#valheim)
 - [PC saves](#pc-saves)
@@ -1046,13 +1046,29 @@ osu!'s built-in OpenTabletDriver.
 - **Default:** `false`
 - **Example:** `true`
 
-## SuperTuxKart
+## Tux games
 
-SuperTuxKart, in the Ports system.
+Free games starring Tux, in the Ports system: SuperTuxKart, SuperTux and SuperTux Party.
+
+### `famidrive.superTux.enable`
+
+Whether to enable SuperTux, in ES-DE's Ports system.
+
+- **Type:** boolean
+- **Default:** `false`
+- **Example:** `true`
 
 ### `famidrive.superTuxKart.enable`
 
 Whether to enable SuperTuxKart, in ES-DE's Ports system.
+
+- **Type:** boolean
+- **Default:** `false`
+- **Example:** `true`
+
+### `famidrive.superTuxParty.enable`
+
+Whether to enable SuperTux Party, in ES-DE's Ports system.
 
 - **Type:** boolean
 - **Default:** `false`
