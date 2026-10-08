@@ -37,7 +37,7 @@ yet is listed below as ❔ until someone does.
 | [Xbox One controller, wired](#xbox-one-controller-wired) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Original Xbox controller (Duke)](#original-xbox-controller-duke) | Xbox-to-USB cable | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [DualShock 4](#dualshock-4) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
-| [Razer Raiju Tournament Edition](#razer-raiju) | USB / Bluetooth | ✅ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Razer Raiju Tournament Edition](#razer-raiju) | USB / Bluetooth | ✅ | ❔ | ✅ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [PS3 Sixaxis / DualShock 3](#ps3-sixaxis--dualshock-3) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [PS2 controllers on a USB adapter](#ps2-controllers-on-a-usb-adapter) | USB adapter | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [DualSense](#dualsense) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
@@ -259,7 +259,10 @@ cable. It also has Bluetooth, untested.
   announced it when it was plugged in, and it drove ES-DE's menus.
 - **USB ID** `1532:1007`. The kernel names it "Razer Razer Raiju
   Tournament Edition Wired".
-- **Still to record:** the name SDL gives it, and how it does in games. The other Raijus (the original, Ultimate and Mobile)
+- **2026-10-08, Dolphin (GameCube):** ✅ It played Mario Party 4
+  Deluxe.
+- **Still to record:** the name SDL gives it, and how it does in other
+  emulators and Steam games. The other Raijus (the original, Ultimate and Mobile)
   are untested.
 
 ## PS3 Sixaxis / DualShock 3
