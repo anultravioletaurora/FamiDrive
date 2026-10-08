@@ -12,6 +12,15 @@ sees every press), and when Select + Start are held for HOLD seconds it
 asks the game to close (SIGTERM), then force-closes it (SIGKILL) if it's
 still there after GRACE seconds. ES-DE comes back when the game is gone.
 
+Which buttons are Select and Start: a pad with a kernel driver of its own
+(xpad, hid-sony, hid-nintendo, ...) names them BTN_SELECT and BTN_START.
+A pad the kernel only knows as a generic HID gamepad (hid-generic) gets
+its buttons named in order instead, whatever they are. For those, SDL's
+community controller database (SDL_GameControllerDB) says which numbered
+buttons are back and start. Found on the second box 2026-10-08: on a
+Razer Raiju Tournament Edition, "BTN_SELECT" and "BTN_START" were the
+stick clicks, and Share + Options did nothing.
+
 Runs for the life of the session: started by famidrive-session, and exits
 when that goes away.
 """
@@ -37,17 +46,75 @@ PGID_FILE = RUN / "famidrive-game.pgid"
 TREE_FILE = RUN / "famidrive-game.tree"
 CLOSE_FILE = RUN / "famidrive-game.close"
 COMBO = {e.BTN_SELECT, e.BTN_START}
+# SDL_GameControllerDB's gamecontrollerdb.txt (set by the package).
+PADDB = os.environ.get("FAMIDRIVE_QUIT_PADDB", "@gamecontrollerdb@")
+BTN_MISC, BTN_JOYSTICK, KEY_MAX = 0x100, 0x120, 0x2ff
 
 
 def log(msg):
     print(f"famidrive-quit: {msg}", flush=True)
 
 
-def is_gamepad(dev):
+def le16(hexstr):
+    """A GUID's little-endian 16-bit field, as a number."""
+    return int(hexstr[2:4] + hexstr[0:2], 16)
+
+
+def load_paddb(path):
+    """(vendor, product) -> {platform: (back, start)} button numbers, from
+    SDL_GameControllerDB. Only entries that give both as buttons."""
+    db = {}
+    try:
+        lines = Path(path).read_text(errors="replace").splitlines()
+    except OSError:
+        return db
+    for line in lines:
+        fields = line.strip().split(",")
+        if len(fields) < 3 or line.startswith("#") or len(fields[0]) != 32:
+            continue
+        guid = fields[0]
+        try:
+            vendor, product = le16(guid[8:12]), le16(guid[16:20])
+        except ValueError:
+            continue
+        m = dict(f.split(":", 1) for f in fields[2:] if ":" in f)
+        back, start = m.get("back", ""), m.get("start", "")
+        if not (back[:1] == "b" and back[1:].isdigit() and start[:1] == "b" and start[1:].isdigit()):
+            continue
+        db.setdefault((vendor, product), {}).setdefault(m.get("platform", ""), (int(back[1:]), int(start[1:])))
+    return db
+
+
+def sdl_buttons(keys):
+    """A device's key codes in the order SDL numbers its buttons on Linux:
+    from BTN_JOYSTICK up, then the ones below it from BTN_MISC."""
+    keys = sorted(set(keys))
+    return [k for k in keys if BTN_JOYSTICK <= k <= KEY_MAX] + [k for k in keys if BTN_MISC <= k < BTN_JOYSTICK]
+
+
+def combo_for(keys, vendor, product, driver, db):
+    """The two key codes that are Select and Start on this device, or None
+    if it has no such pair (not a pad, or a dongle's keyboard side)."""
+    if driver == "hid-generic":
+        # Numbered buttons. A Linux entry was made from the same numbering;
+        # a Windows one numbers the HID report's buttons, which is the
+        # order hid-generic gives them codes in.
+        found = db.get((vendor, product), {})
+        pair = found.get("Linux") or found.get("Windows")
+        order = sdl_buttons(keys)
+        if pair and max(pair) < len(order):
+            return {order[pair[0]], order[pair[1]]}
     # 2.4 GHz dongles often add keyboard and mouse interfaces next to the
     # pad (the 8BitDo one does). Only the interface with both buttons counts.
-    keys = dev.capabilities().get(e.EV_KEY, [])
-    return COMBO.issubset(keys)
+    return set(COMBO) if COMBO.issubset(keys) else None
+
+
+def hid_driver(dev):
+    """The kernel driver behind an input device (hid-generic, xpad, ...)."""
+    try:
+        return Path(f"/sys/class/input/{Path(dev.path).name}/device/device/driver").resolve().name
+    except OSError:
+        return None
 
 
 def read_pid(path):
@@ -130,9 +197,11 @@ def quit_game():
 def main():
     parent = os.getppid()
     devices = {}        # fd -> InputDevice
+    combos = {}         # fd -> its Select and Start key codes
     held = {}           # fd -> set of combo buttons currently down
     since = {}          # fd -> when the full combo went down (None = fired or not held)
     last_scan = 0.0
+    db = load_paddb(PADDB)
 
     while True:
         # The session (gamescope-fg) is our parent; when it's gone, so are we.
@@ -150,11 +219,15 @@ def main():
                     dev = evdev.InputDevice(path)
                 except OSError:
                     continue
-                if is_gamepad(dev):
+                combo = combo_for(dev.capabilities().get(e.EV_KEY, []), dev.info.vendor,
+                                  dev.info.product, hid_driver(dev), db)
+                if combo:
                     devices[dev.fd] = dev
+                    combos[dev.fd] = combo
                     held[dev.fd] = set()
                     since[dev.fd] = None
-                    log(f"watching {dev.name} ({path})")
+                    names = "+".join(str(e.BTN.get(c) or e.KEY.get(c) or c) for c in sorted(combo))
+                    log(f"watching {dev.name} ({path}), quitting on {names}")
                 else:
                     dev.close()
 
@@ -164,18 +237,18 @@ def main():
             dev = devices[fd]
             try:
                 for ev in dev.read():
-                    if ev.type == e.EV_KEY and ev.code in COMBO:
+                    if ev.type == e.EV_KEY and ev.code in combos[fd]:
                         if ev.value:
                             held[fd].add(ev.code)
                         else:
                             held[fd].discard(ev.code)
                             since[fd] = None
-                        if held[fd] == COMBO and since[fd] is None:
+                        if held[fd] == combos[fd] and since[fd] is None:
                             since[fd] = time.monotonic()
             except OSError:
                 # Unplugged, out of range or switched off.
                 log(f"lost {dev.name}")
-                del devices[fd], held[fd], since[fd]
+                del devices[fd], combos[fd], held[fd], since[fd]
                 try:
                     dev.close()
                 except OSError:
