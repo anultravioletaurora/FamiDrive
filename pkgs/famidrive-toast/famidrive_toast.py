@@ -50,7 +50,7 @@ POSITIONS = ("top-left", "top-center", "top-right", "middle-left", "middle-right
 # theme's text color), or gives an image (a game's logo). Without one, or
 # when the image can't be read, the kind's own. A success is always the
 # checkmark.
-ICONS = ("save", "warning", "trophy", "download", "info", "controller", "check")
+ICONS = ("save", "warning", "trophy", "download", "info", "controller", "check", "music")
 KIND_ICON = {"notice": "info", "alert": "warning", "progress": "download", "achievement": "trophy",
              "success": "check"}
 ALERT = (230, 160, 40, 255)
@@ -620,6 +620,11 @@ def daemon(spec_file, player):
         elif name == "check":   # a checkmark in a circle
             pygame.draw.circle(c, color, (n * .5, n * .5), n * .44)
             pygame.draw.lines(c, clear, False, [(n * .29, n * .51), (n * .44, n * .66), (n * .72, n * .37)], max(4, n // 9))
+        elif name == "music":   # two beamed eighth notes
+            for x in (.30, .74):
+                pygame.draw.ellipse(c, color, (n * (x - .19), n * .66, n * .22, n * .17))
+                pygame.draw.rect(c, color, (n * (x - .02), n * .20, n * .05, n * .56))
+            pygame.draw.polygon(c, color, [(n * .28, n * .20), (n * .79, n * .10), (n * .79, n * .22), (n * .28, n * .32)])
         elif name == "download":   # an arrow down into a tray
             pygame.draw.rect(c, color, (n * .43, n * .08, n * .14, n * .42))
             pygame.draw.polygon(c, color, [(n * .25, n * .46), (n * .75, n * .46), (n * .5, n * .70)])
