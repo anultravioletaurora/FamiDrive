@@ -246,7 +246,9 @@ xpadneo, so test those first.
   plastic around the Xbox button joined to the face) have no Bluetooth.
   They work over USB as an [Xbox One controller,
   wired](#xbox-one-controller-wired), or wirelessly through Microsoft's
-  Xbox Wireless Adapter, which needs the out-of-tree `xone` driver.
+  Xbox Wireless Adapter. The adapter needs the out-of-tree `xone`
+  driver: turn it on with
+  [`famidrive.controllers.xboxWirelessAdapter`](USAGE.md#famidrivecontrollersxboxwirelessadapter).
   Untested.
 
 ## Xbox 360 controller, wired
