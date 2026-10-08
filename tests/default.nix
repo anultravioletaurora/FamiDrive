@@ -145,9 +145,9 @@ in
 
   # USAGE.md is generated: this fails when it's out of date.
   usage-doc = pkgs.runCommand "test-usage-doc" { passthru.doc = usageDoc; } ''
-    if ! diff -u ${../USAGE.md} ${usageDoc}; then
+    if ! diff -u ${../docs/USAGE.md} ${usageDoc}; then
       echo "USAGE.md is out of date. Regenerate it:" >&2
-      echo "  nix build .#checks.x86_64-linux.usage-doc.doc && cp result USAGE.md" >&2
+      echo "  nix build .#checks.x86_64-linux.usage-doc.doc && cp result docs/USAGE.md" >&2
       exit 1
     fi
     touch $out

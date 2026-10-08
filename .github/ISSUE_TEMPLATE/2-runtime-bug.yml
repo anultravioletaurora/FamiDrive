@@ -8,7 +8,7 @@ body:
       value: |
         For problems on the TV: a game that won't launch or drops back to ES-DE, a controller that isn't seen, a black screen, a crash. If it's about one game working with FamiDrive (mods, a specific release), a [game support request](?template=4-game-support.yml) may fit better.
 
-        Results also go into [COMPATIBILITY.md](https://github.com/anultravioletaurora/FamiDrive/blob/main/COMPATIBILITY.md).
+        Results also go into [COMPATIBILITY.md](https://github.com/anultravioletaurora/FamiDrive/blob/main/docs/COMPATIBILITY.md).
   - type: input
     id: game
     attributes:

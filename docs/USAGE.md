@@ -1,7 +1,7 @@
 # Usage
 
 Every option a box's `configuration.nix` can set, under `famidrive.`. For
-setting up a box, start with [Using it](README.md#using-it) in the README.
+setting up a box, start with [Using it](../README.md#using-it) in the README.
 
 Options without a default have to be set when the feature that uses them
 is on; every other option is optional.
@@ -9,7 +9,7 @@ is on; every other option is optional.
 <!-- Generated from the option declarations by tests/usage_doc.py. CI
      fails when this file is out of date. To change it, change the
      option's description, then regenerate on an x86_64-linux machine:
-     nix build .#checks.x86_64-linux.usage-doc.doc && cp result USAGE.md -->
+     nix build .#checks.x86_64-linux.usage-doc.doc && cp result docs/USAGE.md -->
 
 ## Contents
 
@@ -392,7 +392,7 @@ the box lists its cards and the setting to use.
   20-series cards and newer), with kernel modesetting, which
   gamescope needs, its video decoder, and the long-term kernel,
   which Nvidia's driver keeps up with. Untested: results welcome
-  in COMPATIBILITY.md.
+  in docs/COMPATIBILITY.md.
 
 - **Type:** one of "auto", "amd", "intel", "nvidia"
 - **Default:** `"auto"`

@@ -1,6 +1,6 @@
 """USAGE.md, from FamiDrive's option declarations.
 
-    python3 usage_doc.py OPTIONS_JSON > USAGE.md
+    python3 usage_doc.py OPTIONS_JSON > docs/USAGE.md
 
 OPTIONS_JSON is what tests/default.nix writes from a box's options (name,
 type, description, default, example, readOnly). The `usage-doc` check
@@ -84,7 +84,7 @@ def render(options):
         "# Usage",
         "",
         "Every option a box's `configuration.nix` can set, under `famidrive.`. For",
-        "setting up a box, start with [Using it](README.md#using-it) in the README.",
+        "setting up a box, start with [Using it](../README.md#using-it) in the README.",
         "",
         "Options without a default have to be set when the feature that uses them",
         "is on; every other option is optional.",
@@ -92,7 +92,7 @@ def render(options):
         "<!-- Generated from the option declarations by tests/usage_doc.py. CI",
         "     fails when this file is out of date. To change it, change the",
         "     option's description, then regenerate on an x86_64-linux machine:",
-        "     nix build .#checks.x86_64-linux.usage-doc.doc && cp result USAGE.md -->",
+        "     nix build .#checks.x86_64-linux.usage-doc.doc && cp result docs/USAGE.md -->",
         "",
         "## Contents",
         "",

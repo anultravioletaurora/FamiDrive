@@ -27,14 +27,19 @@ and never needs a desktop, and makes Steam just one entry on the menu.
 > edges. RomM sync works for GameCube, Wii, Switch and Clone Hero; most of
 > the other emulators haven't been tried yet. See
 > [Status](#status) for what's real and what's a placeholder, and
-> [COMPATIBILITY.md](COMPATIBILITY.md) for game-by-game results.
+> [COMPATIBILITY.md](docs/COMPATIBILITY.md) for game-by-game results.
 
 FamiDrive is for games you legally own, and for backups you made yourself
 of games you own. See [Your games](#your-games).
 
-How FamiDrive compares with Bazzite, ChimeraOS, Jovian-NixOS, Batocera
-and Windows with Playnite, and when to pick one of those instead, is in
-[COMPARISON.md](COMPARISON.md).
+## Docs
+
+- [Comparison](docs/COMPARISON.md): FamiDrive next to Bazzite, ChimeraOS,
+  Jovian-NixOS, Batocera and Windows with Playnite, and when to pick one
+  of those instead
+- [Options](docs/USAGE.md): every `famidrive.*` option a box can set
+- [Compatibility](docs/COMPATIBILITY.md): game-by-game results
+- [Controllers](docs/CONTROLLERS.md): each pad's results and notes
 
 
 ## What's in the box
@@ -182,13 +187,13 @@ planning doc for now and will move into this repo.
   Smash Ultimate with HewDraw Remix gets there with its update, DLC and
   the player's save bridged from Eden's. Its menus work on the first
   box, but matches crash on Ryujinx 1.3.3 (see
-  [COMPATIBILITY.md](COMPATIBILITY.md#super-smash-bros-ultimate)).
+  [COMPATIBILITY.md](docs/COMPATIBILITY.md#super-smash-bros-ultimate)).
 - The Steam lane, with Proton pins and Steam Input set from Nix, Steam's
   Big Picture as a Settings entry, a status screen while Steam
   updates, processes shaders or starts a game, and each game's art and
   details from Steam itself. GOG, Epic and Amazon through Heroic
   (`lanes` has `"heroic"`). Results per game are in
-  [COMPATIBILITY.md](COMPATIBILITY.md).
+  [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 - Toasts over whatever's on the TV, in the player's theme, with an icon
   each: a save going up to RomM, or not. Toasts show bottom right by
   default, and MangoHud's performance overlay, off by default, middle
@@ -244,7 +249,7 @@ planning doc for now and will move into this repo.
 **Graphics cards:** AMD is tested (the first box's Radeon RX 7900 XTX).
 Intel Arc should just work, the same as AMD. Nvidia is supported
 (`famidrive.gpu = "nvidia"`) but untested, and testers are wanted (#77).
-[COMPATIBILITY.md](COMPATIBILITY.md#graphics-cards) has the details.
+[COMPATIBILITY.md](docs/COMPATIBILITY.md#graphics-cards) has the details.
 
 **Not in scope yet:** original Xbox, HDMI-CEC power-on (sketched behind
 `famidrive.cec.enable`, off), and waking the box with a controller.
@@ -295,7 +300,7 @@ from the same FamiDrive revision runs the same emulator builds, which
 netplay needs. Build with
 `sudo nixos-rebuild switch --flake /etc/nixos#tv`, and pick up a newer
 FamiDrive with `nix flake update famidrive` first. Every option, with
-what it does and its default, is in [USAGE.md](USAGE.md).
+what it does and its default, is in [USAGE.md](docs/USAGE.md).
 
 **Secrets.** Server addresses aren't secret and go in `configuration.nix`.
 Logins for Jellyfin, Steam and Heroic's stores (GOG, Epic, Amazon) happen once in each app, on the TV. The
@@ -426,7 +431,7 @@ NixOS, but isn't covered here.
    };
    ```
 
-   Every option is in [USAGE.md](USAGE.md).
+   Every option is in [USAGE.md](docs/USAGE.md).
    - **Without a RomM server:** keep `romm.enable = false`. No secrets
      are needed. Games come from folders on the box (`localRoms`);
      plugging in a drive and having it just work is
@@ -472,7 +477,7 @@ NixOS, but isn't covered here.
    - **Controllers:** 2.4 GHz dongles and wired pads work as they are.
      Pair Bluetooth pads once with `bluetoothctl` over SSH
      (`scan on`, then `pair`, `trust` and `connect` with the pad's
-     address). [CONTROLLERS.md](CONTROLLERS.md) has each pad's notes.
+     address). [CONTROLLERS.md](docs/CONTROLLERS.md) has each pad's notes.
    - **Steam:** sign in under Settings → Steam Settings.
    - **GOG, Epic, Amazon:** sign in under Settings → Heroic Games
      Launcher, if `lanes` has `"heroic"`.
@@ -549,8 +554,8 @@ covers what can be tested without a TV or a server ([tests/](tests)):
 
 Run the same locally with `nix flake check`. After merging, a change gets
 tried on a real box (and against RomM, for anything that touches it),
-and the results go in [COMPATIBILITY.md](COMPATIBILITY.md) (games) and
-[CONTROLLERS.md](CONTROLLERS.md) (controllers). Notes for coding agents
+and the results go in [COMPATIBILITY.md](docs/COMPATIBILITY.md) (games) and
+[CONTROLLERS.md](docs/CONTROLLERS.md) (controllers). Notes for coding agents
 are in [AGENTS.md](AGENTS.md).
 
 ## Special Thanks

@@ -232,7 +232,7 @@ Found against RomM 5.3:
   "Cannot enable" for the port. Try another hub before debugging the
   device.
 
-See [CONTROLLERS.md](../CONTROLLERS.md) for per-controller results.
+See [CONTROLLERS.md](../docs/CONTROLLERS.md) for per-controller results.
 
 ## Clone Hero
 

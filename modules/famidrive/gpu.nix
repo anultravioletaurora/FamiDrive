@@ -30,7 +30,7 @@ in
         20-series cards and newer), with kernel modesetting, which
         gamescope needs, its video decoder, and the long-term kernel,
         which Nvidia's driver keeps up with. Untested: results welcome
-        in COMPATIBILITY.md.
+        in docs/COMPATIBILITY.md.
     '';
   };
 
