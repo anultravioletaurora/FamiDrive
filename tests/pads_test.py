@@ -80,5 +80,24 @@ class Eden(unittest.TestCase):
             self.assertLess(text.index("player_0_type"), text.index("[UI]"))
 
 
+class Cemu(unittest.TestCase):
+    def test_gamepad_profile_in_cemus_format(self):
+        import xml.etree.ElementTree as ET
+        root = ET.fromstring(m.cemu_profile({"uuid": "0_" + GUID, "name": "Xbox <360>"}, "labels"))
+        self.assertEqual(root.findtext("type"), "Wii U GamePad")
+        c = root.find("controller")
+        self.assertEqual((c.findtext("api"), c.findtext("uuid"), c.findtext("display_name")),
+                         ("SDLController", "0_" + GUID, "Xbox <360>"))
+        maps = {int(e.findtext("mapping")): int(e.findtext("button")) for e in c.find("mappings")}
+        self.assertEqual(maps[1], 0)    # A on the button printed A
+        self.assertEqual(maps[7], 42)   # ZL on the left trigger
+        self.assertEqual(maps[17], 45)  # left stick up: the axis' negative Y
+        self.assertEqual(maps[27], 5)   # Home on Guide
+
+    def test_positions_is_cemus_own_default(self):
+        self.assertEqual(m.cemu_mapping("positions")[1], 1)   # A on the right-hand button
+        self.assertEqual(m.cemu_mapping("positions")[3], 3)   # X on the top button
+
+
 if __name__ == "__main__":
     unittest.main()

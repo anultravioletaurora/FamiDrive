@@ -206,6 +206,13 @@ in
       in {
         gc.before = dolphin;
         wii.before = dolphin;
+        wiiu.before = ''
+          ${pkgs.famidrive-pads}/bin/famidrive-pads cemu ${q (builtins.toJSON {
+            sdl = "${lib.getLib pkgs.SDL2}/lib/libSDL2-2.0.so.0";   # Cemu's (sdl2-compat)
+            inherit (cfg.controllers) faceButtons;
+            config = "~/.config/Cemu/controllerProfiles/controller0.xml";
+          })} || echo "famidrive-launch: couldn't bind the connected pad in Cemu" >&2
+        '';
         switch.before = ''
           ${pkgs.famidrive-pads}/bin/famidrive-pads eden ${q (builtins.toJSON {
             sdl = "${lib.getLib pkgs.SDL2}/lib/libSDL2-2.0.so.0";   # Eden's (sdl2-compat)

@@ -2,6 +2,7 @@
 
     famidrive-pads dolphin SPEC.json
     famidrive-pads eden SPEC.json
+    famidrive-pads cemu SPEC.json
 
 Run by famidrive-launch just before a GameCube, Wii or Switch game. Both
 emulators bind a controller by identity (Dolphin by SDL name, Eden by
@@ -32,9 +33,18 @@ the pad's A, "positions" on the right-hand button, as Eden does. Players
 past the last pad are disconnected. With no pad connected, nothing
 changes.
 
+cemu: the first pad becomes the Wii U GamePad (controllerProfiles/
+controller0.xml), with Cemu's own default mapping for an SDL controller
+(VPADController::set_default_mapping, Cemu 2.6), face buttons per
+controllers.faceButtons. Cemu reads pads through SDL's game-controller
+layer, so the mapping names SDL's buttons, not raw ones; the pad is named
+by Cemu's uuid, <n>_<SDL GUID> (CRC kept), n counting pads of that GUID.
+More players, as Wii U Pro Controllers, aren't set up yet.
+
 SPEC (JSON, from Nix):
   dolphin: {"sdl": libSDL3 path, "ports": [...], "adapter": bool, "config": GCPadNew.ini}
   eden:    {"sdl": libSDL2 path, "faceButtons": "labels"|"positions", "config": qt-config.ini}
+  cemu:    {"sdl": libSDL2 path, "faceButtons": ..., "config": controllerProfiles/controller0.xml}
 """
 
 import ctypes
@@ -289,12 +299,100 @@ def cmd_eden(spec):
     return 0
 
 
+# --- Cemu (SDL2) ----------------------------------------------------------------
+
+# The Wii U GamePad's buttons (VPADController::ButtonId) and Cemu's controller
+# inputs (Buttons2): kButton0-31 are SDL's game-controller buttons by number.
+VPAD = {"A": 1, "B": 2, "X": 3, "Y": 4, "L": 5, "R": 6, "ZL": 7, "ZR": 8, "Plus": 9, "Minus": 10,
+        "Up": 11, "Down": 12, "Left": 13, "Right": 14, "StickL": 15, "StickR": 16,
+        "StickL_Up": 17, "StickL_Down": 18, "StickL_Left": 19, "StickL_Right": 20,
+        "StickR_Up": 21, "StickR_Down": 22, "StickR_Left": 23, "StickR_Right": 24, "Home": 27}
+CEMU = {"AxisXP": 38, "AxisYP": 39, "RotationXP": 40, "RotationYP": 41, "TriggerXP": 42, "TriggerYP": 43,
+        "AxisXN": 44, "AxisYN": 45, "RotationXN": 46, "RotationYN": 47}
+
+
+def cemu_mapping(face):
+    """{GamePad button: Cemu input}, Cemu's default for an SDL controller,
+    whose face buttons go by position (A on SDL's B, the right-hand
+    button); "labels" puts them on the buttons printed A, B, X, Y."""
+    by_label = face == "labels"
+    m = {"A": 0 if by_label else 1, "B": 1 if by_label else 0, "X": 2 if by_label else 3, "Y": 3 if by_label else 2,
+         "L": 9, "R": 10, "ZL": CEMU["TriggerXP"], "ZR": CEMU["TriggerYP"], "Plus": 6, "Minus": 4,
+         "Up": 11, "Down": 12, "Left": 13, "Right": 14, "StickL": 7, "StickR": 8,
+         "StickL_Up": CEMU["AxisYN"], "StickL_Down": CEMU["AxisYP"],
+         "StickL_Left": CEMU["AxisXN"], "StickL_Right": CEMU["AxisXP"],
+         "StickR_Up": CEMU["RotationYN"], "StickR_Down": CEMU["RotationYP"],
+         "StickR_Left": CEMU["RotationXN"], "StickR_Right": CEMU["RotationXP"], "Home": 5}
+    return {VPAD[k]: v for k, v in m.items()}
+
+
+def cemu_profile(pad, face):
+    """A controllerProfiles XML for the GamePad on this pad, as Cemu saves one."""
+    from xml.sax.saxutils import escape
+    entries = "".join(f"\t\t\t<entry>\n\t\t\t\t<mapping>{k}</mapping>\n\t\t\t\t<button>{v}</button>\n\t\t\t</entry>\n"
+                      for k, v in sorted(cemu_mapping(face).items()))
+    dz = "\t\t\t<deadzone>0.15</deadzone>\n\t\t\t<range>1</range>\n"
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n<emulated_controller>\n\t<type>Wii U GamePad</type>\n'
+            f"\t<controller>\n\t\t<api>SDLController</api>\n\t\t<uuid>{pad['uuid']}</uuid>\n"
+            f"\t\t<display_name>{escape(pad['name'])}</display_name>\n\t\t<rumble>1</rumble>\n"
+            f"\t\t<axis>\n{dz}\t\t</axis>\n\t\t<rotation>\n{dz}\t\t</rotation>\n\t\t<trigger>\n{dz}\t\t</trigger>\n"
+            f"\t\t<mappings>\n{entries}\t\t</mappings>\n\t</controller>\n</emulated_controller>\n")
+
+
+def cemu_pads(lib):
+    """Connected game controllers as Cemu lists them (SDLControllerProvider,
+    with its hints): uuid <n>_<SDL GUID>, SDL's game-controller name."""
+    sdl = ctypes.CDLL(lib)
+    sdl.SDL_SetHint.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+    for k in ("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "SDL_JOYSTICK_HIDAPI_PS4", "SDL_JOYSTICK_HIDAPI_PS5",
+              "SDL_JOYSTICK_HIDAPI_PS4_RUMBLE", "SDL_JOYSTICK_HIDAPI_PS5_RUMBLE", "SDL_JOYSTICK_HIDAPI_GAMECUBE",
+              "SDL_JOYSTICK_HIDAPI_SWITCH", "SDL_JOYSTICK_HIDAPI_JOY_CONS", "SDL_JOYSTICK_HIDAPI_STADIA",
+              "SDL_JOYSTICK_HIDAPI_STEAM", "SDL_JOYSTICK_HIDAPI_LUNA"):
+        sdl.SDL_SetHint(k.encode(), b"1")
+    if sdl.SDL_Init(0x200 | 0x2000) < 0:
+        return []
+    sdl.SDL_JoystickGetDeviceGUID.restype = _Guid
+    sdl.SDL_GameControllerOpen.restype = ctypes.c_void_p
+    sdl.SDL_GameControllerName.restype = ctypes.c_char_p
+    sdl.SDL_GameControllerName.argtypes = [ctypes.c_void_p]
+    sdl.SDL_GameControllerClose.argtypes = [ctypes.c_void_p]
+    sdl.SDL_JoystickGetDeviceVendor.restype = ctypes.c_uint16
+    sdl.SDL_JoystickGetDeviceProduct.restype = ctypes.c_uint16
+    pads, seen = [], {}
+    try:
+        for i in range(sdl.SDL_NumJoysticks()):
+            if sdl.SDL_JoystickGetDeviceType(i) != 1:   # SDL_JOYSTICK_TYPE_GAMECONTROLLER
+                continue
+            guid = bytes(sdl.SDL_JoystickGetDeviceGUID(i).data).hex()
+            n = seen.get(guid, 0)
+            seen[guid] = n + 1
+            gc = sdl.SDL_GameControllerOpen(i)
+            name = (sdl.SDL_GameControllerName(gc) or b"").decode(errors="replace") if gc else ""
+            if gc:
+                sdl.SDL_GameControllerClose(gc)
+            usb = (sdl.SDL_JoystickGetDeviceVendor(i), sdl.SDL_JoystickGetDeviceProduct(i))
+            pads.append({"uuid": f"{n}_{guid}", "name": name or f"Controller {len(pads) + 1}", "adapter": usb == GC_ADAPTER})
+    finally:
+        sdl.SDL_Quit()
+    return modern_first(pads)
+
+
+def cmd_cemu(spec):
+    pads = cemu_pads(spec["sdl"])
+    if not pads:
+        return 0
+    path = Path(spec["config"])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(cemu_profile(pads[0], spec.get("faceButtons", "labels")))
+    return 0
+
+
 def main():
-    if len(sys.argv) != 3 or sys.argv[1] not in ("dolphin", "eden"):
+    if len(sys.argv) != 3 or sys.argv[1] not in ("dolphin", "eden", "cemu"):
         sys.exit(__doc__)
     spec = json.loads(Path(sys.argv[2]).read_text() if os.path.exists(sys.argv[2]) else sys.argv[2])
     spec["config"] = os.path.expanduser(spec["config"])
-    sys.exit(cmd_dolphin(spec) if sys.argv[1] == "dolphin" else cmd_eden(spec))
+    sys.exit({"dolphin": cmd_dolphin, "eden": cmd_eden, "cemu": cmd_cemu}[sys.argv[1]](spec))
 
 
 if __name__ == "__main__":

@@ -243,7 +243,10 @@ in
     (check "the pads connected at launch are bound in Dolphin (gamepad ports) and Eden"
       (lib.hasInfix "famidrive-pads dolphin" c.famidrive.systems.gc.before
         && lib.hasInfix "famidrive-pads eden" c.famidrive.systems.switch.before
+        && lib.hasInfix "famidrive-pads cemu" c.famidrive.systems.wiiu.before
         && lib.hasInfix "libSDL3.so.0" c.famidrive.systems.gc.before))
+    (check "Cemu starts without its getting-started wizard"
+      (lib.hasInfix "Cemu/settings.xml" c.home-manager.users.alice.home.activation.famidriveEmulators.data))
     (check "Dolphin's own on-screen messages off, for every player (toasts instead)"
       (lib.all (u: lib.hasInfix "OnScreenDisplayMessages" c.home-manager.users.${u}.home.activation.famidriveEmulators.data) [ "alice" "bob" "guest" ]))
     (check "Heroic sends desktop notifications (not taken for Steam Deck Game Mode); GOG games have the Comet watcher"
