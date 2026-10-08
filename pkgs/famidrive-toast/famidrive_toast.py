@@ -52,6 +52,8 @@ POSITIONS = ("top-left", "top-center", "top-right", "middle-left", "middle-right
 ICONS = ("save", "warning", "trophy", "download", "info", "controller", "check")
 KIND_ICON = {"notice": "info", "alert": "warning", "progress": "download", "achievement": "trophy",
              "success": "check"}
+ICONS = ("save", "warning", "trophy", "download", "info", "controller")
+KIND_ICON = {"notice": "info", "alert": "warning", "progress": "download", "achievement": "trophy"}
 ALERT = (230, 160, 40, 255)
 SUCCESS = (76, 187, 106, 255)
 GOLD = (232, 184, 64, 255)
