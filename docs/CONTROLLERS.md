@@ -30,6 +30,7 @@ yet is listed below as ❔ until someone does.
 | [8BitDo Ultimate 2](#8bitdo-ultimate-2-bluetooth) | Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [8BitDo Ultimate 2C](#8bitdo-ultimate-2c) | 2.4 GHz dongle / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [8BitDo Pro 2 and Pro 3](#8bitdo-pro-2-and-pro-3) | Bluetooth / 2.4 GHz dongle (Pro 3) | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [8BitDo Arcade Stick](#8bitdo-arcade-stick) | 2.4 GHz dongle / Bluetooth / USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [8BitDo Ultimate (first model)](#8bitdo-ultimate-first-model) | USB / 2.4 GHz dongle / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Logitech gamepads](#logitech-gamepads) | USB (F310) / 2.4 GHz dongle (F710) | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Xbox Wireless Controller](#xbox-wireless-controller) | Bluetooth | ✅ | ❔ | ❔ | ❔ | ❔ | ✅ | ❔ | ❔ |
@@ -73,6 +74,7 @@ Clone Hero results for the guitars are in their own entries below.
 - [8BitDo Ultimate 2 (Bluetooth)](#8bitdo-ultimate-2-bluetooth)
 - [8BitDo Ultimate 2C](#8bitdo-ultimate-2c)
 - [8BitDo Pro 2 and Pro 3](#8bitdo-pro-2-and-pro-3)
+- [8BitDo Arcade Stick](#8bitdo-arcade-stick)
 - [8BitDo Ultimate (first model)](#8bitdo-ultimate-first-model)
 - [Logitech gamepads](#logitech-gamepads)
 - [Xbox Wireless Controller](#xbox-wireless-controller)
@@ -107,6 +109,7 @@ Clone Hero results for the guitars are in their own entries below.
 - [DK Bongos](#dk-bongos)
 - [Wii guitar on a Raphnet adapter](#wii-guitar-on-a-raphnet-adapter)
 - [Xbox 360 guitar](#xbox-360-guitar)
+- [Fight sticks](#fight-sticks)
 - [Racing wheels](#racing-wheels)
 - [Flight sticks and throttles](#flight-sticks-and-throttles)
 - [Typing on the TV](#typing-on-the-tv)
@@ -189,7 +192,14 @@ also has a 2.4 GHz dongle). Over the dongle or a cable it's expected to
 run under `xpad` like the [Ultimate 2](#8bitdo-ultimate-2-24-ghz), but
 with its own USB ID and name. Record both, and which version it is.
 
-## Logitech gamepads
+## 8BitDo Arcade Stick
+
+❔ Untested. 8BitDo's fight stick, over its 2.4 GHz dongle, Bluetooth or a
+USB cable. Its mode switch picks X (XInput), D (DirectInput) or Switch.
+In X mode it's expected to run under `xpad` like the
+[Ultimate 2](#8bitdo-ultimate-2-24-ghz), with its own USB ID and name.
+See [Fight sticks](#fight-sticks) for what to check on any stick.
+
 
 ❔ Untested. Logitech's current pads are the F310 (USB) and the F710
 (2.4 GHz dongle). Each has an X/D switch: X (XInput) runs under `xpad`
@@ -574,6 +584,37 @@ presents the guitar as an ordinary USB gamepad.
 ## Xbox 360 guitar
 
 ❔ Being tested in Clone Hero.
+
+## Fight sticks
+
+❔ None tried yet. Most sticks are made for one console and act like
+that console's pad on a PC:
+
+- **Xbox sticks** (and sticks in an XInput mode) run under `xpad`, like
+  an Xbox pad.
+- **PlayStation sticks** (Hori, Victrix, Qanba and others) usually show
+  up as a PlayStation pad, or as a generic HID pad whose buttons come
+  out numbered (like the [Razer Raiju](#razer-raiju)).
+- **Switch sticks** run under `hid-nintendo`, or as a generic HID pad.
+
+To check with each one:
+
+- **The stick's mode switch** (often labeled DP / LS / RS): whether the
+  lever is the d-pad or the left stick. ES-DE's menus and most fighting
+  games want the d-pad. Some emulated games want the stick.
+- **Select + Start** to quit: many sticks hide Select (View, Share or
+  "Back") on the top or side of the case, and some have a lock switch
+  that turns those buttons off during tournaments. Check that the lock
+  is off, and that famidrive-quit sees both buttons.
+- **Button layout:** the eight buttons on the face map to the pad's
+  A/B/X/Y and shoulder buttons. Check that each game's default layout
+  makes sense, especially in emulators, where the console's own layout
+  may differ from the stick's labels.
+- **Leverless sticks** (all buttons, like a Hit Box) send the
+  direction buttons as a d-pad. Check how each game resolves left and
+  right held at once (SOCD).
+- **Games to try:** [Street Fighter 6](COMPATIBILITY.md#street-fighter-6)
+  on Steam, and arcade and console fighting games in the emulators.
 
 ## Racing wheels
 
