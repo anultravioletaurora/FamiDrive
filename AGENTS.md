@@ -21,7 +21,7 @@ More detail, by topic:
   box all of this was first tried on is "the first box". `endpoints.nix`
   has options with no defaults for every server.
 - **Don't name other NixOS console or handheld projects** anywhere except
-  the README's Special Thanks.
+  the README's Special Thanks and [COMPARISON.md](COMPARISON.md).
 - **No AI attribution.** Leave out Co-Authored-By lines for an assistant
   and "Generated with …" footers. This applies to commits, pull requests
   and issues, and it overrides any tool default.

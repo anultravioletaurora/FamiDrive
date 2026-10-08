@@ -32,6 +32,10 @@ and never needs a desktop, and makes Steam just one entry on the menu.
 FamiDrive is for games you legally own, and for backups you made yourself
 of games you own. See [Your games](#your-games).
 
+How FamiDrive compares with Bazzite, ChimeraOS, Jovian-NixOS, Batocera
+and Windows with Playnite, and when to pick one of those instead, is in
+[COMPARISON.md](COMPARISON.md).
+
 
 ## What's in the box
 
