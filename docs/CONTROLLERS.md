@@ -28,9 +28,23 @@ yet is listed below as ❔ until someone does.
 |---|---|---|---|---|---|---|---|---|---|
 | [8BitDo Ultimate 2](#8bitdo-ultimate-2-24-ghz) | 2.4 GHz dongle | ✅ | ✅ | ✅ | ✅ as a GameCube pad | ✅ (Eden and Ryujinx) | ✅ | ✅ Dolphin | ✅ |
 | [8BitDo Ultimate 2](#8bitdo-ultimate-2-bluetooth) | Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [8BitDo Ultimate 2C](#8bitdo-ultimate-2c) | 2.4 GHz dongle / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [8BitDo Pro 2 and Pro 3](#8bitdo-pro-2-and-pro-3) | Bluetooth / 2.4 GHz dongle (Pro 3) | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Logitech gamepads](#logitech-gamepads) | USB (F310) / 2.4 GHz dongle (F710) | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Xbox Wireless Controller](#xbox-wireless-controller) | Bluetooth | ✅ | ❔ | ❔ | ❔ | ❔ | ✅ | ❔ | ❔ |
+| [Xbox 360 controller, wired](#xbox-360-controller-wired) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Xbox One controller, wired](#xbox-one-controller-wired) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [DualShock 4](#dualshock-4) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [PS3 Sixaxis / DualShock 3](#ps3-sixaxis--dualshock-3) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [DualSense](#dualsense) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Switch Pro Controller](#switch-pro-controller) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Switch 2 GameCube controller](#switch-2-gamecube-controller) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [PowerA GameCube-style controller for Switch](#powera-gamecube-style-controller-for-switch) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Wii U Pro Controller](#wii-u-pro-controller) | Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Google Stadia controller](#google-stadia-controller) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Steam Controller (2015)](#steam-controller-2015) | USB dongle / USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Steam Controller (2026)](#steam-controller-2026) | Wireless puck / USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [USB NES and SNES pads](#usb-nes-and-snes-pads) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Wii Remote](#wii-remote) | Bluetooth, through Dolphin | — | — | — | ✅ | — | — | ❔ | ❔ |
 | [Wii Balance Board](#wii-balance-board) | Bluetooth, through Dolphin | — | — | — | ❔ | — | — | — | — |
 | [GameCube controller on the official adapter](#gamecube-controllers-on-the-official-adapter) | USB adapter | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
@@ -43,9 +57,23 @@ Clone Hero results for the guitars are in their own entries below.
 
 - [8BitDo Ultimate 2 (2.4 GHz)](#8bitdo-ultimate-2-24-ghz)
 - [8BitDo Ultimate 2 (Bluetooth)](#8bitdo-ultimate-2-bluetooth)
+- [8BitDo Ultimate 2C](#8bitdo-ultimate-2c)
+- [8BitDo Pro 2 and Pro 3](#8bitdo-pro-2-and-pro-3)
+- [Logitech gamepads](#logitech-gamepads)
 - [Xbox Wireless Controller](#xbox-wireless-controller)
+- [Xbox 360 controller, wired](#xbox-360-controller-wired)
+- [Xbox One controller, wired](#xbox-one-controller-wired)
 - [DualShock 4](#dualshock-4)
+- [PS3 Sixaxis / DualShock 3](#ps3-sixaxis--dualshock-3)
 - [DualSense](#dualsense)
+- [Switch Pro Controller](#switch-pro-controller)
+- [Switch 2 GameCube controller](#switch-2-gamecube-controller)
+- [PowerA GameCube-style controller for Switch](#powera-gamecube-style-controller-for-switch)
+- [Wii U Pro Controller](#wii-u-pro-controller)
+- [Google Stadia controller](#google-stadia-controller)
+- [Steam Controller (2015)](#steam-controller-2015)
+- [Steam Controller (2026)](#steam-controller-2026)
+- [USB NES and SNES pads](#usb-nes-and-snes-pads)
 - [Wii Remote](#wii-remote)
 - [Wii Balance Board](#wii-balance-board)
 - [GameCube controllers on the official adapter](#gamecube-controllers-on-the-official-adapter)
@@ -109,6 +137,28 @@ This is the house controller, and FamiDrive knows it by name
 FamiDrive's known-pad entry (and so the Eden face-button fix and Dolphin
 ports set by its short name) doesn't match it yet.
 
+## 8BitDo Ultimate 2C
+
+❔ Untested, in either version (2.4 GHz or Bluetooth). The 2.4 GHz
+dongle is expected to work like the
+[Ultimate 2's](#8bitdo-ultimate-2-24-ghz), under `xpad`, but it has its
+own USB ID and name, so FamiDrive's known-pad entry for the Ultimate 2
+doesn't cover it. Record the USB ID and the name SDL gives it.
+
+## 8BitDo Pro 2 and Pro 3
+
+❔ Untested. The Pro 2 is Bluetooth only; the Pro 3 adds a 2.4 GHz
+dongle. Both have a mode switch on the back: X (XInput) is the one to
+try first. The Switch mode presents a Switch Pro Controller instead,
+whose button layout is swapped from the labels on an Xbox-style pad.
+
+## Logitech gamepads
+
+❔ Untested. Logitech's current pads are the F310 (USB) and the F710
+(2.4 GHz dongle). Each has an X/D switch: X (XInput) runs under `xpad`
+like an Xbox 360 pad, and is the one to use. D (DirectInput) is a
+generic HID pad with numbered buttons.
+
 ## Xbox Wireless Controller
 
 Over Bluetooth.
@@ -128,6 +178,19 @@ Over Bluetooth.
   xpadneo's profile switch as a ninth axis. Not yet tried that way. Rumble and the Share button are the usual reasons people add
 xpadneo, so test those first.
 
+## Xbox 360 controller, wired
+
+❔ Untested. The kernel's `xpad` driver handles it (`045e:028e`), and
+almost every PC game and emulator expects its layout, so it should work
+everywhere with no setup. Kodi's map for the 8BitDo Ultimate 2 is this
+pad's layout.
+
+## Xbox One controller, wired
+
+❔ Untested. To try: an Afterglow (PDP) wired pad. Licensed wired pads
+use the Xbox One protocol, which `xpad` also handles. Check its USB ID
+and the name SDL gives it, since third-party pads each have their own.
+
 ## DualShock 4
 
 ❔ Untested. The kernel driver is `hid-playstation` on recent kernels.
@@ -138,10 +201,90 @@ SDL knows the pad. Things to note:
 - whether FamiDrive's controller tools need to skip its motion-sensor
   device
 
+## PS3 Sixaxis / DualShock 3
+
+❔ Untested. The driver is `hid-sony`.
+
+- **USB:** expected to work once plugged in.
+- **Bluetooth:** pairing is unusual. Plug it in by USB once with
+  Bluetooth on, then accept it in `bluetoothctl` (BlueZ's `sixaxis`
+  plugin handles the rest). Unplug it and press the PS button.
+- **To note:** its motion sensors show up as a separate input device,
+  like the DualShock 4's.
+
 ## DualSense
 
 ❔ Untested. Same notes as the DualShock 4, plus the adaptive triggers
 and haptics, which need USB or game support over Bluetooth.
+
+## Switch Pro Controller
+
+❔ Untested. The driver is `hid-nintendo`, over USB or Bluetooth.
+
+- **Face buttons:** Nintendo's A and B are where an Xbox pad has B and
+  A. Check that each emulator and Steam game goes by label
+  (`controllers.faceButtons`).
+- **Joy-Cons** use the same driver. A pair only acts as one controller
+  with `joycond`, which FamiDrive doesn't set up yet.
+
+## Switch 2 GameCube controller
+
+❔ Untested. The Nintendo Switch Online GameCube controller for the
+Switch 2. Linux support for Switch 2 controllers is new: SDL 3 talks to
+them over USB, and kernel and Bluetooth support was still in progress as of
+2026-10. Try USB first, and record the kernel version.
+
+## PowerA GameCube-style controller for Switch
+
+❔ Untested. A wired pad shaped like a GameCube controller that speaks
+the Switch's wired-pad protocol, so it's expected to show up as a
+generic Switch controller rather than a GameCube one. Check whether
+Dolphin can use it as a GameCube pad, and how its triggers read (they're
+digital on most of these).
+
+## Wii U Pro Controller
+
+❔ Untested. The driver is `hid-wiimote`, over Bluetooth. Pair it like
+any other Bluetooth pad (press the sync button underneath).
+
+If this is the Wii's Classic Controller Pro instead (the one that plugs
+into a Wii Remote), it works through a Wii Remote in Dolphin, and in
+other emulators through `hid-wiimote` as an extension.
+
+## Google Stadia controller
+
+❔ Untested. Over USB it's a standard HID gamepad that SDL knows. For
+Bluetooth, it needs the Bluetooth mode Google released before Stadia
+shut down; once switched over, it pairs like any other pad.
+
+## Steam Controller (2015)
+
+❔ Untested. The USB dongle (or a cable) and the kernel's `hid-steam`
+driver.
+
+- Without Steam running, the pad starts out as a mouse and keyboard
+  ("lizard mode"). `hid-steam` also offers it as a gamepad.
+- Steam turns the gamepad into whatever its Steam Input config says.
+  With Steam Input off (FamiDrive's default), how it behaves in Steam
+  games needs checking.
+- Its trackpads have no stick equivalent outside Steam.
+
+## Steam Controller (2026)
+
+❔ Untested. Valve's new controller and its wireless puck. Linux support
+outside Steam is new. Check what the kernel and SDL see with Steam
+closed, and with Steam running.
+
+## USB NES and SNES pads
+
+❔ Untested. Generic USB pads in the shape of an NES or SNES controller.
+
+- They're plain HID gamepads with numbered buttons, so names vary and the
+  D-pad is often an axis.
+- RetroArch has autoconfigs for many common ones, by USB ID.
+- **Quitting:** like the [Wii guitar](#wii-guitar-on-a-raphnet-adapter),
+  famidrive-quit won't see Select and Start on a pad whose buttons
+  aren't named. Record which numbers they are.
 
 ## Wii Remote
 
