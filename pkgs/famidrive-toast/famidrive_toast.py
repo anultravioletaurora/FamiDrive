@@ -436,6 +436,44 @@ def watch_controllers(interval=1.5):
 
 # --- The daemon -------------------------------------------------------------
 
+def live(path):
+    """Whether a daemon answers on this socket."""
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.settimeout(1)
+            s.connect(str(path))
+        return True
+    except OSError:
+        return False
+
+
+def listen(path, mode):
+    """A listening socket at path, unless a live daemon already has it
+    (None then): only a dead one left behind is replaced. Found on the
+    first box 2026-10-07: a second daemon took the player's shared socket
+    over and left a dead file there when it stopped, so the library pull's
+    toasts were refused."""
+    if os.path.exists(path):
+        if live(path):
+            return None
+        os.unlink(path)
+    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    srv.bind(str(path))
+    os.chmod(path, mode)
+    srv.listen(8)
+    return srv
+
+
+def release(paths):
+    """Remove the sockets this daemon made, if they're still its own."""
+    for path, ino in paths:
+        try:
+            if os.stat(path).st_ino == ino:
+                os.unlink(path)
+        except OSError:
+            pass
+
+
 def daemon(spec_file, player):
     import select
 
@@ -635,23 +673,24 @@ def daemon(spec_file, player):
             put(pygame.Surface(rect[2:], pygame.SRCALPHA, 32), rect[:2])
 
     path = sock_path()
-    path.unlink(missing_ok=True)
-    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    srv.bind(str(path))
-    os.chmod(path, 0o600)
-    srv.listen(8)
-    servers = [srv]
-    if SHARED.is_dir() and os.access(SHARED, os.W_OK):
+    srv = listen(path, 0o600)
+    if srv is None:
+        print("famidrive-toast: a toast daemon is already running in this session", file=sys.stderr)
+        return
+    servers, mine = [srv], [(path, os.stat(path).st_ino)]
+    if SHARED.is_dir() and os.access(SHARED, os.W_OK) and not os.environ.get("FAMIDRIVE_TOAST_NO_SHARED"):
         shared = SHARED / f"{player}.sock"
         try:
-            shared.unlink(missing_ok=True)
-            pub = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            pub.bind(str(shared))
-            os.chmod(shared, 0o660)   # the folder's group (famidrive) can send
-            pub.listen(8)
-            servers.append(pub)
+            pub = listen(shared, 0o660)   # the folder's group (famidrive) can send
+            if pub:
+                servers.append(pub)
+                mine.append((shared, os.stat(shared).st_ino))
         except OSError as e:
             print(f"famidrive-toast: no shared socket ({e})", file=sys.stderr)
+    import atexit
+    import signal
+    atexit.register(release, mine)
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))   # the session ending: clean up too
     import threading
     threading.Thread(target=serve_notifications, daemon=True).start()
     threading.Thread(target=watch_controllers, daemon=True).start()

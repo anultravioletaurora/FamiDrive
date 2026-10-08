@@ -157,7 +157,9 @@ Found against RomM 5.3:
   MangoHud.conf into it before Steam starts, and starts Steam without
   `STEAM_USE_MANGOAPP` so Steam never writes it back.
 - **Checking how a toast looks without the TV:** run the daemon under
-  `xvfb-run` with `FAMIDRIVE_TOAST_SNAPSHOT=<dir>`; each toast is saved
+  `xvfb-run` with `FAMIDRIVE_TOAST_SNAPSHOT=<dir>` and
+  `FAMIDRIVE_TOAST_NO_SHARED=1` (or a test daemon would answer for the
+  player on the shared socket, as one did on 2026-10-07); each toast is saved
   there as a PNG with its transparency. Screenshots of the X window lose
   the alpha.
 

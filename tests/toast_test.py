@@ -183,6 +183,23 @@ class Controllers(unittest.TestCase):
         self.assertEqual(len(t.battery_changes(warned, {"x": ("Pad", 19)})), 1)
 
 
+class Sockets(unittest.TestCase):
+    def test_a_live_socket_is_left_alone_and_a_dead_one_replaced(self):
+        import socket
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "x.sock"
+            first = t.listen(path, 0o600)
+            self.assertIsNotNone(first)
+            self.assertIsNone(t.listen(path, 0o600))   # live: not taken over
+            first.close()                               # dead file left behind
+            second = t.listen(path, 0o600)
+            self.assertIsNotNone(second)
+            t.release([(path, os.stat(path).st_ino)])
+            self.assertFalse(path.exists())
+            second.close()
+            del socket
+
+
 class Sending(unittest.TestCase):
     def test_arguments(self):
         self.assertEqual(t.parse_send(["--kind", "progress", "--id", "p", "--progress", "1.5", "Pulling", "2", "of", "5"]),
