@@ -33,7 +33,6 @@ behave differently in each. For a console game it's the emulator.
   - [DOOM](#doom) (PC)
   - [Fallout: New Vegas](#fallout-new-vegas) (PC)
   - [Gears 5](#gears-5) (PC)
-  - [The Legend of Zelda: Four Swords Adventures](#the-legend-of-zelda-four-swords-adventures) (GameCube)
   - [Tom Clancy's Ghost Recon Wildlands](#tom-clancys-ghost-recon-wildlands) (PC)
   - [Grand Theft Auto V](#grand-theft-auto-v) (PC)
   - [Halo: The Master Chief Collection](#halo-the-master-chief-collection) (PC)
@@ -43,6 +42,7 @@ behave differently in each. For a console game it's the emulator.
   - [The Jackbox Party Pack 3](#the-jackbox-party-pack-3) (PC)
   - [The Jackbox Party Pack 6](#the-jackbox-party-pack-6) (PC)
   - [The Legend of Zelda: Breath of the Wild](#the-legend-of-zelda-breath-of-the-wild) (Switch)
+  - [The Legend of Zelda: Four Swords Adventures](#the-legend-of-zelda-four-swords-adventures) (GameCube)
   - [Left 4 Dead 2](#left-4-dead-2) (PC)
   - [Mario Kart: Double Dash!!](#mario-kart-double-dash) (GameCube)
   - [Mario Kart 8 Deluxe](#mario-kart-8-deluxe) (Switch)
@@ -278,14 +278,6 @@ Multiplayer, split-screen, rumble and HDR are still to check.
   split-screen co-op, controllers and rumble (it's an Xbox game, so pads
   should be first-class), and HDR.
 
-### The Legend of Zelda: Four Swords Adventures
-
-**GameCube, Dolphin: ❔ Untested.** Single player (Hyrulean Adventure)
-should play with any pad. Multiplayer needs a Game Boy Advance per
-player, linked to the GameCube: Dolphin can emulate them, and FamiDrive
-setting them up, with phones as the GBAs, is
-[#132](https://github.com/anultravioletaurora/FamiDrive/issues/132).
-
 ### Tom Clancy's Ghost Recon Wildlands
 
 **Steam: ❔ Untested.** 2026-10-08: first launch under way.
@@ -396,6 +388,14 @@ Don't test it without being ready for a reboot.
 **Switch, Eden: ✅ Works.** The first save went into Eden's profile, the
 same one Animal Crossing: New Horizons and Smash Ultimate use. The
 8BitDo's rumble works.
+
+### The Legend of Zelda: Four Swords Adventures
+
+**GameCube, Dolphin: ❔ Untested.** Single player (Hyrulean Adventure)
+should play with any pad. Multiplayer needs a Game Boy Advance per
+player, linked to the GameCube: Dolphin can emulate them, and FamiDrive
+setting them up, with phones as the GBAs, is
+[#132](https://github.com/anultravioletaurora/FamiDrive/issues/132).
 
 ### Left 4 Dead 2
 
