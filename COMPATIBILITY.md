@@ -401,11 +401,18 @@ joins the server straight from launch.
 
 ### Need for Speed Heat
 
-**Steam: ❔ Untested.**
+**Steam: ✅ Works.** Proton (Steam's choice), no launch options.
 
-- **What to watch for:** the Steam copy goes through the EA app, which
-  installs and asks for an EA sign-in inside Proton on first launch, as
-  with [Titanfall 2](#titanfall-2).
+- **2026-10-07:** launched without trouble.
+  - **First launch:** a one-time setup installs the EA app, and its
+    installer could be worked with the controller. Steam then processed
+    the game's Vulkan shaders, with the status screen's progress bar
+    up, before the game started.
+  - **Sign-in:** the player's EA account was already signed in from an
+    earlier session ([Titanfall 2](#titanfall-2) as well), so the EA
+    app stayed out of the way. A player signing in for the first time
+    needs to type in the EA app inside Proton: the on-screen keyboard
+    is #73.
 - **Racing wheels:** worth a try once the controller works; see
   [CONTROLLERS.md](CONTROLLERS.md#racing-wheels).
 - **To check:** controllers and rumble, online (crews and races with
