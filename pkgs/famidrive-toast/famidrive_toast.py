@@ -582,6 +582,19 @@ def daemon(spec_file, player):
         out.blit(fitted, ((size - fitted.get_width()) // 2, (size - fitted.get_height()) // 2))
         return out
 
+    def stroke(c, color, points, w):
+        """A thick polyline with round ends and joins. pygame's own thick
+        lines end in flat, slanted cuts and leave a notch at each join,
+        which read as clipped at a toast's size."""
+        r = w / 2
+        for (x0, y0), (x1, y1) in zip(points, points[1:]):
+            dx, dy = x1 - x0, y1 - y0
+            k = r / max(1e-6, (dx * dx + dy * dy) ** .5)
+            ox, oy = -dy * k, dx * k
+            pygame.draw.polygon(c, color, [(x0 + ox, y0 + oy), (x1 + ox, y1 + oy), (x1 - ox, y1 - oy), (x0 - ox, y0 - oy)])
+        for x, y in points:
+            pygame.draw.circle(c, color, (x, y), r)
+
     def drawn_icon(name, size, color):
         """One of ICONS, drawn at 4x and scaled down, for smooth edges."""
         n = size * 4
@@ -619,7 +632,7 @@ def daemon(spec_file, player):
             pygame.draw.circle(c, clear, (n * .74, n * .51), n * .04)
         elif name == "check":   # a checkmark in a circle
             pygame.draw.circle(c, color, (n * .5, n * .5), n * .44)
-            pygame.draw.lines(c, clear, False, [(n * .29, n * .51), (n * .44, n * .66), (n * .72, n * .37)], max(4, n // 9))
+            stroke(c, clear, [(n * .29, n * .51), (n * .44, n * .66), (n * .72, n * .37)], max(4, n // 9))
         elif name == "music":   # two beamed eighth notes
             for x in (.30, .74):
                 pygame.draw.ellipse(c, color, (n * (x - .19), n * .66, n * .22, n * .17))
