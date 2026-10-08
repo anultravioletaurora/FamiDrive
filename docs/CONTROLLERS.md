@@ -33,7 +33,7 @@ yet is listed below as ❔ until someone does.
 | [8BitDo Ultimate (first model)](#8bitdo-ultimate-first-model) | USB / 2.4 GHz dongle / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Logitech gamepads](#logitech-gamepads) | USB (F310) / 2.4 GHz dongle (F710) | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Xbox Wireless Controller](#xbox-wireless-controller) | Bluetooth | ✅ | ❔ | ❔ | ❔ | ❔ | ✅ | ❔ | ❔ |
-| [Xbox 360 controller, wired](#xbox-360-controller-wired) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Xbox 360 controller, wired](#xbox-360-controller-wired) | USB | ✅ | ❔ | ✅ | ❔ | ❔ | ❔ | ❔ | ✅ |
 | [Xbox One controller, wired](#xbox-one-controller-wired) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Original Xbox controller (Duke)](#original-xbox-controller-duke) | Xbox-to-USB cable | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [DualShock 4](#dualshock-4) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
@@ -220,16 +220,26 @@ xpadneo, so test those first.
 
 ## Xbox 360 controller, wired
 
-❔ Untested. The kernel's `xpad` driver handles it (`045e:028e`), and
-almost every PC game and emulator expects its layout, so it should work
-everywhere with no setup. Kodi's map for the 8BitDo Ultimate 2 is this
-pad's layout.
+The kernel's `xpad` driver handles it (`045e:028e`, "Microsoft X-Box
+360 pad"), and almost every PC game and emulator expects its layout.
+Kodi's map for the 8BitDo Ultimate 2 is this pad's layout.
+
+- **2026-10-08, a generic third-party pad on the second box:** ✅ The
+  toasts came up, it drove ES-DE, played a whole Grand Prix in
+  [Mario Kart: Double Dash!!](COMPATIBILITY.md#mario-kart-double-dash) in Dolphin, and
+  Select + Start quit the game. No setup.
 
 ## Xbox One controller, wired
 
-❔ Untested. To try: an Afterglow (PDP) wired pad. Licensed wired pads
-use the Xbox One protocol, which `xpad` also handles. Check its USB ID
-and the name SDL gives it, since third-party pads each have their own.
+❔ Untested. Licensed wired pads use the Xbox One protocol, which
+`xpad` also handles. Check its USB ID and the name SDL gives it, since
+third-party pads each have their own.
+
+- **2026-10-08, Afterglow Prismatic (PDP, `0e6f:0139`):** ❔ `xpad`
+  took it and ES-DE added it, but it didn't respond, and it kept
+  dropping off USB and coming back every few seconds (`error -71`).
+  This pad had been unreliable before, so it's probably the pad, not
+  FamiDrive. Needs another Xbox One pad to settle it.
 
 ## Original Xbox controller (Duke)
 
