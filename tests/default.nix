@@ -312,7 +312,9 @@ in
       (check "no autologin" (!(c.services.greetd.settings ? initial_session)))
       (check "a switch restarts the session when it changed" c.systemd.services.greetd.restartIfChanged)
       (check "a host's own cleanup choice wins" (c.nix.gc.options == "--delete-older-than 30d"))
-      (check "YARG is in Ports next to Clone Hero, scores saved under its RomM entry"
+      (check "YARG can open rhythm-game hardware's hidraw devices (Raphnet among them)"
+      (lib.any (p: lib.hasInfix "famidrive-instruments" (toString p)) c.services.udev.packages))
+    (check "YARG is in Ports next to Clone Hero, scores saved under its RomM entry"
         (lib.hasInfix "yarg)" c.famidrive.systems.ports.command
           && lib.hasInfix "clonehero)" c.famidrive.systems.ports.command
           && (etcJson c "famidrive/romm/alice.json").apps ? yarg))
