@@ -92,6 +92,8 @@ This is the house controller, and FamiDrive knows it by name
 - **Steam games:** ✅ Steam Input is off. Two at once worked in Street
   Fighter 6 and Rocket League. In Rocket League, which pad is switched on
   first doesn't decide who's player 1.
+  [Need for Speed Heat](COMPATIBILITY.md#need-for-speed-heat): the right
+  glyphs and strong rumble.
 - **Kodi:** ✅ with FamiDrive's button map, 2026-10-06. At first Kodi saw
   the pad but had no button map for it, so it ignored the pad and kept
   offering to set it up. FamiDrive now gives every player's Kodi a map for

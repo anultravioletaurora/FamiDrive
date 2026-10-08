@@ -413,8 +413,9 @@ joins the server straight from launch.
     app stayed out of the way. A player signing in for the first time
     needs to type in the EA app inside Proton: the on-screen keyboard
     is #73.
-  - **Controller:** the game showed the right button glyphs for the
-    pad, with Steam Input off (FamiDrive's default).
+  - **Controller:** the 8BitDo Ultimate 2 (2.4 GHz), with Steam Input
+    off (FamiDrive's default): the right button glyphs in the game, and
+    rumble that works well.
 - **Racing wheels:** worth a try once the controller works; see
   [CONTROLLERS.md](CONTROLLERS.md#racing-wheels).
 - **To check:** controllers and rumble, online (crews and races with
