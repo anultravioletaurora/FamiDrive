@@ -257,8 +257,9 @@ cable. It also has Bluetooth, untested.
 
 - **2026-10-08, ES-DE:** ✅ On the second box, FamiDrive's toast
   announced it when it was plugged in, and it drove ES-DE's menus.
-- **Still to record:** its USB ID and the name SDL gives it, and how
-  it does in games. The other Raijus (the original, Ultimate and Mobile)
+- **USB ID** `1532:1007`. The kernel names it "Razer Razer Raiju
+  Tournament Edition Wired".
+- **Still to record:** the name SDL gives it, and how it does in games. The other Raijus (the original, Ultimate and Mobile)
   are untested.
 
 ## PS3 Sixaxis / DualShock 3
