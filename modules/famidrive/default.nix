@@ -112,6 +112,7 @@ in
     ./yarg.nix
     ./osu.nix
     ./tux.nix
+    ./spacecadet.nix
     ./ryujinx.nix
     ./gpu.nix
     ./boot.nix

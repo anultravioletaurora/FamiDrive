@@ -106,6 +106,7 @@ let
       superTuxKart.enable = true;
       superTux.enable = true;
       superTuxParty.enable = true;
+      spaceCadetPinball.enable = true;
       cloneHero = {
         enable = true;
         songs."AFI - Miss Murder" = "05185565cb931978c11de73d3048206e";
@@ -319,6 +320,10 @@ in
       (check "a host's own cleanup choice wins" (c.nix.gc.options == "--delete-older-than 30d"))
       (check "YARG can open rhythm-game hardware's hidraw devices (Raphnet among them)"
       (lib.any (p: lib.hasInfix "famidrive-instruments" (toString p)) c.services.udev.packages))
+    (check "Space Cadet Pinball plays the owner's files from the library disk, none bundled"
+        (lib.hasInfix "spacecadet)" c.famidrive.systems.ports.command
+          && lib.hasInfix "/var/lib/famidrive/space-cadet-pinball" c.famidrive.systems.ports.command
+          && lib.elem "d /var/lib/famidrive/space-cadet-pinball 2775 famidrive-library famidrive -" c.systemd.tmpfiles.rules))
     (check "SuperTuxKart, SuperTux and SuperTux Party are in Ports"
         (lib.all (w: lib.hasInfix "${w})" c.famidrive.systems.ports.command) [ "supertuxkart" "supertux" "supertuxparty" ]
           && lib.all (n: lib.hasInfix "${n}.port" c.home-manager.users.alice.home.activation.famidriveTux.data)
