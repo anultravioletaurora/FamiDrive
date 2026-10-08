@@ -21,7 +21,7 @@ More detail, by topic:
   box all of this was first tried on is "the first box". `endpoints.nix`
   has options with no defaults for every server.
 - **Don't name other NixOS console or handheld projects** anywhere except
-  the README's Special Thanks.
+  the README's Special Thanks and [COMPARISON.md](docs/COMPARISON.md).
 - **No AI attribution.** Leave out Co-Authored-By lines for an assistant
   and "Generated with …" footers. This applies to commits, pull requests
   and issues, and it overrides any tool default.
@@ -39,8 +39,8 @@ More detail, by topic:
 3. Squash-merge and delete the branch.
 4. Then the maintainer tests on a real box, and against RomM for anything
    that touches it.
-5. Write the results down: games go in [COMPATIBILITY.md](COMPATIBILITY.md),
-   controllers go in [CONTROLLERS.md](CONTROLLERS.md). Keep the old notes
+5. Write the results down: games go in [COMPATIBILITY.md](docs/COMPATIBILITY.md),
+   controllers go in [CONTROLLERS.md](docs/CONTROLLERS.md). Keep the old notes
    when a status changes.
 
 Doc-only updates (results, these notes) can go straight to main when the
@@ -58,10 +58,10 @@ the exact commands.
 - **Options:**
   - A host sets everything under `famidrive.*`, and every option gets a
     description.
-  - [USAGE.md](USAGE.md) is generated from the options and CI fails
+  - [USAGE.md](docs/USAGE.md) is generated from the options and CI fails
     when it's out of date. After adding or changing an option, rebuild
     it on an x86_64-linux machine:
-    `nix build .#checks.x86_64-linux.usage-doc.doc && cp result USAGE.md`.
+    `nix build .#checks.x86_64-linux.usage-doc.doc && cp result docs/USAGE.md`.
     A new top-level option group needs a section in `tests/usage_doc.py`,
     or it lands under "Everything else".
   - A default a host may want to change is `lib.mkDefault`.
