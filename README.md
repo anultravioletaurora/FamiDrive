@@ -431,7 +431,7 @@ NixOS, but isn't covered here.
      and each player's token:
      ```sh
      sudo mkdir -p /var/lib/sops-nix
-     sudo nix --extra-experimental-features 'nix-command flakes' run nixpkgs#age -- -keygen -o /var/lib/sops-nix/key.txt
+     sudo nix --extra-experimental-features 'nix-command flakes' shell nixpkgs#age -c age-keygen -o /var/lib/sops-nix/key.txt
      ```
      The command prints the box's public key (`age1…`). Put it in
      `/etc/nixos/.sops.yaml` (with yours, if you'll edit secrets from
@@ -442,7 +442,8 @@ NixOS, but isn't covered here.
          age: age1…
      ```
      Then add `romm-token-alice: rmm_…` to `secrets.yaml` with
-     `sudo env SOPS_AGE_KEY_FILE=/var/lib/sops-nix/key.txt nix --extra-experimental-features 'nix-command flakes' run nixpkgs#sops -- /etc/nixos/secrets.yaml`,
+     `cd /etc/nixos && sudo env SOPS_AGE_KEY_FILE=/var/lib/sops-nix/key.txt nix --extra-experimental-features 'nix-command flakes' run nixpkgs#sops -- secrets.yaml`
+     (sops finds `.sops.yaml` from the folder you're in),
      and the two `sops.` lines from [Using it](#using-it) to
      `configuration.nix`. [Secrets](#using-it) lists the token's scopes.
    - **A second disk for the library:** `sudo mkfs.ext4 -L famidrive /dev/<disk>`,
