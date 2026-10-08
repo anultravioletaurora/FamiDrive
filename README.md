@@ -568,9 +568,11 @@ FamiDrive is for games you legally own, and for legal backups you've made
 yourself of games you own. That's how it's used on the boxes it was built
 for, and it's the expectation for everyone else who uses it.
 
-FamiDrive ships no games, BIOS files, firmware or keys. Everything it
-plays comes from your own RomM server, your own disks, or your own store
-accounts (Steam, GOG, Epic, Amazon).
+FamiDrive provides no games, licenses, keys, BIOS files or firmware.
+Everything it plays is sourced by you: from your own RomM server, your own
+disks, or your own store accounts (Steam, GOG, Epic, Amazon). It's your
+responsibility to source your games' licenses, keys and files ethically
+and legally.
 
 ## License
 
