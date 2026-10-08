@@ -58,6 +58,7 @@
         tcli = final.callPackage ./pkgs/tcli { };
         xenia-netplay = final.callPackage ./pkgs/xenia-netplay { };
         supertuxparty = final.callPackage ./pkgs/supertuxparty { };
+        supertux-advance = final.callPackage ./pkgs/supertux-advance { };
         gamescope-fg = final.callPackage ./pkgs/gamescope-fg { };
         romm-agent = final.callPackage ./pkgs/romm-agent { };
         famidrive-generators = final.callPackage ./pkgs/famidrive-generators { };
@@ -127,7 +128,7 @@
       };
 
       packages.${system} = {
-        inherit (pkgs) es-de tcli xenia-netplay supertuxparty gamescope-fg romm-agent famidrive-generators famidrive-quit famidrive-steam-config famidrive-prism famidrive-status famidrive-valheim famidrive-picker famidrive-end-session famidrive-clonehero famidrive-kodi famidrive-ryujinx famidrive-hardware famidrive-toast famidrive-cheevos famidrive-pads famidrive-padmouse
+        inherit (pkgs) es-de tcli xenia-netplay supertuxparty supertux-advance gamescope-fg romm-agent famidrive-generators famidrive-quit famidrive-steam-config famidrive-prism famidrive-status famidrive-valheim famidrive-picker famidrive-end-session famidrive-clonehero famidrive-kodi famidrive-ryujinx famidrive-hardware famidrive-toast famidrive-cheevos famidrive-pads famidrive-padmouse
           mpv-gamepad jellyfin-mpv-shim;
       };
 

@@ -1049,11 +1049,27 @@ osu!'s built-in OpenTabletDriver.
 
 ## Tux games
 
-Free games starring Tux, in the Ports system: SuperTuxKart, SuperTux and SuperTux Party.
+Free games starring Tux, in the Ports system: SuperTuxKart, SuperTux, SuperTux Party, SuperTux Advance, Extreme Tux Racer and Tux Paint.
+
+### `famidrive.extremeTuxRacer.enable`
+
+Whether to enable Extreme Tux Racer, in ES-DE's Ports system.
+
+- **Type:** boolean
+- **Default:** `false`
+- **Example:** `true`
 
 ### `famidrive.superTux.enable`
 
 Whether to enable SuperTux, in ES-DE's Ports system.
+
+- **Type:** boolean
+- **Default:** `false`
+- **Example:** `true`
+
+### `famidrive.superTuxAdvance.enable`
+
+Whether to enable SuperTux Advance, in ES-DE's Ports system.
 
 - **Type:** boolean
 - **Default:** `false`
@@ -1070,6 +1086,14 @@ Whether to enable SuperTuxKart, in ES-DE's Ports system.
 ### `famidrive.superTuxParty.enable`
 
 Whether to enable SuperTux Party, in ES-DE's Ports system.
+
+- **Type:** boolean
+- **Default:** `false`
+- **Example:** `true`
+
+### `famidrive.tuxPaint.enable`
+
+Whether to enable Tux Paint, in ES-DE's Ports system.
 
 - **Type:** boolean
 - **Default:** `false`
