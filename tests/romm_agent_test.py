@@ -770,6 +770,18 @@ class Test(unittest.TestCase):
         self.assertEqual(a["gc_region"](str(rvz), "GZLD01"), "EUR")
         self.assertEqual(a["gc_region"](str(self.base / "gone.iso"), "GZLE01"), "USA")
 
+    def test_the_pull_shows_its_progress_and_stays_quiet_otherwise(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        sent = []
+        a["toast"] = lambda *args: sent.append(args)
+        a["PULL"]["label"] = "Mario Party 4 Deluxe"
+        a["pull_toast"](0.25)
+        a["pull_toast"](0.5)   # within 2 s of the last: not shown
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0][:6], ("--kind", "progress", "--id", "library-pull", "--progress", "0.250"))
+        self.assertEqual(sent[0][-1], "Mario Party 4 Deluxe")
+
     def test_an_empty_save_is_not_a_save(self):
         box = Box(self.base, "alice")
         a = box.agent()

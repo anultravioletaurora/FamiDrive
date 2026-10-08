@@ -191,6 +191,25 @@ def known_sha1(path):
     return digest
 
 
+# The library pull's progress, for its toast: the game being fetched, and
+# the games actually downloaded this run (not ones already here).
+PULL = {"label": None, "fetched": [], "shown": 0.0}
+
+
+def pull_toast(progress=None):
+    """The pull's progress toast on the TV, at most every 2 seconds."""
+    now = time.monotonic()
+    if now - PULL["shown"] < 2:
+        return
+    PULL["shown"] = now
+    args = ["--kind", "progress", "--id", "library-pull"]
+    if progress is not None:
+        args += ["--progress", f"{progress:.3f}"]
+    n = len(PULL["fetched"])
+    detail = PULL["label"] + (f" ({n} done)" if n else "")
+    toast(*args, "Downloading games", detail)
+
+
 def download(s, path, dest, expected_sha1=None, expected_size=None, params=None):
     """Resumable download: a 40 GB ISO must not restart from zero."""
     if dest.suffix.lower() in ARCHIVES:
@@ -210,9 +229,13 @@ def download(s, path, dest, expected_sha1=None, expected_size=None, params=None)
         r.raise_for_status()
         mode = "ab" if r.status_code == 206 else "wb"  # 200 = no Range support, start over
         dest.parent.mkdir(parents=True, exist_ok=True)
+        done = have if mode == "ab" else 0
         with open(part, mode) as f:
             for chunk in r.iter_content(1 << 20):
                 f.write(chunk)
+                done += len(chunk)
+                if PULL["label"]:
+                    pull_toast(done / expected_size if expected_size else None)
     if expected_sha1 and known_sha1(part) != expected_sha1:
         part.unlink()
         raise RuntimeError(f"hash mismatch for {dest}, discarded")
@@ -223,6 +246,8 @@ def download(s, path, dest, expected_sha1=None, expected_size=None, params=None)
         part.unlink()
         raise RuntimeError(f"size mismatch for {dest}, discarded")
     part.rename(dest)
+    if PULL["label"] and PULL["label"] not in PULL["fetched"]:
+        PULL["fetched"].append(PULL["label"])
     if expected_sha1:
         try:   # the hash just checked is the finished file's: keep it
             cache = json.loads(HASHES.read_text())
@@ -798,11 +823,14 @@ def cmd_pull():
         system = system_for(rom)
         if system is None:
             continue  # a platform this box doesn't run (PC, iOS, ...)
+        PULL["label"] = rom.get("name") or rom["fs_name"]
         try:
             dest = fetch_rom(s, rom, system)
         except (requests.RequestException, RuntimeError, zipfile.BadZipFile) as e:
             print(f"skipped {rom['fs_name']}: {e}", file=sys.stderr)
             continue
+        finally:
+            PULL["label"] = None
         launch = launchable(dest, system)
         if dest != launch:
             folders.add(str(dest))
@@ -826,6 +854,15 @@ def cmd_pull():
 
     for system, entries in by_system.items():
         write_gamelist(system, entries)
+
+    # Done: one toast for what came down, none for a pull with nothing new.
+    # ES-DE reads its game lists when it starts, so they're in the menu at
+    # the next session.
+    got = PULL["fetched"]
+    if got:
+        what = got[0] if len(got) == 1 else f"{len(got)} new games"
+        toast("--kind", "progress", "--id", "library-pull", "--progress", "1", "--done", "--seconds", "6",
+              "Library updated", f"{what}, in the menu from the next session")
 
     # Deletion policy is undecided (roms.md). Report orphans and never delete.
     local = {str(p) for p in (DATA / "roms").glob("*/*")
