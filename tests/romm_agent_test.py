@@ -312,6 +312,21 @@ class Test(unittest.TestCase):
         a["cmd_save_push"]("gc", key, learn=False)      # changed again: a new copy
         self.assertEqual(posts, ["famidrive-conflict-box", "famidrive-conflict-box"])
 
+    def test_no_sync_for_a_file_romm_never_sent(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        a["save_index"]({})
+        g = a["cmd_save_push"].__globals__
+        g["session"] = lambda: self.fail("no RomM call for a file RomM never sent")
+        other = str(box.data / "roms/gc/Not from RomM.iso")
+        a["cmd_save_pull"]("gc", other)
+        a["cmd_save_push"]("gc", other)
+        # A NAND title from RomM: its entry's saves are the Miis' (an app's).
+        nand = str(box.data / "roms/gc/Mii Channel.nand")
+        a["save_index"]({nand: {"id": 3100, "system": "gc", "title_id": None}})
+        a["cmd_save_pull"]("gc", nand)
+        a["cmd_save_push"]("gc", nand)
+
     def test_save_state_follows_a_rename(self):
         box = Box(self.base, "alice")
         a = box.agent()

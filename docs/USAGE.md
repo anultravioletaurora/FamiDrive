@@ -28,6 +28,7 @@ is on; every other option is optional.
 - [YARG](#yarg)
 - [osu!](#osu)
 - [Tux games](#tux-games)
+- [Miis](#miis)
 - [Space Cadet Pinball](#space-cadet-pinball)
 - [Minecraft](#minecraft)
 - [Valheim](#valheim)
@@ -968,8 +969,8 @@ Songs added by hand go in `clonehero/local` on the library disk
 
 The RomM entry each player's Clone Hero scores and profiles are
 saved under, by name. RomM keeps saves only for games in its
-library, so add one by hand (any platform this box doesn't pull,
-and any small file). null keeps scores on this box only.
+library, so add one by hand, with "Add Physical Game" (no file
+needed). null keeps scores on this box only.
 
 - **Type:** null or string
 - **Default:** `"Clone Hero"`
@@ -1027,8 +1028,8 @@ bass, drums, keys and vocals, with the box's Clone Hero songs
 
 The RomM entry each player's YARG scores and profiles are saved
 under, by name. RomM keeps saves only for games in its library, so
-add one by hand (any platform this box doesn't pull, and any small
-file), as for Clone Hero. null keeps scores on this box only.
+add one by hand, with "Add Physical Game" (no file needed), as for
+Clone Hero. null keeps scores on this box only.
 
 - **Type:** null or string
 - **Default:** `"YARG"`
@@ -1098,6 +1099,31 @@ Whether to enable Tux Paint, in ES-DE's Ports system.
 - **Type:** boolean
 - **Default:** `false`
 - **Example:** `true`
+
+## Miis
+
+Miis, made in each console's own editor and synced with RomM.
+
+### `famidrive.miis.wii.enable`
+
+Whether to enable Wii Miis: the Mii Channel in ES-DE's Wii list, and each player's
+Miis synced with RomM, as the save of the Mii Channel's RomM entry
+(`miis.wii.romm.entry`). The Mii Channel itself comes from the
+owner's own Wii: it has to be installed in Dolphin's Wii NAND, with
+the Wii System Menu.
+
+- **Type:** boolean
+- **Default:** `false`
+- **Example:** `true`
+
+### `famidrive.miis.wii.romm.entry`
+
+The RomM entry each player's Wii Miis are saved under, by name.
+Add it to RomM by hand, on the Wii platform, with "Add Physical
+Game" (it needs no file). null keeps Miis on this box only.
+
+- **Type:** null or string
+- **Default:** `"Mii Channel"`
 
 ## Space Cadet Pinball
 

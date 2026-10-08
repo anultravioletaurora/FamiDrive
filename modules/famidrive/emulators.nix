@@ -303,8 +303,15 @@ in
         };
         wii = dolphinCheevos // {
           fullname = "Nintendo Wii";
-          extensions = [ ".iso" ".rvz" ".wbfs" ];
-          command = ''${pkgs.dolphin-emu}/bin/dolphin-emu --batch --exec="$ROM"'';
+          # .nand: a title installed in Dolphin's Wii NAND, by its title ID
+          # (the file's content), such as the Mii Channel (miis.nix).
+          extensions = [ ".iso" ".rvz" ".wbfs" ".nand" ];
+          command = ''
+            case "$ROM" in
+              *.nand) ${pkgs.dolphin-emu}/bin/dolphin-emu --batch --nand_title="$(cat "$ROM")" ;;
+              *) ${pkgs.dolphin-emu}/bin/dolphin-emu --batch --exec="$ROM" ;;
+            esac
+          '';
           rommPlatform = "wii";
           emulator = "dolphin";
           saveSync = true;

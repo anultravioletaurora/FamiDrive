@@ -823,6 +823,10 @@ def cmd_pull():
         system = system_for(rom)
         if system is None:
             continue  # a platform this box doesn't run (PC, iOS, ...)
+        if rom.get("is_physical"):
+            # Added with RomM's "Add Physical Game": no file to fetch. Such
+            # entries hold apps' saves (Clone Hero, the Mii Channel's Miis).
+            continue
         PULL["label"] = rom.get("name") or rom["fs_name"]
         try:
             dest = fetch_rom(s, rom, system)
@@ -1735,9 +1739,24 @@ def server_save(s, dev, rom_id):
     return max(ours, key=lambda x: x["updated_at"]) if ours else None
 
 
+def not_in_library(key):
+    """A launch with no save of its own to sync: a file that isn't a RomM
+    game, or a title in Dolphin's Wii NAND (.nand, such as the Mii Channel).
+    The Mii Channel's RomM entry holds the player's Miis as an app's save
+    (miis.nix), in the same slot this sync would use."""
+    if key.startswith("app:"):
+        return False
+    if key in load_index() and not key.lower().endswith(".nand"):
+        return False
+    print(f"{key}: no save of its own to sync", file=sys.stderr)
+    return True
+
+
 def cmd_save_pull(system, rom_path):
-    kind, root, lay = layout(system)
     key = library_path(rom_path)
+    if not_in_library(key):
+        return
+    kind, root, lay = layout(system)
     STATE.mkdir(parents=True, exist_ok=True)
     # For rule 3 at push time; fixed files need no learning. Found on the
     # first box 2026-10-06: Clone Hero's root is the home folder, and
@@ -1794,8 +1813,10 @@ def save_is_empty(root, rels):
 
 
 def cmd_save_push(system, rom_path, learn=True):
-    kind, root, lay = layout(system)
     key = library_path(rom_path)
+    if not_in_library(key):
+        return
+    kind, root, lay = layout(system)
     entry = entry_for(key)
     saves = load_saves()
     mine = my_state(saves, key, entry["id"])

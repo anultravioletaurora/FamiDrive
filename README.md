@@ -271,6 +271,8 @@ planning doc for now and will move into this repo.
   Cemu) and the RetroArch core file names are unverified.
 - osu! in Ports (`famidrive.osu`) hasn't run on a box yet, nor has a
   pen tablet through osu!'s built-in OpenTabletDriver.
+- Wii Miis (`famidrive.miis.wii`): the Mii Channel in the Wii list, and
+  each player's Miis synced with RomM. Untried on a box.
 - The Tux games in Ports (`famidrive.superTuxKart`, `superTux`,
   `superTuxParty`, `superTuxAdvance`, `extremeTuxRacer`, `tuxPaint`)
   haven't run on a box yet, and neither has Space Cadet
@@ -357,14 +359,16 @@ setup at all.
 
 **RomM entries to add by hand.** RomM keeps saves only for games in its
 library, and some apps on the box aren't ROMs. To sync their saves, add
-one entry for each in RomM's web UI, once for the whole RomM server.
-Upload any small file to any platform this box doesn't pull, such as
-Windows, and give the entry exactly this name:
+one entry for each in RomM's web UI, once for the whole RomM server,
+with "Add Physical Game" (no file needed) and exactly this name. Any
+platform works; the box doesn't download physical entries, so an app's
+entry can sit with the console it belongs to:
 
 | Turned on with | RomM entry | What syncs |
 |---|---|---|
 | `cloneHero.enable` | `Clone Hero` (`cloneHero.romm.entry`) | each player's scores and profiles |
 | `yarg.enable` | `YARG` (`yarg.romm.entry`) | each player's scores and profiles |
+| `miis.wii.enable` | `Mii Channel` (`miis.wii.romm.entry`), on the Wii platform | each player's Wii Miis |
 
 Without its entry, an app still works, and its saves stay on the box.
 

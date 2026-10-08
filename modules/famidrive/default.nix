@@ -113,6 +113,7 @@ in
     ./osu.nix
     ./tux.nix
     ./spacecadet.nix
+    ./miis.nix
     ./ryujinx.nix
     ./gpu.nix
     ./boot.nix

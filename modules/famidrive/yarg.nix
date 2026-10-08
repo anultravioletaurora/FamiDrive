@@ -47,8 +47,8 @@ in
       description = ''
         The RomM entry each player's YARG scores and profiles are saved
         under, by name. RomM keeps saves only for games in its library, so
-        add one by hand (any platform this box doesn't pull, and any small
-        file), as for Clone Hero. null keeps scores on this box only.
+        add one by hand, with "Add Physical Game" (no file needed), as for
+        Clone Hero. null keeps scores on this box only.
       '';
     };
   };
