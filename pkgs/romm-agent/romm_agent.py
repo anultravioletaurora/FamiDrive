@@ -855,14 +855,13 @@ def cmd_pull():
     for system, entries in by_system.items():
         write_gamelist(system, entries)
 
-    # Done: one toast for what came down, none for a pull with nothing new.
-    # ES-DE reads its game lists when it starts, so they're in the menu at
-    # the next session.
+    # Done: the progress toast turns into a success toast in place (no bar,
+    # a checkmark), none for a pull with nothing new.
     got = PULL["fetched"]
     if got:
         what = got[0] if len(got) == 1 else f"{len(got)} new games"
-        toast("--kind", "progress", "--id", "library-pull", "--progress", "1", "--done", "--seconds", "6",
-              "Library updated", f"{what}, in the menu from the next session")
+        toast("--kind", "success", "--id", "library-pull", "--seconds", "6",
+              "Library updated", f"{what} fetched from RomM")
 
     # Deletion policy is undecided (roms.md). Report orphans and never delete.
     local = {str(p) for p in (DATA / "roms").glob("*/*")
