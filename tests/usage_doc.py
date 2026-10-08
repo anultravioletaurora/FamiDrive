@@ -39,8 +39,10 @@ SECTIONS = [
     ("YARG", ["famidrive.yarg"],
      "YARG (Yet Another Rhythm Game), in the Ports system, playing the same songs as Clone Hero."),
     ("osu!", ["famidrive.osu"], "osu! (lazer), in the Ports system."),
-    ("Tux games", ["famidrive.superTuxKart", "famidrive.superTux", "famidrive.superTuxParty"],
-     "Free games starring Tux, in the Ports system: SuperTuxKart, SuperTux and SuperTux Party."),
+    ("Tux games", ["famidrive.superTuxKart", "famidrive.superTux", "famidrive.superTuxParty",
+                   "famidrive.superTuxAdvance", "famidrive.extremeTuxRacer", "famidrive.tuxPaint"],
+     "Free games starring Tux, in the Ports system: SuperTuxKart, SuperTux, SuperTux Party, "
+     "SuperTux Advance, Extreme Tux Racer and Tux Paint."),
     ("Space Cadet Pinball", ["famidrive.spaceCadetPinball"],
      "3D Pinball Space Cadet, in the Ports system, playing your own copy of the game's files."),
     ("Minecraft", ["famidrive.minecraft"],

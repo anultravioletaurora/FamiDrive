@@ -106,6 +106,9 @@ let
       superTuxKart.enable = true;
       superTux.enable = true;
       superTuxParty.enable = true;
+      superTuxAdvance.enable = true;
+      extremeTuxRacer.enable = true;
+      tuxPaint.enable = true;
       spaceCadetPinball.enable = true;
       cloneHero = {
         enable = true;
@@ -324,10 +327,11 @@ in
         (lib.hasInfix "spacecadet)" c.famidrive.systems.ports.command
           && lib.hasInfix "/var/lib/famidrive/space-cadet-pinball" c.famidrive.systems.ports.command
           && lib.elem "d /var/lib/famidrive/space-cadet-pinball 2775 famidrive-library famidrive -" c.systemd.tmpfiles.rules))
-    (check "SuperTuxKart, SuperTux and SuperTux Party are in Ports"
-        (lib.all (w: lib.hasInfix "${w})" c.famidrive.systems.ports.command) [ "supertuxkart" "supertux" "supertuxparty" ]
+    (check "every Tux game is in Ports"
+        (lib.all (w: lib.hasInfix "${w})" c.famidrive.systems.ports.command)
+            [ "supertuxkart" "supertux" "supertuxparty" "supertuxadvance" "extremetuxracer" "tuxpaint" ]
           && lib.all (n: lib.hasInfix "${n}.port" c.home-manager.users.alice.home.activation.famidriveTux.data)
-            [ "SuperTuxKart" "SuperTux" "SuperTux Party" ]))
+            [ "SuperTuxKart" "SuperTux" "SuperTux Party" "SuperTux Advance" "Extreme Tux Racer" "Tux Paint" ]))
     (check "osu! is in Ports, and the player at the TV can use a pen tablet"
         (lib.hasInfix "osu)" c.famidrive.systems.ports.command
           && lib.any (p: lib.getName p == lib.getName pkgs.opentabletdriver) c.services.udev.packages

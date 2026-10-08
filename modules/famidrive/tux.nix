@@ -7,6 +7,11 @@
 # - SuperTux: a 2D platformer.
 # - SuperTux Party: a party game of boards and minigames, up to four
 #   players, like Mario Party. Not in nixpkgs: pkgs/supertuxparty.
+# - SuperTux Advance: a newer 2D platformer in the SuperTux style, on
+#   its author's Brux engine. Not in nixpkgs: pkgs/supertux-advance.
+# - Extreme Tux Racer: sledding Tux downhill, collecting herring.
+# - Tux Paint: a drawing program for children. It plays best with a
+#   mouse or a touchscreen; it can also move its pointer with a pad.
 #
 # Their settings and progress are in each player's home and don't sync
 # with RomM yet.
@@ -21,6 +26,9 @@ let
     superTuxKart = { title = "SuperTuxKart"; word = "supertuxkart"; package = pkgs.supertuxkart; };
     superTux = { title = "SuperTux"; word = "supertux"; package = pkgs.supertux; };
     superTuxParty = { title = "SuperTux Party"; word = "supertuxparty"; package = pkgs.supertuxparty; };
+    superTuxAdvance = { title = "SuperTux Advance"; word = "supertuxadvance"; package = pkgs.supertux-advance; };
+    extremeTuxRacer = { title = "Extreme Tux Racer"; word = "extremetuxracer"; package = pkgs.extremetuxracer; };
+    tuxPaint = { title = "Tux Paint"; word = "tuxpaint"; package = pkgs.tuxpaint; };
   };
   on = lib.filterAttrs (name: _: cfg.${name}.enable) games;
 in
