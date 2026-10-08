@@ -113,6 +113,18 @@ class Queue(unittest.TestCase):
         self.assertAlmostEqual(left, t.SECONDS["success"])
         self.assertEqual(q.tick(10 + t.SECONDS["success"] + 0.1), [])
 
+    def test_a_success_is_always_the_checkmark(self):
+        q = t.Queue()
+        q.add({"kind": "progress", "id": "pull", "icon": "download", "title": "Downloading games"}, 0)
+        q.tick(0)
+        q.add({"kind": "success", "id": "pull", "title": "Library updated"}, 1)
+        (toast, _, _), = q.tick(1)
+        self.assertEqual(t.icon_name(toast), "check")
+        self.assertEqual(t.icon_name({"kind": "success", "icon": "save"}), "check")
+        self.assertEqual(t.icon_name({"kind": "progress"}), "download")
+        self.assertEqual(t.icon_name({"kind": "notice", "icon": "save"}), "save")
+        self.assertIn("check", t.ICONS)
+
     def test_alerts_and_achievements_go_ahead_of_waiting_notices(self):
         q = t.Queue(slots=1)
         q.add({"kind": "notice", "title": "first"}, 0)
