@@ -28,18 +28,10 @@ let
     # reports a different name and is untested.
     "8bitdo-ultimate-2" = {
       sdlName = "8BitDo Ultimate 2 Wireless Controller";
-      edenGuid = "03000000c82d00000b31000014010000";
     };
   };
   sdlName = p: knownPads.${p}.sdlName or p;
 
-  # Eden binds a pad's raw button numbers. On xpad pads (the 8BitDo on
-  # its dongle) 0-3 are A, B, X, Y as printed. Eden's own automatic
-  # mapping follows the Switch's shape, where A is on the right, so
-  # pressing the 8BitDo's A gave the Switch's B.
-  edenButtons =
-    if byLabel then { a = 0; b = 1; x = 2; y = 3; }
-    else { a = 1; b = 0; x = 3; y = 2; };
 
   # Dolphin's SIDevice numbers (SI_Device.h): 0 nothing, 6 standard
   # GameCube controller, 12 Wii U GameCube adapter.
@@ -177,7 +169,10 @@ in
       What's in each GameCube port in Dolphin, port 1 first. Ports left off
       the end are empty. Each entry is one of:
 
-      - `"gamepad"`: a modern controller, whichever one Dolphin picks.
+      - `"gamepad"`: whichever controller is connected when the game
+        starts: the first `"gamepad"` port gets the first pad, and so on,
+        modern pads before GameCube controllers on the official adapter.
+        Any model works; nothing is tied to one pad.
       - a known controller's short name, such as `"8bitdo-ultimate-2"`. Name
         the same model twice for two of them; the first one connected is
         the lower port.
@@ -192,6 +187,34 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # The pads connected when a game starts, bound in Dolphin and Eden just
+    # before it (pkgs/famidrive-pads), each read through that emulator's own
+    # SDL. Both bind a pad by identity, so a binding made for one pad did
+    # nothing for another. Found on the first box 2026-10-07: with the
+    # 8BitDo flat, the Xbox controller worked in Steam and RetroArch but not
+    # in Dolphin or Eden.
+    famidrive.systems = lib.mkIf (lib.elem "roms" cfg.lanes) (
+      let
+        dolphin = lib.optionalString (lib.elem "gamepad" ports) ''
+          ${pkgs.famidrive-pads}/bin/famidrive-pads dolphin ${q (builtins.toJSON {
+            sdl = "${lib.getLib pkgs.sdl3}/lib/libSDL3.so.0";   # Dolphin's
+            inherit ports;
+            adapter = lib.elem "adapter" ports;
+            config = "~/.config/dolphin-emu/GCPadNew.ini";
+          })} || echo "famidrive-launch: couldn't bind the connected pads in Dolphin" >&2
+        '';
+      in {
+        gc.before = dolphin;
+        wii.before = dolphin;
+        switch.before = ''
+          ${pkgs.famidrive-pads}/bin/famidrive-pads eden ${q (builtins.toJSON {
+            sdl = "${lib.getLib pkgs.SDL2}/lib/libSDL2-2.0.so.0";   # Eden's (sdl2-compat)
+            inherit (cfg.controllers) faceButtons;
+            config = "~/.config/eden/qt-config.ini";
+          })} || echo "famidrive-launch: couldn't bind the connected pads in Eden" >&2
+        '';
+      });
+
     assertions = [{
       assertion = lib.length ports <= 4;
       message = "famidrive.controllers.gamecube.ports: a GameCube has 4 ports.";
@@ -235,16 +258,6 @@ in
         ${crudini} --set "$HOME/.config/dolphin-emu/Dolphin.ini" Core WiimoteEnableSpeaker ${if wii.speaker then "True" else "False"}
         ${crudini} --set "$HOME/.config/dolphin-emu/Dolphin.ini" BluetoothPassthrough Enabled ${if wii.bluetoothPassthrough then "True" else "False"}
 
-        # Eden: rewrite the face buttons of every binding to a known pad,
-        # whichever player it's on. Eden writes them the first time it sees
-        # the pad, so a new box gets this from its second session on.
-        eden="$HOME/.config/eden/qt-config.ini"
-        if [ -f "$eden" ]; then
-          ${lib.concatStrings (lib.mapAttrsToList (_: pad:
-            lib.concatStrings (lib.mapAttrsToList (b: n: ''
-              ${pkgs.gnused}/bin/sed -i -E 's/^(player_[0-9]_button_${b}=".*guid:${pad.edenGuid},button:)[0-9]+"/\1${toString n}"/' "$eden"
-            '') edenButtons)) knownPads)}
-        fi
 
         # Quitting is famidrive-quit's job: no "are you sure?" box nobody
         # can reach with a controller.
