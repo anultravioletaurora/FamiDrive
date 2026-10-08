@@ -263,6 +263,10 @@ itself. Windows installers that run before a game (Rockstar's, the EA app)
 are a different case: Proton's own helper already lets a controller move
 between their buttons.
 
+Tested on the first box: Ghost Recon Wildlands' EULA, accepted with an
+8BitDo Ultimate 2 (left stick to the Accept button, then A). Steam then
+went on to process the game's shaders.
+
 ## Typing on the TV
 
 Sign-ins and search boxes are the hardest part of a box with no
