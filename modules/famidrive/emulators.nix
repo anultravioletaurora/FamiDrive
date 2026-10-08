@@ -23,6 +23,7 @@ let
   cores = with pkgs.libretro; {
     swanstation = [ swanstation "swanstation" ];
     mgba = [ mgba "mgba" ];
+    mesen = [ mesen "mesen" ];
     snes9x = [ snes9x "snes9x" ];
     mupen64plus = [ mupen64plus "mupen64plus_next" ];
     genesis = [ genesis-plus-gx "genesis_plus_gx" ];
@@ -383,6 +384,10 @@ in
         gba = ra { coreName = "mgba"; } // {
           fullname = "Nintendo Game Boy Advance"; rommPlatform = "gba"; platform = "gba";
           extensions = [ ".gba" ".zip" ];
+        };
+        nes = ra { coreName = "mesen"; } // {
+          fullname = "Nintendo Entertainment System"; rommPlatform = "nes"; platform = "nes";
+          extensions = [ ".nes" ".unf" ".unif" ".zip" ];
         };
         snes = ra { coreName = "snes9x"; } // {
           fullname = "Super Nintendo"; rommPlatform = "snes"; platform = "snes";

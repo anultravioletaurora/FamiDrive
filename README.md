@@ -38,6 +38,7 @@ of games you own. See [Your games](#your-games).
 | System | Plays with | nixpkgs | Save sync | Where the games come from |
 |---|---|---|---|---|
 | Game Boy / Color / Advance | [RetroArch](https://www.retroarch.com) + [mGBA](https://mgba.io) | [`libretro.mgba`](https://search.nixos.org/packages?channel=26.05&show=libretro.mgba) | ✅ | RomM |
+| NES | [RetroArch](https://www.retroarch.com) + [Mesen](https://www.mesen.ca) | [`libretro.mesen`](https://search.nixos.org/packages?channel=26.05&show=libretro.mesen) | ✅ | RomM |
 | SNES | [RetroArch](https://www.retroarch.com) + [Snes9x](https://www.snes9x.com) | [`libretro.snes9x`](https://search.nixos.org/packages?channel=26.05&show=libretro.snes9x) | ✅ | RomM |
 | Nintendo 64 | [RetroArch](https://www.retroarch.com) + [Mupen64Plus-Next](https://github.com/libretro/mupen64plus-libretro-nx) | [`libretro.mupen64plus`](https://search.nixos.org/packages?channel=26.05&show=libretro.mupen64plus) | ✅ | RomM |
 | Nintendo 64DD | [RetroArch](https://www.retroarch.com) + [Mupen64Plus-Next](https://github.com/libretro/mupen64plus-libretro-nx) | [`libretro.mupen64plus`](https://search.nixos.org/packages?channel=26.05&show=libretro.mupen64plus) | — | RomM |
