@@ -82,45 +82,55 @@ class Placement(unittest.TestCase):
 
 
 class Queue(unittest.TestCase):
-    def test_one_at_a_time_in_order(self):
-        q = t.Queue()
-        q.add({"kind": "notice", "title": "a"}, 0)
-        q.add({"kind": "notice", "title": "b"}, 0)
-        self.assertEqual(q.tick(0)[0]["title"], "a")
-        self.assertEqual(q.tick(3)[0]["title"], "a")
-        self.assertEqual(q.tick(4.1)[0]["title"], "b")
-        self.assertIsNone(q.tick(9)[0])
+    def titles(self, shown):
+        return [t["title"] for t, _, _ in shown]
 
-    def test_progress_updates_in_place_until_done(self):
+    def test_up_to_three_at_once_then_in_order(self):
+        q = t.Queue()
+        for n in "abcd":
+            q.add({"kind": "notice", "title": n}, 0)
+        self.assertEqual(self.titles(q.tick(0)), ["a", "b", "c"])
+        self.assertEqual(self.titles(q.tick(4.1)), ["d"])
+        self.assertEqual(q.tick(9), [])
+
+    def test_a_long_progress_toast_holds_one_slot_not_all(self):
         q = t.Queue()
         q.add({"kind": "progress", "id": "pull", "title": "Downloading", "progress": 0.1}, 0)
-        q.add({"kind": "notice", "title": "after"}, 1)
-        self.assertEqual(q.tick(1)[0]["progress"], 0.1)
+        q.add({"kind": "notice", "title": "Saved"}, 1)
+        self.assertEqual(self.titles(q.tick(1)), ["Downloading", "Saved"])
         q.add({"kind": "progress", "id": "pull", "title": "Downloading", "progress": 0.5}, 30)
-        toast, _, left = q.tick(60)
-        self.assertEqual((toast["progress"], left), (0.5, None))     # stays while unfinished
-        q.add({"kind": "progress", "id": "pull", "title": "Done", "done": True}, 61)
-        self.assertEqual(q.tick(62)[0]["title"], "Done")
-        self.assertEqual(q.tick(63.1)[0]["title"], "after")
+        shown = q.tick(60)
+        self.assertEqual(self.titles(shown), ["Downloading"])
+        self.assertEqual((shown[0][0]["progress"], shown[0][2]), (0.5, None))   # stays while unfinished
 
     def test_progress_turns_into_success_in_place(self):
         q = t.Queue()
         q.add({"kind": "progress", "id": "pull", "title": "Downloading games", "progress": 0.6}, 0)
         q.tick(0)
         q.add({"kind": "success", "id": "pull", "title": "Library updated", "detail": "2 new games fetched from RomM"}, 10)
-        toast, _, left = q.tick(10)
+        (toast, _, left), = q.tick(10)
         self.assertEqual((toast["kind"], toast["title"]), ("success", "Library updated"))
         self.assertAlmostEqual(left, t.SECONDS["success"])
-        self.assertIsNone(q.tick(10 + t.SECONDS["success"] + 0.1)[0])
+        self.assertEqual(q.tick(10 + t.SECONDS["success"] + 0.1), [])
+
+    def test_alerts_and_achievements_go_ahead_of_waiting_notices(self):
+        q = t.Queue(slots=1)
+        q.add({"kind": "notice", "title": "first"}, 0)
+        q.tick(0)
+        q.add({"kind": "notice", "title": "n1"}, 0)
+        q.add({"kind": "notice", "title": "n2"}, 0)
+        q.add({"kind": "alert", "title": "battery"}, 0)
+        q.add({"kind": "achievement", "title": "unlock"}, 0)
+        self.assertEqual([w["title"] for w in q.waiting], ["battery", "unlock", "n1", "n2"])
 
     def test_a_forgotten_progress_toast_goes(self):
         q = t.Queue()
         q.add({"kind": "progress", "id": "x", "title": "Stuck"}, 0)
-        self.assertIsNotNone(q.tick(100)[0])
-        self.assertIsNone(q.tick(t.STALE_PROGRESS + 1)[0])
+        self.assertTrue(q.tick(100))
+        self.assertEqual(q.tick(t.STALE_PROGRESS + 1), [])
 
     def test_waiting_progress_is_replaced_not_repeated(self):
-        q = t.Queue()
+        q = t.Queue(slots=1)
         q.add({"kind": "notice", "title": "first"}, 0)
         q.tick(0)
         q.add({"kind": "progress", "id": "p", "title": "1"}, 0)
@@ -131,7 +141,17 @@ class Queue(unittest.TestCase):
         q = t.Queue(hide=["progress"])
         self.assertFalse(q.add({"kind": "progress", "title": "x"}, 0))
         self.assertTrue(q.add({"kind": "sparkles", "title": "y"}, 0))
-        self.assertEqual(q.tick(0)[0]["kind"], "notice")
+        self.assertEqual(q.tick(0)[0][0]["kind"], "notice")
+
+
+class Stacking(unittest.TestCase):
+    def test_up_from_the_bottom_down_from_the_top(self):
+        screen, sizes = (1920, 1080), [(500, 100), (500, 150), (500, 80)]
+        self.assertEqual(t.layout("bottom-right", screen, sizes, 40, 16),
+                         [(1380, 892), (1380, 726), (1380, 630)])
+        self.assertEqual(t.layout("top-left", screen, sizes, 40, 16),
+                         [(40, 40), (40, 156), (40, 322)])
+        self.assertEqual(t.layout("top-left", screen, [], 40, 16), [])
 
 
 class Notifications(unittest.TestCase):
