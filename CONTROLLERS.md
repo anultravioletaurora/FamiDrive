@@ -238,6 +238,29 @@ How a wheel is expected to work on a FamiDrive box, until one has:
   steering wheel accessory, for the few games that support it. Wii
   racing games use the Wii Remote, in or out of a Wii Wheel shell.
 
+## Steam's prompts
+
+Steam's own dialogs over a launch (a game's EULA, a cloud save conflict,
+a CD key) are made for a mouse. While one is up, the controller works as
+one (`famidrive-padmouse`):
+
+| Pad | Does |
+|---|---|
+| Left stick | moves the pointer |
+| Right stick | scrolls |
+| A | clicks |
+| B | Esc |
+| X / R1 | Tab (next button) |
+| L1 | Shift+Tab (previous button) |
+| Y | Space |
+| D-pad | arrow keys |
+| Start | Enter (not while Select is held: Select + Start still quits) |
+
+It switches off once the prompt is answered, so the game gets the pad to
+itself. Windows installers that run before a game (Rockstar's, the EA app)
+are a different case: Proton's own helper already lets a controller move
+between their buttons.
+
 ## Typing on the TV
 
 Sign-ins and search boxes are the hardest part of a box with no
