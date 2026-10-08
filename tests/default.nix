@@ -187,6 +187,7 @@ in
   toast = unit "toast" ../pkgs/famidrive-toast/famidrive_toast.py pkgs.python3;
   pads = unit "pads" ../pkgs/famidrive-pads/famidrive_pads.py pkgs.python3;
   padmouse = unit "padmouse" ../pkgs/famidrive-padmouse/famidrive_padmouse.py pkgs.python3;
+  quit = unit "quit" ../pkgs/famidrive-quit/famidrive_quit.py pkgs.python3;
   cheevos = unit "cheevos" ../pkgs/famidrive-cheevos/famidrive_cheevos.py
     (pkgs.python3.withPackages (ps: [ ps.requests ]));
 

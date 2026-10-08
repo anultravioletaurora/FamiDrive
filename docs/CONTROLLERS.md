@@ -270,7 +270,13 @@ cable. It also has Bluetooth, untested.
 - **USB ID** `1532:1007`. The kernel names it "Razer Razer Raiju
   Tournament Edition Wired".
 - **2026-10-08, Dolphin (GameCube):** ✅ It played Mario Party 4
-  Deluxe.
+  Deluxe, then stopped responding in the middle of the game, until it
+  was unplugged and plugged back in. Not yet known why.
+- **Select + Start:** ❌ at first. The kernel has no driver of its own
+  for it (it's `hid-generic`), so its buttons get names in order, and
+  "Select" and "Start" were the stick clicks. famidrive-quit now finds
+  Share and Options through SDL's controller database. Not yet tried
+  that way.
 - **Still to record:** the name SDL gives it, and how it does in other
   emulators and Steam games. The other Raijus (the original, Ultimate and Mobile)
   are untested.
@@ -400,9 +406,10 @@ emulators. Check what the box's Steam allows over its network.
 - They're plain HID gamepads with numbered buttons, so names vary and the
   D-pad is often an axis.
 - RetroArch has autoconfigs for many common ones, by USB ID.
-- **Quitting:** like the [Wii guitar](#wii-guitar-on-a-raphnet-adapter),
-  famidrive-quit won't see Select and Start on a pad whose buttons
-  aren't named. Record which numbers they are.
+- **Quitting:** their buttons are numbered, not named, so famidrive-quit
+  looks them up in SDL's community controller database to find Select
+  and Start. A pad that isn't in it can't quit with Select + Start yet:
+  record which numbers they are.
 
 ## SNES controller with a mod kit
 
