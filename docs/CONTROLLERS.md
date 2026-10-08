@@ -614,7 +614,8 @@ To check with each one:
   direction buttons as a d-pad. Check how each game resolves left and
   right held at once (SOCD).
 - **Games to try:** [Street Fighter 6](COMPATIBILITY.md#street-fighter-6)
-  on Steam, and arcade and console fighting games in the emulators.
+  on Steam, arcade fighting games in FinalBurn Neo (the Arcade
+  system), and console fighting games in the other emulators.
 
 ## Racing wheels
 
