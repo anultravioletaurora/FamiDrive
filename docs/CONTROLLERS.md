@@ -41,6 +41,8 @@ yet is listed below as ❔ until someone does.
 | [Switch 2 GameCube controller](#switch-2-gamecube-controller) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [PowerA GameCube-style controller for Switch](#powera-gamecube-style-controller-for-switch) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Wii U Pro Controller](#wii-u-pro-controller) | Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Wii Classic Controller Pro](#wii-classic-controller-pro) | Through a Wii Remote | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Wii U GamePad](#wii-u-gamepad) | Chocolate USB adapter | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Google Stadia controller](#google-stadia-controller) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Steam Controller (2015)](#steam-controller-2015) | USB dongle / USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Steam Controller (2026)](#steam-controller-2026) | Wireless puck / USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
@@ -70,6 +72,8 @@ Clone Hero results for the guitars are in their own entries below.
 - [Switch 2 GameCube controller](#switch-2-gamecube-controller)
 - [PowerA GameCube-style controller for Switch](#powera-gamecube-style-controller-for-switch)
 - [Wii U Pro Controller](#wii-u-pro-controller)
+- [Wii Classic Controller Pro](#wii-classic-controller-pro)
+- [Wii U GamePad](#wii-u-gamepad)
 - [Google Stadia controller](#google-stadia-controller)
 - [Steam Controller (2015)](#steam-controller-2015)
 - [Steam Controller (2026)](#steam-controller-2026)
@@ -247,9 +251,24 @@ digital on most of these).
 ❔ Untested. The driver is `hid-wiimote`, over Bluetooth. Pair it like
 any other Bluetooth pad (press the sync button underneath).
 
-If this is the Wii's Classic Controller Pro instead (the one that plugs
-into a Wii Remote), it works through a Wii Remote in Dolphin, and in
-other emulators through `hid-wiimote` as an extension.
+## Wii Classic Controller Pro
+
+❔ Untested. It plugs into a Wii Remote, so it connects however the
+remote does:
+
+- **In Dolphin (Wii):** the remote connects to Dolphin directly, and
+  the Classic Controller Pro is the game's extension. Check games that
+  use it (Mario Kart Wii, Smash Bros. Brawl).
+- **Everywhere else:** paired with the box itself, `hid-wiimote` shows
+  the extension as its own pad. Then it could be a general controller,
+  but a remote can't be paired with the box and with Dolphin at once.
+
+## Wii U GamePad
+
+❔ Not possible yet: it needs Chocolate, a USB adapter that hasn't
+shipped. Support for it is planned in
+[#127](https://github.com/anultravioletaurora/FamiDrive/issues/127),
+Cemu's second screen included.
 
 ## Google Stadia controller
 
