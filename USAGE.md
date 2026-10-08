@@ -508,6 +508,15 @@ Players without music files get none.
 - **Type:** integer between 0 and 100 (both inclusive)
 - **Default:** `50`
 
+### `famidrive.esde.nowPlaying`
+
+Whether the menu's music shows a toast as each song starts: its
+title and artist (from the file's tags; the file name when it has
+none).
+
+- **Type:** boolean
+- **Default:** `true`
+
 ### `famidrive.esde.skipFolders`
 
 Folders, at any depth under a system's ROMs, that ES-DE shouldn't
