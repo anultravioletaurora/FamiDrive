@@ -823,6 +823,10 @@ def cmd_pull():
         system = system_for(rom)
         if system is None:
             continue  # a platform this box doesn't run (PC, iOS, ...)
+        if rom.get("is_physical"):
+            # Added with RomM's "Add Physical Game": no file to fetch. Such
+            # entries hold apps' saves (Clone Hero, the Mii Channel's Miis).
+            continue
         PULL["label"] = rom.get("name") or rom["fs_name"]
         try:
             dest = fetch_rom(s, rom, system)
@@ -1736,11 +1740,15 @@ def server_save(s, dev, rom_id):
 
 
 def not_in_library(key):
-    """A launch of something that isn't a RomM game (the Mii Channel's
-    entry in the Wii list, say): it has no save of its own to sync."""
-    if key.startswith("app:") or key in load_index():
+    """A launch with no save of its own to sync: a file that isn't a RomM
+    game, or a title in Dolphin's Wii NAND (.nand, such as the Mii Channel).
+    The Mii Channel's RomM entry holds the player's Miis as an app's save
+    (miis.nix), in the same slot this sync would use."""
+    if key.startswith("app:"):
         return False
-    print(f"{key}: not a game from RomM, no save to sync", file=sys.stderr)
+    if key in load_index() and not key.lower().endswith(".nand"):
+        return False
+    print(f"{key}: no save of its own to sync", file=sys.stderr)
     return True
 
 

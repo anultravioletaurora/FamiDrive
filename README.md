@@ -359,15 +359,16 @@ setup at all.
 
 **RomM entries to add by hand.** RomM keeps saves only for games in its
 library, and some apps on the box aren't ROMs. To sync their saves, add
-one entry for each in RomM's web UI, once for the whole RomM server.
-Upload any small file to any platform this box doesn't pull, such as
-Windows, and give the entry exactly this name:
+one entry for each in RomM's web UI, once for the whole RomM server,
+with "Add Physical Game" (no file needed) and exactly this name. Any
+platform works; the box doesn't download physical entries, so an app's
+entry can sit with the console it belongs to:
 
 | Turned on with | RomM entry | What syncs |
 |---|---|---|
 | `cloneHero.enable` | `Clone Hero` (`cloneHero.romm.entry`) | each player's scores and profiles |
 | `yarg.enable` | `YARG` (`yarg.romm.entry`) | each player's scores and profiles |
-| `miis.wii.enable` | `Wii Miis` (`miis.wii.romm.entry`) | each player's Wii Miis |
+| `miis.wii.enable` | `Mii Channel` (`miis.wii.romm.entry`), on the Wii platform | each player's Wii Miis |
 
 Without its entry, an app still works, and its saves stay on the box.
 

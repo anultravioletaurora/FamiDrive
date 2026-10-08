@@ -9,9 +9,15 @@
 # title/00010002/48414341, which `dolphin-emu --nand_title` starts by
 # itself.
 #
-# Each player's database syncs with RomM like a save, under an entry added
-# to RomM by hand (as Clone Hero's scores do): pulled before every Wii
-# game and the Mii Channel, pushed after.
+# The Mii Channel's entry in ES-DE's Wii list is a file this module
+# writes into the shared Wii folder, "Mii Channel.nand", holding its title
+# ID; the Wii command boots .nand files from Dolphin's NAND.
+#
+# Each player's database syncs as the save of a "Mii Channel" entry in
+# RomM, added by hand on the Wii platform with "Add Physical Game" (no
+# file), like an app's (Clone Hero's scores): pulled before every Wii game
+# and the Mii Channel, pushed after. The library pull skips physical
+# entries, and the Wii save sync skips .nand files, so neither touches it.
 { config, lib, pkgs, ... }:
 
 let
@@ -28,19 +34,19 @@ in
 {
   options.famidrive.miis.wii = {
     enable = mkEnableOption ''
-      Wii Miis: a "Mii Channel" entry in ES-DE's Wii list, and each
-      player's Miis synced with RomM (`miis.wii.romm.entry`). The Mii
-      Channel comes from the owner's own Wii: it has to be installed in
-      Dolphin's Wii NAND, with the Wii System Menu'';
+      Wii Miis: the Mii Channel in ES-DE's Wii list, and each player's
+      Miis synced with RomM, as the save of the Mii Channel's RomM entry
+      (`miis.wii.romm.entry`). The Mii Channel itself comes from the
+      owner's own Wii: it has to be installed in Dolphin's Wii NAND, with
+      the Wii System Menu'';
 
     romm.entry = mkOption {
       type = types.nullOr types.str;
-      default = "Wii Miis";
+      default = "Mii Channel";
       description = ''
-        The RomM entry each player's Wii Miis are saved under, by name. RomM
-        keeps saves only for games in its library, so add one by hand (any
-        platform this box doesn't pull, and any small file), as for Clone
-        Hero. null keeps Miis on this box only.
+        The RomM entry each player's Wii Miis are saved under, by name.
+        Add it to RomM by hand, on the Wii platform, with "Add Physical
+        Game" (it needs no file). null keeps Miis on this box only.
       '';
     };
   };

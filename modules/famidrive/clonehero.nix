@@ -99,8 +99,8 @@ in
       description = ''
         The RomM entry each player's Clone Hero scores and profiles are
         saved under, by name. RomM keeps saves only for games in its
-        library, so add one by hand (any platform this box doesn't pull,
-        and any small file). null keeps scores on this box only.
+        library, so add one by hand, with "Add Physical Game" (no file
+        needed). null keeps scores on this box only.
       '';
     };
 
