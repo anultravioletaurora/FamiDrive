@@ -43,17 +43,19 @@ import sys
 import time
 from pathlib import Path
 
-KINDS = ("notice", "alert", "progress", "achievement")
+KINDS = ("notice", "alert", "progress", "achievement", "success")
 POSITIONS = ("top-left", "top-center", "top-right", "middle-left", "middle-right",
              "bottom-left", "bottom-center", "bottom-right")
 # Every toast has an icon: --icon names one of these (drawn here, in the
 # theme's text color), or gives an image (a game's logo). Without one, or
 # when the image can't be read, the kind's own.
-ICONS = ("save", "warning", "trophy", "download", "info", "controller")
-KIND_ICON = {"notice": "info", "alert": "warning", "progress": "download", "achievement": "trophy"}
+ICONS = ("save", "warning", "trophy", "download", "info", "controller", "check")
+KIND_ICON = {"notice": "info", "alert": "warning", "progress": "download", "achievement": "trophy",
+             "success": "check"}
 ALERT = (230, 160, 40, 255)
+SUCCESS = (76, 187, 106, 255)
 GOLD = (232, 184, 64, 255)
-SECONDS = {"notice": 4.0, "alert": 7.0, "achievement": 6.0, "progress": 2.0}
+SECONDS = {"notice": 4.0, "alert": 7.0, "achievement": 6.0, "progress": 2.0, "success": 5.0}
 STALE_PROGRESS = 120.0   # a progress toast nobody updates is let go
 FADE = 0.25
 
@@ -187,7 +189,9 @@ class Queue:
         if tid:
             if self.current and self.current.get("id") == tid:
                 self.current.update(toast)
-                self.ends_at = self._end(self.current, now) if toast.get("done") else None
+                # An unfinished progress toast stays; anything else (done,
+                # or turned into a success or alert) gets its own time.
+                self.ends_at = self._end(self.current, now)
                 return True
             for i, t in enumerate(self.waiting):
                 if t.get("id") == tid:
@@ -573,6 +577,9 @@ def daemon(spec_file, player):
             pygame.draw.rect(c, clear, (n * .265, n * .385, n * .05, n * .16))
             pygame.draw.circle(c, clear, (n * .66, n * .43), n * .04)
             pygame.draw.circle(c, clear, (n * .74, n * .51), n * .04)
+        elif name == "check":   # a checkmark in a circle
+            pygame.draw.circle(c, color, (n * .5, n * .5), n * .44)
+            pygame.draw.lines(c, clear, False, [(n * .29, n * .51), (n * .44, n * .66), (n * .72, n * .37)], max(4, n // 9))
         elif name == "download":   # an arrow down into a tray
             pygame.draw.rect(c, color, (n * .43, n * .08, n * .14, n * .42))
             pygame.draw.polygon(c, color, [(n * .25, n * .46), (n * .75, n * .46), (n * .5, n * .70)])
@@ -591,7 +598,7 @@ def daemon(spec_file, player):
                 return img
             icon = ""
         name = icon or KIND_ICON.get(toast["kind"], "info")
-        color = {"warning": ALERT, "trophy": GOLD}.get(name, colors["text"])
+        color = {"warning": ALERT, "trophy": GOLD, "check": SUCCESS}.get(name, colors["text"])
         return drawn_icon(name, size, color)
 
     def render(toast, alpha, colors):
@@ -610,8 +617,8 @@ def daemon(spec_file, player):
         inner = max(isz, text_h + (gap + bar_h if bar_h else 0))
         surf = pygame.Surface((width, inner + 2 * pad), pygame.SRCALPHA, 32)
         pygame.draw.rect(surf, colors["panel"], surf.get_rect(), border_radius=radius)
-        if toast["kind"] in ("alert", "achievement"):
-            accent = ALERT if toast["kind"] == "alert" else GOLD
+        if toast["kind"] in ("alert", "achievement", "success"):
+            accent = {"alert": ALERT, "achievement": GOLD, "success": SUCCESS}[toast["kind"]]
             pygame.draw.rect(surf, accent, (0, radius, int(5 * u), surf.get_height() - 2 * radius))
         surf.blit(img, (pad, pad + (inner - isz) // 2))
         x = pad + isz + gap

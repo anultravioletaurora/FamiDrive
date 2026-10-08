@@ -103,6 +103,16 @@ class Queue(unittest.TestCase):
         self.assertEqual(q.tick(62)[0]["title"], "Done")
         self.assertEqual(q.tick(63.1)[0]["title"], "after")
 
+    def test_progress_turns_into_success_in_place(self):
+        q = t.Queue()
+        q.add({"kind": "progress", "id": "pull", "title": "Downloading games", "progress": 0.6}, 0)
+        q.tick(0)
+        q.add({"kind": "success", "id": "pull", "title": "Library updated", "detail": "2 new games fetched from RomM"}, 10)
+        toast, _, left = q.tick(10)
+        self.assertEqual((toast["kind"], toast["title"]), ("success", "Library updated"))
+        self.assertAlmostEqual(left, t.SECONDS["success"])
+        self.assertIsNone(q.tick(10 + t.SECONDS["success"] + 0.1)[0])
+
     def test_a_forgotten_progress_toast_goes(self):
         q = t.Queue()
         q.add({"kind": "progress", "id": "x", "title": "Stuck"}, 0)
