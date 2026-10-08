@@ -261,6 +261,15 @@ here.
   Rockstar Games Launcher first, which asks for a Rockstar sign-in;
   check that with a controller, and that the launcher's windows count
   as the game's (`gamescope-fg`).
+- **2026-10-07, Enhanced (3240220), first launch:**
+  - **Steam's EULA:** Steam showed Rockstar's EULA in a Steam dialog,
+    which took only a mouse. FamiDrive now makes the controller work as
+    a mouse while Steam waits on a prompt (#117).
+  - **Rockstar Games Launcher:** its installer, from the game's install
+    script, could be worked with the controller (Proton's own helper
+    moves between a Windows dialog's buttons).
+  - **To check:** the game itself, the Rockstar sign-in, and controllers
+    in game.
 - **GTA Online:** expect ❌. Rockstar turned on BattlEye in September
   2024 and blocked Linux and Steam Deck players from GTA Online, and
   that's still the case as far as we know. Try it once and record what
