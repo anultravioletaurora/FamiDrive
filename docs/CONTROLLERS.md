@@ -49,11 +49,14 @@ yet is listed below as ❔ until someone does.
 | [Google Stadia controller](#google-stadia-controller) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Steam Controller (2015)](#steam-controller-2015) | USB dongle / USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Steam Controller (2026)](#steam-controller-2026) | Wireless puck / USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Steam Deck](#steam-deck) | Steam Remote Play, over the network | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [USB NES and SNES pads](#usb-nes-and-snes-pads) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [SNES controller with a mod kit](#snes-controller-with-a-mod-kit) | Depends on the kit | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [NES and SNES Classic controllers](#nes-and-snes-classic-controllers) | USB adapter / through a Wii Remote | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Meta Quest Touch Plus controllers](#meta-quest-touch-plus-controllers) | — | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | [NES Zapper](#nes-zapper) | — | ❌ | ❌ | — | — | — | — | — | — |
 | [Wii Remote](#wii-remote) | Bluetooth, through Dolphin | — | — | — | ✅ | — | — | ❔ | ❔ |
+| [Wii MotionPlus](#wii-motionplus) | Through a Wii Remote | — | — | — | ❔ | — | — | — | — |
 | [Wii Balance Board](#wii-balance-board) | Bluetooth, through Dolphin | — | — | — | ❔ | — | — | — | — |
 | [GameCube controller on the official adapter](#gamecube-controllers-on-the-official-adapter) | USB adapter | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Wii guitar on a Raphnet adapter](#wii-guitar-on-a-raphnet-adapter) | USB adapter | ✅ | — | — | — | — | — | — | ❔ |
@@ -86,11 +89,14 @@ Clone Hero results for the guitars are in their own entries below.
 - [Google Stadia controller](#google-stadia-controller)
 - [Steam Controller (2015)](#steam-controller-2015)
 - [Steam Controller (2026)](#steam-controller-2026)
+- [Steam Deck](#steam-deck)
 - [USB NES and SNES pads](#usb-nes-and-snes-pads)
 - [SNES controller with a mod kit](#snes-controller-with-a-mod-kit)
 - [NES and SNES Classic controllers](#nes-and-snes-classic-controllers)
+- [Meta Quest Touch Plus controllers](#meta-quest-touch-plus-controllers)
 - [NES Zapper](#nes-zapper)
 - [Wii Remote](#wii-remote)
+- [Wii MotionPlus](#wii-motionplus)
 - [Wii Balance Board](#wii-balance-board)
 - [GameCube controllers on the official adapter](#gamecube-controllers-on-the-official-adapter)
 - [Wii guitar on a Raphnet adapter](#wii-guitar-on-a-raphnet-adapter)
@@ -202,6 +208,13 @@ Over Bluetooth.
   player's Kodi one: the same buttons and first eight axes as `xpad`, plus
   xpadneo's profile switch as a ninth axis. Not yet tried that way. Rumble and the Share button are the usual reasons people add
 xpadneo, so test those first.
+
+- **Older Xbox One controllers** (the first models, without the
+  plastic around the Xbox button joined to the face) have no Bluetooth.
+  They work over USB as an [Xbox One controller,
+  wired](#xbox-one-controller-wired), or wirelessly through Microsoft's
+  Xbox Wireless Adapter, which needs the out-of-tree `xone` driver.
+  Untested.
 
 ## Xbox 360 controller, wired
 
@@ -340,6 +353,19 @@ driver.
 outside Steam is new. Check what the kernel and SDL see with Steam
 closed, and with Steam running.
 
+## Steam Deck
+
+❔ Untested. A Deck isn't a controller over USB or Bluetooth, but it
+can be one over the network:
+
+- **Steam Remote Play** from the Deck to the box streams a Steam game
+  to the Deck, and the Deck's controls reach the game on the box.
+- **Remote Play Together** lets the Deck join a game running on the box
+  as another player, if the game supports it.
+
+Both need Steam running on the box, and neither reaches ES-DE or the
+emulators. Check what the box's Steam allows over its network.
+
 ## USB NES and SNES pads
 
 ❔ Untested. Generic USB pads in the shape of an NES or SNES controller.
@@ -374,6 +400,11 @@ extension plug, so they need one of:
 The NES pad has only A, B, Select and Start, so it's a pad for NES
 games. ES-DE's menus need more buttons than it has.
 
+## Meta Quest Touch Plus controllers
+
+❌ Not usable. They connect only to their Quest headset, not to a PC
+on their own, and VR isn't something FamiDrive does.
+
 ## NES Zapper
 
 ❌ Doesn't work, and can't without changes. The Zapper senses the light
@@ -394,6 +425,13 @@ FamiDrive yet.
 - **Still to check:** the remote's speaker (`controllers.wii.speaker`),
   rumble, and Bluetooth passthrough with a Wii-compatible adapter
   (`controllers.wii.bluetoothPassthrough`).
+
+## Wii MotionPlus
+
+❔ Untested. The MotionPlus adds a gyroscope to a Wii Remote, plugged in
+or built into a Wii Remote Plus. With a real remote connected to
+Dolphin, games that need it (Wii Sports Resort, Skyward Sword) should
+see it. Check that it's detected, and whether it needs recalibrating.
 
 ## Wii Balance Board
 
@@ -490,7 +528,8 @@ How a wheel is expected to work on a FamiDrive box, until one has:
 ## Flight sticks and throttles
 
 ❔ None tried yet. Thrustmaster's sticks and throttles (the T.16000M,
-TWCS, T.Flight HOTAS and others) are plain USB joysticks, with no driver
+TWCS, T.Flight HOTAS and others), Speedlink's joysticks and most
+others are plain USB joysticks, with no driver
 needed. They're for PC flight and space games on Steam, which read them
 directly, and through Proton they reach games through Wine.
 
