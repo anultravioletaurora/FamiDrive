@@ -32,6 +32,7 @@ yet is listed below as ❔ until someone does.
 | [8BitDo Pro 2 and Pro 3](#8bitdo-pro-2-and-pro-3) | Bluetooth / 2.4 GHz dongle (Pro 3) | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [8BitDo Arcade Stick](#8bitdo-arcade-stick) | 2.4 GHz dongle / Bluetooth / USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [8BitDo Ultimate (first model)](#8bitdo-ultimate-first-model) | USB / 2.4 GHz dongle / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [ATK AXE Pro](#atk-axe-pro) | 2.4 GHz dongle / Bluetooth / USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Logitech gamepads](#logitech-gamepads) | USB (F310) / 2.4 GHz dongle (F710) | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Xbox Wireless Controller](#xbox-wireless-controller) | Bluetooth | ✅ | ❔ | ❔ | ❔ | ❔ | ✅ | ❔ | ❔ |
 | [Xbox 360 controller, wired](#xbox-360-controller-wired) | USB | ✅ | ❔ | ✅ | ❔ | ❔ | ❔ | ❔ | ✅ |
@@ -76,6 +77,7 @@ Clone Hero results for the guitars are in their own entries below.
 - [8BitDo Pro 2 and Pro 3](#8bitdo-pro-2-and-pro-3)
 - [8BitDo Arcade Stick](#8bitdo-arcade-stick)
 - [8BitDo Ultimate (first model)](#8bitdo-ultimate-first-model)
+- [ATK AXE Pro](#atk-axe-pro)
 - [Logitech gamepads](#logitech-gamepads)
 - [Xbox Wireless Controller](#xbox-wireless-controller)
 - [Xbox 360 controller, wired](#xbox-360-controller-wired)
@@ -200,6 +202,18 @@ In X mode it's expected to run under `xpad` like the
 [Ultimate 2](#8bitdo-ultimate-2-24-ghz), with its own USB ID and name.
 See [Fight sticks](#fight-sticks) for what to check on any stick.
 
+## ATK AXE Pro
+
+❔ Untested. ATK's wireless pad, over its 2.4 GHz dongle, Bluetooth or a
+USB-C cable, with Hall-effect sticks and a gyro. It's sold for PC and the
+Switch, so like most such pads it's expected to have a PC (XInput) mode
+that runs under `xpad`, and a Switch mode that looks like a Switch Pro
+Controller (`hid-nintendo`, gyro included, but Nintendo's button
+layout). Record which mode it's in, the USB ID and the name SDL gives
+it. Its gyro would matter for motion controls in Switch games
+([#133](https://github.com/anultravioletaurora/FamiDrive/issues/133)).
+
+## Logitech gamepads
 
 ❔ Untested. Logitech's current pads are the F310 (USB) and the F710
 (2.4 GHz dongle). Each has an X/D switch: X (XInput) runs under `xpad`
