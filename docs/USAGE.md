@@ -26,6 +26,7 @@ is on; every other option is optional.
 - [Media](#media)
 - [Clone Hero](#clone-hero)
 - [YARG](#yarg)
+- [osu!](#osu)
 - [Minecraft](#minecraft)
 - [Valheim](#valheim)
 - [PC saves](#pc-saves)
@@ -1012,6 +1013,20 @@ file), as for Clone Hero. null keeps scores on this box only.
 
 - **Type:** null or string
 - **Default:** `"YARG"`
+
+## osu!
+
+osu! (lazer), in the Ports system.
+
+### `famidrive.osu.enable`
+
+Whether to enable osu! (lazer), in ES-DE's Ports system, played with a mouse, a pen
+tablet or a touchscreen, and a keyboard. Pen tablets work through
+osu!'s built-in OpenTabletDriver.
+
+- **Type:** boolean
+- **Default:** `false`
+- **Example:** `true`
 
 ## Minecraft
 

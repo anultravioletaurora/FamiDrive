@@ -110,6 +110,7 @@ in
     ./valheim.nix
     ./clonehero.nix
     ./yarg.nix
+    ./osu.nix
     ./ryujinx.nix
     ./gpu.nix
     ./boot.nix

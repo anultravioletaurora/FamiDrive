@@ -113,6 +113,7 @@ Clone Hero results for the guitars are in their own entries below.
 - [Xbox 360 guitar](#xbox-360-guitar)
 - [Fight sticks](#fight-sticks)
 - [Racing wheels](#racing-wheels)
+- [Pen tablets](#pen-tablets)
 - [Flight sticks and throttles](#flight-sticks-and-throttles)
 - [Typing on the TV](#typing-on-the-tv)
 - [What to test](#what-to-test)
@@ -700,6 +701,26 @@ To check with one:
   ES-DE's menus or count as a player.
 - **Force feedback** on the sticks that have it (none of the above do)
   would need checking, like a [wheel's](#racing-wheels).
+
+## Pen tablets
+
+❔ None tried yet. For [osu!](USAGE.md#famidriveosuenable), which plays
+best with a pen tablet.
+
+- **How they work here:** osu! has OpenTabletDriver built in, and reads
+  the tablet itself. FamiDrive installs OpenTabletDriver's udev rules so
+  the player at the TV can open it, and not OpenTabletDriver's own
+  background service, which would fight osu! for the tablet.
+- **Wacom:** the kernel's `wacom` driver also makes the tablet a pointer
+  everywhere else, and OpenTabletDriver supports Wacom's tablets. The
+  usual osu! choices are the Intuos S (CTL-4100) and the older One by
+  Wacom (CTL-472).
+- **Others:** XP-Pen and Huion tablets are cheaper and also supported by
+  OpenTabletDriver; check its list of supported tablets for the exact
+  model.
+- **To check:** that osu! finds the tablet in its settings, area mapping,
+  and that the kernel's pointer and osu!'s reading don't both move the
+  cursor.
 
 ## Steam's prompts
 
