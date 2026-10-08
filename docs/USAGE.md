@@ -736,6 +736,23 @@ Play game sounds through real Wii Remotes' speakers.
 - **Type:** boolean
 - **Default:** `true`
 
+### `famidrive.controllers.xboxWirelessAdapter`
+
+Turn on xone, the driver for Microsoft's Xbox Wireless Adapter (the
+USB dongle that connects Xbox One and Series controllers without
+Bluetooth). Only the dongle needs it: those controllers already work
+over Bluetooth (xpadneo) and over a USB cable (`xpad`).
+
+Off by default, because xone replaces the kernel's `xpad` driver
+with xpad-noone, a copy without Xbox One support, so that the two
+don't fight over wired Xbox One pads. xpad-noone still drives Xbox
+360 pads, and 8BitDo pads in XInput mode. xone also blocks
+`mt76x2u`, the driver for some MediaTek USB Wi-Fi adapters, since
+the dongle uses the same chip.
+
+- **Type:** boolean
+- **Default:** `false`
+
 ## Steam
 
 The Steam lane (`lanes` has `"steam"`).

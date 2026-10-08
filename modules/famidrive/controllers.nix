@@ -161,6 +161,24 @@ in
     };
   };
 
+  options.famidrive.controllers.xboxWirelessAdapter = mkOption {
+    type = types.bool;
+    default = false;
+    description = ''
+      Turn on xone, the driver for Microsoft's Xbox Wireless Adapter (the
+      USB dongle that connects Xbox One and Series controllers without
+      Bluetooth). Only the dongle needs it: those controllers already work
+      over Bluetooth (xpadneo) and over a USB cable (`xpad`).
+
+      Off by default, because xone replaces the kernel's `xpad` driver
+      with xpad-noone, a copy without Xbox One support, so that the two
+      don't fight over wired Xbox One pads. xpad-noone still drives Xbox
+      360 pads, and 8BitDo pads in XInput mode. xone also blocks
+      `mt76x2u`, the driver for some MediaTek USB Wi-Fi adapters, since
+      the dongle uses the same chip.
+    '';
+  };
+
   options.famidrive.controllers.gamecube.ports = mkOption {
     type = types.listOf types.str;
     default = [ "gamepad" ];
@@ -233,6 +251,10 @@ in
     # USB access to the GameCube adapter and to Bluetooth adapters for
     # passthrough (Dolphin's udev rules).
     services.udev.packages = lib.mkIf (lib.elem "adapter" ports || wii.bluetoothPassthrough) [ pkgs.dolphin-emu ];
+
+    # The Xbox Wireless Adapter: nixpkgs' module brings the driver, the
+    # dongle's firmware (unfree, allowed in default.nix) and xpad-noone.
+    hardware.xone.enable = cfg.controllers.xboxWirelessAdapter;
 
     famidrive.playerHome = { lib, ... }: {
       home.activation.famidriveControllers = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
