@@ -57,7 +57,9 @@ stdenv.mkDerivation {
     runHook preInstall
     mkdir -p $out/share/supertux-advance
     cp -r . $out/share/supertux-advance/
-    # Brux runs a game from its folder.
+    # Brux runs a game from its folder. The game writes its config and
+    # saves to the player's own folder (PhysFS's pref dir,
+    # ~/.local/share/sta/supertux-advance), not next to itself.
     makeWrapper ${lib.getExe brux} $out/bin/supertux-advance \
       --chdir $out/share/supertux-advance --add-flags game.brx
     runHook postInstall
