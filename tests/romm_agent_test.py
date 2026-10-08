@@ -733,20 +733,34 @@ class Test(unittest.TestCase):
         a["launchable"](d, "switch")
         self.assertEqual((d / "noload.txt").stat().st_mtime_ns, m)
         self.assertEqual((d / "dlc" / "noload.txt").stat().st_mtime_ns, before)
+    def test_wii_u_keys_with_a_header_and_bom_are_tidied(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        fw = self.base / "fw-wiiu-hdr"
+        fw.mkdir()
+        (fw / "keys.txt").write_bytes("\ufeffWii-U Title Keys\n----------------\n\n".encode() + b"d7b0" * 8 + b" # Game\n")
+        cemu = box.home / ".local/share/Cemu/keys.txt"
+        cemu.parent.mkdir(parents=True, exist_ok=True)
+        cemu.write_bytes("\ufeffWii-U Title Keys\n".encode())   # an earlier, untidied install
+        a["install_cemu_keys"](fw)
+        lines = cemu.read_text().splitlines()
+        self.assertEqual(lines, ["# Wii-U Title Keys", "# ----------------", "d7b0" * 8 + " # Game"])
+
     def test_wii_u_keys_merge_into_cemus(self):
         box = Box(self.base, "alice")
         a = box.agent()
         fw = self.base / "fw-wiiu"
         fw.mkdir()
-        (fw / "keys.txt").write_text("AAAA0000 # Game A\nbbbb1111 # Game B\n")
+        A, B, C = "AAAA0000" * 4, "bbbb1111" * 4, "cccc2222" * 4
+        (fw / "keys.txt").write_text(f"{A} # Game A\n{B} # Game B\n")
         cemu = box.home / ".local/share/Cemu/keys.txt"
         cemu.parent.mkdir(parents=True)
-        cemu.write_text("# mine\ncccc2222\naaaa0000 # already here\n")
+        cemu.write_text(f"# mine\n{C}\n{A.lower()} # already here\n")
         a["install_cemu_keys"](fw)
         lines = cemu.read_text().splitlines()
-        self.assertEqual(lines[:3], ["# mine", "cccc2222", "aaaa0000 # already here"])
-        self.assertIn("bbbb1111 # Game B", lines)
-        self.assertEqual(sum("aaaa0000" in l.lower() for l in lines), 1)
+        self.assertEqual(lines[:3], ["# mine", C, f"{A.lower()} # already here"])
+        self.assertIn(f"{B} # Game B", lines)
+        self.assertEqual(sum(A.lower() in x.lower() for x in lines), 1)
 
     def test_gamecube_save_region_from_the_disc_header(self):
         box = Box(self.base, "alice")

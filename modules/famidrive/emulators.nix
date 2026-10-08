@@ -552,17 +552,26 @@ in
           # minimal one before its first start skips it; Cemu then makes
           # its MLC folders itself (InitializeExistingMLCOrFail) and
           # fills in the rest of the file.
+          #
+          # No game paths: FamiDrive starts each game itself (-g), and a game
+          # path makes Cemu scan every disc in it at start for its own game
+          # list. Found on the first box 2026-10-07: the scan crashed Cemu
+          # (CafeTitleList::ScanGamePath, TitleInfo::Mount) before Smash for
+          # Wii U could start. The first seed had the library's Wii U
+          # folder there; it's taken out of files that still have it.
           target = "$HOME/.config/Cemu/settings.xml";
           source = pkgs.writeText "cemu-settings.xml" ''
             <?xml version="1.0" encoding="UTF-8"?>
             <content>
                 <check_update>false</check_update>
-                <GamePaths>
-                    <Entry>${cfg.dataDir}/roms/wiiu</Entry>
-                </GamePaths>
             </content>
           '';
         })}
+        ${lib.optionalString (cfg.systems ? wiiu) ''
+          if [ -f "$HOME/.config/Cemu/settings.xml" ]; then
+            ${pkgs.gnused}/bin/sed -i '\#<Entry>${cfg.dataDir}/roms/wiiu</Entry>#d' "$HOME/.config/Cemu/settings.xml"
+          fi
+        ''}
         ${seedLib.lockKeys {
           format = "ini";
           target = "$HOME/.config/dolphin-emu/Dolphin.ini";
