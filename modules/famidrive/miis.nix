@@ -78,7 +78,7 @@ in
           *.nand)
             if [ ! -d "$HOME/.local/share/dolphin-emu/Wii/title/$(cut -c1-8 "$ROM")/$(cut -c9-16 "$ROM")" ]; then
               famidrive-toast --kind alert "The Mii Channel isn't installed" \
-                "Install the Wii System Menu into Dolphin first, from a NAND backup of your own Wii."
+                "Add a Wii System Menu zip to RomM's Wii firmware, or install it in Dolphin (Tools, Perform Online System Update)."
               exit 0
             fi
             ;;
