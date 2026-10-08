@@ -54,6 +54,29 @@ in
   };
 
   config = lib.mkIf (cfg.enable && y.enable) {
+
+    # YARG reads guitars and drums through hidraw (its HIDrogen backend),
+    # which is root-only by default; Clone Hero reads the joystick
+    # interface, which players can. Found on the first box 2026-10-07: a
+    # Wii Les Paul on a Raphnet adapter worked in Clone Hero, and YARG
+    # logged "HIDrogen ... Error getting descriptor (EACCES)". The player
+    # at the TV (uaccess) gets the hidraw devices of rhythm-game hardware
+    # only, by vendor, not every hidraw device (keyboards are hidraw too).
+    # In a rules file of its own, numbered before systemd's 73-seat-late,
+    # which turns the uaccess tag into access: extraRules (99-local) would
+    # come too late.
+    services.udev.packages = [ (pkgs.writeTextDir "lib/udev/rules.d/70-famidrive-instruments.rules" (lib.concatMapStrings (v: ''
+      KERNEL=="hidraw*", ATTRS{idVendor}=="${v}", TAG+="uaccess"
+    '') [
+      "289b"   # raphnet technologies (Wii, GameCube and other instrument adapters)
+      "1209"   # pid.codes: Santroller and other open-hardware instruments
+      "1430"   # RedOctane (Guitar Hero, its dongles and PC guitars)
+      "12ba"   # Sony Computer Entertainment America (PS3 Guitar Hero and Rock Band)
+      "0e6f"   # PDP (Rock Band 4, Riffmaster)
+      "0738"   # Mad Catz (Rock Band)
+      "1bad"   # Harmonix (Rock Band)
+      "3651"   # CRKD (Nitro guitars)
+    ])) ];
     environment.systemPackages = [ pkgs.yarg ];
 
     # Another kind of Ports entry, like Clone Hero's: a .port file whose
