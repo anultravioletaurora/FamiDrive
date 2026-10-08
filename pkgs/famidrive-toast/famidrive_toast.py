@@ -58,7 +58,9 @@ ALERT = (230, 160, 40, 255)
 SUCCESS = (76, 187, 106, 255)
 GOLD = (232, 184, 64, 255)
 SECONDS = {"notice": 4.0, "alert": 7.0, "achievement": 6.0, "progress": 2.0, "success": 5.0}
-STALE_PROGRESS = 120.0   # a progress toast nobody updates is let go
+STALE_PROGRESS = 120.0
+MAX_SHOWN = 3          # toasts on screen at once, stacked from the corner
+URGENT = ("alert", "achievement")   # a progress toast nobody updates is let go
 FADE = 0.25
 
 # ES-DE's own dark look, for a theme that names no colors.
@@ -168,17 +170,40 @@ def place(position, screen, size, margin):
     return x, y
 
 
+def layout(position, screen, sizes, margin, gap):
+    """Top-left corners for a stack of toasts (`sizes`, oldest first): the
+    oldest at `position`, the rest stacked away from the screen's edge,
+    upward from the bottom, downward from the top or middle."""
+    if not sizes:
+        return []
+    up = position.startswith("bottom")
+    x0, y = place(position, screen, sizes[0], margin)
+    out = [(x0, y)]
+    for prev, size in zip(sizes, sizes[1:]):
+        x, _ = place(position, screen, size, margin)
+        y = y - size[1] - gap if up else y + prev[1] + gap
+        out.append((x, y))
+    return out
+
+
 # --- The queue ----------------------------------------------------------------
 
 class Queue:
-    """Toasts waiting and showing, one at a time. Pure: the clock is passed in."""
+    """Toasts waiting and showing, up to `slots` at once (a stack in the
+    corner), oldest first. Pure: the clock is passed in.
 
-    def __init__(self, hide=()):
+    A toast with an id is updated in place, showing or waiting. Alerts and
+    achievements go ahead of waiting notices, so a controller going flat
+    or an unlock isn't stuck behind a burst of "Saved" toasts. A progress
+    toast keeps showing until it's done, and the others come and go around
+    it (one at a time, before: a long library pull held every other toast
+    back until it finished)."""
+
+    def __init__(self, hide=(), slots=MAX_SHOWN):
         self.hide = set(hide)
+        self.slots = slots
         self.waiting = []
-        self.current = None    # the toast on screen
-        self.shown_at = None
-        self.ends_at = None
+        self.showing = []   # {"toast", "shown_at", "ends_at"}, oldest first
 
     def add(self, toast, now):
         kind = toast.get("kind", "notice")
@@ -189,17 +214,22 @@ class Queue:
         toast["updated"] = now
         tid = toast.get("id")
         if tid:
-            if self.current and self.current.get("id") == tid:
-                self.current.update(toast)
-                # An unfinished progress toast stays; anything else (done,
-                # or turned into a success or alert) gets its own time.
-                self.ends_at = self._end(self.current, now)
-                return True
+            for shown in self.showing:
+                if shown["toast"].get("id") == tid:
+                    shown["toast"].update(toast)
+                    # An unfinished progress toast stays; anything else (done,
+                    # or turned into a success or alert) gets its own time.
+                    shown["ends_at"] = self._end(shown["toast"], now)
+                    return True
             for i, t in enumerate(self.waiting):
                 if t.get("id") == tid:
                     self.waiting[i] = toast
                     return True
-        self.waiting.append(toast)
+        if kind in URGENT:
+            at = next((i for i, t in enumerate(self.waiting) if t["kind"] not in URGENT), len(self.waiting))
+            self.waiting.insert(at, toast)
+        else:
+            self.waiting.append(toast)
         return True
 
     def _end(self, toast, now):
@@ -208,19 +238,17 @@ class Queue:
         return now + float(toast.get("seconds") or SECONDS[toast["kind"]])
 
     def tick(self, now):
-        """Advance; returns (toast or None, its age in seconds, seconds left or None)."""
-        if self.current:
-            stale = (self.ends_at is None and now - self.current["updated"] > STALE_PROGRESS)
-            if stale or (self.ends_at is not None and now >= self.ends_at):
-                self.current = None
-        if not self.current and self.waiting:
-            self.current = self.waiting.pop(0)
-            self.shown_at = now
-            self.ends_at = self._end(self.current, now)
-        if not self.current:
-            return None, 0.0, None
-        left = None if self.ends_at is None else self.ends_at - now
-        return self.current, now - self.shown_at, left
+        """Advance; returns [(toast, its age, seconds left or None)], oldest first."""
+        def gone(shown):
+            if shown["ends_at"] is None:
+                return now - shown["toast"]["updated"] > STALE_PROGRESS
+            return now >= shown["ends_at"]
+        self.showing = [x for x in self.showing if not gone(x)]
+        while self.waiting and len(self.showing) < self.slots:
+            t = self.waiting.pop(0)
+            self.showing.append({"toast": t, "shown_at": now, "ends_at": self._end(t, now)})
+        return [(x["toast"], now - x["shown_at"], None if x["ends_at"] is None else x["ends_at"] - now)
+                for x in self.showing]
 
 
 # --- Sending --------------------------------------------------------------
@@ -705,13 +733,13 @@ def daemon(spec_file, player):
     threading.Thread(target=watch_controllers, daemon=True).start()
     xfd = d.fileno()
     snapshots = os.environ.get("FAMIDRIVE_TOAST_SNAPSHOT")
-    drawn = None   # (x, y, w, h) on screen now
-    last = None    # what was drawn there, to skip redrawing a still toast
-    colors, colors_for = None, None
+    drawn = None   # (x, y, w, h) of the stack on screen now
+    last = None    # what was drawn, to skip redrawing a still stack
+    colors, rendered, ys = {}, {}, {}   # per toast: its scheme, its last render, its animated y
+    gap = int(16 * u)
     while True:
         now = time.monotonic()
-        toast, age, left = queue.tick(now)
-        busy = toast is not None
+        busy = bool(queue.tick(now))
         ready, _, _ = select.select([*servers, xfd], [], [], 1 / 30 if busy else None)
         for server in (x for x in servers if x in ready):
             conn, _ = server.accept()
@@ -731,30 +759,58 @@ def daemon(spec_file, player):
         if xfd in ready:
             while d.pending_events():
                 d.next_event()   # also notices when gamescope has gone
-        toast, age, left = queue.tick(time.monotonic())
-        if toast is None:
+        shown = queue.tick(time.monotonic())
+        live = {id(t) for t, _, _ in shown}
+        for cache in (colors, rendered, ys):
+            for k in [k for k in cache if k not in live]:
+                del cache[k]
+        if not shown:
             clear(drawn)
             drawn = last = None
             d.flush()
             continue
-        if colors_for is not toast:   # the player's scheme, read once per toast
-            colors, colors_for = theme_colors(theme, color_scheme(Path.home())), toast
-        alpha = int(255 * max(0.0, min(age / FADE, 1.0, (left / FADE) if left is not None else 1.0)))
-        moving = toast["kind"] == "progress" and toast.get("progress") is None and not toast.get("done")
-        key = (json.dumps(toast, sort_keys=True), alpha)
+        surfs, moving = [], False
+        for toast, age, left in shown:
+            k = id(toast)
+            if k not in colors:   # the player's scheme, read once per toast
+                colors[k] = theme_colors(theme, color_scheme(Path.home()))
+            alpha = int(255 * max(0.0, min(age / FADE, 1.0, (left / FADE) if left is not None else 1.0)))
+            sig = (json.dumps(toast, sort_keys=True), alpha)
+            indeterminate = toast["kind"] == "progress" and toast.get("progress") is None and not toast.get("done")
+            moving = moving or indeterminate
+            if indeterminate or rendered.get(k, (None,))[0] != sig:
+                rendered[k] = (sig, render(toast, alpha, colors[k]))
+            surfs.append((toast, rendered[k][1]))
+        sizes = [(sf.get_width() - 2 * spread, sf.get_height() - 2 * spread) for _, sf in surfs]
+        spots = []
+        for (toast, sf), (tx, ty) in zip(surfs, layout(me["position"], (sw, sh), sizes, margin, gap)):
+            y = ys.get(id(toast), ty)
+            if abs(ty - y) > 1:   # glide to its new place in the stack
+                y += (ty - y) * 0.3
+                moving = True
+            else:
+                y = ty
+            ys[id(toast)] = y
+            spots.append((tx - spread, int(y) - spread))
+        key = (tuple(rendered[id(t)][0] for t, _ in surfs), tuple(spots))
         if key == last and not moving:
             continue
         last = key
-        surf = render(toast, alpha, colors)
-        px, py = place(me["position"], (sw, sh), (surf.get_width() - 2 * spread, surf.get_height() - 2 * spread), margin)
-        pos = (px - spread, py - spread)
-        rect = (*pos, *surf.get_size())
-        if drawn and drawn != rect:
-            clear(drawn)
-        put(surf, pos)
-        drawn = rect
-        if snapshots and alpha == 255:   # FAMIDRIVE_TOAST_SNAPSHOT: each toast as a PNG, for docs and checks
-            pygame.image.save(surf, str(Path(snapshots) / f"{int(time.time() * 1000)}.png"))
+        # One canvas over everything the stack covers now and covered
+        # before, so leftovers are cleared in the same put.
+        rects = [(x, y, sf.get_width(), sf.get_height()) for (x, y), (_, sf) in zip(spots, surfs)]
+        now_box = (min(r[0] for r in rects), min(r[1] for r in rects),
+                   max(r[0] + r[2] for r in rects), max(r[1] + r[3] for r in rects))
+        box = now_box if not drawn else (min(now_box[0], drawn[0]), min(now_box[1], drawn[1]),
+                                         max(now_box[2], drawn[0] + drawn[2]), max(now_box[3], drawn[1] + drawn[3]))
+        box = (max(0, box[0]), max(0, box[1]), min(sw, box[2]), min(sh, box[3]))
+        canvas = pygame.Surface((box[2] - box[0], box[3] - box[1]), pygame.SRCALPHA, 32)
+        for (x, y), (_, sf) in zip(spots, surfs):
+            canvas.blit(sf, (x - box[0], y - box[1]))
+        put(canvas, box[:2])
+        drawn = (now_box[0], now_box[1], now_box[2] - now_box[0], now_box[3] - now_box[1])
+        if snapshots and not moving and all(sig[1] == 255 for sig, _ in (rendered[id(t)] for t, _ in surfs)):
+            pygame.image.save(canvas, str(Path(snapshots) / f"{int(time.time() * 1000)}.png"))
         d.flush()
 
 
