@@ -37,7 +37,7 @@ yet is listed below as ❔ until someone does.
 | [Xbox One controller, wired](#xbox-one-controller-wired) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Original Xbox controller (Duke)](#original-xbox-controller-duke) | Xbox-to-USB cable | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [DualShock 4](#dualshock-4) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
-| [Razer Raiju](#razer-raiju) | USB | ✅ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Razer Raiju Tournament Edition](#razer-raiju) | USB / Bluetooth | ✅ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [PS3 Sixaxis / DualShock 3](#ps3-sixaxis--dualshock-3) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [PS2 controllers on a USB adapter](#ps2-controllers-on-a-usb-adapter) | USB adapter | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [DualSense](#dualsense) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
@@ -252,13 +252,14 @@ SDL knows the pad. Things to note:
 
 ## Razer Raiju
 
-Razer's PS4-style pad, over a USB cable.
+The Raiju Tournament Edition, Razer's PS4-style pad, over a USB
+cable. It also has Bluetooth, untested.
 
 - **2026-10-08, ES-DE:** ✅ On the second box, FamiDrive's toast
   announced it when it was plugged in, and it drove ES-DE's menus.
-- **Still to record:** which Raiju it is (the original, Tournament,
-  Ultimate or Mobile), its USB ID and the name SDL gives it, and how it
-  does in games.
+- **Still to record:** its USB ID and the name SDL gives it, and how
+  it does in games. The other Raijus (the original, Ultimate and Mobile)
+  are untested.
 
 ## PS3 Sixaxis / DualShock 3
 
