@@ -198,7 +198,10 @@ generic HID pad with numbered buttons.
 
 ## Xbox Wireless Controller
 
-Over Bluetooth.
+Over Bluetooth. The Xbox Series X|S controller and the later Xbox One
+controllers (the ones with Bluetooth) are both this pad as far as Linux
+is concerned. They report the same name, and both run under xpadneo.
+Which of the two the result below was from isn't recorded.
 
 - **2026-10-07, ES-DE and Steam:** ✅ It drove the menu, then
   [Titanfall 2](COMPATIBILITY.md#titanfall-2), with Steam Input off
@@ -605,6 +608,17 @@ How a wheel is expected to work on a FamiDrive box, until one has:
   only games that take input from several devices at once can use:
   most sims do, many arcade racers don't. Logitech's shifter is
   H-pattern, and each gear is a button.
+- **Fanatec ClubSport** (wheel bases, pedals, shifter, handbrake):
+  ❔ untested.
+  - The wheel base's force feedback needs `hid-fanatecff`, which covers
+    the ClubSport V2 and V2.5 bases as well as Fanatec's direct-drive
+    ones.
+  - ClubSport pedals plugged into the base come through as part of the
+    wheel. Plugged in by their own USB cable, they're a separate device.
+  - The ClubSport shifter and handbrake plug into the base too, or into
+    USB with an adapter, and then they're separate devices, as above.
+  - Fanatec's wheel rims are read through the base.
+  - Record each device's USB ID and what the game sees.
 - **Rotation range, centering and other settings** are usually set with
   Oversteer, a desktop app. A TV box has no desktop, so FamiDrive would
   set them from Nix.
