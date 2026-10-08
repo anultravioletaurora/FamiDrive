@@ -33,6 +33,7 @@ behave differently in each. For a console game it's the emulator.
   - [DOOM](#doom) (PC)
   - [Fallout: New Vegas](#fallout-new-vegas) (PC)
   - [Gears 5](#gears-5) (PC)
+  - [The Legend of Zelda: Four Swords Adventures](#the-legend-of-zelda-four-swords-adventures) (GameCube)
   - [Tom Clancy's Ghost Recon Wildlands](#tom-clancys-ghost-recon-wildlands) (PC)
   - [Grand Theft Auto V](#grand-theft-auto-v) (PC)
   - [Halo: The Master Chief Collection](#halo-the-master-chief-collection) (PC)
@@ -117,6 +118,11 @@ in the journal when an Nvidia card has no driver.
 
 **GameCube, Dolphin: ✅ Works.** With custom textures. The save loads.
 Select + Start quits, with a short flicker of Dolphin's window first.
+
+- **The island (Kapp'n's boat):** ❌ not yet. It needs a Game Boy
+  Advance linked to the GameCube, which Dolphin can emulate but FamiDrive
+  doesn't set up
+  ([#132](https://github.com/anultravioletaurora/FamiDrive/issues/132)).
 
 ### Animal Crossing: New Horizons
 
@@ -271,6 +277,14 @@ Multiplayer, split-screen, rumble and HDR are still to check.
 - **To check:** whether multiplayer and its anti-cheat run under Proton,
   split-screen co-op, controllers and rumble (it's an Xbox game, so pads
   should be first-class), and HDR.
+
+### The Legend of Zelda: Four Swords Adventures
+
+**GameCube, Dolphin: ❔ Untested.** Single player (Hyrulean Adventure)
+should play with any pad. Multiplayer needs a Game Boy Advance per
+player, linked to the GameCube: Dolphin can emulate them, and FamiDrive
+setting them up, with phones as the GBAs, is
+[#132](https://github.com/anultravioletaurora/FamiDrive/issues/132).
 
 ### Tom Clancy's Ghost Recon Wildlands
 
