@@ -26,11 +26,11 @@
 # whole tree gets closed (it isn't in a group of its own);
 # famidrive-game.close holds a command to run instead of killing anything
 # (Big Picture: closing it must not take the Steam client with it).
-{ writeShellApplication, xprop, xwininfo, xrestop, procps, util-linux, gnugrep, coreutils, socat, famidrive-status }:
+{ writeShellApplication, xprop, xwininfo, xrestop, procps, util-linux, gnugrep, coreutils, socat, famidrive-status, famidrive-padmouse }:
 
 writeShellApplication {
   name = "gamescope-fg";
-  runtimeInputs = [ xprop xwininfo xrestop procps util-linux gnugrep coreutils socat famidrive-status ];
+  runtimeInputs = [ xprop xwininfo xrestop procps util-linux gnugrep coreutils socat famidrive-status famidrive-padmouse ];
   text = ''
     FRONTEND=1
     GAME=2
@@ -243,7 +243,20 @@ writeShellApplication {
           if descends "$wpid" "$1"; then tag "$wid" "$appid"; fi
         done
       }
-      trap 'status_stop; music_paused false' EXIT
+      # The controller as a mouse and keyboard while Steam waits on a prompt
+      # (famidrive-padmouse): Steam's own dialogs (a EULA, a cloud
+      # conflict) take only a mouse. Found on the first box 2026-10-07:
+      # GTA V Enhanced's EULA couldn't be accepted with a controller.
+      pointer_pid=""
+      pointer() {
+        if [ "$1" = on ] && [ -z "$pointer_pid" ]; then
+          famidrive-padmouse & pointer_pid=$!
+        elif [ "$1" = off ] && [ -n "$pointer_pid" ]; then
+          kill "$pointer_pid" 2>/dev/null || true
+          pointer_pid=""
+        fi
+      }
+      trap 'pointer off; status_stop; music_paused false' EXIT
 
       # This game's launch steps since the launch. Read whole, not piped into
       # grep -q, which under pipefail can fail on tail's SIGPIPE.
@@ -330,6 +343,7 @@ writeShellApplication {
         # launch's setup still waits, Steam logs nothing new.
         if [ -n "$install" ] && [ "$state" = asking ]; then state=installing; fi
         status "$state"
+        if [ "$state" = prompt ]; then pointer on; else pointer off; fi
         if [ "$state" = prompt ]; then
           base "769,$STATUS,$FRONTEND"
         elif [ "$state" = installing ]; then
@@ -348,6 +362,7 @@ writeShellApplication {
         fi
         sleep 0.5
       done
+      pointer off   # the game has its pad to itself
       if [ -z "$pid" ]; then
         echo "gamescope-fg: Steam never started $appid" >&2
         status failed "Steam didn't start the game and stopped reporting progress."
