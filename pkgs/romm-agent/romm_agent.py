@@ -986,6 +986,21 @@ def install_ps2_bios(d):
     ini.write_text("\n".join(out) + "\n")
 
 
+CEMU_KEY = re.compile(r"^[0-9a-fA-F]{32}(\s|#|$)")
+
+
+def cemu_key_line(line):
+    """A keys.txt line as Cemu takes it: a key (32 hex digits, maybe a
+    # comment after), a # comment, or nothing. Any other text, such as a
+    title and a row of dashes above the keys, becomes a comment: Cemu
+    stops at it ("error in keys.txt at line 1", seen on the first box
+    2026-10-07, with a byte-order mark and a header on top)."""
+    line = line.lstrip("\ufeff").strip()
+    if not line or line.startswith("#") or CEMU_KEY.match(line):
+        return line
+    return "# " + line
+
+
 def install_cemu_keys(d):
     """Wii U disc keys (keys.txt, a firmware file in RomM) merged into
     Cemu's own keys.txt, where it looks for them (its data folder, as
@@ -994,20 +1009,30 @@ def install_cemu_keys(d):
     stay; each key is added once."""
     new = []
     for f in sorted(d.glob("*.txt")):
-        new += [line.strip() for line in f.read_text(errors="replace").splitlines() if line.strip()]
+        new += [cemu_key_line(line) for line in f.read_text(encoding="utf-8-sig", errors="replace").splitlines()]
+    new = [line for line in new if line]
     if not new:
         return
     dest = Path.home() / ".local/share/Cemu/keys.txt"
     dest.parent.mkdir(parents=True, exist_ok=True)
-    have = dest.read_text(errors="replace").splitlines() if dest.exists() else []
+    have = [cemu_key_line(line) for line in dest.read_text(encoding="utf-8-sig", errors="replace").splitlines()] if dest.exists() else []
+    have = [line for line in have if line]
     seen = {line.split("#")[0].strip().lower() for line in have}
     for line in new:
         key = line.split("#")[0].strip().lower()
-        if key and key not in seen:
-            have.append(line)
+        if key:
+            if key in seen:
+                continue
             seen.add(key)
+        elif line in have:   # a comment already there
+            continue
+        have.append(line)
     dest.write_text("\n".join(have) + "\n")
 
+
+# Raised when an installer changes how it installs. 2: Cemu's keys.txt
+# tidied (2026-10-07).
+INSTALLERS_VERSION = 2
 
 INSTALLERS = {
     "ps2": install_ps2_bios,
@@ -1062,7 +1087,9 @@ def cmd_firmware_install():
         files = sorted(p for p in target.glob("*") if p.is_file()) if target.is_dir() else []
         if not files:
             continue
-        stamp = json.dumps([[p.name, p.stat().st_size, int(p.stat().st_mtime)] for p in files])
+        # INSTALLERS_VERSION: a fixed installer runs again on boxes that
+        # already installed with the old one.
+        stamp = json.dumps([INSTALLERS_VERSION, [[p.name, p.stat().st_size, int(p.stat().st_mtime)] for p in files]])
         marker = STATE / f"firmware-{system}.json"
         if marker.exists() and marker.read_text() == stamp:
             continue
