@@ -60,6 +60,8 @@ behave differently in each. For a console game it's the emulator.
   - [Star Wars Jedi: Fallen Order](#star-wars-jedi-fallen-order) (PC)
   - [Star Wars Jedi: Survivor](#star-wars-jedi-survivor) (PC)
   - [Stardew Valley](#stardew-valley) (PC)
+  - [Super Mario Odyssey](#super-mario-odyssey) (Switch)
+  - [Super Mario Party](#super-mario-party) (Switch)
   - [Super Smash Bros. Brawl](#super-smash-bros-brawl) (Wii)
   - [Super Smash Bros. Melee](#super-smash-bros-melee) (GameCube)
   - [Super Smash Bros. Ultimate](#super-smash-bros-ultimate) (Switch)
@@ -603,6 +605,26 @@ was in use; ES-DE listed it after the next session start.
   plain game is tested.
 - **To check:** controllers (one per player in split-screen), rumble,
   and online co-op with friends.
+
+### Super Mario Odyssey
+
+**Switch, Eden: ❔ Untested.** It uses motion controls (shaking to throw
+Cappy, and more), which FamiDrive doesn't bind yet
+([#133](https://github.com/anultravioletaurora/FamiDrive/issues/133)).
+Every move also works with buttons, so it should play without them.
+
+### Super Mario Party
+
+**Switch, Eden: 🟡 Playable, barely.** Each player is meant to hold one
+Joy-Con sideways.
+
+- **2026-10, the first box, an 8BitDo Ultimate 2:** the controls came
+  up rotated, and the menus were hard to get around. FamiDrive makes
+  every player a Pro Controller, and Eden switches a player to a single
+  Joy-Con when a game won't take that, so the pad drives a sideways
+  Joy-Con as if it were upright. The fix, binding a normal pad as a
+  sideways Joy-Con for games like this, is
+  [#133](https://github.com/anultravioletaurora/FamiDrive/issues/133).
 
 ### Super Smash Bros. Brawl
 

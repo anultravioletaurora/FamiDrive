@@ -42,6 +42,7 @@ yet is listed below as ❔ until someone does.
 | [PS2 controllers on a USB adapter](#ps2-controllers-on-a-usb-adapter) | USB adapter | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [DualSense](#dualsense) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Switch Pro Controller](#switch-pro-controller) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Joy-Cons](#joy-cons) | Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Switch 2 GameCube controller](#switch-2-gamecube-controller) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [PowerA GameCube-style controller for Switch](#powera-gamecube-style-controller-for-switch) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Wii U Pro Controller](#wii-u-pro-controller) | Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
@@ -84,6 +85,7 @@ Clone Hero results for the guitars are in their own entries below.
 - [PS2 controllers on a USB adapter](#ps2-controllers-on-a-usb-adapter)
 - [DualSense](#dualsense)
 - [Switch Pro Controller](#switch-pro-controller)
+- [Joy-Cons](#joy-cons)
 - [Switch 2 GameCube controller](#switch-2-gamecube-controller)
 - [PowerA GameCube-style controller for Switch](#powera-gamecube-style-controller-for-switch)
 - [Wii U Pro Controller](#wii-u-pro-controller)
@@ -322,8 +324,28 @@ and haptics, which need USB or game support over Bluetooth.
 - **Face buttons:** Nintendo's A and B are where an Xbox pad has B and
   A. Check that each emulator and Steam game goes by label
   (`controllers.faceButtons`).
-- **Joy-Cons** use the same driver. A pair only acts as one controller
-  with `joycond`, which FamiDrive doesn't set up yet.
+- **Joy-Cons:** see [Joy-Cons](#joy-cons).
+
+## Joy-Cons
+
+❔ Untested, and they need Bluetooth (the second box has none). The plan
+for them is [#133](https://github.com/anultravioletaurora/FamiDrive/issues/133).
+
+- **In Switch games:** Eden has its own Joy-Con driver, on by default,
+  that talks to them directly: each Joy-Con is its own controller, with
+  motion, HD rumble and amiibo (NFC). That's what Super Mario Party (one
+  sideways Joy-Con each) and motion games like Super Mario Odyssey want.
+- **Everywhere else** (ES-DE, RetroArch, Dolphin, Steam, Select +
+  Start): the kernel's `hid-nintendo` sees each Joy-Con as its own
+  device. `joycond` would make L + R across two Joy-Cons one controller,
+  and SL + SR on one a sideways pad. FamiDrive doesn't turn joycond on
+  yet.
+- **BetterJoy** is for Windows only, and not needed here: on Linux the
+  kernel driver, joycond, SDL, Steam Input and Eden's driver cover what
+  it does.
+- **An ordinary pad in a Joy-Con game:** Eden makes it a sideways
+  Joy-Con with the controls turned 90°. See
+  [Super Mario Party](COMPATIBILITY.md#super-mario-party).
 
 ## Switch 2 GameCube controller
 
