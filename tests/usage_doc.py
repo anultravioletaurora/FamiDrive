@@ -41,6 +41,8 @@ SECTIONS = [
     ("osu!", ["famidrive.osu"], "osu! (lazer), in the Ports system."),
     ("Tux games", ["famidrive.superTuxKart", "famidrive.superTux", "famidrive.superTuxParty"],
      "Free games starring Tux, in the Ports system: SuperTuxKart, SuperTux and SuperTux Party."),
+    ("Space Cadet Pinball", ["famidrive.spaceCadetPinball"],
+     "3D Pinball Space Cadet, in the Ports system, playing your own copy of the game's files."),
     ("Minecraft", ["famidrive.minecraft"],
      "Minecraft through Prism Launcher, in the Ports system (`lanes` has `\"minecraft\"`)."),
     ("Valheim", ["famidrive.valheim"], "Valheim mods, for playing on a modded server."),

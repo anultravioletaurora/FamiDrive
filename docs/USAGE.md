@@ -28,6 +28,7 @@ is on; every other option is optional.
 - [YARG](#yarg)
 - [osu!](#osu)
 - [Tux games](#tux-games)
+- [Space Cadet Pinball](#space-cadet-pinball)
 - [Minecraft](#minecraft)
 - [Valheim](#valheim)
 - [PC saves](#pc-saves)
@@ -1069,6 +1070,21 @@ Whether to enable SuperTuxKart, in ES-DE's Ports system.
 ### `famidrive.superTuxParty.enable`
 
 Whether to enable SuperTux Party, in ES-DE's Ports system.
+
+- **Type:** boolean
+- **Default:** `false`
+- **Example:** `true`
+
+## Space Cadet Pinball
+
+3D Pinball Space Cadet, in the Ports system, playing your own copy of the game's files.
+
+### `famidrive.spaceCadetPinball.enable`
+
+Whether to enable 3D Pinball Space Cadet, in ES-DE's Ports system. It plays your own
+copy of the game's files (from Windows), copied into
+`space-cadet-pinball/` on the library disk: PINBALL.DAT, PINBALL.MID,
+the .WAV sounds and the rest of the game's folder.
 
 - **Type:** boolean
 - **Default:** `false`
