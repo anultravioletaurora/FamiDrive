@@ -26,6 +26,7 @@ is on; every other option is optional.
 - [Media](#media)
 - [Clone Hero](#clone-hero)
 - [YARG](#yarg)
+- [osu!](#osu)
 - [Minecraft](#minecraft)
 - [Valheim](#valheim)
 - [PC saves](#pc-saves)

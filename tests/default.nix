@@ -318,7 +318,7 @@ in
       (lib.any (p: lib.hasInfix "famidrive-instruments" (toString p)) c.services.udev.packages))
     (check "osu! is in Ports, and the player at the TV can use a pen tablet"
         (lib.hasInfix "osu)" c.famidrive.systems.ports.command
-          && lib.any (p: lib.getName p == "opentabletdriver") c.services.udev.packages
+          && lib.any (p: lib.getName p == lib.getName pkgs.opentabletdriver) c.services.udev.packages
           && lib.hasInfix "osu!.port" c.home-manager.users.alice.home.activation.famidriveOsu.data))
     (check "YARG is in Ports next to Clone Hero, scores saved under its RomM entry"
         (lib.hasInfix "yarg)" c.famidrive.systems.ports.command
