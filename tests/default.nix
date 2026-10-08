@@ -110,6 +110,7 @@ let
       extremeTuxRacer.enable = true;
       tuxPaint.enable = true;
       spaceCadetPinball.enable = true;
+      miis.wii.enable = true;
       cloneHero = {
         enable = true;
         songs."AFI - Miss Murder" = "05185565cb931978c11de73d3048206e";
@@ -323,6 +324,12 @@ in
       (check "a host's own cleanup choice wins" (c.nix.gc.options == "--delete-older-than 30d"))
       (check "YARG can open rhythm-game hardware's hidraw devices (Raphnet among them)"
       (lib.any (p: lib.hasInfix "famidrive-instruments" (toString p)) c.services.udev.packages))
+    (check "Wii Miis: the Mii Channel in the Wii list, Miis synced before and after every Wii game"
+        (c.systemd.services ? famidrive-mii-channel
+          && lib.hasInfix "--nand_title" c.famidrive.systems.wii.command
+          && lib.hasInfix "save-pull wii-miis app:wii-miis" c.famidrive.systems.wii.before
+          && lib.hasInfix "save-push wii-miis app:wii-miis" c.famidrive.systems.wii.after
+          && (etcJson c "famidrive/romm/alice.json").apps ? wii-miis))
     (check "Space Cadet Pinball plays the owner's files from the library disk, none bundled"
         (lib.hasInfix "spacecadet)" c.famidrive.systems.ports.command
           && lib.hasInfix "/var/lib/famidrive/space-cadet-pinball" c.famidrive.systems.ports.command

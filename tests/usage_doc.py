@@ -43,6 +43,7 @@ SECTIONS = [
                    "famidrive.superTuxAdvance", "famidrive.extremeTuxRacer", "famidrive.tuxPaint"],
      "Free games starring Tux, in the Ports system: SuperTuxKart, SuperTux, SuperTux Party, "
      "SuperTux Advance, Extreme Tux Racer and Tux Paint."),
+    ("Miis", ["famidrive.miis"], "Miis, made in each console's own editor and synced with RomM."),
     ("Space Cadet Pinball", ["famidrive.spaceCadetPinball"],
      "3D Pinball Space Cadet, in the Ports system, playing your own copy of the game's files."),
     ("Minecraft", ["famidrive.minecraft"],

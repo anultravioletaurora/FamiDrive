@@ -271,6 +271,8 @@ planning doc for now and will move into this repo.
   Cemu) and the RetroArch core file names are unverified.
 - osu! in Ports (`famidrive.osu`) hasn't run on a box yet, nor has a
   pen tablet through osu!'s built-in OpenTabletDriver.
+- Wii Miis (`famidrive.miis.wii`): the Mii Channel in the Wii list, and
+  each player's Miis synced with RomM. Untried on a box.
 - The Tux games in Ports (`famidrive.superTuxKart`, `superTux`,
   `superTuxParty`, `superTuxAdvance`, `extremeTuxRacer`, `tuxPaint`)
   haven't run on a box yet, and neither has Space Cadet
@@ -365,6 +367,7 @@ Windows, and give the entry exactly this name:
 |---|---|---|
 | `cloneHero.enable` | `Clone Hero` (`cloneHero.romm.entry`) | each player's scores and profiles |
 | `yarg.enable` | `YARG` (`yarg.romm.entry`) | each player's scores and profiles |
+| `miis.wii.enable` | `Wii Miis` (`miis.wii.romm.entry`) | each player's Wii Miis |
 
 Without its entry, an app still works, and its saves stay on the box.
 

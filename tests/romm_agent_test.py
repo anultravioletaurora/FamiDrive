@@ -312,6 +312,16 @@ class Test(unittest.TestCase):
         a["cmd_save_push"]("gc", key, learn=False)      # changed again: a new copy
         self.assertEqual(posts, ["famidrive-conflict-box", "famidrive-conflict-box"])
 
+    def test_no_sync_for_a_file_romm_never_sent(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        a["save_index"]({})
+        g = a["cmd_save_push"].__globals__
+        g["session"] = lambda: self.fail("no RomM call for a file RomM never sent")
+        other = str(box.data / "roms/gc/Not from RomM.nand")
+        a["cmd_save_pull"]("gc", other)
+        a["cmd_save_push"]("gc", other)
+
     def test_save_state_follows_a_rename(self):
         box = Box(self.base, "alice")
         a = box.agent()

@@ -1735,9 +1735,20 @@ def server_save(s, dev, rom_id):
     return max(ours, key=lambda x: x["updated_at"]) if ours else None
 
 
+def not_in_library(key):
+    """A launch of something that isn't a RomM game (the Mii Channel's
+    entry in the Wii list, say): it has no save of its own to sync."""
+    if key.startswith("app:") or key in load_index():
+        return False
+    print(f"{key}: not a game from RomM, no save to sync", file=sys.stderr)
+    return True
+
+
 def cmd_save_pull(system, rom_path):
-    kind, root, lay = layout(system)
     key = library_path(rom_path)
+    if not_in_library(key):
+        return
+    kind, root, lay = layout(system)
     STATE.mkdir(parents=True, exist_ok=True)
     # For rule 3 at push time; fixed files need no learning. Found on the
     # first box 2026-10-06: Clone Hero's root is the home folder, and
@@ -1794,8 +1805,10 @@ def save_is_empty(root, rels):
 
 
 def cmd_save_push(system, rom_path, learn=True):
-    kind, root, lay = layout(system)
     key = library_path(rom_path)
+    if not_in_library(key):
+        return
+    kind, root, lay = layout(system)
     entry = entry_for(key)
     saves = load_saves()
     mine = my_state(saves, key, entry["id"])
