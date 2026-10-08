@@ -38,6 +38,7 @@ SECTIONS = [
     ("Clone Hero", ["famidrive.cloneHero"], "Clone Hero, in the Ports system."),
     ("YARG", ["famidrive.yarg"],
      "YARG (Yet Another Rhythm Game), in the Ports system, playing the same songs as Clone Hero."),
+    ("osu!", ["famidrive.osu"], "osu! (lazer), in the Ports system."),
     ("Minecraft", ["famidrive.minecraft"],
      "Minecraft through Prism Launcher, in the Ports system (`lanes` has `\"minecraft\"`)."),
     ("Valheim", ["famidrive.valheim"], "Valheim mods, for playing on a modded server."),

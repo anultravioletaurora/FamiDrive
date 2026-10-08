@@ -83,6 +83,7 @@ of games you own. See [Your games](#your-games).
 | GOG, Epic Games Store, Amazon Games | [Heroic Games Launcher](https://heroicgameslauncher.com), each store its own system | [`heroic`](https://search.nixos.org/packages?channel=26.05&show=heroic) | Each store's cloud saves | Your libraries in each store |
 | Minecraft | [Prism Launcher](https://prismlauncher.org) | [`prismlauncher`](https://search.nixos.org/packages?channel=26.05&show=prismlauncher) | — | Your Prism instances, and ones declared in Nix |
 | Clone Hero, YARG | [Clone Hero](https://clonehero.net) and [YARG](https://yarg.in), in the Ports system | [`clonehero`](https://search.nixos.org/packages?channel=26.05&show=clonehero), [`yarg`](https://search.nixos.org/packages?channel=26.05&show=yarg) | ✅ (scores and profiles) | Songs declared in Nix, downloaded once for the box |
+| osu! | [osu!](https://osu.ppy.sh) (lazer), in the Ports system | [`osu-lazer-bin`](https://search.nixos.org/packages?channel=26.05&show=osu-lazer-bin) | osu!'s own servers (scores, when signed in) | Beatmaps downloaded in the game, each player's own |
 | Media | [Kodi](https://kodi.tv) 21 with [JellyCon](https://github.com/jellyfin/jellycon), or [Jellyfin MPV Shim](https://github.com/jellyfin/jellyfin-mpv-shim) 3.1 | [`kodi`](https://search.nixos.org/packages?channel=26.05&show=kodi), [`jellyfin-mpv-shim`](https://search.nixos.org/packages?channel=unstable&show=jellyfin-mpv-shim) | — | Your Jellyfin server, and media folders on the box (an external drive) |
 
 RetroArch runs everything it does well, so those systems share one
@@ -266,6 +267,8 @@ planning doc for now and will move into this repo.
   the library and firmware half shouldn't.
 - Launch flags for the standalone emulators added later (Azahar, PPSSPP,
   Cemu) and the RetroArch core file names are unverified.
+- osu! in Ports (`famidrive.osu`) hasn't run on a box yet, nor has a
+  pen tablet through osu!'s built-in OpenTabletDriver.
 - The Heroic lane (GOG, Epic, Amazon) hasn't run against a signed-in
   Heroic yet. The installed-games files it reads were taken from
   Heroic's source and are marked `VERIFY`.
