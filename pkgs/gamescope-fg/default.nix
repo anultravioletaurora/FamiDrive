@@ -305,11 +305,22 @@ writeShellApplication {
           # Found on the first box 2026-10-05: when a game needs an update,
           # Steam may fail the launch (AppError_19) while the update itself
           # carries on. Wait for the update, then ask once more.
+          #
+          # Wait for all of it: Steam takes the update off its schedule
+          # only after the game's install script has run, a moment after
+          # the files are in (and the manifest says "fully installed").
+          # Found on the first box 2026-10-07: asking again at that moment
+          # suspended DOOM's install script, and the new launch sat on
+          # "updating" for hours.
           if [ -z "$retried" ] && grep -q DownloadingDepots <<< "$steps"; then
             retried=1
             status updating
             base "$STATUS,769,$FRONTEND"
-            while ! grep -qE '"StateFlags"[[:space:]]+"4"' "$manifest" 2>/dev/null; do
+            content="$HOME/.local/share/Steam/logs/content_log.txt"
+            from=$(wc -l < "$content" 2>/dev/null || echo 0)
+            until grep -qE '"StateFlags"[[:space:]]+"4"' "$manifest" 2>/dev/null \
+              && tail -n +"$((from + 1))" "$content" 2>/dev/null \
+                | grep -a "AppID $appid scheduler finished : removed from schedule" > /dev/null; do
               status_tag
               sleep 0.5
             done
