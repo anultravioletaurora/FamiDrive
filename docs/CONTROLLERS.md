@@ -30,12 +30,15 @@ yet is listed below as ❔ until someone does.
 | [8BitDo Ultimate 2](#8bitdo-ultimate-2-bluetooth) | Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [8BitDo Ultimate 2C](#8bitdo-ultimate-2c) | 2.4 GHz dongle / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [8BitDo Pro 2 and Pro 3](#8bitdo-pro-2-and-pro-3) | Bluetooth / 2.4 GHz dongle (Pro 3) | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [8BitDo Ultimate (first model)](#8bitdo-ultimate-first-model) | USB / 2.4 GHz dongle / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Logitech gamepads](#logitech-gamepads) | USB (F310) / 2.4 GHz dongle (F710) | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Xbox Wireless Controller](#xbox-wireless-controller) | Bluetooth | ✅ | ❔ | ❔ | ❔ | ❔ | ✅ | ❔ | ❔ |
 | [Xbox 360 controller, wired](#xbox-360-controller-wired) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Xbox One controller, wired](#xbox-one-controller-wired) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Original Xbox controller (Duke)](#original-xbox-controller-duke) | Xbox-to-USB cable | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [DualShock 4](#dualshock-4) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [PS3 Sixaxis / DualShock 3](#ps3-sixaxis--dualshock-3) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [PS2 controllers on a USB adapter](#ps2-controllers-on-a-usb-adapter) | USB adapter | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [DualSense](#dualsense) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Switch Pro Controller](#switch-pro-controller) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Switch 2 GameCube controller](#switch-2-gamecube-controller) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
@@ -47,6 +50,9 @@ yet is listed below as ❔ until someone does.
 | [Steam Controller (2015)](#steam-controller-2015) | USB dongle / USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Steam Controller (2026)](#steam-controller-2026) | Wireless puck / USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [USB NES and SNES pads](#usb-nes-and-snes-pads) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [SNES controller with a mod kit](#snes-controller-with-a-mod-kit) | Depends on the kit | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [NES and SNES Classic controllers](#nes-and-snes-classic-controllers) | USB adapter / through a Wii Remote | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [NES Zapper](#nes-zapper) | — | ❌ | ❌ | — | — | — | — | — | — |
 | [Wii Remote](#wii-remote) | Bluetooth, through Dolphin | — | — | — | ✅ | — | — | ❔ | ❔ |
 | [Wii Balance Board](#wii-balance-board) | Bluetooth, through Dolphin | — | — | — | ❔ | — | — | — | — |
 | [GameCube controller on the official adapter](#gamecube-controllers-on-the-official-adapter) | USB adapter | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
@@ -61,12 +67,15 @@ Clone Hero results for the guitars are in their own entries below.
 - [8BitDo Ultimate 2 (Bluetooth)](#8bitdo-ultimate-2-bluetooth)
 - [8BitDo Ultimate 2C](#8bitdo-ultimate-2c)
 - [8BitDo Pro 2 and Pro 3](#8bitdo-pro-2-and-pro-3)
+- [8BitDo Ultimate (first model)](#8bitdo-ultimate-first-model)
 - [Logitech gamepads](#logitech-gamepads)
 - [Xbox Wireless Controller](#xbox-wireless-controller)
 - [Xbox 360 controller, wired](#xbox-360-controller-wired)
 - [Xbox One controller, wired](#xbox-one-controller-wired)
+- [Original Xbox controller (Duke)](#original-xbox-controller-duke)
 - [DualShock 4](#dualshock-4)
 - [PS3 Sixaxis / DualShock 3](#ps3-sixaxis--dualshock-3)
+- [PS2 controllers on a USB adapter](#ps2-controllers-on-a-usb-adapter)
 - [DualSense](#dualsense)
 - [Switch Pro Controller](#switch-pro-controller)
 - [Switch 2 GameCube controller](#switch-2-gamecube-controller)
@@ -78,12 +87,16 @@ Clone Hero results for the guitars are in their own entries below.
 - [Steam Controller (2015)](#steam-controller-2015)
 - [Steam Controller (2026)](#steam-controller-2026)
 - [USB NES and SNES pads](#usb-nes-and-snes-pads)
+- [SNES controller with a mod kit](#snes-controller-with-a-mod-kit)
+- [NES and SNES Classic controllers](#nes-and-snes-classic-controllers)
+- [NES Zapper](#nes-zapper)
 - [Wii Remote](#wii-remote)
 - [Wii Balance Board](#wii-balance-board)
 - [GameCube controllers on the official adapter](#gamecube-controllers-on-the-official-adapter)
 - [Wii guitar on a Raphnet adapter](#wii-guitar-on-a-raphnet-adapter)
 - [Xbox 360 guitar](#xbox-360-guitar)
 - [Racing wheels](#racing-wheels)
+- [Flight sticks and throttles](#flight-sticks-and-throttles)
 - [Typing on the TV](#typing-on-the-tv)
 - [What to test](#what-to-test)
 
@@ -156,6 +169,14 @@ dongle. Both have a mode switch on the back: X (XInput) is the one to
 try first. The Switch mode presents a Switch Pro Controller instead,
 whose button layout is swapped from the labels on an Xbox-style pad.
 
+## 8BitDo Ultimate (first model)
+
+❔ Untested. The Ultimate from before the Ultimate 2 came in three
+versions: wired, 2.4 GHz (with a charging dock), and Bluetooth (which
+also has a 2.4 GHz dongle). Over the dongle or a cable it's expected to
+run under `xpad` like the [Ultimate 2](#8bitdo-ultimate-2-24-ghz), but
+with its own USB ID and name. Record both, and which version it is.
+
 ## Logitech gamepads
 
 ❔ Untested. Logitech's current pads are the F310 (USB) and the F710
@@ -195,6 +216,15 @@ pad's layout.
 use the Xbox One protocol, which `xpad` also handles. Check its USB ID
 and the name SDL gives it, since third-party pads each have their own.
 
+## Original Xbox controller (Duke)
+
+❔ Untested. The original Xbox's port is USB with a different plug, so
+the pad needs an Xbox-to-USB cable or adapter, not a driver. The
+kernel's `xpad` driver knows the Duke and the later Controller S. Its
+face buttons and black and white buttons are pressure-sensitive; games
+see them as plain buttons. Record the name SDL gives it, and whether
+the black and white buttons come through.
+
 ## DualShock 4
 
 ❔ Untested. The kernel driver is `hid-playstation` on recent kernels.
@@ -215,6 +245,22 @@ SDL knows the pad. Things to note:
   plugin handles the rest). Unplug it and press the PS button.
 - **To note:** its motion sensors show up as a separate input device,
   like the DualShock 4's.
+
+## PS2 controllers on a USB adapter
+
+❔ Untested. A PS2 pad needs a PS2-to-USB adapter, and the adapter
+decides how it works:
+
+- **Cheap two-port adapters** often show up as one device with two
+  pads in it, with numbered buttons and the D-pad as an axis. Some only
+  report the sticks while the pad's Analog light is on.
+- **Raphnet's adapters** present each pad cleanly and keep the
+  pressure-sensitive buttons for PCSX2.
+- **Quitting:** with numbered buttons, famidrive-quit may not see
+  Select and Start, as with the [USB NES and SNES
+  pads](#usb-nes-and-snes-pads).
+
+Record the adapter's USB ID, and whether both ports show up.
 
 ## DualSense
 
@@ -304,6 +350,39 @@ closed, and with Steam running.
 - **Quitting:** like the [Wii guitar](#wii-guitar-on-a-raphnet-adapter),
   famidrive-quit won't see Select and Start on a pad whose buttons
   aren't named. Record which numbers they are.
+
+## SNES controller with a mod kit
+
+❔ Untested. An original SNES pad rebuilt with a mod kit inside. It
+behaves like whatever the kit presents: 8BitDo's Bluetooth kit looks
+like an 8BitDo pad (with its own mode switch), and USB kits are usually
+plain HID pads like the [USB NES and SNES pads](#usb-nes-and-snes-pads).
+Record which kit it is and the name SDL gives it.
+
+## NES and SNES Classic controllers
+
+❔ Untested. The NES Classic and SNES Classic pads have the Wii's
+extension plug, so they need one of:
+
+- **A USB adapter** (Mayflash, Raphnet, 8BitDo's Retro Receiver for the
+  Classics, and others). Each presents them differently: record which
+  adapter, and its USB ID.
+- **A Wii Remote:** in Dolphin they act as a Classic Controller. Paired
+  with the box, `hid-wiimote` may show them as their own pad. See the
+  [Wii Classic Controller Pro](#wii-classic-controller-pro).
+
+The NES pad has only A, B, Select and Start, so it's a pad for NES
+games. ES-DE's menus need more buttons than it has.
+
+## NES Zapper
+
+❌ Doesn't work, and can't without changes. The Zapper senses the light
+of a CRT's picture as it's drawn, which an LCD or OLED TV doesn't
+produce, and it has no USB. The usual ways to play light-gun games on a
+modern TV are a Wii Remote (Dolphin, and RetroArch through
+`hid-wiimote`), an IR light gun such as the Sinden or a GUN4IR build,
+or a Zapper rebuilt with one of those kits. None have been tried on
+FamiDrive yet.
 
 ## Wii Remote
 
@@ -395,12 +474,36 @@ How a wheel is expected to work on a FamiDrive box, until one has:
   nixpkgs packages the out-of-tree drivers, so FamiDrive can turn each
   one on for the box. That option doesn't exist yet (#58): it's worth
   adding once a wheel of that kind has been tried.
+- **Shifters, pedals and handbrakes:** a Logitech shifter and pedals
+  plug into the wheel and come through as part of it. A handbrake (and
+  pedals on their own cable) is usually a separate USB device, which
+  only games that take input from several devices at once can use:
+  most sims do, many arcade racers don't. Logitech's shifter is
+  H-pattern, and each gear is a button.
 - **Rotation range, centering and other settings** are usually set with
   Oversteer, a desktop app. A TV box has no desktop, so FamiDrive would
   set them from Nix.
 - **Emulators:** Dolphin can present a wheel to the GameCube as its
   steering wheel accessory, for the few games that support it. Wii
   racing games use the Wii Remote, in or out of a Wii Wheel shell.
+
+## Flight sticks and throttles
+
+❔ None tried yet. Thrustmaster's sticks and throttles (the T.16000M,
+TWCS, T.Flight HOTAS and others) are plain USB joysticks, with no driver
+needed. They're for PC flight and space games on Steam, which read them
+directly, and through Proton they reach games through Wine.
+
+To check with one:
+
+- **Several devices at once:** a stick and a throttle (or two sticks)
+  are separate devices. Check that the game sees each, and keeps its
+  bindings when they're plugged in a different order.
+- **ES-DE and FamiDrive's tools** should leave them alone. A stick
+  isn't a gamepad (it has a trigger, not A and B), so it shouldn't move
+  ES-DE's menus or count as a player.
+- **Force feedback** on the sticks that have it (none of the above do)
+  would need checking, like a [wheel's](#racing-wheels).
 
 ## Steam's prompts
 
