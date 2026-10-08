@@ -16,6 +16,26 @@ let
   # Players with MangoHud's performance overlay on (overlays.nix).
   perfUsers = lib.attrNames (lib.filterAttrs (_: o: o.performance.enable) cfg.overlays.resolved);
 
+  # The menu's music says what's playing (esde.nowPlaying): a toast with
+  # the song's title and artist as each one starts, from its tags, or its
+  # file name when it has none. An mpv script, so it's mpv's own playlist
+  # that decides when a song changes.
+  nowPlaying = pkgs.writeText "famidrive-now-playing.lua" ''
+    local function tag(key)
+      local v = mp.get_property("metadata/by-key/" .. key)
+      if v and v ~= "" then return v end
+    end
+    mp.register_event("file-loaded", function()
+      local title = tag("title") or mp.get_property("filename/no-ext")
+      if not title or title == "" then return end
+      local args = { "${pkgs.famidrive-toast}/bin/famidrive-toast", "--kind", "notice",
+                     "--icon", "music", "--id", "now-playing", title }
+      local artist = tag("artist") or tag("album_artist")
+      if artist then table.insert(args, artist) end
+      mp.command_native_async({ name = "subprocess", args = args, playback_only = false }, function() end)
+    end)
+  '';
+
   famidriveSession = pkgs.writeShellScript "famidrive-session" ''
     ${lib.optionalString (perfUsers != [ ]) ''
       # MangoHud (gamescope --mangoapp, for players with the performance
@@ -88,7 +108,7 @@ let
         -o -iname '*.flac' -o -iname '*.m4a' -o -iname '*.wav' \) -print -quit 2>/dev/null)" ]; then
       ${pkgs.mpv}/bin/mpv --no-video --no-terminal --really-quiet --shuffle --loop-playlist=inf \
         --volume=${toString cfg.esde.musicVolume} \
-        --input-ipc-server="''${XDG_RUNTIME_DIR:-/tmp}/famidrive-music.sock" "$music" &
+        ${lib.optionalString cfg.esde.nowPlaying "--script=${nowPlaying} "}--input-ipc-server="''${XDG_RUNTIME_DIR:-/tmp}/famidrive-music.sock" "$music" &
     fi
     # Nothing is running yet: clear what a crashed launch may have left.
     rm -f "''${XDG_RUNTIME_DIR:-/nonexistent}"/famidrive-game.*

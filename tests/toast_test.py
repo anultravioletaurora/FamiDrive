@@ -124,6 +124,8 @@ class Queue(unittest.TestCase):
         self.assertEqual(t.icon_name({"kind": "progress"}), "download")
         self.assertEqual(t.icon_name({"kind": "notice", "icon": "save"}), "save")
         self.assertIn("check", t.ICONS)
+        self.assertEqual(t.icon_name({"kind": "notice", "icon": "music"}), "music")
+        self.assertIn("music", t.ICONS)
 
     def test_alerts_and_achievements_go_ahead_of_waiting_notices(self):
         q = t.Queue(slots=1)

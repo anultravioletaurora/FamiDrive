@@ -145,6 +145,16 @@ in
     '';
   };
 
+  options.famidrive.esde.nowPlaying = lib.mkOption {
+    type = lib.types.bool;
+    default = true;
+    description = ''
+      Whether the menu's music shows a toast as each song starts: its
+      title and artist (from the file's tags; the file name when it has
+      none).
+    '';
+  };
+
   options.famidrive.esde.skipFolders = lib.mkOption {
     type = lib.types.listOf lib.types.str;
     # RomM's names for a game's extra folders, plus common variants.
