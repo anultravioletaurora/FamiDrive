@@ -37,6 +37,7 @@ yet is listed below as ❔ until someone does.
 | [Xbox One controller, wired](#xbox-one-controller-wired) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Original Xbox controller (Duke)](#original-xbox-controller-duke) | Xbox-to-USB cable | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [DualShock 4](#dualshock-4) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Razer Raiju](#razer-raiju) | USB | ✅ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [PS3 Sixaxis / DualShock 3](#ps3-sixaxis--dualshock-3) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [PS2 controllers on a USB adapter](#ps2-controllers-on-a-usb-adapter) | USB adapter | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [DualSense](#dualsense) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
@@ -77,6 +78,7 @@ Clone Hero results for the guitars are in their own entries below.
 - [Xbox One controller, wired](#xbox-one-controller-wired)
 - [Original Xbox controller (Duke)](#original-xbox-controller-duke)
 - [DualShock 4](#dualshock-4)
+- [Razer Raiju](#razer-raiju)
 - [PS3 Sixaxis / DualShock 3](#ps3-sixaxis--dualshock-3)
 - [PS2 controllers on a USB adapter](#ps2-controllers-on-a-usb-adapter)
 - [DualSense](#dualsense)
@@ -247,6 +249,16 @@ SDL knows the pad. Things to note:
 - the light bar
 - whether FamiDrive's controller tools need to skip its motion-sensor
   device
+
+## Razer Raiju
+
+Razer's PS4-style pad, over a USB cable.
+
+- **2026-10-08, ES-DE:** ✅ On the second box, FamiDrive's toast
+  announced it when it was plugged in, and it drove ES-DE's menus.
+- **Still to record:** which Raiju it is (the original, Tournament,
+  Ultimate or Mobile), its USB ID and the name SDL gives it, and how it
+  does in games.
 
 ## PS3 Sixaxis / DualShock 3
 
