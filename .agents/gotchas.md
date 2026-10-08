@@ -230,7 +230,19 @@ Found against RomM 5.3:
   (`SDL/<n>/<name>`).
 - **A bad USB hub looks like a bad controller.** The kernel logs
   "Cannot enable" for the port. Try another hub before debugging the
-  device.
+  device. A dying pad looks the same: an Afterglow wired pad dropped off
+  USB every few seconds (`error -71`) and never sent a press.
+- **Button names on `hid-generic` pads mean nothing.** With no driver of
+  its own, the kernel names a pad's buttons in order from BTN_SOUTH. On
+  a Razer Raiju Tournament Edition, "BTN_SELECT" and "BTN_START" were
+  the stick clicks. ES-DE and the emulators were fine (SDL knows the pad
+  by its USB ID); famidrive-quit, reading evdev, wasn't, until it looked
+  pads up in SDL's controller database (#130).
+- **Toasts once stayed on screen, faded,** on the second box after a
+  pad was unplugged and plugged back in mid-game, until a reboot. They
+  were on a capture card's picture but not in gamescope's screenshot.
+  Not reproduced since. If it happens again, read the toast window's
+  pixels (box-testing.md) before anyone restarts.
 
 See [CONTROLLERS.md](../docs/CONTROLLERS.md) for per-controller results.
 

@@ -17,7 +17,7 @@ behave differently in each. For a console game it's the emulator.
 
 ## Contents
 
-- [Test box](#test-box)
+- [Test boxes](#test-boxes)
 - [Graphics cards](#graphics-cards)
 - **Games**
   - [Animal Crossing](#animal-crossing) (GameCube)
@@ -46,6 +46,7 @@ behave differently in each. For a console game it's the emulator.
   - [Mario Kart: Double Dash!!](#mario-kart-double-dash) (GameCube)
   - [Mario Kart 8 Deluxe](#mario-kart-8-deluxe) (Switch)
   - [Mario Party 3](#mario-party-3) (N64)
+  - [Mario Party 4 Deluxe](#mario-party-4-deluxe) (GameCube)
   - [Minecraft (vanilla 26.2, a private server)](#minecraft-vanilla-262-a-private-server) (PC)
   - [Need for Speed Heat](#need-for-speed-heat) (PC)
   - [Overwatch](#overwatch) (PC)
@@ -68,9 +69,12 @@ behave differently in each. For a console game it's the emulator.
   - [Wii Sports](#wii-sports) (Wii)
 - [Known problems across games](#known-problems-across-games)
 
-## Test box
+## Test boxes
 
-Every result below comes from this box, unless a game says otherwise.
+Every result below comes from the first box, unless a game says
+otherwise.
+
+**The first box:**
 
 | | |
 |---|---|
@@ -79,6 +83,18 @@ Every result below comes from this box, unless a game says otherwise.
 | Display | 4K TV, 120 Hz, HDR on (`display.hdr = true`, `display.refresh = 120`) |
 | Controllers | 8BitDo Ultimate 2 (2.4 GHz dongle), Xbox Wireless Controller (Bluetooth), first-party Wii Remotes ([CONTROLLERS.md](CONTROLLERS.md)) |
 | FamiDrive | `f2b8769` and later, October 2026 |
+
+**The second box:** a small office PC, installed fresh from the README.
+
+| | |
+|---|---|
+| Model | Dell OptiPlex 3070 Micro |
+| CPU | Intel Core i5-9500T (6 cores) |
+| GPU | Intel UHD Graphics 630 (integrated) |
+| Memory | 16 GB |
+| Display | TV over HDMI, 1080p |
+| Controllers | Razer Raiju Tournament Edition (USB), a generic wired Xbox 360 pad ([CONTROLLERS.md](CONTROLLERS.md)). No Bluetooth. |
+| FamiDrive | main as of 2026-10-08 |
 
 ## Graphics cards
 
@@ -90,7 +106,8 @@ in the journal when an Nvidia card has no driver.
 
 | Vendor | Driver | Status |
 |---|---|---|
-| AMD | Mesa (RADV), `amdgpu` | ✅ **Tested.** Radeon RX 7900 XTX on the [test box](#test-box): 4K120, HDR, VRR, Steam, every emulator so far. |
+| AMD | Mesa (RADV), `amdgpu` | ✅ **Tested.** Radeon RX 7900 XTX on the [first box](#test-boxes): 4K120, HDR, VRR, Steam, every emulator so far. |
+| Intel integrated | Mesa (ANV, iris), `i915` | ✅ **Tested** for GameCube. UHD Graphics 630 on the [second box](#test-boxes), at 1080p: ES-DE, and GameCube games played start to finish. Newer consoles and PC games untried; expect it to be too slow for Switch and most Steam games. |
 | Intel Arc | Mesa (ANV), `i915` or `xe`, plus Intel's video decoder | ❔ **Untested, should just work.** The same Mesa path as AMD. Some DirectX 12 games run slower on Arc under Proton than on AMD. |
 | Nvidia | Nvidia's driver (open kernel module), modesetting, the long-term kernel | ❔ **Untested. Help wanted:** #77 lists what to try. Gamescope, HDR and VRR on Nvidia are the least certain parts. |
 
@@ -383,6 +400,9 @@ content loads.
 
 **GameCube, Dolphin: ✅ Works.** The 8BitDo's rumble works.
 
+- **2026-10-08, the second box (Intel UHD 630):** ✅ A whole Grand Prix
+  with a generic wired Xbox 360 pad, then Select + Start back to ES-DE.
+
 ### Mario Kart 8 Deluxe
 
 **Switch, Eden 0.2.1: 🟡 Graphics glitches.** 2026-10-06, with update
@@ -405,6 +425,17 @@ right away.
   FamiDrive now maps N64 buttons by label (`controllers.faceButtons`), the
   same as GameCube and Switch, and makes both triggers Z. Not yet tried
   that way.
+
+### Mario Party 4 Deluxe
+
+**GameCube, Dolphin: ✅ Works.** A fan-made update of Mario Party 4.
+Its ID is `GMPDX2`, but its saves are in Dolphin's `GC/USA`, since that's
+what its disc header says.
+
+- **2026-10-08, the second box (Intel UHD 630):** ✅ A save brought over
+  from Batocera loaded, with a party in progress on Koopa's Seaside
+  Soiree, played with a Razer Raiju. The Raiju stopped responding partway
+  through ([CONTROLLERS.md](CONTROLLERS.md#razer-raiju)).
 
 ### Minecraft (vanilla 26.2, a private server)
 

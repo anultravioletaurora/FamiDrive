@@ -21,8 +21,9 @@ and Steam Input sits in front of every controller whether a game wants it
 or not. FamiDrive keeps the good part, a box that boots into a console UI
 and never needs a desktop, and makes Steam just one entry on the menu.
 
-> **Status: early.** FamiDrive runs on its first box: it boots into ES-DE
-> at 4K120 with HDR, and GameCube and Switch games launch, take focus and
+> **Status: early.** FamiDrive runs on two boxes: a gaming PC that boots
+> into ES-DE at 4K120 with HDR, and a small Intel office PC installed
+> fresh from this README. GameCube and Switch games launch, take focus and
 > quit back to the menu from the controller. Steam games launch, with rough
 > edges. RomM sync works for GameCube, Wii, Switch and Clone Hero; most of
 > the other emulators haven't been tried yet. See
@@ -190,6 +191,12 @@ planning doc for now and will move into this repo.
   Select + Start.
 - "Who's playing?" with two players and a guest, each with their own
   saves, Steam and RomM account, and powering off from the controller.
+- On the second box, a Dell OptiPlex 3070 Micro with Intel UHD 630
+  graphics: a fresh install following [Installing from scratch](#installing-from-scratch) as
+  written, one player booting straight into ES-DE at 1080p, the RomM
+  library pull, and GameCube games played start to finish. Its
+  player's GameCube saves came over from Batocera into RomM
+  ([Bringing saves from another setup](#bringing-saves-from-another-setup)).
 - The RomM agent against RomM 5.3 on the first box: the library pull
   (single files, folders and nested files), firmware, and save sync both
   ways for GameCube, Wii, Switch and Clone Hero, with conflict copies
@@ -266,8 +273,9 @@ planning doc for now and will move into this repo.
 - The "home" button (back to the menu, or straight into Jellyfin, from
   inside a game) has no design yet.
 
-**Graphics cards:** AMD is tested (the first box's Radeon RX 7900 XTX).
-Intel Arc should just work, the same as AMD. Nvidia is supported
+**Graphics cards:** AMD is tested (the first box's Radeon RX 7900 XTX),
+and so is Intel's integrated graphics (the second box's UHD 630, at
+1080p). Intel Arc should just work, the same as AMD. Nvidia is supported
 (`famidrive.gpu = "nvidia"`) but untested, and testers are wanted (#77).
 [COMPATIBILITY.md](docs/COMPATIBILITY.md#graphics-cards) has the details.
 
@@ -558,6 +566,30 @@ RomM along the way.
 10. **Commit to it:** `sudo nixos-rebuild boot --flake /etc/nixos#tv` and reboot.
     Don't garbage-collect for a while: the old system's generation in the
     boot menu is the safety net.
+
+## Bringing saves from another setup
+
+Saves from another console OS or an old PC (Batocera, RetroArch on
+Windows, a Steam Deck) come in the same way as in step 8 above: copy them
+into the emulator's save folder in the player's home, as that player.
+Within 15 minutes the player's save sync uploads each one that belongs
+to a game in the box's library, under their RomM user, and every other
+box they play on downloads it before the game starts. A save for a game
+the box's library doesn't have is left alone.
+
+Check the folder is empty first, or move what's in it aside.
+
+| System | Where the saves go | Tried |
+|---|---|---|
+| GameCube | `~/.local/share/dolphin-emu/GC/USA/Card A/` (or `EUR`, `JAP`), as `.gci` files. Batocera keeps them the same way. | ✅ From Batocera, on the second box (Mario Party 4, Animal Crossing, Paper Mario, ...). |
+| Wii | `~/.local/share/dolphin-emu/Wii/title/00010000/<game>/data` | ❔ |
+| RetroArch systems (NES to N64, Sega, Atari, PlayStation and the rest) | `~/.config/retroarch/saves/`, as `.srm` files named after the game's file in the library | ❔ |
+| PS2 | `~/.config/PCSX2/memcards/Mcd001.ps2/`, a folder memory card | ❔ |
+| PS3 | `~/.config/rpcs3/dev_hdd0/home/00000001/savedata/` | ❔ |
+| Switch | Eden's save folder for the player's profile: see step 8 above | ❔ |
+
+The folders come from each system's `saveLayout` in
+[emulators.nix](modules/famidrive/emulators.nix).
 
 ## Making changes
 

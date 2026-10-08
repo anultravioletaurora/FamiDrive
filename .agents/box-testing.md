@@ -59,7 +59,62 @@ still restarts the TV. Warn the maintainer before they rebuild.
   `famidrive-clonehero-songs`.
 - Each player's RomM agent state is in `~/.local/state/romm-agent/`:
   `saves.json`, `save-snapshot.json`, `device.json`.
-- Run one sync by hand as the player: `romm-agent reconcile`.
+- Run one sync by hand as the player: `romm-agent reconcile`. Or wait:
+  each player has a `romm-save-reconcile-<user>` timer, every 15 minutes,
+  and its log is that unit's journal.
+- **There's no `python3` on a box's PATH.** Borrow a FamiDrive tool's
+  Python environment, which has its libraries: famidrive-quit's has
+  `evdev`, famidrive-toast's has `pygame` and `Xlib`. Find the path in
+  `ps -eo args` (the first word of the tool's command line). The
+  binary that `/proc/<pid>/exe` points at is a bare Python without them.
+- **Don't trust SSH to stay up for big transfers.** On one network, a
+  copy of a few MB kept dying partway, and then new connections were
+  refused for minutes (ping still worked). Keep transfers small: crop or
+  shrink on the box first, or `base64` a small file through a command.
+
+## Seeing what's on the TV
+
+- **A screenshot:** set `GAMESCOPECTRL_REQUEST_SCREENSHOT` on the root
+  window of the session's X display (`DISPLAY=:0`) with `xprop`
+  (`nix build nixpkgs#xorg.xprop`). gamescope writes `/tmp/gamescope.png`.
+  It didn't show toasts that a capture card on the HDMI output did, so
+  it can't prove an overlay isn't there.
+- **The toast window's own pixels:** with famidrive-toast's Python, find
+  the window named `famidrive-toast` under the root and `get_image` the
+  corner the toasts use. All-zero alpha means nothing is drawn there.
+- **Ask before putting anything on the screen** (a test toast, a game):
+  someone may be playing.
+
+## Reading a controller
+
+- `/proc/bus/input/devices` gives the name, USB ID and key bitmap, and
+  `/sys/class/input/event<N>/device/device/driver` the kernel driver.
+- To see which codes the buttons send, read the device with `evdev`
+  (famidrive-quit's Python) while the maintainer presses them. Read only:
+  never grab a pad someone's using.
+- ES-DE's log (`~/ES-DE/logs/es_log.txt`) lists each pad as SDL sees it,
+  with its GUID, as it connects.
+- The kernel log (`journalctl -k`) shows USB drops. A pad that drops
+  off and comes back every few seconds, or logs `error -71`, is a bad
+  pad, cable or port, not a FamiDrive bug. Try another port first.
+- `bluetoothctl list` before pairing anything: small office PCs often
+  have no Bluetooth at all.
+
+## Importing saves from another console OS
+
+Put the save files where the emulator keeps them, in the player's home,
+as that player. The next reconcile finds and uploads each one that
+belongs to a game in the box's library. That means a game listed in
+`/var/lib/famidrive/index.json`, the library's index; a game that isn't
+in it is skipped. Check the player's `saves.json` afterwards.
+
+- **GameCube:** Dolphin's GCI folder,
+  `~/.local/share/dolphin-emu/GC/<region>/Card A/`, where region is
+  `USA`, `EUR` or `JAP` from the disc's header. Batocera keeps GameCube
+  saves as `.gci` files too; they copy straight in. Done for one player
+  on the second box 2026-10-08 (9 games).
+- Check the folder is empty first, or move what's there aside: never
+  overwrite a player's saves.
 
 ## Secrets
 
