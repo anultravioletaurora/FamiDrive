@@ -545,6 +545,24 @@ in
     # own UI and survives rebuilds.
     famidrive.playerHome = { lib, ... }: {
       home.activation.famidriveEmulators = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        ${lib.optionalString (cfg.systems ? wiiu) (seedLib.seed {
+          # Cemu shows its getting-started wizard whenever settings.xml is
+          # missing (CemuApp.cpp, isFirstStart), and nobody can click
+          # through it on the TV. Found on the first box 2026-10-07. A
+          # minimal one before its first start skips it; Cemu then makes
+          # its MLC folders itself (InitializeExistingMLCOrFail) and
+          # fills in the rest of the file.
+          target = "$HOME/.config/Cemu/settings.xml";
+          source = pkgs.writeText "cemu-settings.xml" ''
+            <?xml version="1.0" encoding="UTF-8"?>
+            <content>
+                <check_update>false</check_update>
+                <GamePaths>
+                    <Entry>${cfg.dataDir}/roms/wiiu</Entry>
+                </GamePaths>
+            </content>
+          '';
+        })}
         ${seedLib.lockKeys {
           format = "ini";
           target = "$HOME/.config/dolphin-emu/Dolphin.ini";
