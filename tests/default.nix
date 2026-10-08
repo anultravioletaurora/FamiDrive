@@ -103,6 +103,7 @@ let
       };
       yarg.enable = true;
       osu.enable = true;
+      superTuxKart.enable = true;
       cloneHero = {
         enable = true;
         songs."AFI - Miss Murder" = "05185565cb931978c11de73d3048206e";
@@ -316,6 +317,9 @@ in
       (check "a host's own cleanup choice wins" (c.nix.gc.options == "--delete-older-than 30d"))
       (check "YARG can open rhythm-game hardware's hidraw devices (Raphnet among them)"
       (lib.any (p: lib.hasInfix "famidrive-instruments" (toString p)) c.services.udev.packages))
+    (check "SuperTuxKart is in Ports"
+        (lib.hasInfix "supertuxkart)" c.famidrive.systems.ports.command
+          && lib.hasInfix "SuperTuxKart.port" c.home-manager.users.alice.home.activation.famidriveSuperTuxKart.data))
     (check "osu! is in Ports, and the player at the TV can use a pen tablet"
         (lib.hasInfix "osu)" c.famidrive.systems.ports.command
           && lib.any (p: lib.getName p == lib.getName pkgs.opentabletdriver) c.services.udev.packages

@@ -27,6 +27,7 @@ is on; every other option is optional.
 - [Clone Hero](#clone-hero)
 - [YARG](#yarg)
 - [osu!](#osu)
+- [SuperTuxKart](#supertuxkart)
 - [Minecraft](#minecraft)
 - [Valheim](#valheim)
 - [PC saves](#pc-saves)
@@ -1040,6 +1041,18 @@ osu! (lazer), in the Ports system.
 Whether to enable osu! (lazer), in ES-DE's Ports system, played with a mouse, a pen
 tablet or a touchscreen, and a keyboard. Pen tablets work through
 osu!'s built-in OpenTabletDriver.
+
+- **Type:** boolean
+- **Default:** `false`
+- **Example:** `true`
+
+## SuperTuxKart
+
+SuperTuxKart, in the Ports system.
+
+### `famidrive.superTuxKart.enable`
+
+Whether to enable SuperTuxKart, in ES-DE's Ports system.
 
 - **Type:** boolean
 - **Default:** `false`
