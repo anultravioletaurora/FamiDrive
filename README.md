@@ -29,6 +29,9 @@ and never needs a desktop, and makes Steam just one entry on the menu.
 > [Status](#status) for what's real and what's a placeholder, and
 > [COMPATIBILITY.md](COMPATIBILITY.md) for game-by-game results.
 
+FamiDrive is for games you legally own, and for backups you made yourself
+of games you own. See [Your games](#your-games).
+
 
 ## What's in the box
 
@@ -558,6 +561,16 @@ are in [AGENTS.md](AGENTS.md).
   (Dolphin, Eden, RetroArch and its cores, PCSX2, RPCS3, Xenia, Azahar,
   PPSSPP, Cemu, melonDS), Prism Launcher, Kodi, Jellyfin and Jellyfin MPV Shim, mpv,
   home-manager and sops-nix.
+
+## Your games
+
+FamiDrive is for games you legally own, and for legal backups you've made
+yourself of games you own. That's how it's used on the boxes it was built
+for, and it's the expectation for everyone else who uses it.
+
+FamiDrive ships no games, BIOS files, firmware or keys. Everything it
+plays comes from your own RomM server, your own disks, or your own store
+accounts (Steam, GOG, Epic, Amazon).
 
 ## License
 
