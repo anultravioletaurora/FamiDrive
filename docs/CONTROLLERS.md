@@ -60,6 +60,7 @@ yet is listed below as ❔ until someone does.
 | [Wii MotionPlus](#wii-motionplus) | Through a Wii Remote | — | — | — | ❔ | — | — | — | — |
 | [Wii Balance Board](#wii-balance-board) | Bluetooth, through Dolphin | — | — | — | ❔ | — | — | — | — |
 | [GameCube controller on the official adapter](#gamecube-controllers-on-the-official-adapter) | USB adapter | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [DK Bongos](#dk-bongos) | Official GameCube adapter | — | — | ❌ not yet (#131) | — | — | — | — | ❌ no Select |
 | [Wii guitar on a Raphnet adapter](#wii-guitar-on-a-raphnet-adapter) | USB adapter | ✅ | — | — | — | — | — | — | ❔ |
 | [Xbox 360 guitar](#xbox-360-guitar) | ❔ | ❔ | — | — | — | — | — | — | ❔ |
 
@@ -101,6 +102,7 @@ Clone Hero results for the guitars are in their own entries below.
 - [Wii MotionPlus](#wii-motionplus)
 - [Wii Balance Board](#wii-balance-board)
 - [GameCube controllers on the official adapter](#gamecube-controllers-on-the-official-adapter)
+- [DK Bongos](#dk-bongos)
 - [Wii guitar on a Raphnet adapter](#wii-guitar-on-a-raphnet-adapter)
 - [Xbox 360 guitar](#xbox-360-guitar)
 - [Racing wheels](#racing-wheels)
@@ -494,6 +496,34 @@ To test:
   bundled SDL, which doesn't pick up the official adapter, so Smash
   Ultimate in Ryujinx can't use GameCube controllers yet. Dolphin and the
   system's SDL see it fine.
+
+## DK Bongos
+
+❌ Not set up yet: FamiDrive can't tell Dolphin about them
+([#131](https://github.com/anultravioletaurora/FamiDrive/issues/131)).
+No one has tried a set on a FamiDrive box.
+
+The GameCube's bongo controller, for Donkey Konga 1, 2 and 3 and
+Donkey Kong Jungle Beat. How it's meant to work:
+
+- **Connection:** the bongos plug into a GameCube port, so they need
+  the [official adapter](#gamecube-controllers-on-the-official-adapter)
+  (or one that copies it) in Wii U mode, and a port set to `"adapter"`.
+- **Dolphin** has to be told the port has bongos, not a controller: the
+  "DK Bongos" checkbox in its adapter settings (`SimulateKonga<port>`
+  under `[Core]` in Dolphin.ini). FamiDrive resets Dolphin's port
+  settings on every switch, so turning it on in Dolphin doesn't last.
+  #131 adds a `"bongos"` port value that sets it.
+- **Without real bongos:** Dolphin can also emulate them from an
+  ordinary pad (its "DK Bongos" device). FamiDrive doesn't offer that
+  yet either.
+- **Quitting:** the bongos have Start but no Select, so Select + Start
+  can't quit from them. Keep a pad connected to quit.
+- **Donkey Kong Jungle Beat on Wii** (New Play Control!) uses the Wii
+  Remote and Nunchuk instead, not the bongos.
+
+To check, once someone has a set: both games see them, the clap sensor
+works through the adapter, and which port each player's bongos land on.
 
 ## Wii guitar on a Raphnet adapter
 
