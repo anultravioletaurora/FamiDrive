@@ -250,7 +250,20 @@ in
 
     # USB access to the GameCube adapter and to Bluetooth adapters for
     # passthrough (Dolphin's udev rules).
-    services.udev.packages = lib.mkIf (lib.elem "adapter" ports || wii.bluetoothPassthrough) [ pkgs.dolphin-emu ];
+    services.udev.packages =
+      lib.optional (lib.elem "adapter" ports || wii.bluetoothPassthrough) pkgs.dolphin-emu
+      # Wii Remotes paired with the box over Bluetooth: the player at the
+      # TV may open their hidraw devices, which Dolphin's real-remote mode
+      # reads. Dolphin's own rules only cover remotes on USB (the
+      # DolphinBar): a Bluetooth remote has no USB attributes. Found on the
+      # first box 2026-10-08: hidraw was root-only, and Dolphin never took
+      # the remote. 0306 is the Wii Remote, 0330 the Wii Remote Plus. In a
+      # file of its own, numbered before systemd's 73-seat-late (as YARG's
+      # instruments).
+      ++ lib.optional anyReal (pkgs.writeTextDir "lib/udev/rules.d/70-famidrive-wii-remotes.rules" ''
+        SUBSYSTEM=="hidraw", KERNELS=="0005:057E:0306.*", TAG+="uaccess"
+        SUBSYSTEM=="hidraw", KERNELS=="0005:057E:0330.*", TAG+="uaccess"
+      '');
 
     # The Xbox Wireless Adapter: nixpkgs' module brings the driver, the
     # dongle's firmware (unfree, allowed in default.nix) and xpad-noone.

@@ -306,9 +306,16 @@ in
           # .nand: a title installed in Dolphin's Wii NAND, by its title ID
           # (the file's content), such as the Mii Channel (miis.nix).
           extensions = [ ".iso" ".rvz" ".wbfs" ".nand" ];
+          # NANDBOOTINFO is how one title hands off to another and back
+          # (a game opening the Mii Channel). A leftover one tells the title
+          # it was launched for a hand-off, and it returns at once. Found on
+          # the first box 2026-10-08: one from 2024 sent the Mii Channel to
+          # the Wii Menu 50 ms after every start.
           command = ''
             case "$ROM" in
-              *.nand) ${pkgs.dolphin-emu}/bin/dolphin-emu --batch --nand_title="$(cat "$ROM")" ;;
+              *.nand)
+                rm -f "$HOME/.local/share/dolphin-emu/Wii/shared2/sys/NANDBOOTINFO"
+                ${pkgs.dolphin-emu}/bin/dolphin-emu --batch --nand_title="$(cat "$ROM")" ;;
               *) ${pkgs.dolphin-emu}/bin/dolphin-emu --batch --exec="$ROM" ;;
             esac
           '';

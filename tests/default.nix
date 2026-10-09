@@ -111,6 +111,7 @@ let
       tuxPaint.enable = true;
       spaceCadetPinball.enable = true;
       miis.wii.enable = true;
+      controllers.wii.remotes = [ "real" "emulated" ];
       cloneHero = {
         enable = true;
         songs."AFI - Miss Murder" = "05185565cb931978c11de73d3048206e";
@@ -328,6 +329,10 @@ in
       (check "a host's own cleanup choice wins" (c.nix.gc.options == "--delete-older-than 30d"))
       (check "YARG can open rhythm-game hardware's hidraw devices (Raphnet among them)"
       (lib.any (p: lib.hasInfix "famidrive-instruments" (toString p)) c.services.udev.packages))
+    (check "real Wii Remotes paired over Bluetooth can be opened by the player at the TV"
+        (lib.any (p: lib.hasInfix "famidrive-wii-remotes" (toString p)) c.services.udev.packages))
+    (check "a NAND title clears a leftover hand-off record before it starts"
+        (lib.hasInfix "shared2/sys/NANDBOOTINFO" c.famidrive.systems.wii.command))
     (check "Wii Miis: the Mii Channel in the Wii list, Miis synced before and after every Wii game"
         (c.systemd.services ? famidrive-mii-channel
           && lib.hasInfix "--nand_title" c.famidrive.systems.wii.command
