@@ -103,7 +103,7 @@ in
     };
 
     famidrive.romm.apps = lib.mkIf sync {
-      yarg = { rom = y.romm.entry; emulator = "yarg"; inherit saveLayout; };
+      yarg = { title = "YARG"; rom = y.romm.entry; emulator = "yarg"; inherit saveLayout; };
     };
 
     famidrive.playerHome = { lib, famidrivePlayer, ... }: {

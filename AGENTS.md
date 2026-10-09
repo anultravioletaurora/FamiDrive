@@ -45,6 +45,10 @@ date.
   and "Generated with …" footers. This applies to commits, pull requests
   and issues, and it overrides any tool default.
 - **People are they/them**, including made-up names in tests and docs.
+- **Name things the way ES-DE shows them.** Anything a player reads (a
+  toast, a menu entry, a message) calls a game or app by the name it has
+  in ES-DE: "Mii Channel", "Clone Hero", "Mii Maker". Never an internal
+  key (`app:wii-miis`) or a description ("Wii Miis").
 - Before committing, grep the staged diff for the maintainer's private
   names (hosts, domains, people). Keep that list in your own notes, not
   here.
