@@ -524,6 +524,9 @@ FamiDrive yet.
   paired that way, pointer and all. Without the box's permission rule,
   Dolphin couldn't open the remote and never took it. Dolphin's own
   rules only cover remotes on USB.
+- **2026-10-09, after the rebuild with that rule (#146):** ✅ the Mii
+  Channel again, with nothing done by hand: press a button, start the
+  channel, and the remote works in it.
 - **Still to check:** the remote's speaker (`controllers.wii.speaker`),
   rumble, Bluetooth passthrough with a second, Wii-compatible adapter
   (`controllers.wii.bluetoothPassthrough`), and whether ES-DE's menus
