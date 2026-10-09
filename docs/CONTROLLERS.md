@@ -39,7 +39,7 @@ yet is listed below as ❔ until someone does.
 | [Xbox One controller, wired](#xbox-one-controller-wired) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Original Xbox controller (Duke)](#original-xbox-controller-duke) | Xbox-to-USB cable | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [DualShock 4](#dualshock-4) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
-| [Razer Raiju Tournament Edition](#razer-raiju) | USB / Bluetooth | ✅ | ❔ | ✅ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [Razer Raiju Tournament Edition](#razer-raiju) | USB / Bluetooth | ✅ | ❔ | ✅ | ❔ | ❔ | ❔ | ❔ | ✅ |
 | [PS3 Sixaxis / DualShock 3](#ps3-sixaxis--dualshock-3) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [PS2 controllers on a USB adapter](#ps2-controllers-on-a-usb-adapter) | USB adapter | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [DualSense](#dualsense) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
@@ -309,8 +309,9 @@ cable. It also has Bluetooth, untested.
 - **Select + Start:** ❌ at first. The kernel has no driver of its own
   for it (it's `hid-generic`), so its buttons get names in order, and
   "Select" and "Start" were the stick clicks. famidrive-quit now finds
-  Share and Options through SDL's controller database. Not yet tried
-  that way.
+  Share and Options through SDL's controller database.
+- **2026-10-09, Select + Start:** ✅ Share + Options closed the Mii
+  Channel on the second box.
 - **Still to record:** the name SDL gives it, and how it does in other
   emulators and Steam games. The other Raijus (the original, Ultimate and Mobile)
   are untested.

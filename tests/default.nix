@@ -347,7 +347,10 @@ in
         (lib.all (w: lib.hasInfix "${w})" c.famidrive.systems.ports.command)
             [ "supertuxkart" "supertux" "supertuxparty" "supertuxadvance" "extremetuxracer" "tuxpaint" ]
           && lib.all (n: lib.hasInfix "${n}.port" c.home-manager.users.alice.home.activation.famidriveTux.data)
-            [ "SuperTuxKart" "SuperTux" "SuperTux Party" "SuperTux Advance" "Extreme Tux Racer" "Tux Paint" ]))
+            [ "SuperTuxKart" "SuperTux" "SuperTux Party" "SuperTux Advance" "Extreme Tux Racer" "Tux Paint" ]
+          # SuperTux skips the guitar adapter; SuperTux Party gets mappings for the pads plugged in.
+          && lib.hasInfix "SDL_GAMECONTROLLER_IGNORE_DEVICES=0x289b/0x0080" c.famidrive.systems.ports.command
+          && lib.hasInfix "famidrive-pads sdl-mappings" c.famidrive.systems.ports.command))
     (check "osu! is in Ports, and the player at the TV can use a pen tablet"
         (lib.hasInfix "osu)" c.famidrive.systems.ports.command
           && lib.any (p: lib.getName p == lib.getName pkgs.opentabletdriver) c.services.udev.packages

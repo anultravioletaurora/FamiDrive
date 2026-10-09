@@ -20,12 +20,24 @@
 let
   cfg = config.famidrive;
 
+  # SDL leaves out an instrument adapter (raphnet's WUSBMote, for Wii
+  # guitars), which it otherwise counts as a game controller. Found on the
+  # first box 2026-10-09: SuperTux gave player 1 the first controller,
+  # which was the guitar adapter, and the 8BitDo did nothing.
+  ignoreInstruments = "SDL_GAMECONTROLLER_IGNORE_DEVICES=0x289b/0x0080";
+
   # Each game: its option, its Ports entry's name, the word in its .port
-  # file, and what runs it.
+  # file, what runs it, and anything set for it first.
   games = {
     superTuxKart = { title = "SuperTuxKart"; word = "supertuxkart"; package = pkgs.supertuxkart; };
-    superTux = { title = "SuperTux"; word = "supertux"; package = pkgs.supertux; };
-    superTuxParty = { title = "SuperTux Party"; word = "supertuxparty"; package = pkgs.supertuxparty; };
+    superTux = { title = "SuperTux"; word = "supertux"; package = pkgs.supertux; env = ignoreInstruments; };
+    # Godot 3.2's own controller list is from 2021: the pads plugged in are
+    # looked up in SDL's community database, which Godot reads from
+    # SDL_GAMECONTROLLERCONFIG (famidrive-pads sdl-mappings).
+    superTuxParty = {
+      title = "SuperTux Party"; word = "supertuxparty"; package = pkgs.supertuxparty;
+      env = ''SDL_GAMECONTROLLERCONFIG="$(${pkgs.famidrive-pads}/bin/famidrive-pads sdl-mappings ${pkgs.sdl_gamecontrollerdb}/share/gamecontrollerdb.txt)"'';
+    };
     superTuxAdvance = { title = "SuperTux Advance"; word = "supertuxadvance"; package = pkgs.supertux-advance; };
     extremeTuxRacer = { title = "Extreme Tux Racer"; word = "extremetuxracer"; package = pkgs.extremetuxracer; };
     tuxPaint = { title = "Tux Paint"; word = "tuxpaint"; package = pkgs.tuxpaint; };
@@ -45,7 +57,7 @@ in
     famidrive.ports.".port".command = ''
       case "$(cat "$ROM")" in
       ${lib.concatStrings (lib.mapAttrsToList (_: g: ''
-        ${g.word}) ${lib.getExe g.package} ;;
+        ${g.word}) ${g.env or ""} ${lib.getExe g.package} ;;
       '') on)}
       esac
     '';

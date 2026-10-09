@@ -3,6 +3,7 @@
     famidrive-pads dolphin SPEC.json
     famidrive-pads eden SPEC.json
     famidrive-pads cemu SPEC.json
+    famidrive-pads sdl-mappings GAMECONTROLLERDB.txt
 
 Run by famidrive-launch just before a GameCube, Wii or Switch game. Both
 emulators bind a controller by identity (Dolphin by SDL name, Eden by
@@ -40,6 +41,14 @@ controllers.faceButtons. Cemu reads pads through SDL's game-controller
 layer, so the mapping names SDL's buttons, not raw ones; the pad is named
 by Cemu's uuid, <n>_<SDL GUID> (CRC kept), n counting pads of that GUID.
 More players, as Wii U Pro Controllers, aren't set up yet.
+
+sdl-mappings: prints the SDL_GAMECONTROLLERCONFIG lines, from SDL's
+community database, for the pads connected now, each under the GUID the
+pad has here (SDL 2's older form, as Godot 3 makes it), for games whose
+own copy of the database is too old to know them. Only the connected
+pads: the whole database is far over the size an environment variable
+may have. Found on the first box 2026-10-09: SuperTux Party (Godot 3.2,
+2021) didn't know the 8BitDo Ultimate 2.
 
 SPEC (JSON, from Nix):
   dolphin: {"sdl": libSDL3 path, "ports": [...], "adapter": bool, "config": GCPadNew.ini}
@@ -387,7 +396,60 @@ def cmd_cemu(spec):
     return 0
 
 
+# --- SDL mappings for old games ------------------------------------------------
+
+def connected_joysticks(devices_text):
+    """(bus, vendor, product, version) of each joystick in
+    /proc/bus/input/devices, as hex strings, in order, once each."""
+    found = []
+    for block in devices_text.split("\n\n"):
+        ids = handlers = None
+        for line in block.splitlines():
+            if line.startswith("I:"):
+                ids = dict(kv.split("=", 1) for kv in line[2:].split())
+            elif line.startswith("H:"):
+                handlers = line.split("=", 1)[1].split()
+        if ids and handlers and any(h.startswith("js") for h in handlers):
+            key = tuple(ids.get(k, "0").lower().zfill(4) for k in ("Bus", "Vendor", "Product", "Version"))
+            if key not in found:
+                found.append(key)
+    return found
+
+
+def le16(h):
+    return h[2:4] + h[0:2]
+
+
+def legacy_guid(bus, vendor, product, version):
+    """SDL 2's GUID for an evdev pad before the name CRC was added: bus,
+    vendor, product and version, little-endian, each followed by zeroes."""
+    return "".join(le16(x) + "0000" for x in (bus, vendor, product, version))
+
+
+def sdl_mappings(db_text, joysticks):
+    """The database's Linux line for each joystick, under its GUID here:
+    the same version if there's one, else any with that vendor and product."""
+    lines = [line.strip() for line in db_text.splitlines()
+             if "platform:Linux" in line and len(line.split(",", 1)[0]) == 32 and not line.startswith("#")]
+    out = []
+    for bus, vendor, product, version in joysticks:
+        guid = legacy_guid(bus, vendor, product, version)
+        same = [line for line in lines if line[:20] == guid[:20]]
+        best = [line for line in same if line[:32] == guid] or same
+        if best:
+            out.append(guid + best[0][32:])
+    return out
+
+
+def cmd_sdl_mappings(db, devices="/proc/bus/input/devices"):
+    print("\n".join(sdl_mappings(Path(db).read_text(errors="replace"),
+                                 connected_joysticks(Path(devices).read_text(errors="replace")))))
+    return 0
+
+
 def main():
+    if len(sys.argv) == 3 and sys.argv[1] == "sdl-mappings":
+        sys.exit(cmd_sdl_mappings(sys.argv[2]))
     if len(sys.argv) != 3 or sys.argv[1] not in ("dolphin", "eden", "cemu"):
         sys.exit(__doc__)
     spec = json.loads(Path(sys.argv[2]).read_text() if os.path.exists(sys.argv[2]) else sys.argv[2])

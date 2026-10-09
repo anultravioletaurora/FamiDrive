@@ -99,5 +99,40 @@ class Cemu(unittest.TestCase):
         self.assertEqual(m.cemu_mapping("positions")[3], 3)   # X on the top button
 
 
+
+DEVICES = """I: Bus=0003 Vendor=289b Product=0080 Version=0101
+N: Name="raphnet technologies 1-player WUSBMote v2.2"
+H: Handlers=event5 js0
+
+I: Bus=0003 Vendor=2dc8 Product=310b Version=0114
+N: Name="8BitDo Ultimate 2 Wireless Controller"
+H: Handlers=event6 js1
+
+I: Bus=0003 Vendor=2dc8 Product=310b Version=0114
+N: Name="8BitDo 8BitDo Ultimate 2 Wireless Controller for PC Keyboard"
+H: Handlers=sysrq kbd event7
+"""
+DB = """# a comment
+03000000c82d00000b31000014010000,8BitDo Ultimate 2,a:b0,b:b1,platform:Linux,
+03000000c82d00000b31000099990000,8BitDo Ultimate 2 (other version),a:b9,platform:Linux,
+03000000c82d00000b31000000000000,8BitDo Ultimate 2,a:b1,platform:Windows,
+030000005e0400008e02000014010000,Xbox 360,a:b0,platform:Linux,
+"""
+
+
+class SdlMappings(unittest.TestCase):
+    def test_joysticks_only_once_each(self):
+        self.assertEqual(m.connected_joysticks(DEVICES),
+                         [("0003", "289b", "0080", "0101"), ("0003", "2dc8", "310b", "0114")])
+
+    def test_the_connected_pads_linux_line_under_its_guid(self):
+        out = m.sdl_mappings(DB, m.connected_joysticks(DEVICES))
+        self.assertEqual(out, ["03000000c82d00000b31000014010000,8BitDo Ultimate 2,a:b0,b:b1,platform:Linux,"])
+
+    def test_another_version_borrows_the_line(self):
+        out = m.sdl_mappings(DB, [("0003", "2dc8", "310b", "0200")])
+        self.assertEqual(out[0].split(",")[0], "03000000c82d00000b31000000020000")
+        self.assertIn("8BitDo Ultimate 2", out[0])
+
 if __name__ == "__main__":
     unittest.main()
