@@ -7,9 +7,14 @@ FamiDrive session a one-player box autologins into). Quitting ES-DE
 ends a session, and greetd brings this back.
 
 SPEC_JSON (session.nix): {"players": [{"user", "displayName",
-"isGuest"}], "session": [command...], "last": file remembering who
-played last, "theme": the ES-DE theme's folder or null, "powerOff":
-the command that turns the box off, or null}.
+"isGuest", "avatar"}], "session": [command...], "last": file remembering
+who played last, "avatars": the folder of RomM pictures, "theme": the
+ES-DE theme's folder or null, "powerOff": the command that turns the box
+off, or null}.
+
+Each player shows as their picture, cut to a circle: the one set in
+their config (avatar), or else the one their session last fetched from
+RomM (avatars/<user>.png, .jpg, .webp or .gif), or else their initial.
 
 Left and right (D-pad, stick or arrow keys) to choose, A, Start or Enter
 to play. Down to Power Off, below the players. It draws in ES-DE's look, in the theme's own fonts, like
@@ -128,6 +133,35 @@ def font(path, size):
     return pygame.font.Font(None, int(size * 1.3))
 
 
+def avatar_file(player, folder):
+    """The picture to show for a player, or None for their initial."""
+    if player.get("avatar") and Path(player["avatar"]).is_file():
+        return Path(player["avatar"])
+    if folder:
+        for ext in ("png", "jpg", "webp", "gif"):
+            p = Path(folder) / f"{player['user']}.{ext}"
+            if p.is_file():
+                return p
+    return None
+
+
+def circle_image(path, size):
+    """The image at path, its middle square scaled to size and cut to a
+    circle. None if it can't be read."""
+    try:
+        img = pygame.image.load(str(path)).convert_alpha()
+    except (pygame.error, OSError, FileNotFoundError) as e:
+        log(f"picture {path}: {e}")
+        return None
+    side = min(img.get_size())
+    crop = img.subsurface(((img.get_width() - side) // 2, (img.get_height() - side) // 2, side, side))
+    face = pygame.transform.smoothscale(crop, (size, size))
+    mask = pygame.Surface((size, size), pygame.SRCALPHA)
+    pygame.draw.circle(mask, (255, 255, 255, 255), (size // 2, size // 2), size // 2)
+    face.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+    return face
+
+
 def read(path):
     try:
         return Path(path).read_text().strip()
@@ -159,6 +193,17 @@ def main():
     name_f = font(regular, int(40 * u))
     body_f = font(light, int(28 * u))
     help_f = font(regular, int(24 * u))
+
+    pictures = {p["user"]: avatar_file(p, spec.get("avatars")) for p in players}
+    faces = {}   # (user, diameter) -> circle, made once
+
+    def face(p, diameter):
+        if not pictures[p["user"]]:
+            return None
+        key = (p["user"], diameter)
+        if key not in faces:
+            faces[key] = circle_image(pictures[p["user"]], diameter)
+        return faces[key]
 
     background = pygame.Surface((w, h), 0, 32)
     background.fill(BLACK)
@@ -229,9 +274,17 @@ def main():
             color = GUEST if p["isGuest"] else COLORS[i % len(COLORS)]
             if not on:
                 color = tuple(int(c * 0.6) for c in color)
-            pygame.draw.circle(screen, color, (cx, cy), r)
-            letter = initial_f.render(p["displayName"][:1].upper(), True, WHITE)
-            screen.blit(letter, (cx - letter.get_width() // 2, cy - letter.get_height() // 2))
+            picture = face(p, 2 * r)
+            if picture:
+                screen.blit(picture, (cx - r, cy - r))
+                if not on:   # dimmed like the others' colors
+                    shade = pygame.Surface((2 * r, 2 * r), pygame.SRCALPHA)
+                    pygame.draw.circle(shade, (0, 0, 0, 102), (r, r), r)
+                    screen.blit(shade, (cx - r, cy - r))
+            else:
+                pygame.draw.circle(screen, color, (cx, cy), r)
+                letter = initial_f.render(p["displayName"][:1].upper(), True, WHITE)
+                screen.blit(letter, (cx - letter.get_width() // 2, cy - letter.get_height() // 2))
             name = name_f.render(p["displayName"], True, WHITE if on else DIM)
             screen.blit(name, (cx - name.get_width() // 2, cy + size // 2 + int(40 * u)))
             x += size + gap

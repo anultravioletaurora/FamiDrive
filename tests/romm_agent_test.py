@@ -72,6 +72,15 @@ class Test(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+    # ------------------------------------------------------------ profile pictures
+
+    def test_avatar_address(self):
+        a = Box(self.base, "alice").agent()
+        self.assertIsNone(a["avatar_url"]({"avatar_path": ""}))
+        self.assertIsNone(a["avatar_url"]({}))
+        self.assertEqual(a["avatar_url"]({"avatar_path": "users/abc/profile/avatar.png"}),
+                         "https://romm.example.org/assets/romm/assets/users/abc/profile/avatar.png")
+
     # ------------------------------------------------------------ Eden profiles
 
     def test_eden_folder_name(self):

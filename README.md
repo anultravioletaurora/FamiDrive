@@ -416,6 +416,13 @@ famidrive = {
   Quit ES-DE, which closes Steam and ends the session so "Who's playing?"
   comes back, plus Reboot and Power Off. "Who's playing?" has Power Off
   too, below the players. Who played last starts out selected.
+- **Pictures on "Who's playing?":** each player with RomM shows the
+  picture on their RomM profile (RomM's profile page, top right), fetched
+  each time they play, so a new one shows from their next turn. RomM
+  doesn't take the picture from a single sign-on provider such as
+  Keycloak: upload it in RomM. To use a picture without RomM, set
+  `famidrive.players.<name>.avatar` to an image file. Anyone without one
+  shows their initial.
 
 ## Installing from scratch
 

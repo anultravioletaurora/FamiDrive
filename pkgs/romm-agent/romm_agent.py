@@ -12,6 +12,7 @@ Each player's own (run as that player):
     romm-agent eden-gamedir            point this player's Eden at the library's Switch folder (updates, DLC)
     romm-agent eden-save TITLE_ID      print where this player's Eden keeps that game's save
     romm-agent switch-dlc ROM          the game's DLC files and their content IDs, as JSON
+    romm-agent avatar DIR              this player's RomM profile picture -> DIR/<user>.<ext>, for "Who's playing?"
     romm-agent save-pull SYSTEM ROM    newest save for ROM -> local (pre-launch)
     romm-agent save-push SYSTEM ROM    local save for ROM -> RomM (post-exit)
     romm-agent reconcile               push every local save RomM doesn't have yet
@@ -1512,6 +1513,50 @@ def eden_profile():
     return users[i] if i < len(users) else users[0]
 
 
+# Where RomM's web page loads a user's avatar_path from (its
+# FRONTEND_RESOURCES_PATH): the uploaded files under RomM's assets.
+AVATARS = "/assets/romm/assets/"
+
+
+def avatar_url(me):
+    """The picture's address on the RomM server, or None for no picture."""
+    path = (me.get("avatar_path") or "").lstrip("/")
+    return BASE + AVATARS + path if path else None
+
+
+def cmd_avatar(folder):
+    """This player's RomM profile picture, for "Who's playing?" (it runs
+    before anyone logs in, so it reads the copies in a shared folder).
+    Fetched at each session start; a picture removed in RomM goes here too.
+    RomM accounts made through an OIDC sign-in (Keycloak) have no picture
+    until one is uploaded on RomM's profile page: RomM doesn't copy the
+    sign-in's picture (both boxes' players, 2026-10-09)."""
+    folder = Path(folder)
+    user = getpass.getuser()
+    s = session()
+    url = avatar_url(get(s, "/users/me").json())
+    mine = [p for p in folder.glob(f"{user}.*") if p.is_file()]
+    if not url:
+        for p in mine:
+            p.unlink()
+        return
+    r = s.get(url, timeout=60)
+    r.raise_for_status()
+    kind = r.headers.get("content-type", "").split(";")[0].strip()
+    ext = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif"}.get(kind)
+    if not ext:
+        print(f"avatar: {kind or 'no content type'}, not an image I can show; left alone", file=sys.stderr)
+        return
+    dest = folder / f"{user}.{ext}"
+    tmp = folder / f".{user}.{ext}.part"
+    tmp.write_bytes(r.content)
+    tmp.chmod(0o644)
+    tmp.replace(dest)
+    for p in mine:
+        if p != dest:
+            p.unlink()
+
+
 def cmd_eden_gamedir():
     """This player's Eden reads the library's Switch folder, deep-scanned,
     for the updates and DLC beside each game (ext_content_from_game_dirs).
@@ -1955,7 +2000,7 @@ def main():
         "gamelists": cmd_gamelists, "firmware-install": cmd_firmware_install,
         "eden-profile": cmd_eden_profile, "textures": cmd_textures,
         "eden-gamedir": cmd_eden_gamedir, "eden-save": cmd_eden_save,
-        "switch-dlc": cmd_switch_dlc,
+        "switch-dlc": cmd_switch_dlc, "avatar": cmd_avatar,
     }
     if cmd not in commands:
         print(__doc__)

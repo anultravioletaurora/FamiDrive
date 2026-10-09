@@ -81,6 +81,7 @@ class Test(unittest.TestCase):
         set_mode = pygame.display.set_mode
 
         def step():
+            self.frame = pygame.display.get_surface().copy()
             frames[0] += 1
             if frames[0] <= len(keys):
                 pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=keys[frames[0] - 1]))
@@ -140,6 +141,32 @@ class Test(unittest.TestCase):
         self.assertIsNone(code)   # still on screen, showing why
         self.assertEqual([r["type"] for r in reqs], ["create_session", "cancel_session"])
         self.assertFalse(self.last.exists())
+
+    def test_pictures_cut_to_circles(self):
+        # Alice's from her config, Bob's fetched from RomM, the guest's
+        # unreadable (an initial instead). 1280x720: circles 146 across,
+        # 206 apart, centered at y 345; Alice's selected, so full color.
+        def picture(path, color):
+            img = pygame.Surface((40, 30))
+            img.fill(color)
+            pygame.image.save(img, str(path))
+        pygame.init()
+        picture(self.dir / "alice.png", (10, 200, 30))
+        avatars = self.dir / "avatars"
+        avatars.mkdir()
+        picture(avatars / "bob.png", (200, 10, 10))
+        (avatars / "guest.png").write_text("not a picture")
+        pygame.quit()
+        spec = json.loads(self.spec.read_text())
+        spec["players"][0]["avatar"] = str(self.dir / "alice.png")
+        spec["avatars"] = str(avatars)
+        self.spec.write_text(json.dumps(spec))
+        self.play([])
+        at = lambda x: tuple(self.frame.get_at((x, 345 - 50)))[:3]
+        self.assertEqual(at(434), (10, 200, 30))
+        r, g, b = at(640)
+        self.assertTrue(110 <= r <= 130 and g < 15, (r, g, b))   # dimmed red
+        self.assertEqual(at(846), (66, 66, 66))   # the guest's grey, dimmed
 
 
 if __name__ == "__main__":

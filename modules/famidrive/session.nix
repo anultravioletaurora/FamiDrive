@@ -76,6 +76,10 @@ let
       # TV for it. Found on the first box 2026-10-06.
       if [ -e "/etc/famidrive/romm/$(id -un).json" ]; then
         romm-agent gamelists || echo "famidrive-session: couldn't copy game lists" >&2
+        ${lib.optionalString picker ''
+          # Their RomM picture for "Who's playing?", next time it shows.
+          romm-agent avatar ${avatarDir} || echo "famidrive-session: couldn't fetch the RomM picture" >&2
+        ''}
         ${lib.optionalString (cfg.systems ? switch) ''
           # Before Eden ever starts: this player's profile, the same ID on each of their boxes.
           romm-agent eden-profile || echo "famidrive-session: couldn't set up the Eden profile" >&2
@@ -170,13 +174,16 @@ let
   # "Who's playing?": greetd's greeter, in a gamescope of its own (no
   # Steam mode: it's the only window). Picks a player and asks greetd to
   # start their session, the same one autologin starts with one player.
+  avatarDir = "/var/lib/famidrive-picker/avatars";
   pickerSpec = pkgs.writeText "famidrive-picker.json" (builtins.toJSON {
     # The primary player first, then the others by name, the guest last.
-    players = map (p: { inherit (p) user displayName isGuest; })
+    players = map (p: { inherit (p) user displayName isGuest; avatar = if p.avatar or null != null then "${p.avatar}" else null; })
       (lib.sortOn (p: (if p.name == cfg.primaryPlayer then "0" else if p.isGuest then "2" else "1") + p.name)
         (lib.attrValues cfg.allPlayers));
     session = [ sessionCmd ];
     last = "/var/lib/famidrive-picker/last";
+    # Each player's RomM picture, copied there at their session start.
+    avatars = avatarDir;
     theme = if cfg.esde.theme != null then "${cfg.esde.theme.src}" else null;
     powerOff = [ "${config.systemd.package}/bin/systemctl" "poweroff" ];
   });
@@ -374,6 +381,8 @@ in
     # Who played last starts out selected.
     systemd.tmpfiles.rules = lib.optionals picker [
       "d /var/lib/famidrive-picker 0755 greeter greeter -"
+      # Players write their own picture; sticky, so not anyone else's.
+      "d ${avatarDir} 3775 greeter famidrive -"
     ];
 
     hardware.graphics.enable = true;
