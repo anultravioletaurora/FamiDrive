@@ -294,8 +294,8 @@ Bluetooth, once signed in to Ubisoft Connect.
   That needs a keyboard for now; an on-screen keyboard is #119.
 - **Multiplayer** (co-op, Ghost War) uses BattlEye. Check whether it
   works under Proton.
-- **To check:** rumble, and whether Ubisoft Connect
-  closes when the game does, so that quitting returns to ES-DE.
+- **Rumble:** ✅ on a DualSense.
+- **Quitting** returns to ES-DE: Ubisoft Connect closes with the game.
 
 ### Grand Theft Auto V
 

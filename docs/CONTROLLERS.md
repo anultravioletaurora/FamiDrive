@@ -42,7 +42,7 @@ yet is listed below as ❔ until someone does.
 | [Razer Raiju Tournament Edition](#razer-raiju) | USB / Bluetooth | ✅ | ❔ | ✅ | ❔ | ❔ | ❔ | ❔ | ✅ |
 | [PS3 Sixaxis / DualShock 3](#ps3-sixaxis--dualshock-3) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [PS2 controllers on a USB adapter](#ps2-controllers-on-a-usb-adapter) | USB adapter | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
-| [DualSense](#dualsense) | USB / Bluetooth | ✅ | ❔ | ✅ | ❔ | ❔ | ✅ | ❔ | ❔ |
+| [DualSense](#dualsense) | USB / Bluetooth | ✅ | ❔ | ✅ | ❔ | ❔ | ✅ | ✅ Ghost Recon Wildlands | ❔ |
 | [Switch Pro Controller](#switch-pro-controller) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Joy-Cons](#joy-cons) | Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Switch 2 GameCube controller](#switch-2-gamecube-controller) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
@@ -360,8 +360,9 @@ which need USB or game support over Bluetooth.
   with Settings → Pair a Controller, then drove ES-DE and played
   [Super Smash Bros. Melee](COMPATIBILITY.md#super-smash-bros-melee)
   in Dolphin, [Rocket League](COMPATIBILITY.md#rocket-league) and
-  [Tom Clancy's Ghost Recon Wildlands](COMPATIBILITY.md#tom-clancys-ghost-recon-wildlands).
-- **Still to record:** USB, rumble, the adaptive triggers, and Select
+  [Tom Clancy's Ghost Recon Wildlands](COMPATIBILITY.md#tom-clancys-ghost-recon-wildlands),
+  with rumble in Ghost Recon.
+- **Still to record:** USB, the adaptive triggers, and Select
   + Start (Share + Options).
 
 ## Switch Pro Controller
