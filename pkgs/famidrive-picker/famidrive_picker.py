@@ -209,7 +209,10 @@ def main():
     background.fill(BLACK)
 
     pads = {}
-    stick_held = False
+    # Which sticks are pushed, per controller and axis. One flag for all
+    # of them let the other axis's wobble near the middle count as letting
+    # go, so one push went past several players (first box, 2026-10-09).
+    stick_held = set()
     error = ""
     busy = ""            # what's happening, while it happens
     power = spec.get("powerOff")
@@ -341,10 +344,11 @@ def main():
                     choose()
             elif event.type == pygame.CONTROLLERAXISMOTION and event.axis in (
                     pygame.CONTROLLER_AXIS_LEFTX, pygame.CONTROLLER_AXIS_LEFTY):
+                held = (getattr(event, "instance_id", None), event.axis)
                 if abs(event.value) < STICK // 2:
-                    stick_held = False
-                elif abs(event.value) > STICK and not stick_held:
-                    stick_held = True
+                    stick_held.discard(held)
+                elif abs(event.value) > STICK and held not in stick_held:
+                    stick_held.add(held)
                     if event.axis == pygame.CONTROLLER_AXIS_LEFTX:
                         move(1 if event.value > 0 else -1)
                     else:

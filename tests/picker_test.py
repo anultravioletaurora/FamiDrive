@@ -84,7 +84,9 @@ class Test(unittest.TestCase):
             self.frame = pygame.display.get_surface().copy()
             frames[0] += 1
             if frames[0] <= len(keys):
-                pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=keys[frames[0] - 1]))
+                k = keys[frames[0] - 1]
+                pygame.event.post(k if isinstance(k, pygame.event.EventType)
+                                  else pygame.event.Event(pygame.KEYDOWN, key=k))
             elif frames[0] > len(keys) + 5:
                 raise TimeoutError
             flip()
@@ -111,6 +113,15 @@ class Test(unittest.TestCase):
             {"type": "start_session", "cmd": ["/run/current-system/sw/bin/famidrive-start"], "env": []},
         ])
         self.assertEqual(self.last.read_text(), "bob")
+
+    def test_one_push_of_the_stick_moves_once(self):
+        def stick(axis, value):
+            return pygame.event.Event(pygame.CONTROLLERAXISMOTION, instance_id=0, axis=axis, value=value)
+        x, y = pygame.CONTROLLER_AXIS_LEFTX, pygame.CONTROLLER_AXIS_LEFTY
+        # Pushed right and held, the other axis wobbling near the middle.
+        code, reqs = self.play([stick(x, 30000), stick(y, 1200), stick(x, 32000), stick(y, -800),
+                                stick(x, 31000), pygame.K_RETURN])
+        self.assertEqual(reqs[0], {"type": "create_session", "username": "bob"})
 
     def test_last_player_starts_selected_and_wraps(self):
         self.last.write_text("guest")
