@@ -330,6 +330,8 @@ in
     in [
       (check "starts on the picker as greeter" (picker.user == "greeter" && lib.hasInfix "famidrive-picker" picker.command))
       (check "no autologin" (!(c.services.greetd.settings ? initial_session)))
+      (check "players' RomM pictures go where the picker can read them, each player only their own"
+        (lib.elem "d /var/lib/famidrive-picker/avatars 3775 greeter famidrive -" c.systemd.tmpfiles.rules))
       (check "a switch restarts the session when it changed" c.systemd.services.greetd.restartIfChanged)
       (check "a host's own cleanup choice wins" (c.nix.gc.options == "--delete-older-than 30d"))
       (check "YARG can open rhythm-game hardware's hidraw devices (Raphnet among them)"

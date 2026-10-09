@@ -129,6 +129,17 @@ screen, and quitting ES-DE goes back to it.
   }
   ```
 
+### `famidrive.players.<name>.avatar`
+
+Their picture on the "Who's playing?" screen (PNG, JPEG or WebP),
+drawn as a circle. Without one, a player with RomM gets the
+picture from their RomM profile, fetched each time they play, and
+anyone else gets their initial.
+
+- **Type:** null or absolute path
+- **Default:** `null`
+- **Example:** `./avatars/alice.png`
+
 ### `famidrive.players.<name>.displayName`
 
 What the "Who's playing?" screen calls them.

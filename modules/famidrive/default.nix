@@ -19,6 +19,17 @@ let
         defaultText = lib.literalMD "the name, capitalized";
         description = "What the \"Who's playing?\" screen calls them.";
       };
+      avatar = mkOption {
+        type = types.nullOr types.path;
+        default = null;
+        example = lib.literalExpression "./avatars/alice.png";
+        description = ''
+          Their picture on the "Who's playing?" screen (PNG, JPEG or WebP),
+          drawn as a circle. Without one, a player with RomM gets the
+          picture from their RomM profile, fetched each time they play, and
+          anyone else gets their initial.
+        '';
+      };
       owner = mkOption {
         type = types.str;
         default = name;
