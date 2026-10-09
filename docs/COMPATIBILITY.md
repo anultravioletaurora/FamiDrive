@@ -282,7 +282,8 @@ Multiplayer, split-screen, rumble and HDR are still to check.
 
 ### Tom Clancy's Ghost Recon Wildlands
 
-**Steam: ❔ Untested.** 2026-10-08: first launch under way.
+**Steam: ✅ Works.** 2026-10-09: played with a DualSense over
+Bluetooth, once signed in to Ubisoft Connect.
 
 - **EULA:** Steam shows the game's EULA before the first launch. Accepted
   with the controller as a mouse
@@ -293,7 +294,7 @@ Multiplayer, split-screen, rumble and HDR are still to check.
   That needs a keyboard for now; an on-screen keyboard is #119.
 - **Multiplayer** (co-op, Ghost War) uses BattlEye. Check whether it
   works under Proton.
-- **To check:** controllers and rumble, and whether Ubisoft Connect
+- **To check:** rumble, and whether Ubisoft Connect
   closes when the game does, so that quitting returns to ES-DE.
 
 ### Grand Theft Auto V
@@ -542,6 +543,10 @@ on first launch, but not the Battle.net app.
   With it off, every pad works, and split-screen with two works.
 - **Player order:** the Xbox controller became player 1, though the
   8BitDo was connected first. Not looked at yet.
+- **"Overlay Disabled":** the game warns at start that the platform
+  overlay is off. Dismiss it and play. Steam's overlay doesn't come up
+  over games in FamiDrive's session yet, so buying in-game items, which
+  Steam confirms in its overlay, won't work (2026-10-09).
 
 ### Street Fighter 6
 

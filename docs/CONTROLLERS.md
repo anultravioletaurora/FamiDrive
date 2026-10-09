@@ -42,7 +42,7 @@ yet is listed below as ❔ until someone does.
 | [Razer Raiju Tournament Edition](#razer-raiju) | USB / Bluetooth | ✅ | ❔ | ✅ | ❔ | ❔ | ❔ | ❔ | ✅ |
 | [PS3 Sixaxis / DualShock 3](#ps3-sixaxis--dualshock-3) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [PS2 controllers on a USB adapter](#ps2-controllers-on-a-usb-adapter) | USB adapter | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
-| [DualSense](#dualsense) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [DualSense](#dualsense) | USB / Bluetooth | ✅ | ❔ | ✅ | ❔ | ❔ | ✅ | ❔ | ❔ |
 | [Switch Pro Controller](#switch-pro-controller) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Joy-Cons](#joy-cons) | Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Switch 2 GameCube controller](#switch-2-gamecube-controller) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
@@ -353,8 +353,16 @@ Record the adapter's USB ID, and whether both ports show up.
 
 ## DualSense
 
-❔ Untested. Same notes as the DualShock 4, plus the adaptive triggers
-and haptics, which need USB or game support over Bluetooth.
+Same notes as the DualShock 4, plus the adaptive triggers and haptics,
+which need USB or game support over Bluetooth.
+
+- **2026-10-09, Bluetooth, on the first box:** ✅ Paired from the couch
+  with Settings → Pair a Controller, then drove ES-DE and played
+  [Super Smash Bros. Melee](COMPATIBILITY.md#super-smash-bros-melee)
+  in Dolphin, [Rocket League](COMPATIBILITY.md#rocket-league) and
+  [Tom Clancy's Ghost Recon Wildlands](COMPATIBILITY.md#tom-clancys-ghost-recon-wildlands).
+- **Still to record:** USB, rumble, the adaptive triggers, and Select
+  + Start (Share + Options).
 
 ## Switch Pro Controller
 
