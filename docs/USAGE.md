@@ -633,6 +633,15 @@ The Ryujinx to run them with: nixpkgs' Ryubing, or a canary build.
 
 How controllers reach the emulators. Per-controller results are in [CONTROLLERS.md](CONTROLLERS.md).
 
+### `famidrive.controllers.bluetoothPairing`
+
+"Pair a Controller" in Settings, and a "Forget" entry for each
+paired controller: Bluetooth pairing from the couch, with no SSH.
+The entries appear only on a box with a Bluetooth adapter.
+
+- **Type:** boolean
+- **Default:** `true`
+
 ### `famidrive.controllers.faceButtons`
 
 How a modern pad's A/B/X/Y reach the GameCube and the Switch, whose
