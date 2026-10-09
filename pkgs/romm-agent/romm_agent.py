@@ -1180,7 +1180,12 @@ def toast(*args):
 
 
 def game_name(key, entry):
-    """The game's name from RomM, or its file's without the tags."""
+    """The game's name from RomM, or its file's without the tags. An app's
+    is the title its module gives it ("Wii Miis"): its key is no name.
+    Found on the first box 2026-10-08: the Miis' toast said app:wii-miis."""
+    if key.startswith("app:"):
+        name = key[4:]
+        return CFG.get("apps", {}).get(name, {}).get("title") or name
     return entry.get("name") or re.sub(r"\s*[\(\[].*$", "", Path(key).stem) or Path(key).name
 
 

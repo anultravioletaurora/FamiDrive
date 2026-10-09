@@ -196,7 +196,7 @@ in
       lib.optional ch.sharedBindings "f ${dir}/bindings 0664 famidrive-library famidrive -";
 
     famidrive.romm.apps = lib.mkIf sync {
-      clonehero = { rom = ch.romm.entry; emulator = "clonehero"; inherit saveLayout; };
+      clonehero = { title = "Clone Hero"; rom = ch.romm.entry; emulator = "clonehero"; inherit saveLayout; };
     };
 
     famidrive.playerHome = { lib, famidrivePlayer, ... }: {
