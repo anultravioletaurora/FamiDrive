@@ -554,6 +554,24 @@ ES-DE theme, symlinked in and selected. null = ES-DE's bundled default.
 - **Default:** [Art Book Next](https://github.com/anthonycaccese/art-book-next-es-de), pinned
 - **Example:** `{ name = "my-theme"; src = ./themes/my-theme; }`
 
+### `famidrive.esde.theme.defaults`
+
+The theme's options a new player starts with, as ES-DE's
+settings (`ThemeVariant`, `ThemeColorScheme`, `ThemeTransitions`,
+`ThemeAspectRatio`, `ThemeFontSize`), by the theme's own IDs (from
+its capabilities.xml), not the names its menu shows. Set only when
+the player has none yet, so what they choose on the TV stays.
+
+- **Type:** attribute set of string
+- **Default:** `{ }`
+- **Example:** 
+
+  ```nix
+  {
+    ThemeColorScheme = "dark-outline";
+  }
+  ```
+
 ### `famidrive.esde.theme.name`
 
 Folder name under ES-DE/themes/, which is also ES-DE's Theme setting.

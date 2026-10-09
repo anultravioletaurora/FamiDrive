@@ -300,6 +300,10 @@ in
         c.home-manager.users.alice.home.activation.famidriveYarg.data))
     (check "autologin as the only player" (c.services.greetd.settings.initial_session.user == "alice"))
     (check "no picker" (c.services.greetd.settings.default_session.user == "alice"))
+    (check "Art Book Next starts new players on its list layout, Dark [Outline] and Slide, only when unset"
+      (let d = c.home-manager.users.alice.home.activation.famidriveEsSettings.data; in
+        lib.hasInfix "grep -q 'name=\"ThemeColorScheme\"'" d && lib.hasInfix "value=\"dark-outline\"" d
+          && lib.hasInfix "gamelist-list-metadata-screenshot-marquee" d && lib.hasInfix "value=\"slide\"" d))
     (check "ES-DE's Quit menu (power off, reboot) is on"
       (lib.hasInfix "ShowQuitMenu" c.home-manager.users.alice.home.activation.famidriveEsSettings.data))
     (check "alice is a player" (lib.elem "famidrive" c.users.users.alice.extraGroups))

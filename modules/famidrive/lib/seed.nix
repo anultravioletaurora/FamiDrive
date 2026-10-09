@@ -5,6 +5,8 @@
 #   seed     - copy a starting file in only if none exists yet
 #   lockKeys - force a small set of keys on every activation and leave
 #              everything else to the app
+#   defaultKeys - set keys only where the file has none yet: a starting
+#              value the player can change in the app, and keep
 #
 # Both return shell snippets meant for home.activation.
 { lib, pkgs }:
@@ -60,6 +62,15 @@ in
       mkdir -p "$(dirname ${dq target})"
       install -m 0644 ${source} ${dq target}
     fi
+  '';
+
+  # es_settings.xml only, for now: the theme's starting options.
+  defaultKeys = { target, keys }: ''
+    mkdir -p "$(dirname ${dq target})"
+    touch ${dq target}
+    ${lib.concatStrings (lib.mapAttrsToList (k: v: ''
+      grep -q 'name="${k}"' ${dq target} || echo '<${v.type} name="${k}" value="${toString v.value}" />' >> ${dq target}
+    '') keys)}
   '';
 
   # Creates an empty file if needed, so locked keys still apply on first boot

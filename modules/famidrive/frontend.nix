@@ -114,6 +114,18 @@ in
       options = {
         name = lib.mkOption { type = lib.types.str; description = "Folder name under ES-DE/themes/, which is also ES-DE's Theme setting."; };
         src = lib.mkOption { type = lib.types.path; description = "The theme's files."; };
+        defaults = lib.mkOption {
+          type = lib.types.attrsOf lib.types.str;
+          default = { };
+          example = { ThemeColorScheme = "dark-outline"; };
+          description = ''
+            The theme's options a new player starts with, as ES-DE's
+            settings (`ThemeVariant`, `ThemeColorScheme`, `ThemeTransitions`,
+            `ThemeAspectRatio`, `ThemeFontSize`), by the theme's own IDs (from
+            its capabilities.xml), not the names its menu shows. Set only when
+            the player has none yet, so what they choose on the TV stays.
+          '';
+        };
       };
     });
     # Art Book Next (ES-DE edition) by Anthony Caccese: a coffee-table-book
@@ -127,6 +139,14 @@ in
         repo = "art-book-next-es-de";
         rev = "d772d07109701d9bd7c9fda305bfef6601105ab8";   # 2026-02-07
         hash = "sha256-9yfLa1g5t2+bH4qyYQv2zX5QA/X5t0Jhs9gQ4J8jrlk=";
+      };
+      # What its menu calls "List: Metadata & Screenshot + Marquee",
+      # "Dark [Outline]" and "Slide" (its capabilities.xml). Chosen
+      # 2026-10-08.
+      defaults = {
+        ThemeVariant = "gamelist-list-metadata-screenshot-marquee";
+        ThemeColorScheme = "dark-outline";
+        ThemeTransitions = "slide";
       };
     };
     defaultText = lib.literalMD "[Art Book Next](https://github.com/anthonycaccese/art-book-next-es-de), pinned";
@@ -267,6 +287,10 @@ in
             # editable from the TV menu and survives rebuilds.
           };
         }}
+        ${lib.optionalString (theme != null && theme.defaults != { }) (seedLib.defaultKeys {
+          target = "$HOME/ES-DE/settings/es_settings.xml";
+          keys = lib.mapAttrs (_: v: { type = "string"; value = v; }) theme.defaults;
+        })}
       '';
     };
   };
