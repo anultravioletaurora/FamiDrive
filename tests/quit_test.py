@@ -30,7 +30,11 @@ DB = """# a comment
 03000000790000001100000000000000,Retro NES pad,a:b2,b:b1,back:b4,start:b5,platform:Windows,
 030000005e0400008e02000014010000,Xbox 360,a:b0,back:b6,start:b7,platform:Linux,
 03000000aaaa0000bbbb000000000000,Axis start,back:b6,start:a2,platform:Linux,
+050000004c69632050726f20436f6e00,Nintendo Switch Controller,a:b0,b:b1,back:b8,start:b9,x:b2,y:b3,platform:Linux,
 """
+# A PowerA GameCube-style controller for the Switch over Bluetooth: no USB
+# ids, 16 buttons from BTN_SOUTH, - and + the 9th and 10th (Switch order).
+POWERA = list(range(0x130, 0x140))
 
 
 class Combo(unittest.TestCase):
@@ -51,6 +55,13 @@ class Combo(unittest.TestCase):
     def test_linux_entry_comes_first(self):
         keys = list(range(0x120, 0x12c))   # a joystick: BTN_TRIGGER up
         self.assertEqual(m.combo_for(keys, 0x0079, 0x0011, "hid-generic", self.db), {0x128, 0x129})
+
+    def test_pad_without_ids_found_by_name(self):
+        self.assertEqual(m.name_key("Lic Pro Controller"), ("name", "4c69632050726f20436f6e00"))
+        self.assertEqual(self.db[m.name_key("Lic Pro Controller")], {"Linux": (8, 9)})
+        self.assertEqual(m.combo_for(POWERA, 0, 0, "hid-generic", self.db, "Lic Pro Controller"), {0x138, 0x139})
+        # Another pad without ids isn't taken for it.
+        self.assertEqual(m.combo_for(POWERA, 0, 0, "hid-generic", self.db, "Some Pad"), {0x13a, 0x13b})
 
     def test_own_driver_keeps_its_names(self):
         keys = [0x130, 0x131, 0x133, 0x134, 0x136, 0x137, 0x13a, 0x13b, 0x13c, 0x13d, 0x13e]

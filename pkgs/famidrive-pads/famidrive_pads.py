@@ -22,7 +22,12 @@ players and ports. Decided 2026-10-07. SDL lists the adapter's first.
 
 dolphin: each GameCube port set to "gamepad" (controllers.gamecube.ports)
 gets the next connected pad, by the name and per-name index Dolphin uses
-(SDL/<n>/<name>). Ports naming a model keep it. Buttons stay as Nix wrote
+(SDL/<n>/<name>). Ports naming a model keep it. With faceButtons
+"labels", each of those ports also gets A, B, X and Y from the labels SDL
+gives that pad's buttons: SDL names them by place (Button S is the bottom
+one), and a Nintendo-labelled pad has its B at the bottom and A on the
+right. Found on the first box 2026-10-09: on a PowerA GameCube-style
+controller for the Switch, A was B and X was Y. The rest stay as Nix wrote
 them (SDL's standard gamepad names, the same for every pad).
 
 eden: each connected pad becomes a player, port order, with every binding
@@ -51,7 +56,7 @@ may have. Found on the first box 2026-10-09: SuperTux Party (Godot 3.2,
 2021) didn't know the 8BitDo Ultimate 2.
 
 SPEC (JSON, from Nix):
-  dolphin: {"sdl": libSDL3 path, "ports": [...], "adapter": bool, "config": GCPadNew.ini}
+  dolphin: {"sdl": libSDL3 path, "ports": [...], "adapter": bool, "faceButtons": ..., "config": GCPadNew.ini}
   eden:    {"sdl": libSDL2 path, "faceButtons": "labels"|"positions", "config": qt-config.ini}
   cemu:    {"sdl": libSDL2 path, "faceButtons": ..., "config": controllerProfiles/controller0.xml}
 """
@@ -104,6 +109,11 @@ def set_ini(path, section, keys):
 # --- Dolphin (SDL3) --------------------------------------------------------------
 
 GC_ADAPTER = (0x057E, 0x0337)
+# SDL 3's face buttons by place (SDL_GAMEPAD_BUTTON_SOUTH up), as Dolphin
+# names them, and its SDL_GamepadButtonLabel numbers for A, B, X and Y.
+PLACES = ("S", "E", "W", "N")
+LABELS = {1: "A", 2: "B", 3: "X", 4: "Y"}
+XBOX_LABELS = {"A": "S", "B": "E", "X": "W", "Y": "N"}
 
 
 def modern_first(pads):
@@ -131,6 +141,7 @@ def sdl3_pads(lib, gc_adapter):
         sdl.SDL_GetGamepadNameForID.restype = ctypes.c_char_p
         sdl.SDL_GetGamepadVendorForID.restype = ctypes.c_uint16
         sdl.SDL_GetGamepadProductForID.restype = ctypes.c_uint16
+        sdl.SDL_GetGamepadButtonLabelForType.argtypes = [ctypes.c_int, ctypes.c_int]
         count = ctypes.c_int(0)
         ids = sdl.SDL_GetGamepads(ctypes.byref(count))
         pads = []
@@ -138,7 +149,11 @@ def sdl3_pads(lib, gc_adapter):
             name = (sdl.SDL_GetGamepadNameForID(ids[i]) or b"Unknown").decode(errors="replace")
             usb = (sdl.SDL_GetGamepadVendorForID(ids[i]), sdl.SDL_GetGamepadProductForID(ids[i]))
             nth = sum(1 for p in pads if p["name"] == name)
-            pads.append({"name": name, "device": f"SDL/{nth}/{name}", "adapter": usb == GC_ADAPTER})
+            kind = sdl.SDL_GetGamepadTypeForID(ids[i])
+            labels = {LABELS[n]: place for b, place in enumerate(PLACES)
+                      if (n := sdl.SDL_GetGamepadButtonLabelForType(kind, b)) in LABELS}
+            pads.append({"name": name, "device": f"SDL/{nth}/{name}", "adapter": usb == GC_ADAPTER,
+                         "labels": labels})
         sdl.SDL_free(ids)
         return pads
     finally:
@@ -152,10 +167,25 @@ def dolphin_devices(ports, pads):
     return {i: free.pop(0) for i, p in enumerate(ports) if p == "gamepad" and free}
 
 
+def dolphin_face(pad, face):
+    """A pad's GameCube A, B, X and Y in Dolphin, by the labels on it, when
+    faceButtons is "labels". A pad whose buttons SDL gives no A/B/X/Y
+    labels (a PlayStation pad's are shapes) is taken as Xbox-labelled, as
+    Nix writes it. With "positions", nothing: Nix's places stay."""
+    if face != "labels":
+        return {}
+    labels = pad.get("labels") or {}
+    if set(labels) != set(XBOX_LABELS):
+        labels = XBOX_LABELS
+    return {f"Buttons/{k}": f"`Button {labels[k]}`" for k in ("A", "B", "X", "Y")}
+
+
 def cmd_dolphin(spec):
     pads = sdl3_pads(spec["sdl"], spec.get("adapter", False))
+    by_device = {p["device"]: p for p in pads}
     for i, device in dolphin_devices(spec["ports"], pads).items():
-        set_ini(spec["config"], f"GCPad{i + 1}", {"Device": device})
+        face = dolphin_face(by_device[device], spec.get("faceButtons", "labels"))
+        set_ini(spec["config"], f"GCPad{i + 1}", {"Device": device, **face})
     return 0
 
 

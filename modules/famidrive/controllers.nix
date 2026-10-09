@@ -52,7 +52,9 @@ let
   # layout, so this one mapping fits any pad SDL recognizes. SDL names
   # buttons by position on an Xbox-style pad (A bottom, B right, X left,
   # Y top). "positions" follows the GameCube's shape instead: B left,
-  # X right.
+  # X right. With "labels", famidrive-pads sets A, B, X and Y again for
+  # each pad it puts on a "gamepad" port, by the labels on that pad: a
+  # Nintendo-labelled one has B at the bottom.
   padMapping = {
     "Buttons/A" = "`Button S`";
     "Buttons/B" = if byLabel then "`Button E`" else "`Button W`";
@@ -217,6 +219,7 @@ in
           ${pkgs.famidrive-pads}/bin/famidrive-pads dolphin ${q (builtins.toJSON {
             sdl = "${lib.getLib pkgs.sdl3}/lib/libSDL3.so.0";   # Dolphin's
             inherit ports;
+            inherit (cfg.controllers) faceButtons;
             adapter = lib.elem "adapter" ports;
             config = "~/.config/dolphin-emu/GCPadNew.ini";
           })} || echo "famidrive-launch: couldn't bind the connected pads in Dolphin" >&2
