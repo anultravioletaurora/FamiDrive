@@ -196,6 +196,7 @@ in
 
   toast = unit "toast" ../pkgs/famidrive-toast/famidrive_toast.py pkgs.python3;
   pads = unit "pads" ../pkgs/famidrive-pads/famidrive_pads.py pkgs.python3;
+  bluetooth = unit "bluetooth" ../pkgs/famidrive-bluetooth/famidrive_bluetooth.py pkgs.python3;
   padmouse = unit "padmouse" ../pkgs/famidrive-padmouse/famidrive_padmouse.py pkgs.python3;
   quit = unit "quit" ../pkgs/famidrive-quit/famidrive_quit.py pkgs.python3;
   cheevos = unit "cheevos" ../pkgs/famidrive-cheevos/famidrive_cheevos.py
@@ -268,6 +269,10 @@ in
         && lib.hasInfix "XDG_CURRENT_DESKTOP=FamiDrive" c.famidrive.systems.settings.command
         && lib.hasInfix "watch-comet" c.famidrive.systems.gog.before
         && !(lib.hasInfix "watch-comet" c.famidrive.systems.epic.before)))
+    (check "Bluetooth pairing in Settings: entries written each session, pair and forget launch"
+      (lib.hasInfix "famidrive-bluetooth entries" c.famidrive.sessionSetup
+        && lib.hasInfix "famidrive-bluetooth pair" c.famidrive.systems.settings.command
+        && lib.hasInfix "famidrive-bluetooth forget" c.famidrive.systems.settings.command))
     (check "RetroArch and Dolphin games have the unlock watcher; Eden's don't"
       (lib.hasInfix "famidrive-cheevos" c.famidrive.systems.psx.before
         && lib.hasInfix "--log-file" c.famidrive.systems.n64.command

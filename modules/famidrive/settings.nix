@@ -8,6 +8,10 @@
 #                           remove their games; heroic lane
 #   Jellyfin Media Player   the Jellyfin app, with its sign-in and its
 #                           own settings menu; media.jellyfin.enable
+#   Pair a Controller,      Bluetooth pairing (famidrive-bluetooth), with
+#   Forget <controller>     toasts for what's happening; only on a box
+#                           with a Bluetooth adapter, checked each session;
+#                           controllers.bluetoothPairing
 { config, lib, pkgs, ... }:
 
 let
@@ -15,6 +19,7 @@ let
   steam = lib.elem "steam" cfg.lanes;
   heroic = lib.elem "heroic" cfg.lanes;
   jellyfin = cfg.media.jellyfin.enable;
+  bluetooth = cfg.controllers.bluetoothPairing;
 
   # Placeholder file name (what ES-DE shows) -> what it opens.
   entries =
@@ -34,7 +39,17 @@ let
   '';
 in
 {
-  config = lib.mkIf (cfg.enable && entries != { }) {
+  options.famidrive.controllers.bluetoothPairing = lib.mkOption {
+    type = lib.types.bool;
+    default = true;
+    description = ''
+      "Pair a Controller" in Settings, and a "Forget" entry for each
+      paired controller: Bluetooth pairing from the couch, with no SSH.
+      The entries appear only on a box with a Bluetooth adapter.
+    '';
+  };
+
+  config = lib.mkIf (cfg.enable && (entries != { } || bluetooth)) {
     famidrive.systems.settings = {
       fullname = "Settings";
       theme = "tools";   # Art Book Next's tools art
@@ -45,9 +60,20 @@ in
           ${lib.optionalString steam ''steam) exec ${pkgs.gamescope-fg}/bin/gamescope-fg --steam bigpicture ;;''}
           ${lib.optionalString heroic ''heroic) XDG_CURRENT_DESKTOP=FamiDrive ${pkgs.heroic}/bin/heroic --fullscreen --no-sandbox ;;''}
           ${lib.optionalString jellyfin ''jellyfin) ${cfg.systems.media.command} ;;''}
+          ${lib.optionalString bluetooth ''
+            bluetooth-pair) exec ${pkgs.famidrive-bluetooth}/bin/famidrive-bluetooth pair ;;
+            bluetooth-forget\ *) exec ${pkgs.famidrive-bluetooth}/bin/famidrive-bluetooth forget "$(cut -d' ' -f2 "$ROM")" ;;
+          ''}
         esac
       '';
     };
+
+    # Bluetooth's entries follow the hardware and what's paired, so
+    # they're written as each session starts, not at switch.
+    famidrive.sessionSetup = lib.mkIf bluetooth ''
+      ${pkgs.famidrive-bluetooth}/bin/famidrive-bluetooth entries "$HOME/.local/share/famidrive/roms/settings" \
+        || echo "famidrive-session: couldn't list Bluetooth controllers" >&2
+    '';
 
     # Each player's own Settings folder, rewritten on every boot and
     # switch. An entry whose feature is turned off is removed with it, and
