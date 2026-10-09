@@ -312,9 +312,17 @@ cable. It also has Bluetooth, untested.
   Share and Options through SDL's controller database.
 - **2026-10-09, Select + Start:** ✅ Share + Options closed the Mii
   Channel on the second box.
-- **Still to record:** the name SDL gives it, and how it does in other
-  emulators and Steam games. The other Raijus (the original, Ultimate and Mobile)
-  are untested.
+- **2026-10-09, Dolphin (Wii):** ❌ for this one controller, a hardware
+  fault. In Mario Kart Wii the camera looked backwards the whole race.
+  The pad sends R1 as held in every report, even untouched, and pressing
+  R1 never changes it. Dolphin maps R1 to the GameCube's Z, which is
+  look-behind in that game. A wired Xbox 360 pad on the same box raced
+  normally. To check a pad for a stuck button: `evtest --query
+  /dev/input/eventN EV_KEY BTN_Z` exits 10 while the button is held.
+- **SDL:** it reaches SDL through HIDAPI's PS4 driver as "Razer Raiju
+  Tournament Edition Wired", with a standard mapping.
+- **Still to record:** how it does in other emulators and Steam games.
+  The other Raijus (the original, Ultimate and Mobile) are untested.
 
 ## PS3 Sixaxis / DualShock 3
 
