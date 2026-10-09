@@ -19,7 +19,11 @@ its buttons named in order instead, whatever they are. For those, SDL's
 community controller database (SDL_GameControllerDB) says which numbered
 buttons are back and start. Found on the second box 2026-10-08: on a
 Razer Raiju Tournament Edition, "BTN_SELECT" and "BTN_START" were the
-stick clicks, and Share + Options did nothing.
+stick clicks, and Share + Options did nothing. A pad that gives no
+USB ids (vendor and product 0, as a PowerA GameCube-style controller
+for the Switch does over Bluetooth, named "Lic Pro Controller") is in
+the database under its name instead, as SDL looks it up. Found on the
+first box 2026-10-09: its - and + did nothing.
 
 Runs for the life of the session: started by famidrive-session, and exits
 when that goes away.
@@ -60,9 +64,16 @@ def le16(hexstr):
     return int(hexstr[2:4] + hexstr[0:2], 16)
 
 
+def name_key(name):
+    """How SDL 2 puts a pad without USB ids in its GUID: the name's first
+    11 bytes and a NUL, where the ids would go."""
+    return ("name", (name.encode()[:11] + b"\0").ljust(12, b"\0").hex())
+
+
 def load_paddb(path):
     """(vendor, product) -> {platform: (back, start)} button numbers, from
-    SDL_GameControllerDB. Only entries that give both as buttons."""
+    SDL_GameControllerDB, or name_key(name) -> the same for a pad with no
+    USB ids. Only entries that give both as buttons."""
     db = {}
     try:
         lines = Path(path).read_text(errors="replace").splitlines()
@@ -72,16 +83,19 @@ def load_paddb(path):
         fields = line.strip().split(",")
         if len(fields) < 3 or line.startswith("#") or len(fields[0]) != 32:
             continue
-        guid = fields[0]
-        try:
-            vendor, product = le16(guid[8:12]), le16(guid[16:20])
-        except ValueError:
-            continue
+        guid = fields[0].lower()
+        if guid[12:16] == "0000" and guid[20:24] == "0000":
+            try:
+                key = (le16(guid[8:12]), le16(guid[16:20]))
+            except ValueError:
+                continue
+        else:
+            key = ("name", guid[8:32])   # no USB ids: the name, as name_key makes it
         m = dict(f.split(":", 1) for f in fields[2:] if ":" in f)
         back, start = m.get("back", ""), m.get("start", "")
         if not (back[:1] == "b" and back[1:].isdigit() and start[:1] == "b" and start[1:].isdigit()):
             continue
-        db.setdefault((vendor, product), {}).setdefault(m.get("platform", ""), (int(back[1:]), int(start[1:])))
+        db.setdefault(key, {}).setdefault(m.get("platform", ""), (int(back[1:]), int(start[1:])))
     return db
 
 
@@ -92,14 +106,14 @@ def sdl_buttons(keys):
     return [k for k in keys if BTN_JOYSTICK <= k <= KEY_MAX] + [k for k in keys if BTN_MISC <= k < BTN_JOYSTICK]
 
 
-def combo_for(keys, vendor, product, driver, db):
+def combo_for(keys, vendor, product, driver, db, name=""):
     """The two key codes that are Select and Start on this device, or None
     if it has no such pair (not a pad, or a dongle's keyboard side)."""
     if driver == "hid-generic":
         # Numbered buttons. A Linux entry was made from the same numbering;
         # a Windows one numbers the HID report's buttons, which is the
         # order hid-generic gives them codes in.
-        found = db.get((vendor, product), {})
+        found = db.get(name_key(name) if (vendor, product) == (0, 0) else (vendor, product), {})
         pair = found.get("Linux") or found.get("Windows")
         order = sdl_buttons(keys)
         if pair and max(pair) < len(order):
@@ -220,7 +234,7 @@ def main():
                 except OSError:
                     continue
                 combo = combo_for(dev.capabilities().get(e.EV_KEY, []), dev.info.vendor,
-                                  dev.info.product, hid_driver(dev), db)
+                                  dev.info.product, hid_driver(dev), db, dev.name)
                 if combo:
                     devices[dev.fd] = dev
                     combos[dev.fd] = combo

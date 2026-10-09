@@ -205,8 +205,16 @@ class Controllers(unittest.TestCase):
             laptop = root / "class/power_supply/BAT0"
             laptop.mkdir()
             (laptop / "scope").write_text("System\n")
+            # A DualSense: its motion sensors are a joystick too, and count
+            # as the same controller.
+            sense = root / "devices/uhid/0005:054C:0CE6.000E"
+            for n, name in ((22, "DualSense Wireless Controller Motion Sensors"), (21, "DualSense Wireless Controller")):
+                (sense / f"input/input{n}").mkdir(parents=True)
+                (sense / f"input/input{n}/name").write_text(name + "\n")
+                (root / f"class/input/js{n}").mkdir()
+                os.symlink(sense / f"input/input{n}", root / f"class/input/js{n}/device")
             pads = t.connected_pads(root / "class")
-            self.assertEqual(list(pads.values()), ["Xbox Wireless Controller"])
+            self.assertEqual(sorted(pads.values()), ["DualSense Wireless Controller", "Xbox Wireless Controller"])
             self.assertEqual(list(t.pad_batteries(root / "class").values()), [("Xbox Wireless Controller", 15)])
 
     def test_connected_and_disconnected(self):

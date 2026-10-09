@@ -404,15 +404,21 @@ LOW = 20   # percent: warn once at or below, again after charging past LOW + 10
 
 
 def connected_pads(sys_class=SYS):
-    """{device path: name} for each joystick the kernel has (jsN)."""
+    """{device path: name} for each controller the kernel has a joystick
+    (jsN) for. A controller with more than one joystick counts once, by
+    its first: a DualSense's motion sensors are a joystick of their own,
+    and got a "Controller disconnected" toast of their own (first box,
+    2026-10-09)."""
     pads = {}
     for js in sorted((sys_class / "input").glob("js*")):
         try:
-            dev = os.path.realpath(js / "device")
-            pads[dev] = (Path(dev) / "name").read_text().strip() or "Controller"
+            dev = Path(os.path.realpath(js / "device"))
+            name = (dev / "name").read_text().strip() or "Controller"
         except OSError:
             continue
-    return pads
+        number = int(dev.name[5:]) if dev.name[5:].isdigit() else 0   # inputN
+        pads.setdefault(str(dev.parent), []).append((number, name))
+    return {parent: min(found)[1] for parent, found in pads.items()}
 
 
 def pad_batteries(sys_class=SYS):
@@ -766,7 +772,11 @@ def daemon(spec_file, player):
     gap = int(16 * u)
     while True:
         now = time.monotonic()
-        busy = bool(queue.tick(now))
+        # Also while something is still drawn: the last toasts to go are
+        # cleared on the pass after they expire. Waiting for the next
+        # event first left them on screen until another toast came, for
+        # good in a game (first box, 2026-10-09).
+        busy = bool(queue.tick(now)) or drawn is not None
         ready, _, _ = select.select([*servers, xfd], [], [], 1 / 30 if busy else None)
         for server in (x for x in servers if x in ready):
             conn, _ = server.accept()

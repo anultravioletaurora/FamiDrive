@@ -33,6 +33,17 @@ class Dolphin(unittest.TestCase):
                           3: "SDL/1/Nintendo GameCube Controller"})
         self.assertEqual(m.dolphin_devices(["gamepad"], []), {})
 
+    def test_face_buttons_by_the_pads_labels(self):
+        xbox = {"labels": {"A": "S", "B": "E", "X": "W", "Y": "N"}}
+        switch = {"labels": {"B": "S", "A": "E", "Y": "W", "X": "N"}}
+        playstation = {"labels": {}}
+        self.assertEqual(m.dolphin_face(xbox, "labels"), {"Buttons/A": "`Button S`", "Buttons/B": "`Button E`",
+                                                          "Buttons/X": "`Button W`", "Buttons/Y": "`Button N`"})
+        self.assertEqual(m.dolphin_face(switch, "labels"), {"Buttons/A": "`Button E`", "Buttons/B": "`Button S`",
+                                                            "Buttons/X": "`Button N`", "Buttons/Y": "`Button W`"})
+        self.assertEqual(m.dolphin_face(playstation, "labels"), m.dolphin_face(xbox, "labels"))
+        self.assertEqual(m.dolphin_face(switch, "positions"), {})
+
     def test_ini_keeps_spaces_and_other_keys(self):
         with tempfile.TemporaryDirectory() as d:
             f = Path(d) / "GCPadNew.ini"
