@@ -511,9 +511,23 @@ FamiDrive yet.
 
 - Wii Sports bowling worked with two remotes as two players
   (`controllers.wii.remotes = [ "real" … ]`).
+- **Paired with the box, the way to use them:** pair each remote with the
+  box's own Bluetooth once (`bluetoothctl`: `scan on`, press the red
+  sync button inside the battery cover, then `pair`, `trust` and
+  `connect` with its address). It shows up as `Nintendo RVL-CNT-01`
+  (`-TR` for a Wii Remote Plus). From then on, any button turns it on
+  and reconnects it, as on a Wii. FamiDrive lets the player at the TV
+  open it, so Dolphin takes it as a real remote about 6 seconds after a
+  game starts (it buzzes when that happens). A controller-friendly
+  pairing screen is planned (#144).
+- **2026-10-08, the Mii Channel on the first box:** ✅ with a remote
+  paired that way, pointer and all. Without the box's permission rule,
+  Dolphin couldn't open the remote and never took it. Dolphin's own
+  rules only cover remotes on USB.
 - **Still to check:** the remote's speaker (`controllers.wii.speaker`),
-  rumble, and Bluetooth passthrough with a Wii-compatible adapter
-  (`controllers.wii.bluetoothPassthrough`).
+  rumble, Bluetooth passthrough with a second, Wii-compatible adapter
+  (`controllers.wii.bluetoothPassthrough`), and whether ES-DE's menus
+  can use the remote.
 
 ## Wii MotionPlus
 
