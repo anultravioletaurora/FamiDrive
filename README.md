@@ -99,6 +99,15 @@ from RomM where the real console had one (Sega CD, TurboGrafx-CD, Disk
 System, Lynx, Intellivision, 3DO, Neo Geo CD): the firmware pull puts it
 where the core looks. Arcade ROMs must be a FinalBurn Neo romset, and Neo
 Geo games need `neogeo.zip` beside them.
+
+**The Wii System Menu** (for the Mii Channel and other channels) can come
+from RomM too: a zip of Dolphin's `Wii` folder, kept as Wii firmware.
+Make it once with Dolphin on any computer (Tools, Perform Online System
+Update, which installs it from Nintendo's update servers), then zip the
+`Wii` folder. A player whose Dolphin has no System Menu gets it at the
+start of their next session. One who already has one keeps theirs, files
+already there are never replaced, and nobody's Miis or saves come from
+the zip.
 Save sync is on for every system whose save files are mapped so far
 (✅ above, through RomM); the others (—) keep their saves on the box until theirs are.
 Every console system can also play from a folder already on the box

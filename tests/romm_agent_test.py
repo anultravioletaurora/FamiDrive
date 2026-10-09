@@ -748,6 +748,34 @@ class Test(unittest.TestCase):
         a["launchable"](d, "switch")
         self.assertEqual((d / "noload.txt").stat().st_mtime_ns, m)
         self.assertEqual((d / "dlc" / "noload.txt").stat().st_mtime_ns, before)
+    def test_wii_nand_first_time_only(self):
+        import zipfile
+        box = Box(self.base, "alice")
+        a = box.agent()
+        fw = self.base / "fw-wii"
+        fw.mkdir()
+        with zipfile.ZipFile(fw / "Wii 4.3U.zip", "w") as z:
+            z.writestr("Wii/title/00000001/00000002/content/title.tmd", b"menu")
+            z.writestr("Wii/title/00010002/48414341/content/title.tmd", b"mii channel")
+            z.writestr("Wii/shared2/sys/SYSCONF", b"template settings")
+            z.writestr("Wii/shared2/menu/FaceLib/RFL_DB.dat", b"someone else's miis")
+            z.writestr("Wii/title/00010000/52534245/data/save.bin", b"someone else's save")
+            z.writestr("Wii/../escape", b"no")
+        nand = box.home / ".local/share/dolphin-emu/Wii"
+        (nand / "shared2/sys").mkdir(parents=True)
+        (nand / "shared2/sys/SYSCONF").write_bytes(b"mine")
+        a["install_wii_nand"](fw)
+        self.assertEqual((nand / "title/00000001/00000002/content/title.tmd").read_bytes(), b"menu")
+        self.assertTrue((nand / "title/00010002/48414341/content/title.tmd").exists())
+        self.assertEqual((nand / "shared2/sys/SYSCONF").read_bytes(), b"mine")      # never replaced
+        self.assertFalse((nand / "shared2/menu/FaceLib").exists())                 # Miis: synced, not copied
+        self.assertFalse((nand / "title/00010000").exists())                       # saves: per game
+        self.assertFalse((self.base / "escape").exists() or (nand.parent / "escape").exists())
+        # A player who already has a System Menu keeps their NAND as it is.
+        (nand / "title/00010002/48414341/content/title.tmd").unlink()
+        a["install_wii_nand"](fw)
+        self.assertFalse((nand / "title/00010002/48414341/content/title.tmd").exists())
+
     def test_wii_u_keys_with_a_header_and_bom_are_tidied(self):
         box = Box(self.base, "alice")
         a = box.agent()

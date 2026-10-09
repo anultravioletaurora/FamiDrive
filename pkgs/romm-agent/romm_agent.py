@@ -1033,6 +1033,45 @@ def install_cemu_keys(d):
     dest.write_text("\n".join(have) + "\n")
 
 
+# What a Wii NAND from RomM never brings into a player's: their Miis
+# (miis.nix syncs those), and saves, which sync per game.
+WII_NAND_KEEP_OUT = ("shared2/menu/FaceLib/", "title/00010000/", "tmp/", "import/")
+
+
+def install_wii_nand(d):
+    """A Wii System Menu for a player's Dolphin, the first time: a zip of a
+    Wii NAND (Dolphin's Wii folder, as Tools > Perform Online System Update
+    leaves it, or a backup of the owner's own Wii) kept as Wii firmware in
+    RomM. Only for a player whose NAND has no System Menu yet: one they
+    have stays as it is. Files already there are never replaced, and
+    their Miis and saves aren't touched. Found 2026-10-08: a fresh 4.3U
+    install is 144 MB, the System Menu and its system titles plus six
+    channels, the Mii Channel among them."""
+    nand = Path.home() / ".local/share/dolphin-emu/Wii"
+    if (nand / "title/00000001/00000002/content/title.tmd").exists():
+        return
+    for archive in sorted(d.glob("*.zip")):
+        with zipfile.ZipFile(archive) as z:
+            names = [n for n in z.namelist() if not n.endswith("/")]
+            # Zipped from inside the Wii folder, or with the folder itself on top.
+            top = "Wii/" if names and all(n.startswith("Wii/") for n in names) else ""
+            if not any(n[len(top):].startswith("title/00000001/00000002/") for n in names):
+                print(f"{archive.name}: no Wii System Menu in it, skipped", file=sys.stderr)
+                continue
+            for n in names:
+                rel = n[len(top):]
+                parts = Path(rel).parts
+                if not rel or rel.startswith("/") or ".." in parts or rel.startswith(WII_NAND_KEEP_OUT):
+                    continue
+                dest = nand / rel
+                if dest.exists():
+                    continue
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                with z.open(n) as src, open(dest, "wb") as out:
+                    shutil.copyfileobj(src, out)
+        return
+
+
 # Raised when an installer changes how it installs. 2: Cemu's keys.txt
 # tidied (2026-10-07).
 INSTALLERS_VERSION = 2
@@ -1040,6 +1079,7 @@ INSTALLERS_VERSION = 2
 INSTALLERS = {
     "ps2": install_ps2_bios,
     "wiiu": install_cemu_keys,
+    "wii": install_wii_nand,
     # No PS3 entry: RPCS3 installs firmware only through its window, which
     # asks "Install?" first and says "Success" after, and both wait for a
     # click. Found on the first box 2026-10-06: run at each session start,
