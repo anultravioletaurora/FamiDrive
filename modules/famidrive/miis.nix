@@ -95,7 +95,7 @@ in
 
     famidrive.romm.apps = lib.mkIf sync {
       wii-miis = {
-        title = "Wii Miis";
+        title = "Mii Channel";   # as ES-DE shows it
         rom = wii.romm.entry;
         emulator = "dolphin";
         saveLayout = { kind = "files"; root = dolphinWii; paths = [ "shared2/menu/FaceLib/RFL_DB.dat" ]; };

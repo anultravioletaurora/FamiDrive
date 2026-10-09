@@ -245,8 +245,8 @@ in
         description = ''
           Apps that aren't ROMs but keep saves in RomM, under an entry added
           to RomM by hand (Clone Hero's scores): name -> { title, rom,
-          emulator, saveLayout }, where title is how toasts name it. Set by
-          the app's module.
+          emulator, saveLayout }, where title is the name ES-DE shows it by,
+          which toasts use too. Set by the app's module.
         '';
       };
 

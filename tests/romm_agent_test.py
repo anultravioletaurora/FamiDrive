@@ -328,9 +328,9 @@ class Test(unittest.TestCase):
         a["cmd_save_push"]("gc", nand)
 
     def test_an_apps_toast_uses_its_title(self):
-        box = Box(self.base, "alice", apps={"wii-miis": {"title": "Wii Miis", "rom": "Mii Channel"}})
+        box = Box(self.base, "alice", apps={"wii-miis": {"title": "Mii Channel", "rom": "Mii Channel"}})
         a = box.agent()
-        self.assertEqual(a["game_name"]("app:wii-miis", {"id": 3074}), "Wii Miis")
+        self.assertEqual(a["game_name"]("app:wii-miis", {"id": 3074}), "Mii Channel")
         self.assertEqual(a["game_name"]("app:other", {}), "other")   # no title: its name, not "app:other"
 
     def test_save_state_follows_a_rename(self):
