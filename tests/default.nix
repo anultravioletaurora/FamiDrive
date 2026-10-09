@@ -78,6 +78,7 @@ let
     '';
   # A family: two players with RomM, a guest, every lane.
   familyHost = {
+    networking.networkmanager.enable = true;   # as NixOS's installer sets it up
     famidrive = {
       enable = true;
       lanes = [ "roms" "steam" "heroic" "minecraft" ];
@@ -197,6 +198,7 @@ in
   toast = unit "toast" ../pkgs/famidrive-toast/famidrive_toast.py pkgs.python3;
   pads = unit "pads" ../pkgs/famidrive-pads/famidrive_pads.py pkgs.python3;
   bluetooth = unit "bluetooth" ../pkgs/famidrive-bluetooth/famidrive_bluetooth.py pkgs.python3;
+  network = unit "network" ../pkgs/famidrive-network/famidrive_network.py pkgs.python3;
   padmouse = unit "padmouse" ../pkgs/famidrive-padmouse/famidrive_padmouse.py pkgs.python3;
   quit = unit "quit" ../pkgs/famidrive-quit/famidrive_quit.py pkgs.python3;
   cheevos = unit "cheevos" ../pkgs/famidrive-cheevos/famidrive_cheevos.py
@@ -332,6 +334,10 @@ in
       (check "no autologin" (!(c.services.greetd.settings ? initial_session)))
       (check "players' RomM pictures go where the picker can read them, each player only their own"
         (lib.elem "d /var/lib/famidrive-picker/avatars 3775 greeter famidrive -" c.systemd.tmpfiles.rules))
+      (check "Wi-Fi and Ethernet in Settings: entries each session, launched by famidrive-network, players may join networks"
+        (lib.hasInfix "famidrive-network entries" c.famidrive.sessionSetup
+          && lib.hasInfix "famidrive-network launch" c.famidrive.systems.settings.command
+          && lib.hasInfix "org.freedesktop.NetworkManager." c.security.polkit.extraConfig))
       (check "a switch restarts the session when it changed" c.systemd.services.greetd.restartIfChanged)
       (check "a host's own cleanup choice wins" (c.nix.gc.options == "--delete-older-than 30d"))
       (check "YARG can open rhythm-game hardware's hidraw devices (Raphnet among them)"

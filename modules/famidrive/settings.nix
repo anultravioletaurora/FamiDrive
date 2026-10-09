@@ -12,6 +12,10 @@
 #   Forget <controller>     toasts for what's happening; only on a box
 #                           with a Bluetooth adapter, checked each session;
 #                           controllers.bluetoothPairing
+#   Wi-Fi: <network>,       join a network, forget one, see the wired
+#   Forget Wi-Fi: <network>, port's state (famidrive-network); written each
+#   Ethernet                session for the box's own adapters;
+#                           networkSettings
 { config, lib, pkgs, ... }:
 
 let
@@ -20,6 +24,7 @@ let
   heroic = lib.elem "heroic" cfg.lanes;
   jellyfin = cfg.media.jellyfin.enable;
   bluetooth = cfg.controllers.bluetoothPairing;
+  network = cfg.networkSettings && config.networking.networkmanager.enable;
 
   # Placeholder file name (what ES-DE shows) -> what it opens.
   entries =
@@ -49,7 +54,19 @@ in
     '';
   };
 
-  config = lib.mkIf (cfg.enable && (entries != { } || bluetooth)) {
+  options.famidrive.networkSettings = lib.mkOption {
+    type = lib.types.bool;
+    default = true;
+    description = ''
+      Wi-Fi and Ethernet in Settings: an entry for each Wi-Fi network in
+      range (launch it to join; a password is typed in ES-DE's game-info
+      editor as the entry's Sort name), one to forget each remembered
+      network, and one per wired port that shows its state. Needs
+      NetworkManager (`networking.networkmanager.enable`).
+    '';
+  };
+
+  config = lib.mkIf (cfg.enable && (entries != { } || bluetooth || network)) {
     famidrive.systems.settings = {
       fullname = "Settings";
       theme = "tools";   # Art Book Next's tools art
@@ -64,15 +81,31 @@ in
             bluetooth-pair) exec ${pkgs.famidrive-bluetooth}/bin/famidrive-bluetooth pair ;;
             bluetooth-forget\ *) exec ${pkgs.famidrive-bluetooth}/bin/famidrive-bluetooth forget "$(cut -d' ' -f2 "$ROM")" ;;
           ''}
+          ${lib.optionalString network ''network-*) exec ${pkgs.famidrive-network}/bin/famidrive-network launch "$ROM" ;;''}
         esac
       '';
     };
 
     # Bluetooth's entries follow the hardware and what's paired, so
     # they're written as each session starts, not at switch.
-    famidrive.sessionSetup = lib.mkIf bluetooth ''
+    famidrive.sessionSetup = lib.optionalString bluetooth ''
       ${pkgs.famidrive-bluetooth}/bin/famidrive-bluetooth entries "$HOME/.local/share/famidrive/roms/settings" \
         || echo "famidrive-session: couldn't list Bluetooth controllers" >&2
+    '' + lib.optionalString network ''
+      ${pkgs.famidrive-network}/bin/famidrive-network entries "$HOME/.local/share/famidrive/roms/settings" \
+        || echo "famidrive-session: couldn't list networks" >&2
+    '';
+
+    # Players join and forget networks for the whole box, so Wi-Fi is up
+    # before anyone picks a player. NetworkManager asks for an admin
+    # password for that otherwise, which can't be typed from a controller.
+    security.polkit.extraConfig = lib.mkIf network ''
+      polkit.addRule(function(action, subject) {
+        if (action.id.indexOf("org.freedesktop.NetworkManager.") == 0
+            && subject.isInGroup("famidrive")) {
+          return polkit.Result.YES;
+        }
+      });
     '';
 
     # Each player's own Settings folder, rewritten on every boot and

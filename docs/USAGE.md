@@ -1498,6 +1498,17 @@ The ES-DE theme folder for its logo and art. null: the platform's.
 
 ## Everything else
 
+### `famidrive.networkSettings`
+
+Wi-Fi and Ethernet in Settings: an entry for each Wi-Fi network in
+range (launch it to join; a password is typed in ES-DE's game-info
+editor as the entry's Sort name), one to forget each remembered
+network, and one per wired port that shows its state. Needs
+NetworkManager (`networking.networkmanager.enable`).
+
+- **Type:** boolean
+- **Default:** `true`
+
 ### `famidrive.overlays.performance.enable`
 
 MangoHud's performance overlay (frame rate, frame times, CPU and

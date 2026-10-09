@@ -532,9 +532,18 @@ NixOS, but isn't covered here.
    playing?" with more than one player.
 8. **First run, on the TV:**
    - **Controllers:** 2.4 GHz dongles and wired pads work as they are.
-     Pair Bluetooth pads once with `bluetoothctl` over SSH
-     (`scan on`, then `pair`, `trust` and `connect` with the pad's
-     address). [CONTROLLERS.md](docs/CONTROLLERS.md) has each pad's notes.
+     For a Bluetooth pad, put it in pairing mode and launch Settings →
+     Pair a Controller: the first one found is paired, and toasts say
+     how it went. Settings → Forget <controller> unpairs one.
+     [CONTROLLERS.md](docs/CONTROLLERS.md) has each pad's notes.
+   - **Wi-Fi:** Settings lists the networks in range as "Wi-Fi:
+     <network>". An open one joins when launched. For one with a
+     password, press Select on it, choose "Edit this game's metadata",
+     type the password as its **Sort name** with ES-DE's on-screen
+     keyboard, Save, then launch it. The password is wiped from ES-DE's
+     list after joining, and the box remembers the network.
+     Settings → Ethernet shows the wired port: cable, address, speed and
+     hardware address. The lists are as they were when ES-DE started.
    - **Steam:** sign in under Settings → Steam Settings.
    - **GOG, Epic, Amazon:** sign in under Settings → Heroic Games
      Launcher, if `lanes` has `"heroic"`.
