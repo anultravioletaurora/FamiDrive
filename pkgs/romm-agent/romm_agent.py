@@ -1515,13 +1515,13 @@ def eden_profile():
 
 # Where RomM's web page loads a user's avatar_path from (its
 # FRONTEND_RESOURCES_PATH): the uploaded files under RomM's assets.
-AVATARS = "/assets/romm/assets/"
-
-
 def avatar_url(me):
-    """The picture's address on the RomM server, or None for no picture."""
-    path = (me.get("avatar_path") or "").lstrip("/")
-    return BASE + AVATARS + path if path else None
+    """The picture's address on the RomM server, or None for no picture.
+    RomM 5 serves it from the API, as its own pages do; the avatar_path
+    under /assets/romm/assets/ is a 404 (5.3.1, 2026-10-09)."""
+    if not me.get("avatar_path") or me.get("id") is None:
+        return None
+    return f"{API}/users/{me['id']}/avatar"
 
 
 def cmd_avatar(folder):
