@@ -217,8 +217,13 @@ Warfare's Legacy Edition.
 **Steam: ✅ Works.**
 
 - **Runs on:** GE-Proton7-50, set in Steam.
-- **Mods:** through Vortex: Cyber Engine Tweaks, RED4ext and archive
-  mods all load. Declaring them in Nix is tracked in #6.
+- **Mods:** ✅ from Nexus Mods collections, installed by FamiDrive
+  ([MODDING.md](MODDING.md)). 2026-10-10, on the first box: first
+  Welcome to Night City 2.31a (revision 481) in place of Vortex's install,
+  then NCR Core 2.31a + NCR – Extras + High-Res Graphics Pack – MAXIMUM
+  (5,575 files, 23 GB of archives): "looks preem". redscript compiled
+  every script, RED4ext and Cyber Engine Tweaks loaded with no errors.
+  The Proton launch option below is still needed.
 - **Launch options:** `WINEDLLOVERRIDES="winmm,version=n,b" %command%`.
 - **Launching:** works. Steam's window shows briefly, then a black screen
   for about 37 s while the game starts, then the game. It used to drop
