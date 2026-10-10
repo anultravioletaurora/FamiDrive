@@ -667,6 +667,14 @@ covers what can be tested without a TV or a server ([tests/](tests)):
   with checks on what the module made of them
 - every package in the flake, built
 
+Every Monday the Update workflow
+([.github/workflows/update.yml](.github/workflows/update.yml)) opens one
+pull request with the week's updates: the flake's inputs, and FamiDrive's
+own pins ([scripts/update-pins.py](scripts/update-pins.py): ES-DE, xNVSE,
+Art Book Next, the SuperTux games, the BepInExPacks), new hashes
+included. It's checked like any other; merge it when it's green. It can
+also be started by hand from the Actions tab.
+
 Run the same locally with `nix flake check`. After merging, a change gets
 tried on a real box (and against RomM, for anything that touches it),
 and the results go in [COMPATIBILITY.md](docs/COMPATIBILITY.md) (games) and
