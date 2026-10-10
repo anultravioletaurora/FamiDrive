@@ -120,7 +120,7 @@ writeShellApplication {
 
     if [ "''${1:-}" = "--steam" ] && [ "''${2:-}" = "bigpicture" ]; then
       echo "steam steam://close/bigpicture" > "$run/famidrive-game.close"
-      steam steam://open/bigpicture
+      SDL_GAMECONTROLLER_IGNORE_DEVICES="''${FAMIDRIVE_STEAM_SDL_IGNORE:-}" steam steam://open/bigpicture
       base "769,$FRONTEND"   # 769: the app id Steam gives its own windows
       bp_shown() {
         wid=$(xwininfo -root -children 2>/dev/null | awk '/"Steam Big Picture Mode"/ { print $1; exit }' || true)
@@ -270,7 +270,7 @@ writeShellApplication {
       famidrive-status "$appid" "$status_file" &
       status_pid=$!
       base "$STATUS,769,$FRONTEND"
-      steam -applaunch "$appid"
+      SDL_GAMECONTROLLER_IGNORE_DEVICES="''${FAMIDRIVE_STEAM_SDL_IGNORE:-}" steam -applaunch "$appid"
 
       # -applaunch only hands the game to the running Steam client and
       # returns. Wait for Steam's launcher (`reaper SteamLaunch AppId=N`),
@@ -327,7 +327,7 @@ writeShellApplication {
             seen=$(wc -l < "$log" 2>/dev/null || echo 0)
             idle=0
             last=""
-            steam -applaunch "$appid"
+            SDL_GAMECONTROLLER_IGNORE_DEVICES="''${FAMIDRIVE_STEAM_SDL_IGNORE:-}" steam -applaunch "$appid"
             continue
           fi
           echo "gamescope-fg: Steam couldn't launch $appid; see $log" >&2

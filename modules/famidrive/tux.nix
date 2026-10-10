@@ -20,11 +20,11 @@
 let
   cfg = config.famidrive;
 
-  # SDL leaves out an instrument adapter (raphnet's WUSBMote, for Wii
-  # guitars), which it otherwise counts as a game controller. Found on the
-  # first box 2026-10-09: SuperTux gave player 1 the first controller,
-  # which was the guitar adapter, and the 8BitDo did nothing.
-  ignoreInstruments = "SDL_GAMECONTROLLER_IGNORE_DEVICES=0x289b/0x0080";
+  # SDL leaves out instrument adapters (controllers.instruments), which it
+  # otherwise counts as game controllers. Found on the first box
+  # 2026-10-09: SuperTux gave player 1 the first controller, which was the
+  # guitar adapter, and the 8BitDo did nothing.
+  ignoreInstruments = "SDL_GAMECONTROLLER_IGNORE_DEVICES=${cfg.controllers.sdlIgnoreDevices}";
 
   # Each game: its option, its Ports entry's name, the word in its .port
   # file, what runs it, and anything set for it first.

@@ -59,10 +59,15 @@ let
       ${pkgs.famidrive-steam-config}/bin/famidrive-steam-config ${lib.escapeShellArg (builtins.toJSON {
         inherit (cfg.steam) compatTools steamInput steamInputGames launchOptions;
       })} || echo "famidrive-session: couldn't apply Steam settings" >&2
+      # Instrument adapters out of Steam and its games (controllers.instruments):
+      # games inherit Steam's environment. Not exported as SDL's own name,
+      # or ES-DE, Clone Hero and YARG wouldn't see the guitars either;
+      # gamescope-fg passes it on wherever it starts Steam.
+      export FAMIDRIVE_STEAM_SDL_IGNORE=${lib.escapeShellArg cfg.controllers.sdlIgnoreDevices}
       # Start Steam hidden up front. Otherwise the first `steam -applaunch`
       # brings up Steam's own client windows, which then fight the game
       # for gamescope's single focused window.
-      steam -silent &
+      SDL_GAMECONTROLLER_IGNORE_DEVICES="$FAMIDRIVE_STEAM_SDL_IGNORE" steam -silent &
     ''}
     ${lib.optionalString (config.famidrive.esde.theme != null) ''
       # The Steam launch status screen draws in the theme's fonts.

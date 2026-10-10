@@ -283,6 +283,21 @@ in
       (lib.elem 3658 c.networking.firewall.allowedUDPPorts && !(lib.elem 2626 c.networking.firewall.allowedUDPPorts)))
   ]);
 
+  # Instrument adapters: out of Steam games and SuperTux, in SDL's form.
+  box-instruments = expect "instruments" {
+    famidrive = {
+      enable = true;
+      romm.enable = false;
+      lanes = [ "roms" "steam" ];
+      superTux.enable = true;
+      controllers.instruments = [ "289B:0080" "12ba:0100" ];
+      players.alice = { };
+    };
+  } (c: [
+    (check "the list as SDL and Proton read it"
+      (c.famidrive.controllers.sdlIgnoreDevices == "0x289b/0x0080,0x12ba/0x0100"))
+  ]);
+
   # RetroAchievements for one player of two: their secret, their session
   # signing in, and the unlock watcher beside every RetroArch game.
   box-retroachievements = expect "retroachievements" {
