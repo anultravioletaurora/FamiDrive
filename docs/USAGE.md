@@ -298,6 +298,16 @@ Their RomM Client API Token (rmm_...), decrypted by sops-nix.
 - **Type:** null or absolute path
 - **Default:** their sops secret, `<name>/romm`
 
+### `famidrive.players.<name>.rpcn.username`
+
+Their RPCN username: what other players see in lobbies, 3 to 16
+letters, digits, - or _. Their RomM username unless it's set;
+an account made in RPCS3 under another name goes here.
+
+- **Type:** string
+- **Default:** `owner`
+- **Example:** `"alice-ps3"`
+
 ### `famidrive.players.<name>.user`
 
 Their Linux account. Made if it doesn't exist yet.
@@ -375,10 +385,10 @@ RomM base URL, over HTTPS (behind a reverse proxy) so boxes off the LAN can reac
 
 ### `famidrive.endpoints.rpcn`
 
-RPCN server (PS3 online, RPCS3), host and port. Needs a port forward: it signals peer-to-peer connections.
+RPCN server (PS3 online, RPCS3), host and optional port: RPCS3's public one unless set. A self-hosted one needs a port forward, since it signals peer-to-peer connections.
 
 - **Type:** string
-- **Default:** none; required when used
+- **Default:** `"np.rpcs3.net"`
 - **Example:** `"rpcn.example.com:31313"`
 
 ### `famidrive.endpoints.xeniaWebServices`
@@ -1440,6 +1450,16 @@ Whether to enable online play for this box's emulators.
 - **Type:** boolean
 - **Default:** `false`
 - **Example:** `true`
+
+### `famidrive.online.ps3.enable`
+
+PS3 online through RPCN, RPCS3's stand-in for the PlayStation
+Network, on its own: each player signed in to their RPCN account
+(their sops secret `<name>/rpcn`) on the server in
+`endpoints.rpcn`. See docs/Online-Play/PS3.md.
+
+- **Type:** boolean
+- **Default:** `config.famidrive.online.enable`
 
 ## Systems
 

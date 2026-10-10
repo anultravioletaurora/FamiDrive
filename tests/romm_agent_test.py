@@ -804,6 +804,17 @@ class Test(unittest.TestCase):
         lines = cemu.read_text().splitlines()
         self.assertEqual(lines, ["# Wii-U Title Keys", "# ----------------", "d7b0" * 8 + " # Game"])
 
+    def test_ps3_disc_keys_go_where_rpcs3_looks(self):
+        box = Box(self.base, "alice")
+        a = box.agent()
+        fw = self.base / "fw-ps3"
+        fw.mkdir()
+        (fw / "Game (USA).dkey").write_text("0123456789ABCDEF0123456789ABCDEF")
+        (fw / "PS3UPDAT.PUP").write_bytes(b"firmware")
+        a["install_ps3_disc_keys"](fw)
+        keys = box.home / ".config/rpcs3/data/redump"
+        self.assertEqual(sorted(p.name for p in keys.iterdir()), ["Game (USA).dkey"])
+
     def test_wii_u_keys_merge_into_cemus(self):
         box = Box(self.base, "alice")
         a = box.agent()
