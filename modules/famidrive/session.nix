@@ -9,6 +9,12 @@
 let
   inherit (lib) mkOption types;
   cfg = config.famidrive;
+
+  # famidrive-steam-config's settings, with a player's own launch options.
+  steamSettings = own: lib.escapeShellArg (builtins.toJSON {
+    inherit (cfg.steam) compatTools steamInput steamInputGames;
+    launchOptions = cfg.steam.launchOptions // own;
+  });
   hasLane = l: lib.elem l cfg.lanes;
 
   picker = lib.length (lib.attrNames cfg.allPlayers) > 1;
@@ -54,11 +60,17 @@ let
       export DXVK_HDR=1
     ''}
     ${lib.optionalString (hasLane "steam") ''
-      # Proton pins and Steam Input, written while Steam isn't running
-      # (pkgs/famidrive-steam-config).
-      ${pkgs.famidrive-steam-config}/bin/famidrive-steam-config ${lib.escapeShellArg (builtins.toJSON {
-        inherit (cfg.steam) compatTools steamInput steamInputGames launchOptions;
-      })} || echo "famidrive-session: couldn't apply Steam settings" >&2
+      # Proton pins, Steam Input and launch options, written while Steam
+      # isn't running (pkgs/famidrive-steam-config). A player's own launch
+      # options (their mods') go over the box's.
+      case "$(id -un)" in
+      ${lib.concatStrings (lib.mapAttrsToList (user: own: ''
+        ${user}) steam_settings=${steamSettings own} ;;
+      '') cfg.steam.playerLaunchOptions)}
+        *) steam_settings=${steamSettings { }} ;;
+      esac
+      ${pkgs.famidrive-steam-config}/bin/famidrive-steam-config "$steam_settings" \
+        || echo "famidrive-session: couldn't apply Steam settings" >&2
       # Instrument adapters out of Steam and its games (controllers.instruments):
       # games inherit Steam's environment. Not exported as SDL's own name,
       # or ES-DE, Clone Hero and YARG wouldn't see the guitars either;
@@ -262,6 +274,13 @@ in
       support is missing or worse, such as Valve's older games, which
       expect Steam Input.
     '';
+  };
+
+  options.famidrive.steam.playerLaunchOptions = mkOption {
+    type = types.attrsOf (types.attrsOf types.str);
+    default = { };
+    internal = true;
+    description = "Launch options for one player only, by their user, over `launchOptions` (thunderstore.nix).";
   };
 
   options.famidrive.steam.launchOptions = mkOption {

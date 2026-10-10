@@ -42,7 +42,8 @@ of games you own. See [Your games](#your-games).
 - [Compatibility](docs/COMPATIBILITY.md): game-by-game results
 - [Controllers](docs/CONTROLLERS.md): each pad's results and notes
 - [Modding](docs/MODDING.md): Nexus Mods collections for Steam games,
-  Thunderstore for Valheim, and texture packs and mods for emulators
+  Thunderstore for Valheim and Risk of Rain 2, and texture packs and
+  mods for emulators
 - [Online play: PS3](docs/Online-Play/PS3.md): RPCN accounts, disc keys,
   and how a PS3 game gets online
 
@@ -658,7 +659,7 @@ Changes go in through pull requests. Each one runs `nix flake check` on
 GitHub ([.github/workflows/check.yml](.github/workflows/check.yml)), which
 covers what can be tested without a TV or a server ([tests/](tests)):
 
-- unit tests for FamiDrive's own tools (the RomM agent, the Valheim mod
+- unit tests for FamiDrive's own tools (the RomM agent, the Thunderstore mod
   installer, the Steam settings writer, "Who's playing?"), against
   made-up files
 - example boxes (one player; a family with RomM and a guest), evaluated

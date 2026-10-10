@@ -84,6 +84,10 @@ let
       lanes = [ "roms" "steam" "heroic" "minecraft" ];
       players = {
         alice.romm.tokenFile = "/run/secrets/alice-token";
+        alice.thunderstore.games = {
+          "892970".mods."ValheimModding-Jotunn-2.30.2" = "sha256-iq6S2ivg62ggzUz1fi9sHWrQ1zjUkVlm58PXqU6amw8=";
+          "632360" = { };   # Risk of Rain 2: BepInEx alone
+        };
         bob.owner = "bobby";
       };
       primaryPlayer = "alice";
@@ -118,7 +122,6 @@ let
         songs."AFI - Miss Murder" = "05185565cb931978c11de73d3048206e";
         audioOffset = 200;
       };
-      valheim.mods."ValheimModding-Jotunn-2.30.2" = "sha256-iq6S2ivg62ggzUz1fi9sHWrQ1zjUkVlm58PXqU6amw8=";
     };
     nix.gc.options = "--delete-older-than 30d";   # a host's own choice wins
   };
@@ -166,7 +169,7 @@ in
 
   romm-agent = unit "romm_agent" ../pkgs/romm-agent/romm_agent.py
     (pkgs.python3.withPackages (ps: [ ps.requests ps.cryptography ]));
-  valheim = unit "valheim" ../pkgs/famidrive-valheim/famidrive_valheim.py pkgs.python3;
+  thunderstore = unit "thunderstore" ../pkgs/famidrive-thunderstore/famidrive_thunderstore.py pkgs.python3;
   steam-config = unit "steam_config" ../pkgs/famidrive-steam-config/famidrive_steam_config.py pkgs.python3;
   clonehero = unit "clonehero" ../pkgs/famidrive-clonehero/famidrive_clonehero.py pkgs.python3;
   kodi = unit "kodi" ../pkgs/famidrive-kodi/famidrive_kodi.py pkgs.python3;
@@ -452,6 +455,14 @@ in
           && lib.hasInfix "org.freedesktop.NetworkManager." c.security.polkit.extraConfig))
       (check "a switch restarts the session when it changed" c.systemd.services.greetd.restartIfChanged)
       (check "a host's own cleanup choice wins" (c.nix.gc.options == "--delete-older-than 30d"))
+      (check "Thunderstore mods are each player's own: BepInEx loads only in their Steam, Valheim's and Risk of Rain 2's known"
+        (lib.hasInfix "famidrive-thunderstore" c.home-manager.users.alice.home.activation.famidriveThunderstore.data
+          && lib.hasInfix "bbepis-BepInExPack" c.home-manager.users.alice.home.activation.famidriveThunderstore.data
+          && !(c.home-manager.users.bob.home.activation ? famidriveThunderstore)
+          && c.famidrive.steam.playerLaunchOptions.alice."892970" == "./start_game_bepinex.sh %command%"
+          && lib.hasInfix "winhttp=n,b" c.famidrive.steam.playerLaunchOptions.alice."632360"
+          && !(c.famidrive.steam.playerLaunchOptions ? bob)
+          && !(c.famidrive.steam.launchOptions ? "892970")))
       (check "YARG can open rhythm-game hardware's hidraw devices (Raphnet among them)"
       (lib.any (p: lib.hasInfix "famidrive-instruments" (toString p)) c.services.udev.packages))
     (check "real Wii Remotes paired over Bluetooth can be opened by the player at the TV"

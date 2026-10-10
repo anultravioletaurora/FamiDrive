@@ -6,7 +6,7 @@ kept in place without anyone at the TV with a keyboard:
 | Mods for | From | Chosen in | Account |
 |---|---|---|---|
 | Steam and GOG games (Cyberpunk 2077, Fallout: New Vegas) | [Nexus Mods](#nexus-mods) collections and Wabbajack lists | each player's config | the player's, premium |
-| Valheim | [Thunderstore](#thunderstore-valheim) | the box's config | none |
+| Valheim, Risk of Rain 2 and other BepInEx games on Steam | [Thunderstore](#thunderstore) | each player's config | none |
 | GameCube, Wii and Switch games | [your RomM library](#emulators) | RomM | none |
 
 Mods come from their authors' pages; FamiDrive downloads them the way
@@ -215,23 +215,49 @@ its DLC on Steam.
   Steam updating the game past it can break mods until the curator
   publishes a new revision.
 
-## Thunderstore (Valheim)
+## Thunderstore
 
-Valheim's mods come from Thunderstore, declared by the same
-Author-Name-Version ids a dedicated server's mod list uses, so a box can
-match a server's pack exactly:
+Thunderstore is where r2modman and Thunderstore Mod Manager get their
+mods: BepInEx plugins for Unity games such as Valheim and Risk of Rain 2.
+Each player declares their own, by Steam app id, with the same
+Author-Name-Version ids a dedicated server's mod list or an r2modman
+profile uses, so they can match a server's or their friends' pack:
 
 ```nix
-famidrive.valheim.mods = {
-  "ValheimModding-Jotunn-2.30.2" = "sha256-…";
-  "RandyKnapp-EquipmentAndQuickSlots-3.1.3" = "sha256-…";
+famidrive.players.alice.thunderstore.games = {
+  "892970".mods = {   # Valheim
+    "ValheimModding-Jotunn-2.30.2" = "sha256-…";
+    "RandyKnapp-EquipmentAndQuickSlots-3.1.3" = "sha256-…";
+  };
+  "632360".mods = {   # Risk of Rain 2
+    "tristanmcpherson-R2API-5.0.5" = "sha256-…";
+  };
 };
 ```
 
-Each is downloaded by Nix at build time, with its hash (leave it `""` and
-the build error gives the right one). Dependencies aren't added for you:
-list them too, as a server's list does. Setting any installs BepInEx and
-Valheim's launch option for it. No account is needed.
+- **Downloads:** each package is downloaded by Nix at build time, with
+  its hash (leave it `""` and the build error gives the right one). No
+  account is needed.
+- **Dependencies** aren't added for you: list them too, as a server's
+  list does. One that's missing is logged when the mods go in.
+- **Where they go:** the rebuild puts BepInEx and the mods in the
+  player's own Steam copy of the game, where r2modman would, and sets
+  the game's launch options that load BepInEx for that player only. A
+  player without mods plays the game unmodded.
+- **Only what's listed:** plugins that aren't listed are moved to
+  `BepInEx/plugins-off` (not deleted), so the game matches the pack
+  exactly. `onlyListed = false` keeps plugins added by hand.
+- **Taking a game out** clears its launch options, so it starts
+  unmodded; its files stay in the game's folder.
+- **Other games:** FamiDrive knows Valheim's and Risk of Rain 2's BepInEx
+  pack and launch options. For another BepInEx game, set its
+  `bepinex.package`, `bepinex.hash` and `launchOptions` too. A Windows
+  game under Proton loads BepInEx with
+  `WINEDLLOVERRIDES="winhttp=n,b" %command%`.
+
+Valheim's mods were once one list for the whole box
+(`famidrive.valheim.mods`); that option is gone, and the build says
+where its mods go now.
 
 ## Emulators
 

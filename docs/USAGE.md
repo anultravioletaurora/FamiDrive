@@ -31,7 +31,6 @@ is on; every other option is optional.
 - [Miis](#miis)
 - [Space Cadet Pinball](#space-cadet-pinball)
 - [Minecraft](#minecraft)
-- [Valheim](#valheim)
 - [PC saves](#pc-saves)
 - [Online play](#online-play)
 - [Systems](#systems)
@@ -383,6 +382,83 @@ an account made in RPCS3 under another name goes here.
 - **Type:** string
 - **Default:** `owner`
 - **Example:** `"alice-ps3"`
+
+### `famidrive.players.<name>.thunderstore.games`
+
+Thunderstore (BepInEx) mods for their Steam games, by app id.
+Valheim (892970) and Risk of Rain 2 (632360) need only `mods`;
+another game also needs its `bepinex` pack and `launchOptions`.
+Put in their own Steam library's copy of the game at each
+rebuild, with BepInEx turned on for them only. A game taken out
+keeps its files but starts unmodded (its launch options are
+cleared). See docs/MODDING.md.
+
+- **Type:** attribute set of (submodule)
+- **Default:** `{ }`
+- **Example:** 
+
+  ```nix
+  {
+    "892970".mods = {   # Valheim
+      "ValheimModding-Jotunn-2.30.2" = "sha256-…";
+    };
+    "632360".mods = {   # Risk of Rain 2
+      "tristanmcpherson-R2API-5.0.5" = "sha256-…";
+    };
+  }
+  ```
+
+### `famidrive.players.<name>.thunderstore.games.<name>.bepinex.hash`
+
+Hash of that package's download.
+
+- **Type:** string
+- **Default:** the game's, for Valheim and Risk of Rain 2
+
+### `famidrive.players.<name>.thunderstore.games.<name>.bepinex.package`
+
+The game's BepInExPack on Thunderstore, by Author-Name-Version.
+
+- **Type:** null or string
+- **Default:** the game's, for Valheim and Risk of Rain 2
+- **Example:** `"bbepis-BepInExPack-5.4.2122"`
+
+### `famidrive.players.<name>.thunderstore.games.<name>.launchOptions`
+
+The game's launch options in Steam that load BepInEx, for this
+player only: a Windows game under Proton needs the winhttp
+override above. Cleared again when the game is taken out.
+
+- **Type:** null or string
+- **Default:** the game's, for Valheim and Risk of Rain 2
+- **Example:** `"WINEDLLOVERRIDES=\"winhttp=n,b\" %command%"`
+
+### `famidrive.players.<name>.thunderstore.games.<name>.mods`
+
+Thunderstore packages, by Author-Name-Version, each with the hash
+of its download (leave it "" and the build error gives the right
+one). Dependencies aren't added for you: list them too, as a
+server's list does (a missing one is logged).
+
+- **Type:** attribute set of string
+- **Default:** `{ }`
+- **Example:** 
+
+  ```nix
+  {
+    "RandyKnapp-EquipmentAndQuickSlots-3.1.3" = "sha256-…";
+    "ValheimModding-Jotunn-2.30.2" = "sha256-…";
+  }
+  ```
+
+### `famidrive.players.<name>.thunderstore.games.<name>.onlyListed`
+
+Turn off plugins that aren't listed (they're moved to
+BepInEx/plugins-off, not deleted), so the game matches a
+server's pack exactly. Off: plugins added by hand stay on.
+
+- **Type:** boolean
+- **Default:** `true`
 
 ### `famidrive.players.<name>.user`
 
@@ -1498,52 +1574,6 @@ Servers in the multiplayer list. Servers added in-game stay.
 
 - **Type:** string
 - **Default:** none; required when used
-
-## Valheim
-
-Valheim mods, for playing on a modded server.
-
-### `famidrive.valheim.bepinex.hash`
-
-Hash of that version's download.
-
-- **Type:** string
-- **Default:** `"sha256-vOYxSXl2qTl3zrCOFmcS5sMdFSRJVvifF98JKpti4p8="`
-
-### `famidrive.valheim.bepinex.version`
-
-denikson's BepInExPack_Valheim version.
-
-- **Type:** string
-- **Default:** `"5.4.2351"`
-
-### `famidrive.valheim.mods`
-
-Thunderstore packages to play Valheim with, by Author-Name-Version,
-each with the hash of its download (leave it "" and the build
-error gives the right one). Dependencies aren't added for you: list
-them too, as a server's list does. Setting any turns on BepInEx and
-Valheim's launch option for it.
-
-- **Type:** attribute set of string
-- **Default:** `{ }`
-- **Example:** 
-
-  ```nix
-  {
-    "RandyKnapp-EquipmentAndQuickSlots-3.1.3" = "sha256-…";
-    "ValheimModding-Jotunn-2.30.2" = "sha256-…";
-  }
-  ```
-
-### `famidrive.valheim.onlyListed`
-
-Turn off plugins that aren't listed (they're moved to
-BepInEx/plugins-off, not deleted), so the game matches a server's
-pack exactly. Off: plugins added by hand stay on.
-
-- **Type:** boolean
-- **Default:** `true`
 
 ## PC saves
 

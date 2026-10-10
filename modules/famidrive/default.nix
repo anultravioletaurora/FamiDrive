@@ -118,7 +118,7 @@ in
     ./endpoints.nix
     ./controllers.nix
     ./minecraft.nix
-    ./valheim.nix
+    ./thunderstore.nix
     ./clonehero.nix
     ./yarg.nix
     ./osu.nix
