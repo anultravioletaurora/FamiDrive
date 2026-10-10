@@ -140,6 +140,8 @@ let
   ] ++ lib.optionals (cfg.display.refresh != null) [
     # gamescope otherwise takes the TV's preferred mode, which is usually 60 Hz.
     "-r" (toString cfg.display.refresh)
+  ] ++ lib.optionals (cfg.display.cursorScale != null) [
+    "--cursor-scale-height" (toString cfg.display.cursorScale)
   ];
 
   gamescopeCmd = lib.concatStringsSep " " ([
@@ -305,6 +307,22 @@ in
       uneven. Found on the first box 2026-10-05: Jackbox Party Pack 6
       pulsed on the TV with it on. Off by default, like `hdr`: turn it on
       for a TV that handles it well.
+    '';
+  };
+
+  options.famidrive.display.cursorScale = mkOption {
+    type = types.nullOr types.ints.positive;
+    default = 720;
+    example = 1080;
+    description = ''
+      The mouse pointer's size, as the screen height it's drawn for
+      (gamescope's `--cursor-scale-height`): at 720 it's three times as
+      large on a 4K TV and one and a half times on a 1080p one. The
+      pointer only shows when something needs it, such as the controller
+      as a mouse over a game's setup window. A TV across the room needs
+      it larger than a desktop monitor does. Found on the first box
+      2026-10-10: at its own size, the pointer was tiny on a 4K TV.
+      `null` leaves it at the size programs ask for.
     '';
   };
 

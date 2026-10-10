@@ -633,6 +633,21 @@ on those it also needs a USB-CEC adapter (tv-interface.md).
 - **Default:** `false`
 - **Example:** `true`
 
+### `famidrive.display.cursorScale`
+
+The mouse pointer's size, as the screen height it's drawn for
+(gamescope's `--cursor-scale-height`): at 720 it's three times as
+large on a 4K TV and one and a half times on a 1080p one. The
+pointer only shows when something needs it, such as the controller
+as a mouse over a game's setup window. A TV across the room needs
+it larger than a desktop monitor does. Found on the first box
+2026-10-10: at its own size, the pointer was tiny on a 4K TV.
+`null` leaves it at the size programs ask for.
+
+- **Type:** null or (positive integer, meaning >0)
+- **Default:** `720`
+- **Example:** `1080`
+
 ### `famidrive.display.hdr`
 
 Whether this box's TV does HDR. On: gamescope outputs HDR and Proton
