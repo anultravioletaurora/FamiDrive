@@ -41,6 +41,8 @@ of games you own. See [Your games](#your-games).
 - [Options](docs/USAGE.md): every `famidrive.*` option a box can set
 - [Compatibility](docs/COMPATIBILITY.md): game-by-game results
 - [Controllers](docs/CONTROLLERS.md): each pad's results and notes
+- [Modding](docs/MODDING.md): Nexus Mods collections for Steam games,
+  Thunderstore for Valheim, and texture packs and mods for emulators
 - [Online play: PS3](docs/Online-Play/PS3.md): RPCN accounts, disc keys,
   and how a PS3 game gets online
 

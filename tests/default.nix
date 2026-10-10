@@ -205,8 +205,13 @@ in
   quit = unit "quit" ../pkgs/famidrive-quit/famidrive_quit.py pkgs.python3;
   cheevos = unit "cheevos" ../pkgs/famidrive-cheevos/famidrive_cheevos.py
     (pkgs.python3.withPackages (ps: [ ps.requests ]));
-  nexusmods = unit "nexusmods" ../pkgs/famidrive-nexusmods/famidrive_nexusmods.py
-    (pkgs.python3.withPackages (ps: [ ps.requests ]));
+  nexusmods = pkgs.runCommand "test-nexusmods" {
+    nativeBuildInputs = [ (pkgs.python3.withPackages (ps: [ ps.requests ])) pkgs.libarchive ];
+  } ''
+    export HOME=$TMPDIR
+    python3 ${./nexusmods_test.py} ${../pkgs/famidrive-nexusmods/famidrive_nexusmods.py}
+    touch $out
+  '';
 
   # Nexus Mods for one player of two: their key, and their collections
   # downloaded in the background, as them.
@@ -217,6 +222,7 @@ in
       guest.enable = true;
       players.alice.nexusmods.games."1091500" = {
         collection = { slug = "iszwwe"; revision = 481; };
+        collections = [ { slug = "g0tcm4"; revision = 42; } ];
         choices."WTNC Config" = [ "Cyberpunk THING" ];
       };
       players.bob = { };
@@ -225,12 +231,21 @@ in
     (check "an API key secret for the player with collections, owned by them, and none for the others"
       (c.sops.secrets ? "alice/nexusmods" && c.sops.secrets."alice/nexusmods".owner == "alice"
         && !(c.sops.secrets ? "bob/nexusmods") && !(c.sops.secrets ? "guest/nexusmods")))
-    (check "their collections download and are planned as them, daily, and nobody else's"
-      (let s = c.systemd.services.famidrive-nexusmods-alice.serviceConfig; in
-        s.User == "alice" && lib.length s.ExecStart == 2
-          && lib.hasInfix "famidrive-nexusmods fetch" (lib.head s.ExecStart)
-          && c.systemd.timers ? famidrive-nexusmods-alice
-          && !(c.systemd.services ? famidrive-nexusmods-bob)))
+    (check "their mods sync as them, at boot and whenever a rebuild changes them, without holding up the rebuild"
+      (let svc = c.systemd.services.famidrive-nexusmods-alice; in
+        svc.serviceConfig.User == "alice" && svc.serviceConfig.Type == "exec"
+          && lib.hasInfix "famidrive-nexusmods sync" svc.serviceConfig.ExecStart
+          && lib.elem "multi-user.target" svc.wantedBy && svc.restartTriggers != [ ]
+          && c.systemd.timers ? famidrive-nexusmods-alice))
+    (check "a player with no mods still has the service, to take out ones removed from the config, and no key"
+      (let svc = c.systemd.services.famidrive-nexusmods-bob; in
+        svc.serviceConfig.User == "bob" && !(c.systemd.timers ? famidrive-nexusmods-bob)
+          && !(c.systemd.services ? famidrive-nexusmods-guest)))
+    (check "one collection and a list both work, the single one first"
+      (let spec = builtins.fromJSON (builtins.readFile (lib.last (lib.splitString " "
+            c.systemd.services.famidrive-nexusmods-alice.serviceConfig.ExecStart))); in
+        map (x: x.slug) spec.games."1091500".collections == [ "iszwwe" "g0tcm4" ]
+          && spec.games."1091500".choices."WTNC Config" == [ "Cyberpunk THING" ]))
   ]);
 
   # Overlays: the box's positions, a player's own, MangoHud for one player.
