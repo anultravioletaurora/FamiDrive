@@ -231,11 +231,13 @@ Warfare's Legacy Edition.
   it starts for another, three times in 40 s, and FamiDrive followed only
   the first. Fixed in `ac82a59`. The black wait is the planned status
   screen's job (see [Steam launches](#steam-launches)).
-- **Performance:** frame rate not measured yet (see
-  [Measuring performance](#measuring-performance)). One sample, place in
-  the game unknown: GPU 50–70% busy at 1.5 GHz and 105 W, 9 GB of video
-  memory, the game using about 7 CPU cores. That looks capped (menu,
-  pause or a frame limit) or CPU-bound, not GPU-bound.
+- **Performance:** 2026-10-10, the game's own benchmark on the first
+  box, with NCR and the High-Res Graphics Pack – MAXIMUM installed: **170
+  fps average** (142.6 minimum, 203.8 maximum), at 4K on the TV with
+  every graphics setting at its highest (a custom preset) and AMD FSR on.
+  Earlier, one unmodded sample with the place in the game unknown: GPU
+  50–70% busy at 1.5 GHz and 105 W, 9 GB of video memory, about 7 CPU
+  cores busy.
 
 **GOG: ❔ Untested.** The planned home for it: DRM-free, with the
 same REDmod support.
