@@ -65,7 +65,7 @@ Which launch lanes this box carries:
 - `"heroic"`: each player's GOG, Epic Games Store and Amazon
   Games libraries, through Heroic Games Launcher. Each store is
   its own system in the menu.
-- `"minecraft"`: Prism Launcher's instances, in Ports.
+- `"minecraft"`: Prism Launcher's instances, in Desktop.
 
 An emulation-only box is `[ "roms" ]` and skips Steam, Proton,
 Heroic and Prism entirely.
@@ -1172,7 +1172,7 @@ A folder on this box, usually on an external drive the host mounts.
 
 ## Clone Hero
 
-Clone Hero, in the Ports system.
+Clone Hero, in the Desktop system.
 
 ### `famidrive.cloneHero.audioOffset`
 
@@ -1186,7 +1186,7 @@ leaves each player's own (Settings → Calibration).
 
 ### `famidrive.cloneHero.enable`
 
-Whether to enable Clone Hero, in ES-DE's Ports system.
+Whether to enable Clone Hero, in ES-DE's Desktop system.
 
 - **Type:** boolean
 - **Default:** `false`
@@ -1257,11 +1257,11 @@ Clone Hero's video calibration in milliseconds, the same for every player. null 
 
 ## YARG
 
-YARG (Yet Another Rhythm Game), in the Ports system, playing the same songs as Clone Hero.
+YARG (Yet Another Rhythm Game), in the Desktop system, playing the same songs as Clone Hero.
 
 ### `famidrive.yarg.enable`
 
-Whether to enable YARG (Yet Another Rhythm Game), in ES-DE's Ports system: guitar,
+Whether to enable YARG (Yet Another Rhythm Game), in ES-DE's Desktop system: guitar,
 bass, drums, keys and vocals, with the box's Clone Hero songs
 (`cloneHero.songs`).
 
@@ -1281,11 +1281,11 @@ Clone Hero. null keeps scores on this box only.
 
 ## osu!
 
-osu! (lazer), in the Ports system.
+osu! (lazer), in the Desktop system.
 
 ### `famidrive.osu.enable`
 
-Whether to enable osu! (lazer), in ES-DE's Ports system, played with a mouse, a pen
+Whether to enable osu! (lazer), in ES-DE's Desktop system, played with a mouse, a pen
 tablet or a touchscreen, and a keyboard. Pen tablets work through
 osu!'s built-in OpenTabletDriver.
 
@@ -1295,11 +1295,11 @@ osu!'s built-in OpenTabletDriver.
 
 ## Tux games
 
-Free games starring Tux, in the Ports system: SuperTuxKart, SuperTux, SuperTux Party, SuperTux Advance, Extreme Tux Racer and Tux Paint.
+Free games starring Tux, in the Desktop system: SuperTuxKart, SuperTux, SuperTux Party, SuperTux Advance, Extreme Tux Racer and Tux Paint.
 
 ### `famidrive.extremeTuxRacer.enable`
 
-Whether to enable Extreme Tux Racer, in ES-DE's Ports system.
+Whether to enable Extreme Tux Racer, in ES-DE's Desktop system.
 
 - **Type:** boolean
 - **Default:** `false`
@@ -1307,7 +1307,7 @@ Whether to enable Extreme Tux Racer, in ES-DE's Ports system.
 
 ### `famidrive.superTux.enable`
 
-Whether to enable SuperTux, in ES-DE's Ports system.
+Whether to enable SuperTux, in ES-DE's Desktop system.
 
 - **Type:** boolean
 - **Default:** `false`
@@ -1315,7 +1315,7 @@ Whether to enable SuperTux, in ES-DE's Ports system.
 
 ### `famidrive.superTuxAdvance.enable`
 
-Whether to enable SuperTux Advance, in ES-DE's Ports system.
+Whether to enable SuperTux Advance, in ES-DE's Desktop system.
 
 - **Type:** boolean
 - **Default:** `false`
@@ -1323,7 +1323,7 @@ Whether to enable SuperTux Advance, in ES-DE's Ports system.
 
 ### `famidrive.superTuxKart.enable`
 
-Whether to enable SuperTuxKart, in ES-DE's Ports system.
+Whether to enable SuperTuxKart, in ES-DE's Desktop system.
 
 - **Type:** boolean
 - **Default:** `false`
@@ -1331,7 +1331,7 @@ Whether to enable SuperTuxKart, in ES-DE's Ports system.
 
 ### `famidrive.superTuxParty.enable`
 
-Whether to enable SuperTux Party, in ES-DE's Ports system.
+Whether to enable SuperTux Party, in ES-DE's Desktop system.
 
 - **Type:** boolean
 - **Default:** `false`
@@ -1339,7 +1339,7 @@ Whether to enable SuperTux Party, in ES-DE's Ports system.
 
 ### `famidrive.tuxPaint.enable`
 
-Whether to enable Tux Paint, in ES-DE's Ports system.
+Whether to enable Tux Paint, in ES-DE's Desktop system.
 
 - **Type:** boolean
 - **Default:** `false`
@@ -1387,7 +1387,7 @@ the .WAV sounds and the rest of the game's folder.
 
 ## Minecraft
 
-Minecraft through Prism Launcher, in the Ports system (`lanes` has `"minecraft"`).
+Minecraft through Prism Launcher, in the Desktop system (`lanes` has `"minecraft"`).
 
 ### `famidrive.minecraft.instances`
 
@@ -1469,7 +1469,7 @@ More mod jars. Mods added by hand in Prism stay as well.
 The players (`famidrive.players`) who get this instance. Each
 plays with their own Microsoft account, signed in once in their
 own Prism. A player no longer listed loses the instance from
-their Ports; it's moved aside, worlds and all, not deleted.
+their Desktop; it's moved aside, worlds and all, not deleted.
 
 - **Type:** list of string
 - **Default:** every player (not the guest)

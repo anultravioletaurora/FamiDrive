@@ -1,4 +1,4 @@
-# Free games starring Tux, in ES-DE's Ports system, each turned on by
+# Free games starring Tux, in ES-DE's Desktop system, each turned on by
 # itself. All three are made for controllers and need nothing else:
 #
 # - SuperTuxKart: kart racing. Its menus, multiplayer setup (each player
@@ -26,7 +26,7 @@ let
   # guitar adapter, and the 8BitDo did nothing.
   ignoreInstruments = "SDL_GAMECONTROLLER_IGNORE_DEVICES=${cfg.controllers.sdlIgnoreDevices}";
 
-  # Each game: its option, its Ports entry's name, the word in its .port
+  # Each game: its option, its Desktop entry's name, the word in its .port
   # file, what runs it, and anything set for it first.
   games = {
     superTuxKart = { title = "SuperTuxKart"; word = "supertuxkart"; package = pkgs.supertuxkart; };
@@ -46,15 +46,15 @@ let
 in
 {
   options.famidrive = lib.mapAttrs (_: g: {
-    enable = lib.mkEnableOption "${g.title}, in ES-DE's Ports system";
+    enable = lib.mkEnableOption "${g.title}, in ES-DE's Desktop system";
   }) games;
 
   config = lib.mkIf (cfg.enable && on != { }) {
     environment.systemPackages = lib.mapAttrsToList (_: g: g.package) on;
 
-    # Another kind of Ports entry, like Clone Hero's: a .port file whose
+    # Another kind of Desktop entry, like Clone Hero's: a .port file whose
     # content says which.
-    famidrive.ports.".port".command = ''
+    famidrive.desktop.".port".command = ''
       case "$(cat "$ROM")" in
       ${lib.concatStrings (lib.mapAttrsToList (_: g: ''
         ${g.word}) ${g.env or ""} ${lib.getExe g.package} ;;
@@ -64,9 +64,10 @@ in
 
     famidrive.playerHome = { lib, famidrivePlayer, ... }: {
       home.activation.famidriveTux = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        mkdir -p ${lib.escapeShellArg "${famidrivePlayer.roms}/ports"}
+        mkdir -p ${lib.escapeShellArg "${famidrivePlayer.roms}/desktop"}
         ${lib.concatStrings (lib.mapAttrsToList (_: g: ''
-          printf ${g.word} > ${lib.escapeShellArg "${famidrivePlayer.roms}/ports/${g.title}.port"}
+          printf ${g.word} > ${lib.escapeShellArg "${famidrivePlayer.roms}/desktop/${g.title}.port"}
+          rm -f ${lib.escapeShellArg "${famidrivePlayer.roms}/ports/${g.title}.port"}   # in Ports until 2026-10-10
         '') on)}
       '';
     };

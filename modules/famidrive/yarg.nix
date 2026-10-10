@@ -1,4 +1,4 @@
-# YARG (Yet Another Rhythm Game), in ES-DE's Ports system, next to Clone
+# YARG (Yet Another Rhythm Game), in ES-DE's Desktop system, next to Clone
 # Hero. It reads the same chart formats, so it plays the box's Clone Hero
 # library (clonehero.nix): the same songs for every player, listed once
 # in `cloneHero.songs`, whether or not Clone Hero itself is on. Profiles,
@@ -37,7 +37,7 @@ in
 {
   options.famidrive.yarg = {
     enable = mkEnableOption ''
-      YARG (Yet Another Rhythm Game), in ES-DE's Ports system: guitar,
+      YARG (Yet Another Rhythm Game), in ES-DE's Desktop system: guitar,
       bass, drums, keys and vocals, with the box's Clone Hero songs
       (`cloneHero.songs`)'';
 
@@ -79,10 +79,10 @@ in
     ])) ];
     environment.systemPackages = [ pkgs.yarg ];
 
-    # Another kind of Ports entry, like Clone Hero's: a .port file whose
+    # Another kind of Desktop entry, like Clone Hero's: a .port file whose
     # content says which. The commands add to Clone Hero's (types.lines),
     # each case only acting on its own entry.
-    famidrive.ports.".port" = {
+    famidrive.desktop.".port" = {
       before = lib.optionalString sync ''
         if [ "$(cat "$ROM")" = yarg ]; then
           [ -z "$sync" ] || romm-agent save-pull yarg app:yarg \
@@ -108,8 +108,9 @@ in
 
     famidrive.playerHome = { lib, famidrivePlayer, ... }: {
       home.activation.famidriveYarg = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        mkdir -p ${lib.escapeShellArg "${famidrivePlayer.roms}/ports"}
-        printf yarg > ${lib.escapeShellArg "${famidrivePlayer.roms}/ports/YARG.port"}
+        mkdir -p ${lib.escapeShellArg "${famidrivePlayer.roms}/desktop"}
+        printf yarg > ${lib.escapeShellArg "${famidrivePlayer.roms}/desktop/YARG.port"}
+        rm -f ${lib.escapeShellArg "${famidrivePlayer.roms}/ports/YARG.port"}   # in Ports until 2026-10-10
         mkdir -p "$HOME/YARG Songs"
         ${seedLib.lockKeys {
           format = "json";

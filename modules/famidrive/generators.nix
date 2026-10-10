@@ -43,7 +43,7 @@ let
         serviceConfig = {
           Type = "oneshot";
           User = p.user;
-          # Minecraft's entries live in the Ports system's folder.
+          # Minecraft's entries live in the Desktop system's folder.
           # Heroic's entries go in one folder per store (gog, epic, amazon).
           ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate ${lane} ${(source p).${lane}} ${p.roms}${folder lane}";
         };
@@ -73,7 +73,7 @@ let
     };
   };
 
-  folder = lane: { minecraft = "/ports"; heroic = ""; }.${lane} or "/${lane}";
+  folder = lane: { minecraft = "/desktop"; heroic = ""; }.${lane} or "/${lane}";
 
   lanes = lib.filter hasLane [ "steam" "heroic" "minecraft" ];
 in
