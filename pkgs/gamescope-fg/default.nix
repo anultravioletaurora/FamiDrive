@@ -244,8 +244,8 @@ writeShellApplication {
         done
       }
       # The controller as a mouse and keyboard while Steam waits on a prompt
-      # (famidrive-padmouse): Steam's own dialogs (a EULA, a cloud
-      # conflict) take only a mouse. Found on the first box 2026-10-07:
+      # or a game's first-time setup (famidrive-padmouse): Steam's own
+      # dialogs (a EULA, a cloud conflict) take only a mouse. Found on the first box 2026-10-07:
       # GTA V Enhanced's EULA couldn't be accepted with a controller.
       pointer_pid=""
       pointer() {
@@ -354,7 +354,12 @@ writeShellApplication {
         # launch's setup still waits, Steam logs nothing new.
         if [ -n "$install" ] && [ "$state" = asking ]; then state=installing; fi
         status "$state"
-        if [ "$state" = prompt ]; then pointer on; else pointer off; fi
+        # The pointer also for a first-time setup's windows: some take a
+        # controller's focus moves (Star Wars Jedi: Fallen Order's EA app
+        # setup did), some don't. Found on the first box 2026-10-10: Jedi:
+        # Survivor's EA app installer kept its focus on the close button,
+        # and Tab never reached "Let's Go".
+        if [ "$state" = prompt ] || [ "$state" = installing ]; then pointer on; else pointer off; fi
         if [ "$state" = prompt ]; then
           base "769,$STATUS,$FRONTEND"
         elif [ "$state" = installing ]; then
