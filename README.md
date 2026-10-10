@@ -35,9 +35,9 @@ of games you own. See [Your games](#your-games).
 
 ## Docs
 
-- [Comparison](docs/COMPARISON.md): FamiDrive next to Bazzite, ChimeraOS,
-  Jovian-NixOS, Batocera and Windows with Playnite, and when to pick one
-  of those instead
+- [Comparison](docs/COMPARISON.md): FamiDrive next to SteamOS, Bazzite,
+  ChimeraOS, Jovian-NixOS, Batocera and Windows with Playnite, and when to
+  pick one of those instead
 - [Options](docs/USAGE.md): every `famidrive.*` option a box can set
 - [Compatibility](docs/COMPATIBILITY.md): game-by-game results
 - [Controllers](docs/CONTROLLERS.md): each pad's results and notes

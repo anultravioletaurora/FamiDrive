@@ -7,24 +7,24 @@ date about another project, please open an issue: they all move fast.
 
 ## At a glance
 
-| | FamiDrive | Jovian-NixOS | Bazzite | ChimeraOS | Batocera | Windows + Playnite |
-|---|---|---|---|---|---|---|
-| **Base** | NixOS | NixOS | Fedora Atomic | Arch, as a read-only image | Its own Linux, as a read-only image | Windows |
-| **Boots into** | ES-DE | Steam's gaming mode | Steam's gaming mode | Steam's gaming mode | EmulationStation | The Windows desktop, then Playnite (it can start in fullscreen at login) |
-| **The menu is built around** | Every system at once: emulators, Steam, other stores, apps | Steam | Steam | Steam | Emulators | Every store and emulator, as one library |
-| **Emulators out of the box** | ✅ Installed and set up from the flake | ❌ Bring your own, added as Steam shortcuts | Partly: installers like EmuDeck or RetroDECK are a click away | Partly: its web app adds ROMs as Steam shortcuts | ✅ Emulation is its whole job | Partly: Playnite finds and launches emulators you install |
-| **Steam** | One entry in the menu, launched from ES-DE | ✅ Is the UI | ✅ Is the UI | ✅ Is the UI | Add-on (Flatpak) | ✅ Native |
-| **GOG, Epic, Amazon** | Through Heroic, in the same menu | Through Heroic, as Steam shortcuts | Through Heroic or Lutris, as Steam shortcuts | Through its web app or Heroic, as Steam shortcuts | Limited | ✅ Native clients, in one library |
-| **RomM as the library** | ✅ Games, firmware, art and details pulled per platform | ❌ | ❌ | ❌ | ❌ | A community plugin |
-| **Saves across boxes** | ✅ Through RomM, with conflict copies and history | Steam Cloud only | Steam Cloud, or set up your own | Steam Cloud, or set up your own | Set up your own | Steam Cloud, or set up your own |
-| **Several players** | ✅ "Who's playing?": each player has their own saves, Steam, RomM account and RetroAchievements | One Steam account at a time | One Steam account at a time | One Steam account at a time | One profile | One Windows user at a time |
-| **The whole box as code** | ✅ One flake: copy it to another box and get the same console | ✅ The NixOS parts, not what you set up in Steam | ❌ | ❌ | ❌ | ❌ |
-| **Updates and rollback** | Each rebuild is a boot entry; a config that doesn't evaluate never gets switched to | Same as FamiDrive | Image updates, with the previous image to boot back into | Image updates, with the previous image to boot back into | Image updates | System Restore, sometimes |
-| **Changing anything** | Anything: edit the flake, or override any part of it in your own config | Anything, the NixOS way | Within the image: Flatpaks, Distrobox, Homebrew; changing the image itself is discouraged | Within the image: Flatpaks; the system itself is read-only | Its config files and scripts; system changes don't survive updates | Anything Windows allows |
-| **Desktop mode** | ❌ (Steam's Big Picture is under Settings) | ✅ Switch to a desktop and back | ✅ Switch to a desktop and back | ✅ A desktop session is available | ❌ | It *is* a desktop |
-| **PC games that need anti-cheat** | Only the ones that allow Proton | Only the ones that allow Proton | Only the ones that allow Proton | Only the ones that allow Proton | Only the ones that allow Proton | ✅ Nearly all |
-| **Cost** | Free | Free | Free | Free | Free | A Windows license |
-| **Maturity** | Early: running on its first boxes | Mature | Mature, big community | Mature | Mature, big community | Mature |
+| | FamiDrive | SteamOS | Jovian-NixOS | Bazzite | ChimeraOS | Batocera | Windows + Playnite |
+|---|---|---|---|---|---|---|---|
+| **Base** | NixOS | Arch, as a read-only image (Valve's) | NixOS | Fedora Atomic | Arch, as a read-only image | Its own Linux, as a read-only image | Windows |
+| **Boots into** | ES-DE | Steam's gaming mode | Steam's gaming mode | Steam's gaming mode | Steam's gaming mode | EmulationStation | The Windows desktop, then Playnite (it can start in fullscreen at login) |
+| **The menu is built around** | Every system at once: emulators, Steam, other stores, apps | Steam | Steam | Steam | Steam | Emulators | Every store and emulator, as one library |
+| **Emulators out of the box** | ✅ Installed and set up from the flake | Partly: installers like EmuDeck or RetroDECK, from its desktop mode | ❌ Bring your own, added as Steam shortcuts | Partly: installers like EmuDeck or RetroDECK are a click away | Partly: its web app adds ROMs as Steam shortcuts | ✅ Emulation is its whole job | Partly: Playnite finds and launches emulators you install |
+| **Steam** | One entry in the menu, launched from ES-DE | ✅ Is the UI | ✅ Is the UI | ✅ Is the UI | ✅ Is the UI | Add-on (Flatpak) | ✅ Native |
+| **GOG, Epic, Amazon** | Through Heroic, in the same menu | Through Heroic, as Steam shortcuts | Through Heroic, as Steam shortcuts | Through Heroic or Lutris, as Steam shortcuts | Through its web app or Heroic, as Steam shortcuts | Limited | ✅ Native clients, in one library |
+| **RomM as the library** | ✅ Games, firmware, art and details pulled per platform | ❌ | ❌ | ❌ | ❌ | ❌ | A community plugin |
+| **Saves across boxes** | ✅ Through RomM, with conflict copies and history | Steam Cloud, or set up your own | Steam Cloud only | Steam Cloud, or set up your own | Steam Cloud, or set up your own | Set up your own | Steam Cloud, or set up your own |
+| **Several players** | ✅ "Who's playing?": each player has their own saves, Steam, RomM account and RetroAchievements | One Steam account at a time (switching accounts from the menu) | One Steam account at a time | One Steam account at a time | One Steam account at a time | One profile | One Windows user at a time |
+| **The whole box as code** | ✅ One flake: copy it to another box and get the same console | ❌ | ✅ The NixOS parts, not what you set up in Steam | ❌ | ❌ | ❌ | ❌ |
+| **Updates and rollback** | Each rebuild is a boot entry; a config that doesn't evaluate never gets switched to | Image updates, with the previous image to boot back into | Same as FamiDrive | Image updates, with the previous image to boot back into | Image updates, with the previous image to boot back into | Image updates | System Restore, sometimes |
+| **Changing anything** | Anything: edit the flake, or override any part of it in your own config | Within the image: Flatpaks and Decky plugins; the system itself is read-only | Anything, the NixOS way | Within the image: Flatpaks, Distrobox, Homebrew; changing the image itself is discouraged | Within the image: Flatpaks; the system itself is read-only | Its config files and scripts; system changes don't survive updates | Anything Windows allows |
+| **Desktop mode** | ❌ (Steam's Big Picture is under Settings) | ✅ KDE Plasma, and back | ✅ Switch to a desktop and back | ✅ Switch to a desktop and back | ✅ A desktop session is available | ❌ | It *is* a desktop |
+| **PC games that need anti-cheat** | Only the ones that allow Proton | Only the ones that allow Proton | Only the ones that allow Proton | Only the ones that allow Proton | Only the ones that allow Proton | Only the ones that allow Proton | ✅ Nearly all |
+| **Cost** | Free | Free (comes with a Steam Deck or Steam Machine) | Free | Free | Free | Free | A Windows license |
+| **Maturity** | Early: running on its first boxes | Mature on Valve's own hardware (Steam Deck, Steam Machine) and some handhelds; other PCs aren't officially supported | Mature | Mature, big community | Mature | Mature, big community | Mature |
 
 ## Why NixOS
 
@@ -43,6 +43,12 @@ FamiDrive's main bet is the base it's built on:
   override from your own config, and anything in nixpkgs is one line
   away. You don't have to stay within what an image allows or what's
   available as a Flatpak.
+
+SteamOS, Valve's own system for the Steam Deck and the Steam Machine,
+is the model for most of the alternatives here: Jovian-NixOS, Bazzite
+and ChimeraOS all bring its gaming mode to other PCs. It's a read-only
+image, so it's hard to break too, but not yours to change beyond what
+the image allows, and it's set up by hand, not from a file.
 
 Jovian-NixOS shares the first two: it's NixOS too. The difference is
 what the TV shows. Jovian-NixOS gives you Steam's gaming mode, which is
@@ -64,10 +70,11 @@ and quitting a game gets you back to the menu sooner.
 ## When to pick something else
 
 - **Your library is mostly Steam games:** Steam's gaming mode is the
-  better menu for it. Pick Bazzite, ChimeraOS, or Jovian-NixOS if you
-  want NixOS.
-- **You want a desktop on the same box:** Bazzite, ChimeraOS and
-  Jovian-NixOS all switch between gaming mode and a desktop. FamiDrive
+  better menu for it. On a Steam Deck or a Steam Machine, keep SteamOS;
+  on another PC, pick Bazzite, ChimeraOS, or Jovian-NixOS if you want
+  NixOS.
+- **You want a desktop on the same box:** SteamOS, Bazzite, ChimeraOS
+  and Jovian-NixOS all switch between gaming mode and a desktop. FamiDrive
   doesn't have a desktop mode.
 - **You play online games with kernel anti-cheat:** only Windows runs
   most of those.
@@ -78,9 +85,6 @@ and quitting a game gets you back to the menu sooner.
 
 ## Others worth a look
 
-- **SteamOS:** Valve's own, and what Bazzite, ChimeraOS and Jovian-NixOS
-  recreate. It ships on Valve's hardware. Installing it on other PCs
-  depends on what Valve supports at the time.
 - **RetroBat:** Batocera's idea on Windows: EmulationStation over
   RetroArch and standalone emulators.
 - **LaunchBox and Big Box:** a Windows frontend, like Playnite. Big Box,
