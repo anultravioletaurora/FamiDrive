@@ -8,12 +8,9 @@ let
   cfg = config.famidrive;
   hasLane = l: lib.elem l cfg.lanes;
 
-  # The stores Heroic brings: ES-DE system -> its name and Heroic's runner.
-  heroicStores = {
-    gog = { fullname = "GOG"; runner = "gog"; };
-    epic = { fullname = "Epic Games Store"; runner = "legendary"; };
-    amazon = { fullname = "Amazon Games"; runner = "nile"; };
-  };
+  # The stores Heroic brings: the Desktop entries' extension -> Heroic's
+  # runner for that store.
+  heroicStores = { gog = "gog"; epic = "legendary"; amazon = "nile"; };
   seedLib = import ./lib/seed.nix { inherit lib pkgs; };
   fw = "${cfg.dataDir}/firmware";
 
@@ -622,37 +619,6 @@ in
           theme = "steam";
         };
       })
-      # GOG, the Epic Games Store and Amazon Games, each its own system,
-      # all through Heroic. --no-gui launches the game without Heroic's
-      # window and quits Heroic when the game ends (read in Heroic 2.22's
-      # source, 2026-10-07), so the command lasts as long as the game.
-      # The entry's file holds the game's app name in that store.
-      #
-      # XDG_CURRENT_DESKTOP: gamescope sets it to "gamescope", which Heroic
-      # takes for a Steam Deck in Game Mode, and then sends no desktop
-      # notifications. Under any other name it does, and they show as
-      # toasts (famidrive-toast). The same check otherwise only turns off
-      # Heroic's own MangoHud and gamescope wrappers and its fullscreen,
-      # which FamiDrive doesn't use or asks for itself.
-      #
-      # A GOG game's achievements unlock through Comet, which Heroic
-      # starts beside it; famidrive-cheevos shows them as toasts.
-      (lib.mkIf (hasLane "heroic") (lib.mapAttrs (system: s: {
-        inherit (s) fullname;
-        extensions = [ ".${system}" ];
-        # Through gamescope-fg --launcher: the status screen while Heroic
-        # sets the game up and starts it.
-        command = ''${pkgs.gamescope-fg}/bin/gamescope-fg --launcher "$ROM" env XDG_CURRENT_DESKTOP=FamiDrive ${pkgs.heroic}/bin/heroic --no-gui --no-sandbox "heroic://launch?appName=$(cat "$ROM")&runner=${s.runner}"'';
-        theme = system;
-      } // lib.optionalAttrs (s.runner == "gog") {
-        before = ''
-          ${pkgs.famidrive-cheevos}/bin/famidrive-cheevos watch-comet "$ROM" &
-          cheevos_watch=$!
-        '';
-        after = ''
-          kill "$cheevos_watch" 2>/dev/null || true
-        '';
-      }) heroicStores))
       (lib.mkIf (cfg.desktop != { }) {
         desktop = {
           fullname = "Desktop";
@@ -679,12 +645,43 @@ in
     # 2026-10-06: as a system of their own they showed as a second Ports,
     # with the same art). Every instance starts fullscreen, whoever made
     # it (pkgs/famidrive-prism).
-    famidrive.desktop = lib.mkIf (hasLane "minecraft") {
-      ".prism".command = ''
-        ${pkgs.famidrive-prism}/bin/famidrive-prism fullscreen "$HOME/.local/share/PrismLauncher/instances/$(cat "$ROM")"
-        ${pkgs.prismlauncher}/bin/prismlauncher --launch "$(cat "$ROM")"
-      '';
-    };
+    famidrive.desktop = lib.mkMerge [
+      (lib.mkIf (hasLane "minecraft") {
+        ".prism".command = ''
+          ${pkgs.famidrive-prism}/bin/famidrive-prism fullscreen "$HOME/.local/share/PrismLauncher/instances/$(cat "$ROM")"
+          ${pkgs.prismlauncher}/bin/prismlauncher --launch "$(cat "$ROM")"
+        '';
+      })
+      # GOG, the Epic Games Store and Amazon Games, all through Heroic, as
+      # Desktop entries (.gog, .epic, .amazon; until 2026-10-10 a system
+      # per store, which Art Book Next has no art for but Epic). --no-gui
+      # launches the game without Heroic's window and quits Heroic when
+      # the game ends (read in Heroic 2.22's source, 2026-10-07), so the
+      # command lasts as long as the game. The entry's file holds the
+      # game's app name in that store. Through gamescope-fg --launcher:
+      # the status screen while Heroic sets the game up and starts it.
+      #
+      # XDG_CURRENT_DESKTOP: gamescope sets it to "gamescope", which Heroic
+      # takes for a Steam Deck in Game Mode, and then sends no desktop
+      # notifications. Under any other name it does, and they show as
+      # toasts (famidrive-toast). The same check otherwise only turns off
+      # Heroic's own MangoHud and gamescope wrappers and its fullscreen,
+      # which FamiDrive doesn't use or asks for itself.
+      #
+      # A GOG game's achievements unlock through Comet, which Heroic
+      # starts beside it; famidrive-cheevos shows them as toasts.
+      (lib.mkIf (hasLane "heroic") (lib.mapAttrs' (store: runner: lib.nameValuePair ".${store}" ({
+        command = ''${pkgs.gamescope-fg}/bin/gamescope-fg --launcher "$ROM" env XDG_CURRENT_DESKTOP=FamiDrive ${pkgs.heroic}/bin/heroic --no-gui --no-sandbox "heroic://launch?appName=$(cat "$ROM")&runner=${runner}"'';
+      } // lib.optionalAttrs (store == "gog") {
+        before = ''
+          ${pkgs.famidrive-cheevos}/bin/famidrive-cheevos watch-comet "$ROM" &
+          cheevos_watch=$!
+        '';
+        after = ''
+          kill "$cheevos_watch" 2>/dev/null || true
+        '';
+      })) heroicStores))
+    ];
 
     programs.steam = lib.mkIf (hasLane "steam") {
       enable = true;

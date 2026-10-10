@@ -104,9 +104,9 @@ class Test(unittest.TestCase):
         self.run_tool("steam-media", str(self.steamapps), str(self.out))
         self.assertEqual((self.home / "ES-DE/downloaded_media/steam/covers/PEAK.jpg").read_bytes(), b"peak cover")
 
-    def test_heroic_stores_each_get_their_installed_games(self):
+    def heroic_config(self, extra=None):
         heroic = self.home / ".config/heroic"
-        for path, data in {
+        files = {
             "gog_store/installed.json": {"installed": [
                 {"appName": "1207658924", "platform": "windows", "install_path": "/x"},
                 {"appName": "1", "is_dlc": True}]},
@@ -114,23 +114,79 @@ class Test(unittest.TestCase):
             "legendaryConfig/legendary/installed.json": {"Fortnite": {"app_name": "Fortnite", "title": "Fortnite"}},
             "nile_config/nile/installed.json": [{"id": "amzn1.adg.product.abc", "path": "/y"}],
             "store_cache/nile_library.json": {"library": [{"app_name": "amzn1.adg.product.abc", "title": "Some Prime Game"}]},
-        }.items():
+        }
+        files.update(extra or {})
+        for path, data in files.items():
             (heroic / path).parent.mkdir(parents=True, exist_ok=True)
             (heroic / path).write_text(json.dumps(data))
-        roms = self.home / "roms"
-        (roms / "epic").mkdir(parents=True)
-        (roms / "epic/Uninstalled.epic").write_text("gone")
-        self.run_tool("heroic", str(heroic), str(roms))
-        self.assertEqual((roms / "gog/Hollow Knight_ Voidheart.gog").read_text(), "1207658924")
-        self.assertEqual(sorted(p.name for p in (roms / "gog").iterdir()), ["Hollow Knight_ Voidheart.gog"])
-        self.assertEqual((roms / "epic/Fortnite.epic").read_text(), "Fortnite")
-        self.assertFalse((roms / "epic/Uninstalled.epic").exists())
-        self.assertEqual((roms / "amazon/Some Prime Game.amazon").read_text(), "amzn1.adg.product.abc")
+        return heroic
 
-    def test_heroic_never_signed_in_gives_empty_stores(self):
+    def test_heroic_games_go_in_desktop(self):
+        heroic = self.heroic_config()
+        desktop = self.home / "roms/desktop"
+        desktop.mkdir(parents=True)
+        (desktop / "Uninstalled.epic").write_text("gone")
+        (desktop / "Clone Hero.port").write_text("clonehero")   # not Heroic's
+        self.run_tool("heroic", str(heroic), str(desktop))
+        self.assertEqual((desktop / "Hollow Knight_ Voidheart.gog").read_text(), "1207658924")
+        self.assertEqual((desktop / "Fortnite.epic").read_text(), "Fortnite")
+        self.assertEqual((desktop / "Some Prime Game.amazon").read_text(), "amzn1.adg.product.abc")
+        self.assertFalse((desktop / "Uninstalled.epic").exists())
+        self.assertTrue((desktop / "Clone Hero.port").exists())
+
+    def test_heroic_never_signed_in_gives_no_entries(self):
+        desktop = self.home / "roms/desktop"
+        self.run_tool("heroic", str(self.home / ".config/heroic"), str(desktop))
+        self.assertEqual(list(desktop.iterdir()), [])
+
+    def test_heroic_games_move_from_their_old_systems(self):
+        heroic = self.heroic_config()
         roms = self.home / "roms"
-        self.run_tool("heroic", str(self.home / ".config/heroic"), str(roms))
-        self.assertEqual([list((roms / s).iterdir()) for s in ("gog", "epic", "amazon")], [[], [], []])
+        (roms / "gog").mkdir(parents=True)
+        (roms / "gog/Hollow Knight_ Voidheart.gog").write_text("1207658924")
+        lists = self.home / "ES-DE/gamelists"
+        (lists / "gog").mkdir(parents=True)
+        (lists / "gog/gamelist.xml").write_text(
+            '<?xml version="1.0"?><gameList><game><path>./Hollow Knight_ Voidheart.gog</path>'
+            '<playcount>7</playcount><favorite>true</favorite></game></gameList>')
+        (lists / "desktop").mkdir(parents=True)
+        (lists / "desktop/gamelist.xml").write_text(
+            '<?xml version="1.0"?><gameList><game><path>./Clone Hero.port</path><playcount>2</playcount></game></gameList>')
+        self.run_tool("heroic", str(heroic), str(roms / "desktop"))
+        self.assertFalse((roms / "gog/Hollow Knight_ Voidheart.gog").exists())
+        games = {g.findtext("path"): g for g in ET.parse(lists / "desktop/gamelist.xml").getroot().iter("game")}
+        self.assertEqual(games["./Hollow Knight_ Voidheart.gog"].findtext("playcount"), "7")
+        self.assertEqual(games["./Clone Hero.port"].findtext("playcount"), "2")
+        self.assertFalse((lists / "gog/gamelist.xml").exists())
+
+    def test_heroic_games_get_heroics_name_details_and_art(self):
+        square = self.home / "square.jpg"
+        square.write_bytes(b"cover")
+        background = self.home / "bg.png"
+        background.write_bytes(b"\x89PNG background")
+        heroic = self.heroic_config({"store_cache/gog_library.json": {"games": [{
+            "app_name": "1207658924", "title": "Hollow Knight: Voidheart", "developer": "Team Cherry",
+            "art_square": square.as_uri(), "art_background": background.as_uri(),
+            "extra": {"about": {"description": "Forge your own path\r\n in <b>Hallownest</b>."},
+                      "genres": ["Action", "Adventure"]}}]}})
+        desktop = self.home / "roms/desktop"
+        self.run_tool("heroic", str(heroic), str(desktop))
+        lists = self.home / "ES-DE/gamelists/desktop"
+        lists.mkdir(parents=True)
+        (lists / "gamelist.xml").write_text(
+            '<?xml version="1.0"?><gameList><game><path>./Hollow Knight_ Voidheart.gog</path>'
+            '<name>Old</name><playcount>3</playcount></game></gameList>')
+        self.run_tool("heroic-media", str(heroic), str(desktop))
+        game = next(g for g in ET.parse(lists / "gamelist.xml").getroot().iter("game")
+                    if g.findtext("path") == "./Hollow Knight_ Voidheart.gog")
+        self.assertEqual(game.findtext("name"), "Hollow Knight: Voidheart")
+        self.assertEqual(game.findtext("desc"), "Forge your own path in Hallownest.")
+        self.assertEqual(game.findtext("developer"), "Team Cherry")
+        self.assertEqual(game.findtext("genre"), "Action, Adventure")
+        self.assertEqual(game.findtext("playcount"), "3")
+        media = self.home / "ES-DE/downloaded_media/desktop"
+        self.assertEqual((media / "covers/Hollow Knight_ Voidheart.jpg").read_bytes(), b"cover")
+        self.assertEqual((media / "fanart/Hollow Knight_ Voidheart.png").read_bytes(), b"\x89PNG background")
 
     def test_a_game_the_store_doesnt_know_still_gets_its_art(self):
         self.install(1, "Some Delisted Game")

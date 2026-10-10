@@ -236,7 +236,8 @@ planning doc for now and will move into this repo.
   Big Picture as a Settings entry, a status screen while Steam
   updates, processes shaders or starts a game, and each game's art and
   details from Steam itself. GOG, Epic and Amazon through Heroic
-  (`lanes` has `"heroic"`). Results per game are in
+  (`lanes` has `"heroic"`), in Desktop, with their names, art and
+  details from Heroic and the same status screen. Results per game are in
   [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 - Toasts over whatever's on the TV, in the player's theme, with an icon
   each: a save going up to RomM, or not. Toasts show bottom right by
@@ -431,8 +432,8 @@ famidrive = {
   a family share one copy of each *purchase* (each account still keeps
   its own download).
 - **GOG, Epic and Amazon:** each player signs in to their own stores once,
-  in Settings → Heroic Games Launcher, and installs games there. Each
-  store's games show up in its own system in the menu.
+  in Settings → Heroic Games Launcher, and installs games there. Their
+  games show up in Desktop, with each store's name, art and details.
 - **The guest:** no RomM, so their saves stay on this box. They can sign
   in to their own Steam or play without it.
 - **Switching and turning off:** ES-DE's Quit menu (Start → Quit) has

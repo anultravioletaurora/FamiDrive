@@ -62,8 +62,7 @@ Which launch lanes this box carries:
 - `"roms"`: the consoles, through their emulators.
 - `"steam"`: each player's Steam library.
 - `"heroic"`: each player's GOG, Epic Games Store and Amazon
-  Games libraries, through Heroic Games Launcher. Each store is
-  its own system in the menu.
+  Games libraries, through Heroic Games Launcher, in Desktop.
 - `"minecraft"`: Prism Launcher's instances, in Desktop.
 
 An emulation-only box is `[ "roms" ]` and skips Steam, Proton,

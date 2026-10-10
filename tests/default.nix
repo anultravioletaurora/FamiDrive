@@ -379,11 +379,12 @@ in
     (check "Dolphin's own on-screen messages off, for every player (toasts instead)"
       (lib.all (u: lib.hasInfix "OnScreenDisplayMessages" c.home-manager.users.${u}.home.activation.famidriveEmulators.data) [ "alice" "bob" "guest" ]))
     (check "Heroic sends desktop notifications (not taken for Steam Deck Game Mode) and its games get the status screen; GOG games have the Comet watcher"
-      (lib.hasInfix "XDG_CURRENT_DESKTOP=FamiDrive" c.famidrive.systems.gog.command
-        && lib.hasInfix "gamescope-fg --launcher \"$ROM\"" c.famidrive.systems.gog.command
+      (lib.hasInfix "XDG_CURRENT_DESKTOP=FamiDrive" c.famidrive.systems.desktop.command
+        && lib.hasInfix "gamescope-fg --launcher \"$ROM\"" c.famidrive.systems.desktop.command
         && lib.hasInfix "XDG_CURRENT_DESKTOP=FamiDrive" c.famidrive.systems.settings.command
-        && lib.hasInfix "watch-comet" c.famidrive.systems.gog.before
-        && !(lib.hasInfix "watch-comet" c.famidrive.systems.epic.before)))
+        && lib.hasInfix "*.gog)" c.famidrive.systems.desktop.before
+        && lib.hasInfix "watch-comet" c.famidrive.systems.desktop.before
+        && !(lib.hasInfix "*.epic)" c.famidrive.systems.desktop.before)))
     (check "Bluetooth pairing in Controllers, not Settings: entries written each session (old ones cleared from Settings), pair and forget launch"
       (lib.hasInfix "famidrive-bluetooth entries" c.famidrive.sessionSetup
         && lib.hasInfix "/roms/controllers" c.famidrive.sessionSetup
@@ -530,7 +531,7 @@ in
           && c.famidrive.systems.psx.saveSync))
       (check "one Desktop system, for Minecraft and Clone Hero both; Ports' game list copied over once"
         (!(c.famidrive.systems ? minecraft)
-          && lib.sort lib.lessThan c.famidrive.systems.desktop.extensions == [ ".port" ".prism" ]
+          && lib.sort lib.lessThan c.famidrive.systems.desktop.extensions == [ ".amazon" ".epic" ".gog" ".port" ".prism" ]
           && lib.hasInfix "prismlauncher" c.famidrive.systems.desktop.command
           && lib.hasInfix "clonehero" c.famidrive.systems.desktop.command
           # Saving after a game is outside it, where a quit can't skip it.
@@ -578,9 +579,12 @@ in
           && !(c.systemd.timers ? romm-save-reconcile-guest)))
       (check "a Steam menu generator per player"
         (lib.all (p: c.systemd.services ? "famidrive-gen-steam-${p}") [ "alice" "bob" "guest" ]))
-      (check "GOG, Epic and Amazon are each a system, launched through Heroic"
-        (lib.all (s: c.famidrive.systems ? ${s} && lib.hasInfix "heroic://launch" c.famidrive.systems.${s}.command)
-          [ "gog" "epic" "amazon" ]))
+      (check "GOG, Epic and Amazon games are Desktop entries, launched through Heroic, with Heroic's art and details"
+        (lib.all (s: !(c.famidrive.systems ? ${s}) && lib.hasInfix "runner=" c.famidrive.systems.desktop.command
+            && lib.elem ".${s}" c.famidrive.systems.desktop.extensions)
+          [ "gog" "epic" "amazon" ]
+          && lib.hasInfix "/roms/desktop" c.systemd.services.famidrive-gen-heroic-bob.serviceConfig.ExecStart
+          && lib.hasInfix "heroic-media" c.systemd.services.famidrive-heroic-media-bob.serviceConfig.ExecStart))
       (check "Heroic's menu entries follow its installed-games files, per player"
         (lib.hasInfix "legendaryConfig/legendary/installed.json"
           (toString c.systemd.paths.famidrive-gen-heroic-bob.pathConfig.PathChanged)))

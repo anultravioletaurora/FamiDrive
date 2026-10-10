@@ -43,14 +43,15 @@ let
         serviceConfig = {
           Type = "oneshot";
           User = p.user;
-          # Minecraft's entries live in the Desktop system's folder.
-          # Heroic's entries go in one folder per store (gog, epic, amazon).
+          # Minecraft's and Heroic's entries live in the Desktop system's
+          # folder (Heroic's with an extension per store).
           ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate ${lane} ${(source p).${lane}} ${p.roms}${folder lane}";
         };
-        # Steam's art and details for new games, once the menu entries
-        # are in place, without holding up the session: a first run can
-        # take a minute or two (a store lookup per game).
-        onSuccess = lib.optional (lane == "steam") "famidrive-steam-media-${p.name}.service";
+        # Steam's (and Heroic's) art and details for new games, once the
+        # menu entries are in place, without holding up the session: a
+        # first run can take a minute or two (a store lookup per game).
+        onSuccess = lib.optional (lane == "steam") "famidrive-steam-media-${p.name}.service"
+          ++ lib.optional (lane == "heroic") "famidrive-heroic-media-${p.name}.service";
       };
     } // lib.optionalAttrs (lane == "steam") {
       "famidrive-steam-media-${p.name}" = {
@@ -63,6 +64,19 @@ let
           ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate steam-media ${(source p).steam} ${p.roms}/steam";
         };
       };
+    } // lib.optionalAttrs (lane == "heroic") {
+      # The names, details and art in Heroic's own store cache, with images
+      # from the stores' servers.
+      "famidrive-heroic-media-${p.name}" = {
+        description = "Heroic's art and details for ${p.displayName}'s GOG, Epic and Amazon games in ES-DE";
+        wants = [ "network-online.target" ];
+        after = [ "network-online.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          User = p.user;
+          ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate heroic-media ${(source p).heroic} ${p.roms}/desktop";
+        };
+      };
     };
     # No MakeDirectory: it would make the folder as root inside the
     # player's home (and a root-owned Steam folder breaks Steam's first
@@ -73,7 +87,7 @@ let
     };
   };
 
-  folder = lane: { minecraft = "/desktop"; heroic = ""; }.${lane} or "/${lane}";
+  folder = lane: { minecraft = "/desktop"; heroic = "/desktop"; }.${lane} or "/${lane}";
 
   lanes = lib.filter hasLane [ "steam" "heroic" "minecraft" ];
 in
