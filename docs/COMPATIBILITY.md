@@ -234,7 +234,7 @@ Warfare's Legacy Edition.
 - **Performance:** 2026-10-10, the game's own benchmark on the first
   box, with NCR and the High-Res Graphics Pack – MAXIMUM installed: **170
   fps average** (142.6 minimum, 203.8 maximum), at 4K on the TV with
-  every graphics setting at its highest (a custom preset) and AMD FSR on Auto.
+  every graphics setting at its highest (a custom preset) and AMD FSR on Auto with frame generation.
   Earlier, one unmodded sample with the place in the game unknown: GPU
   50–70% busy at 1.5 GHz and 105 W, 9 GB of video memory, about 7 CPU
   cores busy.
