@@ -168,11 +168,15 @@ preferences, API Keys), for an account with premium.
 
 ### `famidrive.players.<name>.nexusmods.games`
 
-Collections to download for their Steam games, by Steam app
-id. Downloaded in the background into their cache
+Nexus Mods collections for their Steam games, by Steam app id.
+Downloaded in the background into their cache
 (~/.cache/famidrive/nexusmods), each file checked against the
-collection's checksum, with a plan of where each file goes in
-the game's folder. Nothing is installed in the game yet.
+collection's checksum, then installed in the game's folder,
+with every file recorded and anything it replaced backed up.
+A rebuild that changes this starts over: a game taken out gets
+its mods removed, and one with other collections, revisions or
+choices gets the old install taken out and the new one put
+in. See docs/MODDING.md.
 
 - **Type:** attribute set of (submodule)
 - **Default:** `{ }`
@@ -199,10 +203,10 @@ own default (its first option, when one must be picked).
 
 ### `famidrive.players.<name>.nexusmods.games.<name>.collection`
 
-The collection (modpack) for this game.
+One collection for this game, put before `collections`.
 
-- **Type:** submodule
-- **Default:** none; required when used
+- **Type:** null or (submodule)
+- **Default:** `null`
 
 ### `famidrive.players.<name>.nexusmods.games.<name>.collection.revision`
 
@@ -215,6 +219,41 @@ setup doesn't change under a player.
 - **Example:** `481`
 
 ### `famidrive.players.<name>.nexusmods.games.<name>.collection.slug`
+
+The collection's id, the last part of its address on nexusmods.com.
+
+- **Type:** string
+- **Default:** none; required when used
+- **Example:** `"iszwwe"`
+
+### `famidrive.players.<name>.nexusmods.games.<name>.collections`
+
+The collections (modpacks) for this game, installed in this
+order: where two have the same file, the later one's wins.
+
+- **Type:** list of (submodule)
+- **Default:** `[ ]`
+- **Example:** 
+
+  ```nix
+  [
+    { slug = "rcuccp"; revision = 189; }   # NCR Core
+    { slug = "srpv39"; revision = 129; }   # NCR - Extras
+    { slug = "g0tcm4"; revision = 42; }    # High-Res Graphics Pack - MAXIMUM
+  ]
+  ```
+
+### `famidrive.players.<name>.nexusmods.games.<name>.collections.*.revision`
+
+Which revision of it. Pinned, like a flake input: a curator's
+new revision is only used once it's set here, so a working
+setup doesn't change under a player.
+
+- **Type:** positive integer, meaning >0
+- **Default:** none; required when used
+- **Example:** `481`
+
+### `famidrive.players.<name>.nexusmods.games.<name>.collections.*.slug`
 
 The collection's id, the last part of its address on nexusmods.com.
 

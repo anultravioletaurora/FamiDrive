@@ -8,14 +8,21 @@ of its 268 mods where Vortex did, and the other three Vortex left empty.
 """
 
 import importlib.util
+import json
+import os
+import shutil
+import subprocess
 import sys
+import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 SCRIPT = Path(sys.argv.pop(1)).resolve()
 spec = importlib.util.spec_from_file_location("famidrive_nexusmods", SCRIPT)
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
+m.BSDTAR = shutil.which("bsdtar") or "tar"   # macOS's tar is bsdtar
 
 CET = "bin/x64/plugins/cyber_engine_tweaks/mods"
 
@@ -152,6 +159,93 @@ class Plan(unittest.TestCase):
         plan = {"mods": [{"files": [{"from": "a", "to": "archive/pc/mod/A.archive"}, {"from": "b", "to": "r6/b.reds"}]}]}
         c = m.compare(plan, {"files": [{"relPath": "archive\\pc\\mod\\a.archive"}, {"relPath": "bin\\x.dll"}]})
         self.assertEqual((c["both"], c["onlyPlan"], c["onlyVortex"]), (1, ["r6/b.reds"], ["bin/x.dll"]))
+
+
+class Order(unittest.TestCase):
+    def test_phases_then_after_rules(self):
+        mods = [{"name": "Config", "phase": 3, "source": {}}, {"name": "Base", "phase": 1, "source": {}},
+                {"name": "Extended", "phase": 1, "source": {}}, {"name": "Early", "phase": 0, "source": {}}]
+        rules = {"modRules": [{"type": "after", "source": {"logicalFileName": "Base"},
+                               "reference": {"logicalFileName": "Extended"}}]}
+        self.assertEqual([x["name"] for x in m.install_order(rules, mods)], ["Early", "Extended", "Base", "Config"])
+
+    def test_collections_list_or_one(self):
+        self.assertEqual(m.collections_of({"collection": {"slug": "a", "revision": 1}}), [{"slug": "a", "revision": 1}])
+        self.assertEqual(len(m.collections_of({"collections": [{"slug": "a", "revision": 1}, {"slug": "b", "revision": 2}]})), 2)
+
+
+class Install(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        m.STATE = self.base / "state"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def archive(self, name, files):
+        p = self.base / name
+        with zipfile.ZipFile(p, "w") as z:
+            for k, v in files.items():
+                z.writestr(k, v)
+        return str(p)
+
+    def test_finds_the_game_in_any_library(self):
+        steam, lib = self.base / "steam", self.base / "games"
+        (steam / "steamapps").mkdir(parents=True)
+        (lib / "steamapps").mkdir(parents=True)
+        (steam / "steamapps/libraryfolders.vdf").write_text(f'"libraryfolders"\n{{\n "1"\n {{\n  "path" "{lib}"\n }}\n}}\n')
+        (lib / "steamapps/appmanifest_1091500.acf").write_text('"AppState"\n{\n "StateFlags" "4"\n "installdir" "Cyberpunk 2077"\n}\n')
+        (lib / "steamapps/appmanifest_22380.acf").write_text('"AppState"\n{\n "StateFlags" "1026"\n "installdir" "Fallout New Vegas"\n}\n')
+        self.assertEqual(m.game_dir("1091500", steam), lib / "steamapps/common/Cyberpunk 2077")
+        self.assertIsNone(m.game_dir("22380", steam))   # still updating
+        self.assertIsNone(m.game_dir("400", steam))
+
+    def test_follows_the_case_already_there(self):
+        root = self.base / "game"
+        (root / "r6/scripts").mkdir(parents=True)
+        self.assertEqual(m.resolve(root, "R6/Scripts/a.reds"), root / "r6/scripts/a.reds")
+
+    def test_install_then_uninstall(self):
+        root = self.base / "game"
+        (root / "r6/config").mkdir(parents=True)
+        (root / "r6/config/options.json").write_text("the game's own")
+        a = self.archive("a.zip", {"Mod/r6/scripts/a.reds": "first", "Mod/r6/config/options.json": "modded"})
+        b = self.archive("b.zip", {"x.reds": "second"})
+        plan = {"mods": [
+            {"name": "A", "archive": a, "files": [{"from": "Mod/r6/scripts/a.reds", "to": "r6/scripts/A/a.reds"},
+                                                  {"from": "Mod/r6/config/options.json", "to": "r6/config/options.json"}]},
+            {"name": "B", "archive": b, "files": [{"from": "x.reds", "to": "R6/Scripts/A/a.reds"}]},
+        ]}
+        want = {"collections": [{"slug": "s", "revision": 1}], "choices": {}}
+        rec = m.install(plan, root, "1091500", want)
+        self.assertTrue(rec["complete"])
+        self.assertEqual(m.resolve(root, "r6/scripts/A/a.reds").read_text(), "second")   # the later mod's, once
+        self.assertEqual((root / "r6/config/options.json").read_text(), "modded")
+        self.assertEqual(rec["replaced"], ["r6/config/options.json"])
+        self.assertEqual(m.read_installed("1091500")["want"], want)
+        m.uninstall(m.read_installed("1091500"))
+        self.assertEqual((root / "r6/config/options.json").read_text(), "the game's own")
+        self.assertEqual(sorted(p.name for p in (root / "r6").iterdir()), ["config"])   # emptied folders gone
+        self.assertIsNone(m.read_installed("1091500"))
+
+    def test_the_one_off_install_counts_as_installed(self):
+        cache = self.base / "cache"
+        (cache / "installed").mkdir(parents=True)
+        (cache / "installed/1091500.json").write_text(json.dumps(
+            {"collection": "iszwwe", "revision": 481, "backup": str(self.base / "bk"), "files": [], "replaced": []}))
+        have = m.read_installed("1091500", cache)
+        self.assertEqual(have["want"], m.want_of({"collection": {"slug": "iszwwe", "revision": 481}}))
+
+    def test_a_game_taken_out_of_the_config_loses_its_mods(self):
+        root = self.base / "game"
+        root.mkdir()
+        (root / "mod.archive").write_text("x")
+        m.save_installed("1091500", {"appid": "1091500", "root": str(root), "want": {}, "files": ["mod.archive"],
+                                     "replaced": [], "backup": str(self.base / "bk"), "complete": True})
+        m.game_running = lambda appid: False
+        self.assertEqual(m.cmd_sync({"cache": str(self.base / "cache"), "apiKeyFile": None, "games": {}}), 0)
+        self.assertFalse((root / "mod.archive").exists())
 
 
 if __name__ == "__main__":
