@@ -53,6 +53,13 @@
         # Dolphin's maintainers backport to stable for netplay compatibility.
         eden = unstable.eden;
         rpcs3 = unstable.rpcs3;
+        # Heroic and what it runs games with, likewise (as of 2026-10-10:
+        # Heroic 2.22.3 vs 2.22.1, GE-Proton11-7 vs 11-1, umu-launcher 1.4.4
+        # vs 1.4.0, whose runtime download failed its checksum twice on the
+        # first box). proton-ge-bin is Steam's too (programs.steam).
+        heroic = unstable.heroic;
+        proton-ge-bin = unstable.proton-ge-bin;
+        umu-launcher = unstable.umu-launcher;
 
         es-de = final.callPackage ./pkgs/es-de { };
         tcli = final.callPackage ./pkgs/tcli { };
