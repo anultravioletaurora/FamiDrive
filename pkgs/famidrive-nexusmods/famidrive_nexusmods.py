@@ -307,8 +307,8 @@ def cyberpunk_layout(members, mod_name):
     - TweakXL tweaks (.yaml, .tweak): r6/tweaks/
     - a RED4ext plugin (.dll): red4ext/plugins/<its name>/
 
-    Anything else in an archive without those (readmes, pictures) is left
-    out."""
+    Anything else in an archive with those (readmes, pictures) is left
+    out. An archive with none of them goes in as it is (see place())."""
     files = files_only(members)
     # Laid out from the game's folder: the deepest common folder above the
     # first root folder each file has.
@@ -377,6 +377,9 @@ def cyberpunk_layout(members, mod_name):
 
 
 LAYOUTS = {"cyberpunk2077": cyberpunk_layout}
+# Games whose Vortex extension installs an archive it doesn't recognise as
+# it is, into the game's folder, after a warning.
+FALLBACK = {"cyberpunk2077"}
 
 
 # --- FOMOD installers --------------------------------------------------------------
@@ -532,6 +535,12 @@ def place(mod, members, download=None, read=None, picks=None):
     if layout is None:
         return "unknown", []
     placed = layout(members, mod_name(download, mod.get("name", "mod")))
+    if not placed and mod.get("domainName") in FALLBACK and files:
+        # Vortex's "fallback installer": an archive none of the rules
+        # recognise goes into the game's folder as it is. Curators count
+        # on it (NCR's and the High-Res Graphics Pack's notes: "Yes,
+        # install to staging anyway" on those warnings).
+        return "fallback", [(f, f) for f in files]
     return ("rules" if placed else "unknown"), placed
 
 

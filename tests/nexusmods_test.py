@@ -148,6 +148,11 @@ class Plan(unittest.TestCase):
         self.assertEqual(status, "installer")
         self.assertEqual(len(placed), 2)
 
+    def test_cyberpunk_fallback_as_is(self):
+        status, placed = m.place({"domainName": "cyberpunk2077", "name": "Odd"}, ["Odd Folder/thing.bin", "readme.txt"])
+        self.assertEqual(status, "fallback")
+        self.assertEqual(sorted(placed), [("Odd Folder/thing.bin", "Odd Folder/thing.bin"), ("readme.txt", "readme.txt")])
+
     def test_a_game_without_rules(self):
         self.assertEqual(m.place({"domainName": "stardewvalley"}, ["Mod/manifest.json"]), ("unknown", []))
 
