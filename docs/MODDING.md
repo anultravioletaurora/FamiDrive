@@ -5,7 +5,7 @@ kept in place without anyone at the TV with a keyboard:
 
 | Mods for | From | Chosen in | Account |
 |---|---|---|---|
-| Steam games (Cyberpunk 2077 so far) | [Nexus Mods](#nexus-mods) collections | each player's config | the player's, premium |
+| Steam and GOG games (Cyberpunk 2077, Fallout: New Vegas) | [Nexus Mods](#nexus-mods) collections and Wabbajack lists | each player's config | the player's, premium |
 | Valheim | [Thunderstore](#thunderstore-valheim) | the box's config | none |
 | GameCube, Wii and Switch games | [your RomM library](#emulators) | RomM | none |
 
@@ -35,12 +35,14 @@ follow.
 - **Adult content allowed** on the account, for collections Nexus Mods
   marks adult (many large ones are, for a few of their mods). A key
   without it can't see them.
-- **The game installed in the player's Steam library**, and run once.
+- **The game installed** in the player's Steam library, or through
+  Heroic for a GOG game, and run once.
 
 ### Setting it up
 
-Each game, by its Steam app id, gets one or more collections, by the
-id at the end of the collection's address and a revision:
+Each game gets one or more collections, by the id at the end of the
+collection's address and a revision. A Steam game goes by its app id, a
+GOG game (installed through Heroic) as `gog:<GOG id>`:
 
 ```nix
 famidrive.players.alice.nexusmods.games."1091500" = {   # Cyberpunk 2077
@@ -148,11 +150,64 @@ the backup back in.
 - **Taking a game's mods out by hand:**
   `famidrive-nexusmods uninstall <spec> <app id>`.
 
+### Wabbajack lists
+
+Some collections are Wabbajack lists (NakeyJakey's New Vegas is one):
+instead of a list of mods to install, the list holds the steps that
+build a finished Mod Organizer 2 setup, every file of it. FamiDrive
+treats one like any other collection in the config:
+
+```nix
+famidrive.players.alice.nexusmods.games."gog:1454587428".collections = [
+  { slug = "ezlocx"; revision = 1; }   # NakeyJakey's New Vegas
+];
+```
+
+- **Downloading:** every file the list names, from Nexus Mods (and a
+  few from their authors' own sites, such as GitHub releases), checked
+  against the list's checksums.
+- **Building:** each mod's folder, exactly as the list describes: files
+  out of the downloads (also out of archives inside them), files the
+  list carries itself, and the few it patches. Built once, in
+  `~/.local/share/famidrive/nexusmods/wabbajack/<slug>-<revision>/`.
+- **Installing:** the mods go into the game's own `Data` folder in the
+  order the list's Mod Organizer profile gives them (a later mod wins a
+  shared file), as hard links to the built folders, so they take no
+  extra space. Mod Organizer itself isn't needed: the game starts from
+  Steam, Heroic or ES-DE as it always does.
+- **Steps FamiDrive doesn't do yet** (building BSA archives, converting
+  textures) are named in the service's log, and that list isn't
+  installed.
+
+### Fallout: New Vegas
+
+A New Vegas list expects more than its mods in place, and FamiDrive does
+that too, recorded and backed up like everything else:
+
+- **xNVSE**, the script extender (pinned in FamiDrive, from its GitHub
+  releases), into the game's folder.
+- **The 4GB patch**, by its author's own Python patcher (Nexus Mods,
+  "FNV 4GB Patcher", downloaded with the player's key and run only if
+  it's exactly the one FamiDrive knows). It lets the game use 4 GB of
+  memory and load xNVSE itself.
+- **The launcher out of the way:** Steam and GOG start New Vegas's
+  settings launcher; the patched game takes its place, so a launch goes
+  straight into the modded game.
+- **The profile's INIs** (`Fallout.ini`, `FalloutPrefs.ini`,
+  `FalloutCustom.ini`, with its INI tweaks) and **plugins**
+  (`plugins.txt`) into the game's Windows prefix, where the game reads
+  them, and the plugins' **load order**, which New Vegas takes from the
+  plugin files' dates.
+- **Archive invalidation:** the empty `Fallout - Invalidation.bsa` the
+  profile's INI names, as Mod Organizer makes it.
+
+Lists for New Vegas usually need **every DLC** (Dead Money, Honest
+Hearts, Old World Blues, Lonesome Road, Gun Runners' Arsenal and the
+Courier's Stash): the Ultimate Edition on GOG, or the base game plus
+its DLC on Steam.
+
 ### Not done yet
 
-- **Wabbajack lists** (New Vegas's NakeyJakey's list, #5): a Wabbajack
-  list builds a Mod Organizer 2 folder; FamiDrive will build it and
-  install the result the same way.
 - **Rules for other games** (Bethesda games' `Data` folder and plugin
   order, Baldur's Gate 3, Stardew Valley's SMAPI).
 - **A Settings entry** to turn a game's mods off without a rebuild.

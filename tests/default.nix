@@ -206,7 +206,7 @@ in
   cheevos = unit "cheevos" ../pkgs/famidrive-cheevos/famidrive_cheevos.py
     (pkgs.python3.withPackages (ps: [ ps.requests ]));
   nexusmods = pkgs.runCommand "test-nexusmods" {
-    nativeBuildInputs = [ (pkgs.python3.withPackages (ps: [ ps.requests ])) pkgs.libarchive ];
+    nativeBuildInputs = [ (pkgs.python3.withPackages (ps: [ ps.requests ps.xxhash ])) pkgs.libarchive ];
   } ''
     export HOME=$TMPDIR
     python3 ${./nexusmods_test.py} ${../pkgs/famidrive-nexusmods/famidrive_nexusmods.py}
@@ -241,9 +241,13 @@ in
       (let svc = c.systemd.services.famidrive-nexusmods-bob; in
         svc.serviceConfig.User == "bob" && !(c.systemd.timers ? famidrive-nexusmods-bob)
           && !(c.systemd.services ? famidrive-nexusmods-guest)))
+    (check "xNVSE is pinned and handed over, for New Vegas lists"
+      (let spec = builtins.fromJSON (builtins.unsafeDiscardStringContext (builtins.readFile (lib.last (lib.splitString " "
+            c.systemd.services.famidrive-nexusmods-alice.serviceConfig.ExecStart)))); in
+        lib.hasSuffix "nvse_6_4_9.7z" spec.extras.xnvse))
     (check "one collection and a list both work, the single one first"
-      (let spec = builtins.fromJSON (builtins.readFile (lib.last (lib.splitString " "
-            c.systemd.services.famidrive-nexusmods-alice.serviceConfig.ExecStart))); in
+      (let spec = builtins.fromJSON (builtins.unsafeDiscardStringContext (builtins.readFile (lib.last (lib.splitString " "
+            c.systemd.services.famidrive-nexusmods-alice.serviceConfig.ExecStart)))); in
         map (x: x.slug) spec.games."1091500".collections == [ "iszwwe" "g0tcm4" ]
           && spec.games."1091500".choices."WTNC Config" == [ "Cyberpunk THING" ]))
   ]);

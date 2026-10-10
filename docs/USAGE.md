@@ -168,7 +168,10 @@ preferences, API Keys), for an account with premium.
 
 ### `famidrive.players.<name>.nexusmods.games`
 
-Nexus Mods collections for their Steam games, by Steam app id.
+Nexus Mods collections for their games: a Steam game by its app
+id, a GOG game (installed through Heroic) as `gog:<GOG id>`. A
+collection can be a Wabbajack list (New Vegas's NakeyJakey's,
+for one), built and installed the same way.
 Downloaded in the background into their cache
 (~/.cache/famidrive/nexusmods), each file checked against the
 collection's checksum, then installed in the game's folder,
@@ -180,7 +183,14 @@ in. See docs/MODDING.md.
 
 - **Type:** attribute set of (submodule)
 - **Default:** `{ }`
-- **Example:** `{ "1091500".collection = { slug = "iszwwe"; revision = 481; }; }   # Cyberpunk 2077`
+- **Example:** 
+
+  ```nix
+  {
+    "1091500".collections = [ { slug = "rcuccp"; revision = 189; } ];      # Cyberpunk 2077 on Steam
+    "gog:1454587428".collections = [ { slug = "ezlocx"; revision = 1; } ];  # New Vegas on GOG, a Wabbajack list
+  }
+  ```
 
 ### `famidrive.players.<name>.nexusmods.games.<name>.choices`
 
