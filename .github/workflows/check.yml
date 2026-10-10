@@ -6,6 +6,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Started by the Update workflow on its pull request's branch: a pull
+  # request opened with the workflow's own token doesn't start others.
+  workflow_dispatch:
 
 concurrency:
   group: check-${{ github.ref }}

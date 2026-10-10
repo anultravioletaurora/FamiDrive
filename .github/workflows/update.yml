@@ -1,0 +1,67 @@
+# Weekly updates, as one pull request: every flake input (nixpkgs, the
+# unstable packages, home-manager, sops-nix) and FamiDrive's own pins
+# (scripts/update-pins.py: ES-DE, xNVSE, Art Book Next, SuperTux Advance,
+# SuperTux Party, the BepInExPacks). Check runs on it as on any pull
+# request; merge it when it's green. Moving to the next NixOS release
+# stays a change made by hand.
+name: Update
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"   # Mondays
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            accept-flake-config = false
+      - name: Flake inputs
+        run: nix flake update 2>&1 | tee inputs.log
+      - name: FamiDrive's own pins
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/update-pins.py pins.md
+      - name: Pull request text
+        run: |
+          {
+            echo "This week's updates, from the Update workflow. Check runs on it; merge it when it's green."
+            echo
+            echo "## Flake inputs"
+            if grep -q "Updated input" inputs.log; then
+              grep -E "Updated input|→" inputs.log | sed -E "s/^• Updated input '([^']+)':/- **\1**/; s/^ +→ '([^?']+)[^']*' \(([0-9-]+)\)/  → \1 (\2)/"
+            else
+              echo "Nothing new."
+            fi
+            echo
+            echo "## FamiDrive's own pins"
+            if [ -s pins.md ]; then cat pins.md; else echo "Nothing new."; fi
+          } > body.md
+          rm -f inputs.log pins.md
+      - name: Open or update the pull request
+        id: pr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: updates/weekly
+          commit-message: Weekly updates (flake inputs and FamiDrive's pins)
+          title: Weekly updates
+          body-path: body.md
+          add-paths: |
+            flake.lock
+            pkgs/**
+            modules/**
+          delete-branch: true
+      - name: Run Check on it
+        if: steps.pr.outputs.pull-request-head-sha != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run check.yml --ref updates/weekly
