@@ -43,7 +43,7 @@ let
       romm.tokenFile = mkOption {
         type = types.nullOr types.path;
         default = null;
-        defaultText = lib.literalMD "their sops secret, `romm-token-<name>`";
+        defaultText = lib.literalMD "their sops secret, `<name>/romm`";
         description = "Their RomM Client API Token (rmm_...), decrypted by sops-nix.";
       };
       # Revised 2026-10-06: no longer needed by hand. A player's new Eden
@@ -90,7 +90,7 @@ let
     isGuest = false;
     tokenFile =
       if p.romm.tokenFile != null then p.romm.tokenFile
-      else if cfg.romm.enable then config.sops.secrets."romm-token-${name}".path
+      else if cfg.romm.enable then config.sops.secrets."${name}/romm".path
       else null;
   })) cfg.players;
 
@@ -372,7 +372,7 @@ in
 
     # Per-player secrets. Each host points sops.defaultSopsFile at its own file.
     sops.secrets = lib.mkIf cfg.romm.enable (lib.mapAttrs' (name: p:
-      lib.nameValuePair "romm-token-${name}" { owner = p.user; }
+      lib.nameValuePair "${name}/romm" { owner = p.user; }
     ) (lib.filterAttrs (_: p: p.romm.tokenFile == null) cfg.players));
 
     # The shared library. Players read it (group famidrive); saves never

@@ -243,8 +243,8 @@ in
     };
   } (c: [
     (check "a password secret for the player with an account, owned by them, and none for the others"
-      (c.sops.secrets ? "retroachievements-alice" && c.sops.secrets."retroachievements-alice".owner == "alice"
-        && !(c.sops.secrets ? "retroachievements-bob") && !(c.sops.secrets ? "retroachievements-guest")))
+      (c.sops.secrets ? "alice/retroachievements" && c.sops.secrets."alice/retroachievements".owner == "alice"
+        && !(c.sops.secrets ? "bob/retroachievements") && !(c.sops.secrets ? "guest/retroachievements")))
     (check "their session signs in, nobody else's"
       (lib.hasInfix "alice) " c.famidrive.sessionSetup && lib.hasInfix "famidrive-cheevos setup" c.famidrive.sessionSetup
         && !(lib.hasInfix "bob) " c.famidrive.sessionSetup)))
@@ -429,7 +429,7 @@ in
         (lib.all (u: lib.elem "famidrive" c.users.users.${u}.extraGroups) [ "alice" "bob" "guest" ]))
       (check "the library has its own account" (c.users.users.famidrive-library.isSystemUser))
       (check "bob's token comes from sops; alice's is set by hand"
-        (c.sops.secrets ? romm-token-bob && !(c.sops.secrets ? romm-token-alice) && !(c.sops.secrets ? romm-token-guest)))
+        (c.sops.secrets ? "bob/romm" && !(c.sops.secrets ? "alice/romm") && !(c.sops.secrets ? "guest/romm")))
       (check "the library pulls with the primary player's token"
         (c.systemd.services.romm-library-pull.serviceConfig.LoadCredential == "romm-token:/run/secrets/alice-token"
           && c.systemd.services.romm-library-pull.serviceConfig.User == "famidrive-library"))

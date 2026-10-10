@@ -353,15 +353,30 @@ what it does and its default, is in [USAGE.md](docs/USAGE.md).
 **Secrets.** Server addresses aren't secret and go in `configuration.nix`.
 Logins for Jellyfin, Steam and Heroic's stores (GOG, Epic, Amazon) happen once in each app, on the TV. The
 only secrets are in the host's `secrets.yaml`, encrypted with
-[sops](https://github.com/getsops/sops) to the box's age key plus yours:
+[sops](https://github.com/getsops/sops) to the box's age key plus yours.
+Each player's are together under their name:
 
-- `romm-token-<player>`: one per player, a RomM Client API Token (`rmm_…`)
+```yaml
+alice:
+  romm: rmm_…
+  retroachievements: …
+bob:
+  romm: rmm_…
+```
+
+- `romm`: one per player, a RomM Client API Token (`rmm_…`)
   issued by that player's RomM user. The primary player's
   (`famidrive.primaryPlayer`) also pulls the shared library. Scopes the agent uses: `roms.read`, `platforms.read`,
   `firmware.read`, `collections.read`, `assets.read`, `assets.write`,
   `devices.read`, `devices.write`. Add `roms.write` to let a box write game
   IDs it worked out back to RomM (optional; skipped quietly without it).
-- `rpcn-password-<player>`: only for PS3 with `famidrive.online.enable`.
+- `retroachievements`: the player's RetroAchievements password, for
+  players with `retroAchievements.username` set.
+- `rpcn`: their RPCN password, only for PS3 with `famidrive.online.enable`.
+
+Before 2026-10-10 these were top-level keys (`romm-token-alice`,
+`retroachievements-alice`, `rpcn-password-alice`). Move each under its
+player, with the new name, before rebuilding with a newer FamiDrive.
 
 A box with `famidrive.romm.enable = false` needs no secrets and no sops
 setup at all.
@@ -507,7 +522,7 @@ NixOS, but isn't covered here.
        - path_regex: secrets\.yaml$
          age: age1…
      ```
-     Then add `romm-token-alice: rmm_…` to `secrets.yaml` with
+     Then add alice's token (`alice:` and, under it, `romm: rmm_…`) to `secrets.yaml` with
      `cd /etc/nixos && sudo env SOPS_AGE_KEY_FILE=/var/lib/sops-nix/key.txt nix --extra-experimental-features 'nix-command flakes' run nixpkgs#sops -- secrets.yaml`
      (sops finds `.sops.yaml` from the folder you're in),
      and the two `sops.` lines from [Using it](#using-it) to

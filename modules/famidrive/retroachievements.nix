@@ -17,7 +17,7 @@ let
 
   passwordFile = name: p:
     if p.retroAchievements.passwordFile != null then p.retroAchievements.passwordFile
-    else config.sops.secrets."retroachievements-${name}".path;
+    else config.sops.secrets."${name}/retroachievements".path;
 
   spec = name: p: pkgs.writeText "famidrive-cheevos-${name}.json" (builtins.toJSON {
     inherit (p.retroAchievements) username hardcore;
@@ -39,13 +39,13 @@ in
             Their RetroAchievements username. Set, their RetroArch, Dolphin
             and PCSX2 are signed in at the start of each of their sessions,
             and unlocks show as toasts. Their password is a sops secret,
-            `retroachievements-<name>`, unless `passwordFile` says otherwise.
+            `<name>/retroachievements`, unless `passwordFile` says otherwise.
           '';
         };
         passwordFile = mkOption {
           type = types.nullOr types.path;
           default = null;
-          defaultText = lib.literalMD "their sops secret, `retroachievements-<name>`";
+          defaultText = lib.literalMD "their sops secret, `<name>/retroachievements`";
           description = "A file with their RetroAchievements password, readable by their account.";
         };
         hardcore = mkOption {
@@ -63,7 +63,7 @@ in
   config = lib.mkIf cfg.enable {
     environment.systemPackages = [ pkgs.famidrive-cheevos ];
 
-    sops.secrets = lib.mapAttrs' (name: p: lib.nameValuePair "retroachievements-${name}" { owner = p.user; })
+    sops.secrets = lib.mapAttrs' (name: p: lib.nameValuePair "${name}/retroachievements" { owner = p.user; })
       (lib.filterAttrs (_: p: p.retroAchievements.passwordFile == null) withCheevos);
 
     # Signed in before ES-DE, in the background: a slow or unreachable

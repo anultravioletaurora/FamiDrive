@@ -27,7 +27,7 @@ in
     # against the self-hosted RPCN (email validation off), not by hand.
     # Open question in roms.md.
     sops.secrets = lib.mkIf (has "ps3") (lib.mapAttrs' (name: p:
-      lib.nameValuePair "rpcn-password-${name}" { owner = p.user; }
+      lib.nameValuePair "${name}/rpcn" { owner = p.user; }
     ) (lib.filterAttrs (_: p: !p.isGuest) cfg.allPlayers));
 
     # Inbound for peer-to-peer play when this box hosts. Ports to verify
@@ -73,7 +73,7 @@ in
           }}
           ${lib.optionalString (!famidrivePlayer.isGuest) ''
             # Password comes from sops at activation time, never from the Nix store.
-            ${pkgs.yq-go}/bin/yq -i ".Password = \"$(cat ${config.sops.secrets."rpcn-password-${famidrivePlayer.name}".path})\"" "$HOME/.config/rpcs3/rpcn.yml"
+            ${pkgs.yq-go}/bin/yq -i ".Password = \"$(cat ${config.sops.secrets."${famidrivePlayer.name}/rpcn".path})\"" "$HOME/.config/rpcs3/rpcn.yml"
           ''}
         '')
 
