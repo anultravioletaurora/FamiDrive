@@ -1042,6 +1042,15 @@ def extracted(archive, into):
         shutil.rmtree(into, ignore_errors=True)
         Path(into).mkdir(parents=True)
         subprocess.run([UNAR, "-q", "-D", "-o", str(into), "-f", str(archive)], check=True, capture_output=True)
+    # Some archives keep read-only folders (and files), and a file can't be
+    # moved out of a read-only folder. Found on the first box 2026-10-10:
+    # an NCR mod stopped the install with "Permission denied".
+    for d, dirs, files in os.walk(into):
+        os.chmod(d, os.stat(d).st_mode | 0o700)
+        for f in files:
+            p = os.path.join(d, f)
+            if not os.path.islink(p):
+                os.chmod(p, os.stat(p).st_mode | 0o600)
     out = {}
     for p in Path(into).rglob("*"):
         if p.is_file():
@@ -1364,6 +1373,8 @@ def cmd_sync(spec):
             status |= sync_game(nx, cache, appid, game, extras=spec.get("extras", {}))
         except (requests.RequestException, RuntimeError, PermissionError, subprocess.CalledProcessError, OSError) as e:
             log(f"{appid}: {e}")
+            toast("--kind", "alert", "--id", f"nexusmods-{appid}", "--done", "Mods not installed",
+                  "Something went wrong; the next run tries again.")
             status = 1
     return status
 
