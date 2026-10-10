@@ -640,7 +640,9 @@ in
       (lib.mkIf (hasLane "heroic") (lib.mapAttrs (system: s: {
         inherit (s) fullname;
         extensions = [ ".${system}" ];
-        command = ''XDG_CURRENT_DESKTOP=FamiDrive ${pkgs.heroic}/bin/heroic --no-gui --no-sandbox "heroic://launch?appName=$(cat "$ROM")&runner=${s.runner}"'';
+        # Through gamescope-fg --launcher: the status screen while Heroic
+        # sets the game up and starts it.
+        command = ''${pkgs.gamescope-fg}/bin/gamescope-fg --launcher "$ROM" env XDG_CURRENT_DESKTOP=FamiDrive ${pkgs.heroic}/bin/heroic --no-gui --no-sandbox "heroic://launch?appName=$(cat "$ROM")&runner=${s.runner}"'';
         theme = system;
       } // lib.optionalAttrs (s.runner == "gog") {
         before = ''

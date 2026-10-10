@@ -14,6 +14,9 @@
 #                                    client, put it on top, and wait until it exits
 #   gamescope-fg --steam bigpicture  Steam's own UI (per-game Proton, launch options,
 #                                    downloads), on top until it's closed
+#   gamescope-fg --launcher ROM CMD...
+#                                    a game another launcher starts (Heroic): the
+#                                    status screen until its window is up
 #
 # Only windows from the program's own session are tagged (each runs under
 # setsid, matched by _NET_WM_PID). Found on the first box 2026-10-05: tagging
@@ -87,14 +90,30 @@ writeShellApplication {
     untagged() { ! xprop -id "$1" STEAM_GAME 2>/dev/null | grep -q " = "; }
     tag() { xprop -id "$1" -f STEAM_GAME 32c -set STEAM_GAME "$2" 2>/dev/null || true; }
 
-    # tag_session ID SID: label untagged windows whose process is in session SID.
+    # descends PID ROOT: whether PID is ROOT or runs under it.
+    descends() {
+      p="$1"
+      while [ -n "$p" ] && [ "$p" -gt 1 ]; do
+        [ "$p" = "$2" ] && return 0
+        p=$(awk '/^PPid:/ { print $2 }' "/proc/$p/status" 2>/dev/null || true)
+      done
+      return 1
+    }
+
+    # tag_session ID SID: label untagged windows whose process is in session
+    # SID, or runs under its leader: a program can start a session of its
+    # own. Found on the first box 2026-10-10: Heroic runs a GOG game through
+    # umu and Steam's pressure-vessel container, which does, so Fallout:
+    # New Vegas's launcher window was never labelled and the TV stayed
+    # black.
     tag_session() {
       for wid in $(windows); do
         untagged "$wid" || continue
         wpid=$(window_pid "$wid")
         [ -n "$wpid" ] || continue
-        [ "$(ps -o sid= -p "$wpid" 2>/dev/null | tr -d ' ')" = "$2" ] || continue
-        tag "$wid" "$1"
+        if [ "$(ps -o sid= -p "$wpid" 2>/dev/null | tr -d ' ')" = "$2" ] || descends "$wpid" "$2"; then
+          tag "$wid" "$1"
+        fi
       done
     }
 
@@ -118,6 +137,36 @@ writeShellApplication {
     music_paused true
     trap 'music_paused false' EXIT
 
+    # The status screen (pkgs/famidrive-status): shown from the moment
+    # the game is picked until its window is up, with what Steam (or
+    # another launcher) is doing: updating, processing shaders, waiting on
+    # a prompt, setting the game up, starting. This writes the state;
+    # famidrive-status draws it.
+    status_pid=""
+    status_file="$run/famidrive-status.json"
+    status() {
+      printf '{"state": "%s", "detail": "%s"}\n' "$1" "''${2:-}" > "$status_file.new"
+      mv "$status_file.new" "$status_file"
+    }
+    status_stop() {
+      if [ -n "$status_pid" ]; then kill "$status_pid" 2>/dev/null || true; fi
+      status_pid=""
+      rm -f "$status_file"
+    }
+    # Whatever label the window already has: it's in the same session as
+    # the outer gamescope-fg, whose loop may label it GAME first. Found on
+    # the first box 2026-10-05: then the status screen stayed hidden and
+    # Street Fighter 6 showed Steam's own shader dialog instead.
+    status_tag() {
+      for wid in $(windows); do
+        if [ "$(window_pid "$wid")" = "$status_pid" ] \
+            && ! xprop -id "$wid" STEAM_GAME 2>/dev/null | grep -q "= $STATUS$"; then
+          tag "$wid" "$STATUS"
+        fi
+      done
+    }
+    focusable() { xprop -root GAMESCOPE_FOCUSABLE_APPS 2>/dev/null | grep -qE "[ ,]$1(,|$)"; }
+
     if [ "''${1:-}" = "--steam" ] && [ "''${2:-}" = "bigpicture" ]; then
       echo "steam steam://close/bigpicture" > "$run/famidrive-game.close"
       SDL_GAMECONTROLLER_IGNORE_DEVICES="''${FAMIDRIVE_STEAM_SDL_IGNORE:-}" steam steam://open/bigpicture
@@ -140,7 +189,6 @@ writeShellApplication {
       # Games in the default library only; others don't get the update retry.
       manifest="$HOME/.local/share/Steam/steamapps/appmanifest_$appid.acf"
       seen=$(wc -l < "$log" 2>/dev/null || echo 0)
-      status_pid=""   # the status screen's, while it's up (see below)
       # Put the game on top and stay until it's gone: until none of its
       # Steam processes (`SteamLaunch AppId=N --`) is left. Not the game's
       # install script, whose launcher is `SteamLaunch AppId=N Install=1`. Not one pid: Steam
@@ -192,42 +240,6 @@ writeShellApplication {
         exit 0
       fi
 
-      # The status screen (pkgs/famidrive-status): shown from the moment
-      # the game is picked until its window is up, with what Steam is
-      # doing (updating, processing shaders, waiting on a prompt, starting).
-      # This writes the state; famidrive-status draws it.
-      status_file="$run/famidrive-status.json"
-      status() {
-        printf '{"state": "%s", "detail": "%s"}\n' "$1" "''${2:-}" > "$status_file.new"
-        mv "$status_file.new" "$status_file"
-      }
-      status_stop() {
-        if [ -n "$status_pid" ]; then kill "$status_pid" 2>/dev/null || true; fi
-        status_pid=""
-        rm -f "$status_file"
-      }
-      # Whatever label the window already has: it's in the same session as
-      # the outer gamescope-fg, whose loop may label it GAME first. Found on
-      # the first box 2026-10-05: then the status screen stayed hidden and
-      # Street Fighter 6 showed Steam's own shader dialog instead.
-      status_tag() {
-        for wid in $(windows); do
-          if [ "$(window_pid "$wid")" = "$status_pid" ] \
-              && ! xprop -id "$wid" STEAM_GAME 2>/dev/null | grep -q "= $STATUS$"; then
-            tag "$wid" "$STATUS"
-          fi
-        done
-      }
-      focusable() { xprop -root GAMESCOPE_FOCUSABLE_APPS 2>/dev/null | grep -qE "[ ,]$1(,|$)"; }
-      # descends PID ROOT: whether PID is ROOT or runs under it.
-      descends() {
-        p="$1"
-        while [ -n "$p" ] && [ "$p" -gt 1 ]; do
-          [ "$p" = "$2" ] && return 0
-          p=$(awk '/^PPid:/ { print $2 }' "/proc/$p/status" 2>/dev/null || true)
-        done
-        return 1
-      }
       # The windows of a game's first-time setup, labelled as the game so
       # they're shown and can be answered. Found on the first box
       # 2026-10-06: Star Wars Jedi: Survivor's install script runs the EA
@@ -390,6 +402,48 @@ writeShellApplication {
 
       follow
       exit 0
+    fi
+
+    if [ "''${1:-}" = "--launcher" ]; then
+      rom="$2"
+      shift 2
+      trap 'status_stop; music_paused false' EXIT
+      status launching
+      famidrive-status --rom "$rom" "$status_file" &
+      status_pid=$!
+      setsid "$@" &
+      pid=$!
+      # Select + Start closes the launcher and everything under it: the
+      # game may run in a session of its own (Heroic's container).
+      echo "$pid" > "$run/famidrive-game.tree"
+      # Its windows above the status screen: a game's own launcher or a
+      # setup that asks something shows; the status screen covers the
+      # wait until then.
+      base "$GAME,$STATUS,$FRONTEND"
+      while kill -0 "$pid" 2>/dev/null; do
+        tag_session "$GAME" "$pid"
+        if [ -n "$status_pid" ]; then
+          status_tag
+          if focusable "$GAME"; then
+            status_stop
+          # A first launch sets the game up before starting it: Heroic
+          # downloads GOG's runtimes (gogdl redist, into its log), then
+          # makes the prefix and installs them (wineboot, the runtimes'
+          # installers), all without a window. Found on the first box
+          # 2026-10-10: Fallout: New Vegas's first launch was a minute of
+          # black screen.
+          elif pgrep -u "$(id -u)" -f '(gogdl.* redist |wineboot|__redist|vcredist|dotNetFx|DXSETUP|oalinst)' > /dev/null; then
+            status setup
+          else
+            status launching
+          fi
+        fi
+        sleep 0.5
+      done
+      rm -f "$run/famidrive-game.tree"
+      base "$FRONTEND"
+      wait "$pid"
+      exit $?
     fi
 
     # setsid gives the game its own session and process group. A background
