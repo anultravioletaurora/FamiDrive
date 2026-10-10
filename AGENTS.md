@@ -32,6 +32,42 @@ are only ever "the first box" and "the second box":
 Results from either go in the docs with the box named that way and a
 date.
 
+## Where it's going
+
+Today a box is NixOS installed by hand, plus a private host flake that
+someone writes. The goal is to take away everything before FamiDrive
+takes over. FamiDrive's job ends once the box is built and set up.
+
+- **An installer, so FamiDrive works like a distro**
+  ([#156](https://github.com/anultravioletaurora/FamiDrive/issues/156)).
+  A blank PC boots the image, installs, and finishes a first-boot setup
+  with only a controller: players, network, pairing controllers, RomM,
+  which systems to show. The steps, in order:
+  1. A binary cache that CI pushes to. GitHub can't host one, and
+     unfree builds stay out of it.
+  2. The answers a host gives live in a `famidrive.json` that
+     `lib.mkBox` reads, and there's a host-flake template.
+  3. An installer ISO with the system pre-built in its store, plus
+     disko and nixos-facter.
+  4. A controller-driven installer and first-boot setup.
+  5. Settings and automatic updates from the couch.
+- **Other distros**
+  ([#157](https://github.com/anultravioletaurora/FamiDrive/issues/157)).
+  Split the modules into a per-player home-manager module and host
+  modules (system-manager), so a box on Fedora with Nix gets the same
+  apps and per-player setup. Greetd, the picker, players as accounts
+  and boot-menu rollback stay NixOS-only. A Docker image was considered
+  and set aside: FamiDrive's core is the display, the input devices and
+  the kernel, which a container shares with the host.
+
+What this means for changes now:
+- **Keep per-player config separate from host config.** Per-player
+  config goes in `famidrive.playerHome`.
+- **Prefer options that are plain data** (strings, lists, attrsets of
+  them), so a setup screen could write them to JSON later.
+- **Don't make a player hand-edit Nix** for something a setup screen
+  could ask.
+
 ## Rules
 
 - **Nothing private in this repo.** That means no server addresses, RomM
