@@ -84,7 +84,7 @@ otherwise.
 | CPU | AMD Ryzen 9 7900X |
 | GPU | AMD Radeon RX 7900 XTX (24 GB) |
 | Display | 4K TV, 120 Hz, HDR on (`display.hdr = true`, `display.refresh = 120`) |
-| Controllers | 8BitDo Ultimate 2 (2.4 GHz dongle), Xbox Wireless Controller (Bluetooth), first-party Wii Remotes ([CONTROLLERS.md](CONTROLLERS.md)) |
+| Controllers | 8BitDo Ultimate 2 (2.4 GHz dongle), Xbox Wireless Controller (Bluetooth), DualSense (Bluetooth), a PowerA GameCube-style pad for Switch (USB), first-party Wii Remotes, a Wii guitar on a Raphnet adapter ([CONTROLLERS.md](CONTROLLERS.md)) |
 | FamiDrive | `f2b8769` and later, October 2026 |
 
 **The second box:** a small office PC, installed fresh from the README.
@@ -201,7 +201,13 @@ Warfare's Legacy Edition.
 
 ### Call of Duty: WWII
 
-**Steam: ❔ Untested.**
+**Steam: ❔ Untested past its first launch.**
+
+- **2026-10-09, controllers:** the game took the Raphnet adapter (a Wii
+  guitar's, for Clone Hero and YARG) as the first controller, so the
+  8BitDo didn't drive it. FamiDrive now hides instrument adapters from
+  Steam and its games (`controllers.instruments`, #160), while Clone
+  Hero and YARG still see them. Not yet tried again.
 
 - **Modes:** the campaign and Nazi Zombies run from one program, and
   multiplayer from another. Steam asks which one to start, so expect
@@ -224,13 +230,15 @@ Warfare's Legacy Edition.
   (5,575 files, 23 GB of archives): "looks preem". redscript compiled
   every script, RED4ext and Cyber Engine Tweaks loaded with no errors.
   The Proton launch option below is still needed.
-- **Launch options:** `WINEDLLOVERRIDES="winmm,version=n,b" %command%`.
+- **Launch options:** `WINEDLLOVERRIDES="winmm,version=n,b" %command%`,
+  set in Steam (or `steam.launchOptions`). Cyber Engine Tweaks and
+  RED4ext load through them.
 - **Launching:** works. Steam's window shows briefly, then a black screen
   for about 37 s while the game starts, then the game. It used to drop
   back to ES-DE with the game running behind it: Steam swaps the process
   it starts for another, three times in 40 s, and FamiDrive followed only
-  the first. Fixed in `ac82a59`. The black wait is the planned status
-  screen's job (see [Steam launches](#steam-launches)).
+  the first. Fixed in `ac82a59`. The status screen now covers the wait
+  with "Starting" (see [Steam launches](#steam-launches)).
 - **Performance:** 2026-10-10, the game's own benchmark on the first
   box, with NCR and the High-Res Graphics Pack – MAXIMUM installed, at
   4K on the TV with every graphics setting at its highest (a custom
@@ -270,16 +278,28 @@ it (`famidrive.steam.steamInputGames`).
   Steam Input off (FamiDrive's default), the first pad was a Raphnet
   adapter (a guitar's, for YARG) and the 8BitDo did nothing in its menus.
   With Steam Input on, Steam hands it the pads in Steam's own order.
+  Instrument adapters are now hidden from Steam games (#160), so it may
+  play with Steam Input off too; not yet tried.
 - **First launch:** it needed an update, then its install script ran.
   FamiDrive used to ask Steam to launch it again before the script had
   run, and the launch sat on "updating" for hours. Fixed in #118.
 
 ### Fallout: New Vegas
 
-**Steam: ✅ Works.** Proton Experimental (Steam's choice), unmodded.
+**Steam: ✅ Works.** Proton Experimental (Steam's choice), unmodded. The
+copy on the first box is the base game only, without the DLC.
 
-- **Mods:** not set up. NakeyJakey's New Vegas (a Wabbajack list of
-  about 335 mods) is the one wanted; tracked in #5.
+**GOG, through Heroic: ❔ Installed, not yet played.** 2026-10-10: the
+Ultimate Edition (GOG id `1454587428`, version 1.4.0.525), with every
+DLC, on GE-Proton7-50 (Heroic's choice).
+
+- **Mods:** NakeyJakey's New Vegas, a Wabbajack list of 336 mods, as a
+  Nexus Mods collection (`ezlocx`) through FamiDrive (#166,
+  [MODDING.md](MODDING.md)). It needs every DLC, so the GOG copy. On
+  2026-10-10 its download (26 GB) and build (45 GB, 65,561 files) both
+  finished on the first box; installing it into the game and playing it
+  is next (#5). The list also needs the 4 GB patch and xNVSE, which
+  FamiDrive puts in.
 
 ### Gears 5
 
@@ -441,8 +461,9 @@ over from Ryujinx with everything unlocked.
 
 - **Glitches:** during a cup, lots of stray textures (spiky polygons)
   cover the track. Menus are fine.
+- **Graphics API:** Eden runs on Vulkan (its default).
 - **To try:** Eden's GPU accuracy (Normal and High), its asynchronous
-  shader option, and Vulkan against OpenGL.
+  shader option, and OpenGL instead of Vulkan.
 
 ### Mario Party 3
 
@@ -605,8 +626,9 @@ Tracked with the other launchers in #57.
 
 ### Star Wars Jedi: Survivor
 
-**Steam: ⚠️ In progress.** Installed remotely through Steam while the box
-was in use; ES-DE listed it after the next session start.
+**Steam: ❔ Untested past its first launch.** Installed remotely through
+Steam while the box was in use; ES-DE listed it after the next session
+start.
 
 - **First launch:** Steam runs the game's install script first, which
   installs the EA app. Its installer waits on a "Let's go" button, but its
@@ -614,6 +636,12 @@ was in use; ES-DE listed it after the next session start.
   ES-DE came back after three minutes. FamiDrive now shows an install
   script's windows on top ("Setting up the game") and waits for them.
   The EA app's installer and sign-in want a mouse or keyboard.
+- **2026-10-10:** the EA app installer's "Let's go" button couldn't be
+  reached with the pad's buttons. With the controller as a mouse it
+  went through, but the pointer was tiny at 4K; it's now scaled to the
+  screen (`display.cursorScale`, #172). Steam then processed its
+  shaders.
+- **To check:** playing it, rumble, and quitting back to ES-DE.
 
 ### Stardew Valley
 
@@ -657,6 +685,11 @@ works.
 
 **GameCube, Dolphin: ✅ Works.** Face buttons by label
 (`controllers.faceButtons`). The 8BitDo's rumble works.
+
+- **More pads (2026-10-09 and 10):** a DualSense, paired from the couch,
+  went straight into a match. The PowerA GameCube-style pad was
+  excellent, and its − + quit shortcut worked
+  ([CONTROLLERS.md](CONTROLLERS.md#powera-gamecube-style-controller-for-switch)).
 
 - **RetroAchievements:** ✅ achievements unlock, with their toasts
   (2026-10-08). It needs a copy that matches one of RetroAchievements'
@@ -847,6 +880,15 @@ of each session. Games that do better with it are listed in
 
 ### Measuring performance
 
-There's no frame-rate counter yet. MangoHud is installed. Planned: a
-performance overlay switched on from the controller, through gamescope's
-`--mangoapp` (as on the Steam Deck), plus a log readable over SSH.
+MangoHud's performance overlay draws over every game and the menu,
+through gamescope's `--mangoapp` (as on the Steam Deck). Each player
+turns it on in the config (`players.<name>.overlays.performance`, or
+`overlays.performance` for the whole box) and picks what it shows (frame
+rate, frame time, CPU and GPU load and temperatures, memory and graphics
+memory), where, and whether as a column or one row (#165). It takes
+effect at their next session.
+
+- **Not yet:** switching it on or off from the controller, and a log of
+  it readable over SSH.
+- **Games' own benchmarks** are the other measure: see
+  [Cyberpunk 2077](#cyberpunk-2077).
