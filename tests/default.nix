@@ -257,6 +257,32 @@ in
         && lib.any (p: lib.getName p == "famidrive-toast") c.environment.systemPackages))
   ]);
 
+  # PS3 online on its own (not online.enable): each player signed in to
+  # RPCN with their own account, the guest not.
+  box-ps3-online = expect "ps3-online" {
+    famidrive = {
+      enable = true;
+      romm.enable = false;
+      guest.enable = true;
+      online.ps3.enable = true;
+      players.alice.rpcn.username = "alice-ps3";
+      players.bob = { };
+    };
+  } (c: let a = c.home-manager.users.alice.home.activation; in [
+    (check "an RPCN password secret for each player, owned by them, none for the guest"
+      (c.sops.secrets ? "alice/rpcn" && c.sops.secrets."alice/rpcn".owner == "alice"
+        && c.sops.secrets ? "bob/rpcn" && !(c.sops.secrets ? "guest/rpcn")))
+    (check "RPCS3 online through RPCN, on RPCS3's public server, as their own username"
+      (a ? famidriveRpcn && lib.hasInfix "PSN status" a.famidriveRpcn.data && lib.hasInfix "RPCN" a.famidriveRpcn.data
+        && lib.hasInfix "np.rpcs3.net" a.famidriveRpcn.data && lib.hasInfix "alice-ps3" a.famidriveRpcn.data
+        && lib.hasInfix "famidrive-rpcn-password" a.famidriveRpcn.data))
+    (check "bob's username is his RomM one; the guest isn't signed in"
+      (lib.hasInfix "\"bob\"" c.home-manager.users.bob.home.activation.famidriveRpcn.data
+        && !(c.home-manager.users.guest.home.activation ? famidriveRpcn)))
+    (check "RPCN's peer-to-peer port is open; other systems' online stays off"
+      (lib.elem 3658 c.networking.firewall.allowedUDPPorts && !(lib.elem 2626 c.networking.firewall.allowedUDPPorts)))
+  ]);
+
   # RetroAchievements for one player of two: their secret, their session
   # signing in, and the unlock watcher beside every RetroArch game.
   box-retroachievements = expect "retroachievements" {

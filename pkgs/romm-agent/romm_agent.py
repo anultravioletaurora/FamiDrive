@@ -1073,6 +1073,19 @@ def install_wii_nand(d):
         return
 
 
+def install_ps3_disc_keys(d):
+    """Disc keys (.dkey, as hex, or .key, 16 bytes) for encrypted PS3 disc
+    images, kept in RomM as PS3 firmware, into RPCS3's key folder. RPCS3
+    (since April 2026) tries each key there on an encrypted image, so a
+    game stays one .iso in RomM. RPCS3's own firmware (PS3UPDAT.PUP) is
+    still installed by hand (#48)."""
+    keys = Path.home() / ".config/rpcs3/data/redump"
+    for k in d.glob("*"):
+        if k.suffix.lower() in (".dkey", ".key"):
+            keys.mkdir(parents=True, exist_ok=True)
+            (keys / k.name).write_bytes(k.read_bytes())
+
+
 # Raised when an installer changes how it installs. 2: Cemu's keys.txt
 # tidied (2026-10-07).
 INSTALLERS_VERSION = 2
@@ -1081,12 +1094,13 @@ INSTALLERS = {
     "ps2": install_ps2_bios,
     "wiiu": install_cemu_keys,
     "wii": install_wii_nand,
-    # No PS3 entry: RPCS3 installs firmware only through its window, which
+    # PS3: disc keys only. RPCS3 installs firmware only through its window, which
     # asks "Install?" first and says "Success" after, and both wait for a
     # click. Found on the first box 2026-10-06: run at each session start,
     # under ES-DE, the window never showed and RPCS3 waited forever, a new
     # one every session; offscreen it installed nothing. Until there's a
     # way without the window (#48), install it once from RPCS3 itself.
+    "ps3": install_ps3_disc_keys,
     # Eden reads prod.keys/title.keys from its keys dir (seen on Eden 0.2.1).
     # Firmware goes into nand/system; installing it non-interactively: TODO.
     "switch": lambda d: [

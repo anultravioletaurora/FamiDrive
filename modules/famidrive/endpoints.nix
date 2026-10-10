@@ -30,10 +30,14 @@ in
     # Exposure follows option A: HTTP/relay services go through the reverse
     # proxy, while traversal/signaling services get direct port-forwards
     # because they need real client source addresses.
+    # The one default here: RPCN is RPCS3's own service, not a server of
+    # yours, and its public server is where the other players are. A
+    # self-hosted RPCN only has your own boxes on it.
     rpcn = mkOption {
       type = types.str;
-      example = "rpcn.example.com:31313";             # port-forwarded (P2P signaling)
-      description = "RPCN server (PS3 online, RPCS3), host and port. Needs a port forward: it signals peer-to-peer connections.";
+      default = "np.rpcs3.net";
+      example = "rpcn.example.com:31313";             # self-hosted, port-forwarded (P2P signaling)
+      description = "RPCN server (PS3 online, RPCS3), host and optional port: RPCS3's public one unless set. A self-hosted one needs a port forward, since it signals peer-to-peer connections.";
     };
     edenRoomHost = mkOption {
       type = types.str;

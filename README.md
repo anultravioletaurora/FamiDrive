@@ -41,6 +41,8 @@ of games you own. See [Your games](#your-games).
 - [Options](docs/USAGE.md): every `famidrive.*` option a box can set
 - [Compatibility](docs/COMPATIBILITY.md): game-by-game results
 - [Controllers](docs/CONTROLLERS.md): each pad's results and notes
+- [Online play: PS3](docs/Online-Play/PS3.md): RPCN accounts, disc keys,
+  and how a PS3 game gets online
 
 
 ## What's in the box
@@ -372,7 +374,8 @@ bob:
   IDs it worked out back to RomM (optional; skipped quietly without it).
 - `retroachievements`: the player's RetroAchievements password, for
   players with `retroAchievements.username` set.
-- `rpcn`: their RPCN password, only for PS3 with `famidrive.online.enable`.
+- `rpcn`: their RPCN account's password, for PS3 online
+  (`famidrive.online.ps3.enable`, [PS3.md](docs/Online-Play/PS3.md)).
 - `nexusmods`: their Nexus Mods personal API key, for players with
   `nexusmods.games` set. Downloading needs a premium Nexus Mods account.
 
