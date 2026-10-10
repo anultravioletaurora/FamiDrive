@@ -490,6 +490,19 @@ the box lists its cards and the setting to use.
 
 The picture, and what happens to the TV on a rebuild.
 
+### `famidrive.boot.splash.earlyGraphics`
+
+Load the graphics driver in the initrd (by `famidrive.gpu`: AMD,
+Intel, or both for `"auto"`), so the boot screen is drawn at the
+TV's own resolution from the start. Without it, the boot screen
+starts on the firmware's low-resolution framebuffer, scaled up
+by `scale`, until the driver loads from the system disk. Found on
+both test boxes 2026-10-10: a blocky spinner for the first 13
+seconds. Costs a larger initrd (the driver and its firmware).
+
+- **Type:** boolean
+- **Default:** `true`
+
 ### `famidrive.boot.splash.enable`
 
 Whether to enable a boot screen (Plymouth) in place of console text while the box starts.
@@ -504,9 +517,10 @@ How large Plymouth draws the boot screen. It can't tell how far
 away a TV is, so on a 4K TV it draws everything tiny at 1. The
 default, 4, is for a 4K TV; use 2 on a 1080p one.
 
-Until the graphics driver loads, a few seconds in, the screen is
-the firmware's, usually a lower resolution, so the spinner is
-larger then and shrinks when the driver takes over. Found on the
+With `earlyGraphics` (the default) the boot screen is at the TV's
+resolution from the start. Without it, the first seconds are the
+firmware's lower resolution, where the spinner looks larger and
+blockier, then shrinks when the driver takes over. Found on the
 first box 2026-10-07: at 2 the spinner looked right on the
 firmware's screen and tiny at 4K.
 
