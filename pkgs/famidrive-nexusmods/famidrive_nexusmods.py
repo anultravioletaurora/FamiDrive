@@ -992,6 +992,11 @@ def read_installed(appid, cache=None):
         if "want" not in m and "collection" in m:   # the one-off's record
             m["want"] = {"collections": [{"slug": m["collection"], "revision": m["revision"]}], "choices": {}}
             m["complete"] = True
+        if "root" not in m:   # the one-off's record doesn't say where the game is: Steam does
+            root = game_dir(appid)
+            if root is None:
+                continue
+            m["root"] = str(root)
         m["_path"] = str(f)
         return m
     return None
