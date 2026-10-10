@@ -59,6 +59,17 @@ let
           setup doesn't change under a player.
         '';
       };
+      skip = mkOption {
+        type = types.listOf types.ints.positive;
+        default = [ ];
+        example = [ 512 711 ];
+        description = ''
+          Mods of the collection to leave out, by their Nexus Mods mod id
+          (the number in the mod's address, nexusmods.com/<game>/mods/<id>).
+          They're neither downloaded nor installed; the rest of the
+          collection goes in as its curator made it.
+        '';
+      };
     };
   };
 

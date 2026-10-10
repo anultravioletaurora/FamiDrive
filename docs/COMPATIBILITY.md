@@ -660,6 +660,12 @@ Tracked with the other launchers in #57.
   game, with the controller as a mouse ([Steam's prompts](CONTROLLERS.md#steams-prompts)).
 - **To check:** rumble, and quitting back to ES-DE with the EA app still
   running behind.
+- **Mods:** Nexus Mods collections, installed by FamiDrive
+  ([MODDING.md](MODDING.md)): each mod is a `.pak` file, put in
+  `SwGame/Content/Paks`. 2026-10-10: "Better Jedi Fallen Order" (`d3rtf0`,
+  revision 2) planned on the first box without its two adult character
+  mods (`skip`): 14 files, each where its author says. Not yet played
+  modded.
 
 ### Star Wars Jedi: Survivor
 

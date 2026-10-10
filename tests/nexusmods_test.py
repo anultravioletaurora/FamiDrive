@@ -160,6 +160,28 @@ class Plan(unittest.TestCase):
         nexus, other = m.nexus_mods({"mods": [{"source": {"type": "nexus"}}, {"source": {"type": "browse"}}]})
         self.assertEqual((len(nexus), len(other)), (1, 1))
 
+    def test_skipped_mods_are_left_out(self):
+        collection = {"mods": [{"name": "Keep", "source": {"type": "nexus", "modId": 549}},
+                               {"name": "Skip", "source": {"type": "nexus", "modId": 512}},
+                               {"name": "Elsewhere", "source": {"type": "browse"}}]}
+        nexus, other = m.nexus_mods(collection, [512])
+        self.assertEqual([x["name"] for x in nexus], ["Keep"])
+        self.assertEqual(len(other), 1)
+
+    def test_skip_is_part_of_what_is_wanted_only_when_set(self):
+        game = {"collections": [{"slug": "rcuccp", "revision": 189, "skip": []}]}
+        self.assertEqual(m.want_of(game)["collections"], [{"slug": "rcuccp", "revision": 189}])
+        game["collections"][0]["skip"] = [711, 512]
+        self.assertEqual(m.want_of(game)["collections"][0]["skip"], [512, 711])
+
+    def test_fallen_order_paks_into_the_games_paks(self):
+        status, placed = m.place({"domainName": "starwarsjedifallenorder", "name": "DS4 buttons"},
+                                 ["20200815212530_1.jpg", "pakchunk99-DS4Buttons.pak",
+                                  "Put it into SwGame-Content-Paks folder.txt", "sub/Other_P.utoc"])
+        self.assertEqual(status, "rules")
+        self.assertEqual(sorted(placed), [("pakchunk99-DS4Buttons.pak", "SwGame/Content/Paks/pakchunk99-DS4Buttons.pak"),
+                                          ("sub/Other_P.utoc", "SwGame/Content/Paks/Other_P.utoc")])
+
     def test_compare_with_vortex(self):
         plan = {"mods": [{"files": [{"from": "a", "to": "archive/pc/mod/A.archive"}, {"from": "b", "to": "r6/b.reds"}]}]}
         c = m.compare(plan, {"files": [{"relPath": "archive\\pc\\mod\\a.archive"}, {"relPath": "bin\\x.dll"}]})

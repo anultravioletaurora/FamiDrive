@@ -5,7 +5,7 @@ kept in place without anyone at the TV with a keyboard:
 
 | Mods for | From | Chosen in | Account |
 |---|---|---|---|
-| Steam and GOG games (Cyberpunk 2077, Fallout: New Vegas) | [Nexus Mods](#nexus-mods) collections and Wabbajack lists | each player's config | the player's, premium |
+| Steam and GOG games (Cyberpunk 2077, Fallout: New Vegas, Star Wars Jedi: Fallen Order) | [Nexus Mods](#nexus-mods) collections and Wabbajack lists | each player's config | the player's, premium |
 | Valheim, Risk of Rain 2 and other BepInEx games on Steam | [Thunderstore](#thunderstore) | each player's config | none |
 | GameCube, Wii and Switch games | [your RomM library](#emulators) | RomM | none |
 
@@ -68,6 +68,18 @@ famidrive.players.alice.nexusmods.games."1091500" = {   # Cyberpunk 2077
 - **Choices** are for installers the collection didn't record a choice
   for. Without one, the installer's own default is used (its first
   option, where one must be picked).
+- **Leaving mods out:** `skip` lists mods of a collection not to install,
+  by mod id (the number in the mod's address,
+  `nexusmods.com/<game>/mods/<id>`). They aren't downloaded either. The
+  rest goes in as the curator made it, so a collection can be taken
+  without its adult mods, or without an outfit you don't want:
+  ```nix
+  famidrive.players.alice.nexusmods.games."1172380".collections = [   # Star Wars Jedi: Fallen Order
+    { slug = "d3rtf0"; revision = 2; skip = [ 512 711 ]; }
+  ];
+  ```
+  Optional mods in a collection (Vortex asks about each) are installed
+  like the rest; `skip` is how to leave one out.
 
 ### What a rebuild does
 
@@ -106,7 +118,9 @@ progress toast on the TV.
   Vortex's extension for the game. Cyberpunk 2077 has rules: checked
   against Vortex on the first box, they put 265 of 268 mods of Welcome to
   Night City where Vortex did, and the other 3 Vortex had failed to install.
-  A game without rules installs only its exact and FOMOD mods.
+  Star Wars Jedi: Fallen Order's mods are Unreal `.pak` files, which go in
+  `SwGame/Content/Paks` (readmes and screenshots stay out). A game
+  without rules installs only its exact and FOMOD mods.
 - **Folder names follow the case already in the game's folder,** since
   the game (under Proton) doesn't care about case and Linux does.
 - **Anything already there** (one of the game's own files, a settings
