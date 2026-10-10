@@ -46,7 +46,7 @@ yet is listed below as ❔ until someone does.
 | [Switch Pro Controller](#switch-pro-controller) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Joy-Cons](#joy-cons) | Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Switch 2 GameCube controller](#switch-2-gamecube-controller) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
-| [PowerA GameCube-style controller for Switch](#powera-gamecube-style-controller-for-switch) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [PowerA GameCube-style controller for Switch](#powera-gamecube-style-controller-for-switch) | Bluetooth (wireless model) / USB | ❔ | ❔ | ✅ | ❔ | ❔ | ✅ | ❔ | ✅ |
 | [Wii U Pro Controller](#wii-u-pro-controller) | Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Wii Classic Controller Pro](#wii-classic-controller-pro) | Through a Wii Remote | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Wii U GamePad](#wii-u-gamepad) | Chocolate USB adapter | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
@@ -404,11 +404,25 @@ them over USB, and kernel and Bluetooth support was still in progress as of
 
 ## PowerA GameCube-style controller for Switch
 
-❔ Untested. A wired pad shaped like a GameCube controller that speaks
-the Switch's wired-pad protocol, so it's expected to show up as a
-generic Switch controller rather than a GameCube one. Check whether
-Dolphin can use it as a GameCube pad, and how its triggers read (they're
-digital on most of these).
+A pad shaped like a GameCube controller that speaks the Switch's
+protocol, so it shows up as a Switch controller rather than a GameCube
+one, with Nintendo's labels (B at the bottom, A on the right).
+
+- **2026-10-09/10, the wireless model (NSGCWLAA), over Bluetooth on the
+  first box:** ✅ It pairs as "Lic Pro Controller", with no USB ids
+  (vendor and product 0), so the kernel's generic HID driver takes it,
+  not `hid-nintendo`.
+  - **Dolphin (GameCube):** ✅ [Super Smash Bros. Melee](COMPATIBILITY.md#super-smash-bros-melee)
+    played excellently, RetroAchievements unlocks included. At first A
+    was B and X was Y: Dolphin's mapping put the GameCube's A on the
+    bottom button, which is A only on an Xbox-labelled pad. Fixed in
+    #152: each pad's A/B/X/Y now follow the labels SDL reports for it.
+  - **Select + Start (− +):** ✅ quits. At first it did nothing: with no
+    USB ids, famidrive-quit couldn't look the pad up. Fixed in #152: SDL's
+    database has it under its name, as SDL itself looks it up.
+  - **Steam:** ✅ [Rocket League](COMPATIBILITY.md#rocket-league).
+- **Still to record:** the wired model over USB, how the triggers read
+  (digital on most of these), rumble, and Eden.
 
 ## Wii U Pro Controller
 
