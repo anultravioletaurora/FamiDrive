@@ -190,6 +190,8 @@ in
       (c.boot.kernelPackages.kernel.version == pkgs.linuxPackages.kernel.version))
     (check "the boot check knows the box is set up for Nvidia"
       (lib.hasInfix "check nvidia" c.systemd.services.famidrive-hardware-check.serviceConfig.ExecStart))
+    (check "no AMD or Intel driver in its initrd"
+      (!(lib.elem "amdgpu" c.boot.initrd.kernelModules) && !(lib.elem "i915" c.boot.initrd.kernelModules)))
   ]);
   generators = unit "generators" ../pkgs/famidrive-generators/famidrive_generate.py pkgs.python3;
   picker = unit "picker" ../pkgs/famidrive-picker/famidrive_picker.py
@@ -296,6 +298,16 @@ in
   } (c: [
     (check "the list as SDL and Proton read it"
       (c.famidrive.controllers.sdlIgnoreDevices == "0x289b/0x0080,0x12ba/0x0100"))
+  ]);
+
+  # The boot screen at the TV's resolution from the start: the graphics
+  # driver in the initrd, by famidrive.gpu.
+  box-early-graphics = expect "early-graphics" {
+    famidrive = { enable = true; romm.enable = false; players.alice = { }; };
+  } (c: [
+    (check "AMD's and Intel's drivers in the initrd for gpu = auto, with AMD's firmware"
+      (lib.elem "amdgpu" c.boot.initrd.kernelModules && lib.elem "i915" c.boot.initrd.kernelModules
+        && c.hardware.amdgpu.initrd.enable))
   ]);
 
   # RetroAchievements for one player of two: their secret, their session
