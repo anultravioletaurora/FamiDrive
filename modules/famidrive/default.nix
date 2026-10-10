@@ -191,7 +191,7 @@ in
         - `"heroic"`: each player's GOG, Epic Games Store and Amazon
           Games libraries, through Heroic Games Launcher. Each store is
           its own system in the menu.
-        - `"minecraft"`: Prism Launcher's instances, in Ports.
+        - `"minecraft"`: Prism Launcher's instances, in Desktop.
 
         An emulation-only box is `[ "roms" ]` and skips Steam, Proton,
         Heroic and Prism entirely.

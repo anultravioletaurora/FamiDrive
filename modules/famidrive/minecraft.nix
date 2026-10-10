@@ -99,7 +99,7 @@ let
           The players (`famidrive.players`) who get this instance. Each
           plays with their own Microsoft account, signed in once in their
           own Prism. A player no longer listed loses the instance from
-          their Ports; it's moved aside, worlds and all, not deleted.
+          their Desktop; it's moved aside, worlds and all, not deleted.
         '';
       };
 
@@ -152,7 +152,7 @@ in
   };
 
   # On with the lane, not only while instances are declared: a player who
-  # loses their last instance still has it moved out of their Ports.
+  # loses their last instance still has it moved out of their Desktop.
   config = lib.mkIf (cfg.enable && hasLane "minecraft") {
     assertions = lib.concatLists (lib.mapAttrsToList (name: i: [
       {

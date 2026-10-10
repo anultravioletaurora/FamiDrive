@@ -468,21 +468,27 @@ in
         (lib.hasInfix "spacecadet)" c.famidrive.systems.ports.command
           && lib.hasInfix "/var/lib/famidrive/space-cadet-pinball" c.famidrive.systems.ports.command
           && lib.elem "d /var/lib/famidrive/space-cadet-pinball 2775 famidrive-library famidrive -" c.systemd.tmpfiles.rules))
-    (check "every Tux game is in Ports"
-        (lib.all (w: lib.hasInfix "${w})" c.famidrive.systems.ports.command)
+    (check "every Tux game is in Desktop, its old Ports entry taken out"
+        (lib.all (w: lib.hasInfix "${w})" c.famidrive.systems.desktop.command)
             [ "supertuxkart" "supertux" "supertuxparty" "supertuxadvance" "extremetuxracer" "tuxpaint" ]
           && lib.all (n: lib.hasInfix "${n}.port" c.home-manager.users.alice.home.activation.famidriveTux.data)
             [ "SuperTuxKart" "SuperTux" "SuperTux Party" "SuperTux Advance" "Extreme Tux Racer" "Tux Paint" ]
+          && lib.hasInfix "/desktop/SuperTuxKart.port" c.home-manager.users.alice.home.activation.famidriveTux.data
+          && lib.hasInfix "/ports/SuperTuxKart.port" c.home-manager.users.alice.home.activation.famidriveTux.data
           # SuperTux skips the guitar adapter; SuperTux Party gets mappings for the pads plugged in.
-          && lib.hasInfix "SDL_GAMECONTROLLER_IGNORE_DEVICES=0x289b/0x0080" c.famidrive.systems.ports.command
-          && lib.hasInfix "famidrive-pads sdl-mappings" c.famidrive.systems.ports.command))
-    (check "osu! is in Ports, and the player at the TV can use a pen tablet"
-        (lib.hasInfix "osu)" c.famidrive.systems.ports.command
+          && lib.hasInfix "SDL_GAMECONTROLLER_IGNORE_DEVICES=0x289b/0x0080" c.famidrive.systems.desktop.command
+          && lib.hasInfix "famidrive-pads sdl-mappings" c.famidrive.systems.desktop.command))
+    (check "Ports holds only what plays the owner's own files"
+        (lib.hasInfix "spacecadet)" c.famidrive.systems.ports.command
+          && !(lib.hasInfix "supertuxkart)" c.famidrive.systems.ports.command)
+          && c.famidrive.systems.desktop.theme == "desktop"))
+    (check "osu! is in Desktop, and the player at the TV can use a pen tablet"
+        (lib.hasInfix "osu)" c.famidrive.systems.desktop.command
           && lib.any (p: lib.getName p == lib.getName pkgs.opentabletdriver) c.services.udev.packages
           && lib.hasInfix "osu!.port" c.home-manager.users.alice.home.activation.famidriveOsu.data))
-    (check "YARG is in Ports next to Clone Hero, scores saved under its RomM entry"
-        (lib.hasInfix "yarg)" c.famidrive.systems.ports.command
-          && lib.hasInfix "clonehero)" c.famidrive.systems.ports.command
+    (check "YARG is in Desktop next to Clone Hero, scores saved under its RomM entry"
+        (lib.hasInfix "yarg)" c.famidrive.systems.desktop.command
+          && lib.hasInfix "clonehero)" c.famidrive.systems.desktop.command
           && (etcJson c "famidrive/romm/alice.json").apps ? yarg))
       (check "a Switch game listed for Ryujinx runs there, its save bridged through Eden's"
         (lib.hasInfix "FAMIDRIVE_RYUJINX" c.famidrive.systems.switch.command
@@ -491,8 +497,8 @@ in
           && (etcJson c "famidrive/romm/library.json").ryujinxGames == [ "01006A800016E000" ]))
     (check "Ryujinx gets 8 GiB on its command line (it ignores Config.json's with --no-gui)"
       (lib.hasInfix "--dram-size MemoryConfiguration8GiB" c.famidrive.systems.switch.command))
-      (check "Clone Hero is in Ports, songs come down as the library"
-        (c.famidrive.systems ? ports
+      (check "Clone Hero is in Desktop, songs come down as the library"
+        (c.famidrive.systems ? desktop
           && c.systemd.services.famidrive-clonehero-songs.serviceConfig.User == "famidrive-library"))
       (check "a Minecraft instance only for the players it's declared for"
         (lib.hasInfix ''"instances":{"Test Server"'' c.home-manager.users.alice.home.activation.famidriveMinecraft.data
@@ -510,14 +516,15 @@ in
       (check "RetroArch saves straight in saves/, where save sync looks"
         (lib.hasInfix "sort_savefiles_enable" c.home-manager.users.bob.home.activation.famidriveEmulators.data
           && c.famidrive.systems.psx.saveSync))
-      (check "one Ports system, for Minecraft and Clone Hero both"
+      (check "one Desktop system, for Minecraft and Clone Hero both; Ports' game list copied over once"
         (!(c.famidrive.systems ? minecraft)
-          && lib.sort lib.lessThan c.famidrive.systems.ports.extensions == [ ".port" ".prism" ]
-          && lib.hasInfix "prismlauncher" c.famidrive.systems.ports.command
-          && lib.hasInfix "clonehero" c.famidrive.systems.ports.command
+          && lib.sort lib.lessThan c.famidrive.systems.desktop.extensions == [ ".port" ".prism" ]
+          && lib.hasInfix "prismlauncher" c.famidrive.systems.desktop.command
+          && lib.hasInfix "clonehero" c.famidrive.systems.desktop.command
           # Saving after a game is outside it, where a quit can't skip it.
-          && lib.hasInfix "famidrive-clonehero played" c.famidrive.systems.ports.after
-          && !(lib.hasInfix "played" c.famidrive.systems.ports.command)))
+          && lib.hasInfix "famidrive-clonehero played" c.famidrive.systems.desktop.after
+          && !(lib.hasInfix "played" c.famidrive.systems.desktop.command)
+          && lib.hasInfix "/ports/gamelist.xml\" \"$g/desktop/gamelist.xml" c.home-manager.users.bob.home.activation.famidriveDesktopFromPorts.data))
       (check "Clone Hero reads the box's songs and calibration"
         (lib.hasInfix "/var/lib/famidrive/clonehero/songs" c.home-manager.users.bob.home.activation.famidriveCloneHero.data
           && lib.hasInfix "200" c.home-manager.users.bob.home.activation.famidriveCloneHero.data))

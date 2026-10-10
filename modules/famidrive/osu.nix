@@ -1,4 +1,4 @@
-# osu! (lazer), in ES-DE's Ports system. The official build
+# osu! (lazer), in ES-DE's Desktop system. The official build
 # (osu-lazer-bin, ppy's AppImage) rather than nixpkgs' build from source:
 # only official builds can submit scores online.
 #
@@ -24,7 +24,7 @@ in
 {
   options.famidrive.osu = {
     enable = mkEnableOption ''
-      osu! (lazer), in ES-DE's Ports system, played with a mouse, a pen
+      osu! (lazer), in ES-DE's Desktop system, played with a mouse, a pen
       tablet or a touchscreen, and a keyboard. Pen tablets work through
       osu!'s built-in OpenTabletDriver'';
   };
@@ -33,9 +33,9 @@ in
     services.udev.packages = [ pkgs.opentabletdriver ];
     environment.systemPackages = [ pkgs.osu-lazer-bin ];
 
-    # Another kind of Ports entry, like Clone Hero's and YARG's: a .port
+    # Another kind of Desktop entry, like Clone Hero's and YARG's: a .port
     # file whose content says which.
-    famidrive.ports.".port".command = ''
+    famidrive.desktop.".port".command = ''
       case "$(cat "$ROM")" in
         osu) ${lib.getExe pkgs.osu-lazer-bin} ;;
       esac
@@ -43,8 +43,9 @@ in
 
     famidrive.playerHome = { lib, famidrivePlayer, ... }: {
       home.activation.famidriveOsu = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        mkdir -p ${lib.escapeShellArg "${famidrivePlayer.roms}/ports"}
-        printf osu > ${lib.escapeShellArg "${famidrivePlayer.roms}/ports/osu!.port"}
+        mkdir -p ${lib.escapeShellArg "${famidrivePlayer.roms}/desktop"}
+        printf osu > ${lib.escapeShellArg "${famidrivePlayer.roms}/desktop/osu!.port"}
+        rm -f ${lib.escapeShellArg "${famidrivePlayer.roms}/ports/osu!.port"}   # in Ports until 2026-10-10
       '';
     };
   };

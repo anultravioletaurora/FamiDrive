@@ -1,4 +1,4 @@
-# Clone Hero, in ES-DE's Ports system. Songs are the box's, shared by
+# Clone Hero, in ES-DE's Desktop system. Songs are the box's, shared by
 # every player like ROMs: charts listed in Nix by their Chorus Encore md5,
 # downloaded to the library disk (not the Nix store: a song library runs
 # to many GB), plus a folder for songs added by hand. Profiles, scores and
@@ -47,7 +47,7 @@ let
 in
 {
   options.famidrive.cloneHero = {
-    enable = mkEnableOption "Clone Hero, in ES-DE's Ports system";
+    enable = mkEnableOption "Clone Hero, in ES-DE's Desktop system";
 
     songs = mkOption {
       type = types.attrsOf types.str;
@@ -157,13 +157,13 @@ in
   (lib.mkIf (cfg.enable && ch.enable) {
     environment.systemPackages = [ pkgs.clonehero pkgs.famidrive-clonehero ];
 
-    # An entry in the Ports system (emulators.nix). Its setup and the
+    # An entry in the Desktop system (emulators.nix). Its setup and the
     # saving after it run in famidrive-launch, outside the game, so a
     # quit with Select + Start doesn't skip them. Scores come down before
     # the profiles are seeded, so a new box doesn't take its freshly
     # seeded profiles.ini for a save RomM lacks. $sync: famidrive-launch's,
     # set for players with a RomM agent config of their own.
-    famidrive.ports.".port" = {
+    famidrive.desktop.".port" = {
       before = ''
         if [ "$(cat "$ROM")" = clonehero ]; then
           ${lib.optionalString sync ''
@@ -201,8 +201,9 @@ in
 
     famidrive.playerHome = { lib, famidrivePlayer, ... }: {
       home.activation.famidriveCloneHero = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        mkdir -p ${lib.escapeShellArg "${famidrivePlayer.roms}/ports"}
-        printf clonehero > ${lib.escapeShellArg "${famidrivePlayer.roms}/ports/Clone Hero.port"}
+        mkdir -p ${lib.escapeShellArg "${famidrivePlayer.roms}/desktop"}
+        printf clonehero > ${lib.escapeShellArg "${famidrivePlayer.roms}/desktop/Clone Hero.port"}
+        rm -f ${lib.escapeShellArg "${famidrivePlayer.roms}/ports/Clone Hero.port"}   # in Ports until 2026-10-10
         mkdir -p "$HOME/.clonehero"
         touch "$HOME/.clonehero/settings.ini"
         ${seedLib.lockKeys {

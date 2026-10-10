@@ -46,10 +46,31 @@ let
     virtualjaguar = [ virtualjaguar "virtualjaguar" ];
     melondsds = [ melondsds "melondsds" ];
   };
-  # The Ports system's command, before or after: each entry's, picked by
-  # the entry's extension.
-  byExtension = part:
-    let parts = lib.filterAttrs (_: p: p.${part} != "") config.famidrive.ports;
+
+  # One kind of Desktop or Ports entry (options below).
+  entries = types.attrsOf (types.submodule {
+    options = {
+      command = mkOption {
+        type = types.lines;
+        description = "Shell that runs the entry. `$ROM` is the entry's file.";
+      };
+      before = mkOption {
+        type = types.lines;
+        default = "";
+        description = "Shell run just before the command, outside it.";
+      };
+      after = mkOption {
+        type = types.lines;
+        default = "";
+        description = "Shell run just after the command, outside it, even when the player quits with Select + Start.";
+      };
+    };
+  });
+
+  # The Desktop or Ports system's command, before or after: each entry's,
+  # picked by the entry's extension.
+  byExtension = table: part:
+    let parts = lib.filterAttrs (_: p: p.${part} != "") table;
     in lib.optionalString (parts != { }) ''
       case "$ROM" in
       ${lib.concatStrings (lib.mapAttrsToList (ext: p: ''
@@ -222,29 +243,23 @@ in
     '';
   };
 
-  # One Ports system for everything that isn't a console or a store:
-  # Minecraft's instances, Clone Hero, ... Each kind of entry has its own
-  # file extension, the command that starts it ($ROM is the entry), and
-  # shell for before and after it (the systems' before and after).
+  # Two systems for what isn't a console or a store, each a table of
+  # entry kinds: its file extension, the command that starts it ($ROM is
+  # the entry), and shell for before and after it (the systems' before
+  # and after).
+  #
+  # - Desktop: games and apps made for a PC, free to play: Minecraft's
+  #   instances, Clone Hero, YARG, osu!, the Tux games.
+  # - Ports: open-source engines for commercial games, each playing the
+  #   owner's own files (#139): Space Cadet Pinball.
+  options.famidrive.desktop = mkOption {
+    type = entries;
+    default = { };
+    internal = true;
+  };
+
   options.famidrive.ports = mkOption {
-    type = types.attrsOf (types.submodule {
-      options = {
-        command = mkOption {
-          type = types.lines;
-          description = "Shell that runs the entry. `$ROM` is the entry's file.";
-        };
-        before = mkOption {
-          type = types.lines;
-          default = "";
-          description = "Shell run just before the command, outside it.";
-        };
-        after = mkOption {
-          type = types.lines;
-          default = "";
-          description = "Shell run just after the command, outside it, even when the player quits with Select + Start.";
-        };
-      };
-    });
+    type = entries;
     default = { };
     internal = true;
   };
@@ -636,23 +651,33 @@ in
           kill "$cheevos_watch" 2>/dev/null || true
         '';
       }) heroicStores))
+      (lib.mkIf (cfg.desktop != { }) {
+        desktop = {
+          fullname = "Desktop";
+          theme = "desktop";   # Art Book Next's desktop art
+          extensions = lib.attrNames cfg.desktop;
+          command = byExtension cfg.desktop "command";
+          before = byExtension cfg.desktop "before";
+          after = byExtension cfg.desktop "after";
+        };
+      })
       (lib.mkIf (cfg.ports != { }) {
         ports = {
           fullname = "Ports";
           theme = "ports";   # Art Book Next's ports art
           extensions = lib.attrNames cfg.ports;
-          command = byExtension "command";
-          before = byExtension "before";
-          after = byExtension "after";
+          command = byExtension cfg.ports "command";
+          before = byExtension cfg.ports "before";
+          after = byExtension cfg.ports "after";
         };
       })
     ];
 
-    # Minecraft's instances are Ports entries (Found on the first box
+    # Minecraft's instances are Desktop entries (Found on the first box
     # 2026-10-06: as a system of their own they showed as a second Ports,
     # with the same art). Every instance starts fullscreen, whoever made
     # it (pkgs/famidrive-prism).
-    famidrive.ports = lib.mkIf (hasLane "minecraft") {
+    famidrive.desktop = lib.mkIf (hasLane "minecraft") {
       ".prism".command = ''
         ${pkgs.famidrive-prism}/bin/famidrive-prism fullscreen "$HOME/.local/share/PrismLauncher/instances/$(cat "$ROM")"
         ${pkgs.prismlauncher}/bin/prismlauncher --launch "$(cat "$ROM")"
@@ -668,10 +693,25 @@ in
       lib.optionals (hasLane "heroic") [ pkgs.heroic ]
       ++ lib.optionals (hasLane "minecraft") [ pkgs.prismlauncher ];
 
-    # Seeded/locked emulator settings. Only the keys this design depends
-    # on are locked; everything else stays editable from each emulator's
-    # own UI and survives rebuilds.
-    famidrive.playerHome = { lib, ... }: {
+    # Desktop was Ports until 2026-10-10. Each module writes its own entry
+    # into Desktop and takes its old one out of Ports; Minecraft's are
+    # taken out here (its generator writes them into Desktop). The Ports
+    # game list (favorites, play counts, time played) is copied once, so
+    # Desktop starts with it; ES-DE skips entries for files a folder
+    # doesn't have.
+    famidrive.playerHome = { lib, famidrivePlayer, ... }: {
+      home.activation.famidriveDesktopFromPorts = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        rm -f ${lib.escapeShellArg "${famidrivePlayer.roms}/ports"}/*.prism
+        g="$HOME/ES-DE/gamelists"
+        if [ -f "$g/ports/gamelist.xml" ] && [ ! -e "$g/desktop/gamelist.xml" ]; then
+          mkdir -p "$g/desktop"
+          cp "$g/ports/gamelist.xml" "$g/desktop/gamelist.xml"
+        fi
+      '';
+
+      # Seeded/locked emulator settings. Only the keys this design depends
+      # on are locked; everything else stays editable from each emulator's
+      # own UI and survives rebuilds.
       home.activation.famidriveEmulators = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         ${lib.optionalString (cfg.systems ? wiiu) (seedLib.seed {
           # Cemu shows its getting-started wizard whenever settings.xml is

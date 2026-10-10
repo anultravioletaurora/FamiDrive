@@ -86,10 +86,10 @@ of games you own. See [Your games](#your-games).
 | Steam | [Steam](https://store.steampowered.com), started hidden, with [Proton-GE](https://github.com/GloriousEggroll/proton-ge-custom) available | [`steam`](https://search.nixos.org/packages?channel=26.05&show=steam), [`proton-ge-bin`](https://search.nixos.org/packages?channel=26.05&show=proton-ge-bin) | Steam Cloud | Your Steam library |
 | GOG, Epic Games Store, Amazon Games | [Heroic Games Launcher](https://heroicgameslauncher.com), each store its own system | [`heroic`](https://search.nixos.org/packages?channel=26.05&show=heroic) | Each store's cloud saves | Your libraries in each store |
 | Minecraft | [Prism Launcher](https://prismlauncher.org) | [`prismlauncher`](https://search.nixos.org/packages?channel=26.05&show=prismlauncher) | — | Your Prism instances, and ones declared in Nix |
-| Clone Hero, YARG | [Clone Hero](https://clonehero.net) and [YARG](https://yarg.in), in the Ports system | [`clonehero`](https://search.nixos.org/packages?channel=26.05&show=clonehero), [`yarg`](https://search.nixos.org/packages?channel=26.05&show=yarg) | ✅ (scores and profiles) | Songs declared in Nix, downloaded once for the box |
-| The Tux games | [SuperTuxKart](https://supertuxkart.net), [SuperTux](https://www.supertux.org), [SuperTux Party](https://supertux.party), [SuperTux Advance](https://github.com/KelvinShadewing/supertux-advance), [Extreme Tux Racer](https://sourceforge.net/projects/extremetuxracer/) and [Tux Paint](https://tuxpaint.org), in the Ports system | [`supertuxkart`](https://search.nixos.org/packages?channel=26.05&show=supertuxkart), [`supertux`](https://search.nixos.org/packages?channel=26.05&show=supertux), [`extremetuxracer`](https://search.nixos.org/packages?channel=26.05&show=extremetuxracer), [`tuxpaint`](https://search.nixos.org/packages?channel=26.05&show=tuxpaint), FamiDrive's own ([`pkgs/supertuxparty`](pkgs/supertuxparty), [`pkgs/supertux-advance`](pkgs/supertux-advance)) | — | Come with their levels, tracks and boards |
+| Clone Hero, YARG | [Clone Hero](https://clonehero.net) and [YARG](https://yarg.in), in the Desktop system | [`clonehero`](https://search.nixos.org/packages?channel=26.05&show=clonehero), [`yarg`](https://search.nixos.org/packages?channel=26.05&show=yarg) | ✅ (scores and profiles) | Songs declared in Nix, downloaded once for the box |
+| The Tux games | [SuperTuxKart](https://supertuxkart.net), [SuperTux](https://www.supertux.org), [SuperTux Party](https://supertux.party), [SuperTux Advance](https://github.com/KelvinShadewing/supertux-advance), [Extreme Tux Racer](https://sourceforge.net/projects/extremetuxracer/) and [Tux Paint](https://tuxpaint.org), in the Desktop system | [`supertuxkart`](https://search.nixos.org/packages?channel=26.05&show=supertuxkart), [`supertux`](https://search.nixos.org/packages?channel=26.05&show=supertux), [`extremetuxracer`](https://search.nixos.org/packages?channel=26.05&show=extremetuxracer), [`tuxpaint`](https://search.nixos.org/packages?channel=26.05&show=tuxpaint), FamiDrive's own ([`pkgs/supertuxparty`](pkgs/supertuxparty), [`pkgs/supertux-advance`](pkgs/supertux-advance)) | — | Come with their levels, tracks and boards |
 | 3D Pinball Space Cadet | [SpaceCadetPinball](https://github.com/k4zmu2a/SpaceCadetPinball), a port of the game that came with Windows, in the Ports system | [`space-cadet-pinball`](https://search.nixos.org/packages?channel=26.05&show=space-cadet-pinball), without its bundled game files | — | Your own copy of the game's files, on the library disk |
-| osu! | [osu!](https://osu.ppy.sh) (lazer), in the Ports system | [`osu-lazer-bin`](https://search.nixos.org/packages?channel=26.05&show=osu-lazer-bin) | osu!'s own servers (scores, when signed in) | Beatmaps downloaded in the game, each player's own |
+| osu! | [osu!](https://osu.ppy.sh) (lazer), in the Desktop system | [`osu-lazer-bin`](https://search.nixos.org/packages?channel=26.05&show=osu-lazer-bin) | osu!'s own servers (scores, when signed in) | Beatmaps downloaded in the game, each player's own |
 | Media | [Kodi](https://kodi.tv) 21 with [JellyCon](https://github.com/jellyfin/jellycon), or [Jellyfin MPV Shim](https://github.com/jellyfin/jellyfin-mpv-shim) 3.1 | [`kodi`](https://search.nixos.org/packages?channel=26.05&show=kodi), [`jellyfin-mpv-shim`](https://search.nixos.org/packages?channel=unstable&show=jellyfin-mpv-shim) | — | Your Jellyfin server, and media folders on the box (an external drive) |
 
 RetroArch runs everything it does well, so those systems share one
@@ -251,13 +251,13 @@ planning doc for now and will move into this repo.
   are off. RomM shows each player's progress itself once their
   RetroAchievements username is linked in their RomM profile; the box
   sends RomM nothing about achievements.
-- Clone Hero in a Ports system (`famidrive.cloneHero`): songs for the
+- Clone Hero in a Desktop system (`famidrive.cloneHero`): songs for the
   whole box, listed by their Chorus Encore md5 and downloaded to the
   library disk, a profile for every player plus guests, and the TV's
   calibration set once for everyone. Each player's scores and profiles
   sync with RomM, under a "Clone Hero" entry added there by hand (see
   [RomM entries to add by hand](#using-it)).
-- YARG in Ports too (`famidrive.yarg`), playing the same songs as Clone
+- YARG in Desktop too (`famidrive.yarg`), playing the same songs as Clone
   Hero, with scores and profiles under a "YARG" entry in RomM.
 - Menu music: each player's `~/ES-DE/music`, shuffled behind ES-DE and
   paused while a game is open (ES-DE has no music of its own).
@@ -282,11 +282,11 @@ planning doc for now and will move into this repo.
   the library and firmware half shouldn't.
 - Launch flags for the standalone emulators added later (Azahar, PPSSPP,
   Cemu) and the RetroArch core file names are unverified.
-- osu! in Ports (`famidrive.osu`) hasn't run on a box yet, nor has a
+- osu! in Desktop (`famidrive.osu`) hasn't run on a box yet, nor has a
   pen tablet through osu!'s built-in OpenTabletDriver.
 - Wii Miis (`famidrive.miis.wii`): the Mii Channel in the Wii list, and
   each player's Miis synced with RomM. Untried on a box.
-- The Tux games in Ports (`famidrive.superTuxKart`, `superTux`,
+- The Tux games in Desktop (`famidrive.superTuxKart`, `superTux`,
   `superTuxParty`, `superTuxAdvance`, `extremeTuxRacer`, `tuxPaint`)
   haven't run on a box yet, and neither has Space Cadet
   Pinball (`famidrive.spaceCadetPinball`).
