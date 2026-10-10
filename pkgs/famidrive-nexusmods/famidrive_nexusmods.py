@@ -173,10 +173,12 @@ def mod_file(cache, domain, source):
     return Path(cache) / "files" / domain / f"{source['fileId']}-{source.get('md5') or 'nomd5'}"
 
 
-def nexus_mods(collection):
+def nexus_mods(collection, skip=()):
     """The collection's mods that come from Nexus, and the others (a
-    website or a file the player supplies), which can't be fetched."""
-    mods = collection.get("mods", [])
+    website or a file the player supplies), which can't be fetched.
+    Mods whose Nexus mod id is in skip (the player's `skip` for the
+    collection) are left out of both."""
+    mods = [m for m in collection.get("mods", []) if m.get("source", {}).get("modId") not in set(skip)]
     return ([m for m in mods if m.get("source", {}).get("type") == "nexus"],
             [m for m in mods if m.get("source", {}).get("type") != "nexus"])
 
@@ -189,11 +191,11 @@ def collections_of(game):
 def fetch_game(nx, cache, appid, game):
     status = 0
     for c in collections_of(game):
-        status |= fetch_collection(nx, cache, appid, c["slug"], c["revision"])
+        status |= fetch_collection(nx, cache, appid, c["slug"], c["revision"], c.get("skip") or ())
     return status
 
 
-def fetch_collection(nx, cache, appid, slug, revision):
+def fetch_collection(nx, cache, appid, slug, revision, skip=()):
     cfile = collection_file(cache, slug, revision)
     wfile = wabbajack_file(cache, slug, revision)
     if not cfile.exists() and not wfile.exists():
@@ -213,7 +215,7 @@ def fetch_collection(nx, cache, appid, slug, revision):
         return fetch_wabbajack(nx, cache, appid, slug, revision)
     collection = json.loads(cfile.read_text())
     name = collection.get("info", {}).get("name", slug)
-    mods, other = nexus_mods(collection)
+    mods, other = nexus_mods(collection, skip)
     missing = [m for m in mods if not mod_file(cache, m["domainName"], m["source"]).exists()]
     log(f"{name} (revision {revision}): {len(mods) - len(missing)} of {len(mods)} files here")
     failed = []
@@ -376,7 +378,18 @@ def cyberpunk_layout(members, mod_name):
     return out
 
 
-LAYOUTS = {"cyberpunk2077": cyberpunk_layout}
+def fallen_order_layout(members, mod_name):
+    """Star Wars Jedi: Fallen Order's mods are Unreal .pak files (some with
+    .utoc, .ucas or .sig beside them), which go in SwGame/Content/Paks,
+    as their authors say ("Put it into SwGame-Content-Paks folder"); the
+    game loads them with its own. Readmes and screenshots stay out. Its
+    collections give no file placements of their own (Vortex's extension
+    for the game does this)."""
+    return [(f, f"SwGame/Content/Paks/{posixpath.basename(f)}") for f in files_only(members)
+            if posixpath.splitext(f)[1].lower() in (".pak", ".utoc", ".ucas", ".sig")]
+
+
+LAYOUTS = {"cyberpunk2077": cyberpunk_layout, "starwarsjedifallenorder": fallen_order_layout}
 # Games whose Vortex extension installs an archive it doesn't recognise as
 # it is, into the game's folder, after a warning.
 FALLBACK = {"cyberpunk2077"}
@@ -596,13 +609,13 @@ def plan_game(cache, appid, game):
             plan["mods"] += plan_wabbajack(cache, c["slug"], c["revision"])
             plan["wabbajack"] = {"slug": c["slug"], "revision": c["revision"]}
         else:
-            plan["mods"] += plan_collection(cache, c["slug"], c["revision"], game)
+            plan["mods"] += plan_collection(cache, c["slug"], c["revision"], game, c.get("skip") or ())
     return plan
 
 
-def plan_collection(cache, slug, revision, game):
+def plan_collection(cache, slug, revision, game, skip=()):
     collection = json.loads(collection_file(cache, slug, revision).read_text())
-    mods, other = nexus_mods(collection)
+    mods, other = nexus_mods(collection, skip)
     try:
         names = json.loads(names_file(cache, slug, revision).read_text())
     except (OSError, ValueError):
@@ -1021,7 +1034,11 @@ def save_installed(appid, record):
 
 def want_of(game):
     """What a game's mods should be, to compare with what's installed."""
-    return {"collections": [{"slug": c["slug"], "revision": c["revision"]} for c in collections_of(game)],
+    # skip only when there is one, so installs from before it existed
+    # still count as what's wanted.
+    return {"collections": [{"slug": c["slug"], "revision": c["revision"],
+                             **({"skip": sorted(c["skip"])} if c.get("skip") else {})}
+                            for c in collections_of(game)],
             "choices": game.get("choices", {})}
 
 

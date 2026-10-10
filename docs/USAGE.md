@@ -226,6 +226,24 @@ setup doesn't change under a player.
 - **Default:** none; required when used
 - **Example:** `481`
 
+### `famidrive.players.<name>.nexusmods.games.<name>.collection.skip`
+
+Mods of the collection to leave out, by their Nexus Mods mod id
+(the number in the mod's address, nexusmods.com/<game>/mods/<id>).
+They're neither downloaded nor installed; the rest of the
+collection goes in as its curator made it.
+
+- **Type:** list of (positive integer, meaning >0)
+- **Default:** `[ ]`
+- **Example:** 
+
+  ```nix
+  [
+    512
+    711
+  ]
+  ```
+
 ### `famidrive.players.<name>.nexusmods.games.<name>.collection.slug`
 
 The collection's id, the last part of its address on nexusmods.com.
@@ -260,6 +278,24 @@ setup doesn't change under a player.
 - **Type:** positive integer, meaning >0
 - **Default:** none; required when used
 - **Example:** `481`
+
+### `famidrive.players.<name>.nexusmods.games.<name>.collections.*.skip`
+
+Mods of the collection to leave out, by their Nexus Mods mod id
+(the number in the mod's address, nexusmods.com/<game>/mods/<id>).
+They're neither downloaded nor installed; the rest of the
+collection goes in as its curator made it.
+
+- **Type:** list of (positive integer, meaning >0)
+- **Default:** `[ ]`
+- **Example:** 
+
+  ```nix
+  [
+    512
+    711
+  ]
+  ```
 
 ### `famidrive.players.<name>.nexusmods.games.<name>.collections.*.slug`
 
