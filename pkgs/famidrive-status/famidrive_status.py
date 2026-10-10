@@ -1,10 +1,18 @@
 """famidrive-status APPID STATUS_FILE
+famidrive-status --rom ROM STATUS_FILE
 
 The screen shown while Steam gets a game going: updating it, processing
 its shaders, waiting on a prompt, or starting it. gamescope-fg --steam
 starts this, writes the current state to STATUS_FILE (JSON: "state" and,
 for "failed", "detail"), puts this window on top, and closes it once the
 game's own window is up.
+
+With --rom, the same for a game another launcher starts (gamescope-fg
+--launcher, for Heroic): ROM is its ES-DE entry, which gives the name (the
+one ES-DE shows, from the player's game list) and the art (ES-DE's
+downloaded media for its system). Its states are "setup" (a first launch
+setting the game up, with the download of GOG's runtimes as a bar while
+Heroic logs one) and "launching".
 
 It draws in ES-DE's look: the fonts the theme itself uses for game names
 and descriptions (read from the theme's theme.xml, FAMIDRIVE_STATUS_THEME),
@@ -19,6 +27,7 @@ import os
 import re
 import sys
 import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 os.environ.setdefault("SDL_VIDEODRIVER", "x11")   # gamescope's Xwayland
@@ -26,6 +35,8 @@ os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 import pygame  # noqa: E402
 
 STEAM = Path.home() / ".local/share/Steam"
+ESDE = Path.home() / "ES-DE"
+REDIST_LOG = Path.home() / ".config/heroic/GamesConfig/gog-redist.log"
 THEME = Path(os.environ.get("FAMIDRIVE_STATUS_THEME", "/nonexistent"))
 MEDIA = Path(os.environ.get("FAMIDRIVE_STATUS_MEDIA", str(Path.home() / "ES-DE/downloaded_media/steam")))
 
@@ -45,6 +56,9 @@ TEXT = {
     "installing": ("Setting up the game",
                    "Steam is running the game's first-time setup, such as its publisher's launcher. "
                    "If a window asks something, answer it; some need a mouse or keyboard."),
+    "setup": ("Setting up the game",
+              "Its first launch prepares a Windows setup for it and the runtimes it needs. "
+              "This happens once, and can take a few minutes."),
     "launching": ("Starting", "The game is loading."),
     "failed": ("Steam couldn't start the game", ""),
 }
@@ -156,6 +170,39 @@ def wrap(text, f, width):
     return lines + ([line] if line else [])
 
 
+def es_name(rom):
+    """The name ES-DE shows for an entry: its game list's, or else the file's."""
+    rom = Path(rom)
+    try:
+        root = ET.parse(ESDE / "gamelists" / rom.parent.name / "gamelist.xml").getroot()
+        for game in root.iter("game"):
+            if game.findtext("path") == f"./{rom.name}" and game.findtext("name"):
+                return game.findtext("name")
+    except (OSError, ET.ParseError):
+        pass
+    return rom.stem
+
+
+def redist_progress(now=None):
+    """(bytes done, bytes in all) of Heroic's download of GOG's runtimes,
+    from its log ("Progress: 74.58 126045315/169017931"), while it's being
+    written to; else None."""
+    try:
+        if (now or time.time()) - REDIST_LOG.stat().st_mtime > 10:
+            return None
+        with open(REDIST_LOG, "rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 16384))
+            tail = f.read().decode("utf-8", "replace")
+    except OSError:
+        return None
+    found = re.findall(r"Progress: [\d.]+ (\d+)/(\d+)", tail)
+    if not found:
+        return None
+    done, total = (int(n) for n in found[-1])
+    return (done, total) if done < total else None
+
+
 def shader_progress(appid):
     """Steam's shader-processing percentage for this game, from its shader
     log ("Still replaying <appid> (57%, …)"), or None."""
@@ -175,7 +222,10 @@ def gb(n):
 
 
 def main():
-    appid, status_file = sys.argv[1], Path(sys.argv[2])
+    if sys.argv[1] == "--rom":
+        appid, rom, status_file = None, sys.argv[2], Path(sys.argv[3])
+    else:
+        appid, rom, status_file = sys.argv[1], None, Path(sys.argv[2])
     pygame.init()
     display = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
     # Everything is drawn on a plain 32-bit canvas, then copied to the
@@ -188,9 +238,14 @@ def main():
     w, h = display.get_size()
     u = h / 1080   # layout unit: sizes below are for 1080p
 
-    text = manifest(appid)
-    name = field(text, "name") or f"Steam game {appid}"
-    cover_img, bg_img = (load(p) for p in art(name))
+    global MEDIA
+    if rom:
+        name = es_name(rom)
+        MEDIA = ESDE / "downloaded_media" / Path(rom).parent.name
+        cover_img, bg_img = (load(p) for p in art(Path(rom).stem))
+    else:
+        name = field(manifest(appid), "name") or f"Steam game {appid}"
+        cover_img, bg_img = (load(p) for p in art(name))
 
     regular, light = theme_fonts()
     title_f = font(regular, int(64 * u))
@@ -214,7 +269,7 @@ def main():
         s = (560 * u) / cover_img.get_height()
         cover = pygame.transform.smoothscale(cover_img, (int(cover_img.get_width() * s), int(560 * u)))
 
-    state, detail, since = "asking", "", time.monotonic()
+    state, detail, since = ("launching" if rom else "asking"), "", time.monotonic()
     rate, last_bytes, last_t = None, None, None
     done = total = 0
     shaders = None
@@ -261,11 +316,14 @@ def main():
             screen.blit(head_f.render(head, True, WHITE), (left, y))
         y += head_f.get_linesize() + int(16 * u)
 
-        if state == "updating":
+        if state in ("updating", "setup"):
             now = time.monotonic()
             if now >= next_read:
                 next_read = now + 2
-                done, total = download_progress(appid)
+                if state == "updating":
+                    done, total = download_progress(appid)
+                else:
+                    done, total = redist_progress() or (0, 0)
                 if last_bytes is not None and done > last_bytes:
                     r_now = (done - last_bytes) / (now - last_t)
                     rate = r_now if rate is None else 0.7 * rate + 0.3 * r_now

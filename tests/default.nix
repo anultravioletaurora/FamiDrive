@@ -378,8 +378,9 @@ in
       (lib.hasInfix "InputDeviceNotifications" c.home-manager.users.alice.home.activation.famidriveEsSettings.data))
     (check "Dolphin's own on-screen messages off, for every player (toasts instead)"
       (lib.all (u: lib.hasInfix "OnScreenDisplayMessages" c.home-manager.users.${u}.home.activation.famidriveEmulators.data) [ "alice" "bob" "guest" ]))
-    (check "Heroic sends desktop notifications (not taken for Steam Deck Game Mode); GOG games have the Comet watcher"
+    (check "Heroic sends desktop notifications (not taken for Steam Deck Game Mode) and its games get the status screen; GOG games have the Comet watcher"
       (lib.hasInfix "XDG_CURRENT_DESKTOP=FamiDrive" c.famidrive.systems.gog.command
+        && lib.hasInfix "gamescope-fg --launcher \"$ROM\"" c.famidrive.systems.gog.command
         && lib.hasInfix "XDG_CURRENT_DESKTOP=FamiDrive" c.famidrive.systems.settings.command
         && lib.hasInfix "watch-comet" c.famidrive.systems.gog.before
         && !(lib.hasInfix "watch-comet" c.famidrive.systems.epic.before)))

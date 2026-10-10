@@ -293,6 +293,16 @@ copy on the first box is the base game only, without the DLC.
 Ultimate Edition (GOG id `1454587428`, version 1.4.0.525), with every
 DLC, on GE-Proton7-50 (Heroic's choice).
 
+- **First launch:** a black screen. Heroic first downloaded GOG's
+  runtimes (.NET 4, DirectX, Visual C++) and installed them into a new
+  prefix, with no window, for about a minute. Then Bethesda's launcher
+  opened, but stayed invisible: Heroic runs the game in Steam's
+  pressure-vessel container, which starts a session of its own, and
+  FamiDrive only showed windows from the launch's session. FamiDrive now
+  shows windows from anything the launch started, and Heroic launches get
+  the status screen ("Setting up the game", with the runtimes' download
+  as a bar, then "Starting").
+
 - **Mods:** NakeyJakey's New Vegas, a Wabbajack list of 336 mods, as a
   Nexus Mods collection (`ezlocx`) through FamiDrive (#166,
   [MODDING.md](MODDING.md)). It needs every DLC, so the GOG copy. On
