@@ -195,6 +195,23 @@ class Install(unittest.TestCase):
                 z.writestr(k, v)
         return str(p)
 
+    def test_read_only_folders_in_an_archive(self):
+        src = self.base / "ro"
+        (src / "Mod/r6/scripts").mkdir(parents=True)
+        (src / "Mod/r6/scripts/a.reds").write_text("x")
+        os.chmod(src / "Mod/r6/scripts", 0o555)
+        os.chmod(src / "Mod/r6", 0o555)
+        archive = self.base / "ro.tar"
+        subprocess.run([m.BSDTAR, "-cf", str(archive), "-C", str(src), "Mod"], check=True)
+        os.chmod(src / "Mod/r6", 0o755)
+        os.chmod(src / "Mod/r6/scripts", 0o755)
+        root = self.base / "game"
+        root.mkdir()
+        plan = {"mods": [{"name": "RO", "archive": str(archive), "files": [{"from": "Mod/r6/scripts/a.reds", "to": "r6/scripts/a.reds"}]}]}
+        rec = m.install(plan, root, "1091500", {})
+        self.assertTrue(rec["complete"])
+        self.assertEqual((root / "r6/scripts/a.reds").read_text(), "x")
+
     def test_finds_the_game_in_any_library(self):
         steam, lib = self.base / "steam", self.base / "games"
         (steam / "steamapps").mkdir(parents=True)
