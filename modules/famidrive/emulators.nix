@@ -708,6 +708,29 @@ in
         fi
       '';
 
+      # Heroic's Proton: the GE-Proton Steam gets (proton-ge-bin, above),
+      # linked where Heroic finds its own Protons, and its default for new
+      # games when it has no working default. Found on the first box
+      # 2026-10-10: with none, Heroic gave Fallout: New Vegas the only
+      # Proton it could see, a GE-Proton7-50 from 2022, whose Wine lacks
+      # MSVCP140_ATOMIC_WAIT.dll, and the game's JohnnyGuitar plugin
+      # couldn't load. A default the player chose is kept; a game's own
+      # choice in Heroic is never touched.
+      home.activation.famidriveHeroicProton = lib.mkIf (hasLane "heroic") (lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        tools="$HOME/.config/heroic/tools/proton"
+        mkdir -p "$tools"
+        ln -sfn ${pkgs.proton-ge-bin.steamcompattool} "$tools/GE-Proton-FamiDrive"
+        c="$HOME/.config/heroic/config.json"
+        if [ -f "$c" ]; then
+          bin=$(${pkgs.jq}/bin/jq -r '.defaultSettings.wineVersion.bin // ""' "$c" 2>/dev/null || echo "")
+          if [ -z "$bin" ] || [ ! -e "$bin" ]; then
+            ${pkgs.jq}/bin/jq --arg bin "$tools/GE-Proton-FamiDrive/proton" \
+              '.defaultSettings.wineVersion = { bin: $bin, name: "GE-Proton (FamiDrive)", type: "proton" }' \
+              "$c" > "$c.famidrive-tmp" && mv "$c.famidrive-tmp" "$c" || rm -f "$c.famidrive-tmp"
+          fi
+        fi
+      '');
+
       # Seeded/locked emulator settings. Only the keys this design depends
       # on are locked; everything else stays editable from each emulator's
       # own UI and survives rebuilds.

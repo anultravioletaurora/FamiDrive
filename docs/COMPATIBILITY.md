@@ -289,9 +289,30 @@ it (`famidrive.steam.steamInputGames`).
 **Steam: ✅ Works.** Proton Experimental (Steam's choice), unmodded. The
 copy on the first box is the base game only, without the DLC.
 
-**GOG, through Heroic: ❔ Installed, not yet played.** 2026-10-10: the
-Ultimate Edition (GOG id `1454587428`, version 1.4.0.525), with every
-DLC, on GE-Proton7-50 (Heroic's choice).
+**GOG, through Heroic, with NakeyJakey's New Vegas: 🟡 Plays.**
+2026-10-10, on the first box: the Ultimate Edition (GOG id
+`1454587428`, version 1.4.0.525) with every DLC and the list's 336
+mods, on Proton Experimental, reached the main menu and character
+creation. The controller worked right away.
+
+- **Typing:** naming the character needed a keyboard and mouse. The PC
+  game has no on-screen keyboard; typing from the couch is #119 and #73.
+- **How it got there**, after the black screen below:
+  - **Restart loop:** the game started, closed, and started again every
+    few seconds. Two causes. GE-Proton7-50, Heroic's choice, lacks
+    `MSVCP140_ATOMIC_WAIT.dll`, which the list's JohnnyGuitar NVSE needs;
+    Proton Experimental has it (Heroic now gets FamiDrive's GE-Proton
+    as its default). And the list's `FalloutPrefs.ini` has no `[Display]`,
+    so New Vegas found no record of the graphics card
+    (`uVideoDeviceIdentifierPart1`–`4`), ran its launcher to detect it,
+    and exited; with the launcher swapped for the game, that repeated.
+    Bethesda's launcher, run once, wrote all zeros (DXVK's identifier).
+    FamiDrive now writes a full `FalloutPrefs.ini` itself.
+  - **umu's runtime:** Proton Experimental needs Valve's `steamrt4`, and
+    umu's download of it failed its checksum twice; Valve's file was
+    fine when fetched by hand.
+  - **Registry:** GOG's `Installed Path` value was missing from the
+    prefix; FamiDrive sets it now.
 
 - **First launch:** a black screen. Heroic first downloaded GOG's
   runtimes (.NET 4, DirectX, Visual C++) and installed them into a new
@@ -311,10 +332,9 @@ DLC, on GE-Proton7-50 (Heroic's choice).
 - **Mods:** NakeyJakey's New Vegas, a Wabbajack list of 336 mods, as a
   Nexus Mods collection (`ezlocx`) through FamiDrive (#166,
   [MODDING.md](MODDING.md)). It needs every DLC, so the GOG copy. On
-  2026-10-10 its download (26 GB) and build (45 GB, 65,561 files) both
-  finished on the first box; installing it into the game and playing it
-  is next (#5). The list also needs the 4 GB patch and xNVSE, which
-  FamiDrive puts in.
+  2026-10-10 its download (26 GB), build (45 GB) and install (58,770
+  files, with the 4 GB patch and xNVSE) took 21 minutes on the first
+  box, all from a rebuild (#5).
 
 ### Gears 5
 

@@ -198,6 +198,15 @@ that too, recorded and backed up like everything else:
   (`plugins.txt`) into the game's Windows prefix, where the game reads
   them, and the plugins' **load order**, which New Vegas takes from the
   plugin files' dates.
+- **What the launcher would have set:** with the launcher swapped out,
+  FamiDrive makes `FalloutPrefs.ini` the way it does on its first run
+  (the game's defaults and its Very High preset, under the list's own
+  settings), with the graphics card's identifier as DXVK reports it.
+  Without that, New Vegas hands back to the launcher at startup. Over
+  every INI: the TV's resolution, windowed (gamescope shows it full
+  screen), no MSAA, and the controller turned on (lists often turn it
+  off, for a mouse and keyboard).
+- **GOG's registry value** (`Installed Path`), when Heroic hasn't set it.
 - **Archive invalidation:** the empty `Fallout - Invalidation.bsa` the
   profile's INI names, as Mod Organizer makes it.
 
@@ -205,6 +214,12 @@ Lists for New Vegas usually need **every DLC** (Dead Money, Honest
 Hearts, Old World Blues, Lonesome Road, Gun Runners' Arsenal and the
 Courier's Stash): the Ultimate Edition on GOG, or the base game plus
 its DLC on Steam.
+
+Its plugins need a current Proton: JohnnyGuitar NVSE needs
+`MSVCP140_ATOMIC_WAIT.dll`, which GE-Proton7-50's Wine doesn't have.
+FamiDrive makes its own GE-Proton Heroic's default; a game set up
+before that keeps the Proton it was given, so pick a newer one for it
+in Heroic.
 
 ### Not done yet
 

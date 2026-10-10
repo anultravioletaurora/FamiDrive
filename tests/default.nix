@@ -579,6 +579,9 @@ in
           && !(c.systemd.timers ? romm-save-reconcile-guest)))
       (check "a Steam menu generator per player"
         (lib.all (p: c.systemd.services ? "famidrive-gen-steam-${p}") [ "alice" "bob" "guest" ]))
+      (check "Heroic gets the GE-Proton Steam has, as its default when it has none"
+        (lib.hasInfix "GE-Proton-FamiDrive" c.home-manager.users.bob.home.activation.famidriveHeroicProton.data
+          && lib.hasInfix "defaultSettings.wineVersion" c.home-manager.users.bob.home.activation.famidriveHeroicProton.data))
       (check "GOG, Epic and Amazon games are Desktop entries, launched through Heroic, with Heroic's art and details"
         (lib.all (s: !(c.famidrive.systems ? ${s}) && lib.hasInfix "runner=" c.famidrive.systems.desktop.command
             && lib.elem ".${s}" c.famidrive.systems.desktop.extensions)
