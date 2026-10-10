@@ -87,6 +87,33 @@ let
   q = lib.escapeShellArg;
 in
 {
+  options.famidrive.controllers.instruments = mkOption {
+    type = types.listOf (types.strMatching "[0-9a-fA-F]{4}:[0-9a-fA-F]{4}");
+    default = [ "289b:0080" ];
+    example = [ "289b:0080" "12ba:0100" ];
+    description = ''
+      USB ids (vendor:product) of instrument adapters: guitars and drums
+      for rhythm games. Clone Hero and YARG see them; Steam games and
+      SuperTux don't, since SDL takes any of them for a game controller,
+      and one plugged in first became player 1. Found on the first box
+      2026-10-09: Call of Duty: WWII read the guitar adapter instead of
+      the 8BitDo. The default is raphnet's WUSBMote (Wii guitars and
+      drums).
+    '';
+  };
+
+  # The same list as SDL's SDL_GAMECONTROLLER_IGNORE_DEVICES wants it,
+  # which Proton's Wine also reads, for its SDL and its evdev devices
+  # alike (is_sdl_ignored_device, dlls/winebus.sys/bus_sdl.c).
+  options.famidrive.controllers.sdlIgnoreDevices = mkOption {
+    type = types.str;
+    readOnly = true;
+    internal = true;
+    default = lib.concatMapStringsSep "," (id:
+      let p = lib.splitString ":" (lib.toLower id); in "0x${lib.elemAt p 0}/0x${lib.elemAt p 1}"
+    ) cfg.controllers.instruments;
+  };
+
   options.famidrive.controllers.faceButtons = mkOption {
     type = types.enum [ "labels" "positions" ];
     default = "labels";

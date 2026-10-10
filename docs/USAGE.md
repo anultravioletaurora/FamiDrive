@@ -789,6 +789,33 @@ controller screens don't last, on purpose.
   ]
   ```
 
+### `famidrive.controllers.instruments`
+
+USB ids (vendor:product) of instrument adapters: guitars and drums
+for rhythm games. Clone Hero and YARG see them; Steam games and
+SuperTux don't, since SDL takes any of them for a game controller,
+and one plugged in first became player 1. Found on the first box
+2026-10-09: Call of Duty: WWII read the guitar adapter instead of
+the 8BitDo. The default is raphnet's WUSBMote (Wii guitars and
+drums).
+
+- **Type:** list of string matching the pattern [0-9a-fA-F]{4}:[0-9a-fA-F]{4}
+- **Default:** 
+
+  ```nix
+  [
+    "289b:0080"
+  ]
+  ```
+- **Example:** 
+
+  ```nix
+  [
+    "289b:0080"
+    "12ba:0100"
+  ]
+  ```
+
 ### `famidrive.controllers.wii.balanceBoard`
 
 A real Wii Balance Board, connected like a real Wii Remote (the
