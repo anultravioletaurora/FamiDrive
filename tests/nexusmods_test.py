@@ -239,8 +239,17 @@ class Install(unittest.TestCase):
         (cache / "installed").mkdir(parents=True)
         (cache / "installed/1091500.json").write_text(json.dumps(
             {"collection": "iszwwe", "revision": 481, "backup": str(self.base / "bk"), "files": [], "replaced": []}))
-        have = m.read_installed("1091500", cache)
+        game = self.base / "steam/steamapps/common/Cyberpunk 2077"
+        game.mkdir(parents=True)
+        (self.base / "steam/steamapps/appmanifest_1091500.acf").write_text('"StateFlags" "4"\n"installdir" "Cyberpunk 2077"\n')
+        real = m.game_dir
+        m.game_dir = lambda appid, steam=None, heroic=None: real(appid, self.base / "steam")
+        try:
+            have = m.read_installed("1091500", cache)
+        finally:
+            m.game_dir = real
         self.assertEqual(have["want"], m.want_of({"collection": {"slug": "iszwwe", "revision": 481}}))
+        self.assertEqual(have["root"], str(game))   # from Steam, for taking it out
 
     def test_a_game_taken_out_of_the_config_loses_its_mods(self):
         root = self.base / "game"
