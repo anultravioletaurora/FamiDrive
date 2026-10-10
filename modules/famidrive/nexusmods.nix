@@ -23,9 +23,20 @@ let
     if p.nexusmods.apiKeyFile != null then p.nexusmods.apiKeyFile
     else config.sops.secrets."${name}/nexusmods".path;
 
+  # What some games need beyond their mods, pinned here.
+  extras = {
+    # xNVSE, New Vegas's script extender, which Wabbajack lists for it
+    # expect in the game's folder.
+    xnvse = pkgs.fetchurl {
+      url = "https://github.com/xNVSE/NVSE/releases/download/6.4.9/nvse_6_4_9.7z";
+      hash = "sha256-gfsGOPh7LIIicON88soRjTniQl8TAo+Rc7Fyxf2y64g=";
+    };
+  };
+
   spec = name: p: pkgs.writeText "famidrive-nexusmods-${name}.json" (builtins.toJSON {
     apiKeyFile = if withMods ? ${name} then toString (keyFile name p) else null;
     cache = "~/.cache/famidrive/nexusmods";
+    extras = lib.mapAttrs (_: toString) extras;
     games = lib.mapAttrs (_: g: {
       collections = lib.optional (g.collection != null) g.collection ++ g.collections;
       inherit (g) choices;
@@ -104,10 +115,16 @@ in
           type = types.attrsOf game;
           default = { };
           example = lib.literalExpression ''
-            { "1091500".collection = { slug = "iszwwe"; revision = 481; }; }   # Cyberpunk 2077
+            {
+              "1091500".collections = [ { slug = "rcuccp"; revision = 189; } ];      # Cyberpunk 2077 on Steam
+              "gog:1454587428".collections = [ { slug = "ezlocx"; revision = 1; } ];  # New Vegas on GOG, a Wabbajack list
+            }
           '';
           description = ''
-            Nexus Mods collections for their Steam games, by Steam app id.
+            Nexus Mods collections for their games: a Steam game by its app
+            id, a GOG game (installed through Heroic) as `gog:<GOG id>`. A
+            collection can be a Wabbajack list (New Vegas's NakeyJakey's,
+            for one), built and installed the same way.
             Downloaded in the background into their cache
             (~/.cache/famidrive/nexusmods), each file checked against the
             collection's checksum, then installed in the game's folder,

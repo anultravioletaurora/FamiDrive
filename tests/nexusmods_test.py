@@ -243,9 +243,144 @@ class Install(unittest.TestCase):
         (root / "mod.archive").write_text("x")
         m.save_installed("1091500", {"appid": "1091500", "root": str(root), "want": {}, "files": ["mod.archive"],
                                      "replaced": [], "backup": str(self.base / "bk"), "complete": True})
-        m.game_running = lambda appid: False
+        m.game_running = lambda appid, root=None: False
         self.assertEqual(m.cmd_sync({"cache": str(self.base / "cache"), "apiKeyFile": None, "games": {}}), 0)
         self.assertFalse((root / "mod.archive").exists())
+
+
+def octodelta(commands):
+    """An OctoDiff delta, as Wabbajack's patches are."""
+    import struct
+    out = b"OCTODELTA\x01" + bytes([4]) + b"SHA1" + struct.pack("<i", 20) + b"\0" * 20 + b">>>"
+    for c in commands:
+        if c[0] == "copy":
+            out += b"\x60" + struct.pack("<qq", c[1], c[2])
+        else:
+            out += b"\x80" + struct.pack("<q", len(c[1])) + c[1]
+    return out
+
+
+class Wabbajack(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        m.STATE = self.base / "state"
+        self.cache = self.base / "cache"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_octodiff(self):
+        base = b"Hello, Mojave!"
+        self.assertEqual(m.octodiff(base, octodelta([("copy", 0, 7), ("data", b"Courier"), ("copy", 13, 1)])),
+                         b"Hello, Courier!")
+
+    def test_hash_like_wabbajack(self):
+        f = self.base / "x"
+        f.write_bytes(b"abc")
+        self.assertEqual(m.wj_hash(f), m.wj_hash_bytes(b"abc"))
+        self.assertEqual(len(m.base64.b64decode(m.wj_hash(f))), 8)
+
+    def test_mo2_order_lowest_first(self):
+        prof = self.base / "profiles/Default"
+        prof.mkdir(parents=True)
+        (prof / "modlist.txt").write_text("+Top\n-Off\n+Middle\n*DLC\n-Fixes_separator\n+Bottom\n")
+        self.assertEqual(m.mo2_order(prof), ["Bottom", "Middle", "Top"])
+
+    def build_list(self):
+        """A tiny list: one download (with an archive inside it), an inline
+        file, a patched file, MO2's own file (left out)."""
+        dl = self.base / "dl"
+        (dl / "inner").mkdir(parents=True)
+        (dl / "inner/sky.dds").write_bytes(b"sky")
+        inner = self.base / "Mojave Nights.fomod"
+        subprocess.run([m.BSDTAR, "-c", "--format", "zip", "-f", str(inner), "-C", str(dl / "inner"), "sky.dds"], check=True)
+        archive = self.base / "download.zip"
+        with zipfile.ZipFile(archive, "w") as z:
+            z.writestr("Mod/meshes/a.nif", b"mesh")
+            z.writestr("Mod/a.ini", b"x=1\n")
+            z.write(inner, "Mojave Nights.fomod")
+        h = m.wj_hash(archive)
+        patched = b"x=2\n"
+        directives = [
+            {"$type": "FromArchive", "ArchiveHashPath": [h, "Mod\\meshes\\a.nif"], "To": "mods\\A Mod\\meshes\\a.nif"},
+            {"$type": "FromArchive", "ArchiveHashPath": [h, "Mojave Nights.fomod", "sky.dds"], "To": "mods\\A Mod\\textures\\sky.dds"},
+            {"$type": "PatchedFromArchive", "ArchiveHashPath": [h, "Mod\\a.ini"], "PatchID": "p1",
+             "Hash": m.wj_hash_bytes(patched), "To": "mods\\A Mod\\a.ini"},
+            {"$type": "InlineFile", "SourceDataID": "i1", "To": "profiles\\Default\\modlist.txt"},
+            {"$type": "InlineFile", "SourceDataID": "i2", "To": "ModOrganizer.ini"},
+        ]
+        modlist = {"Name": "Test List", "GameType": "FalloutNewVegas", "Directives": directives,
+                   "Archives": [{"Hash": h, "Name": "download.zip", "Size": archive.stat().st_size,
+                                 "State": {"$type": "NexusDownloader, Wabbajack.Lib", "GameName": "FalloutNewVegas",
+                                           "ModID": 1, "FileID": 2}}]}
+        wfile = m.wabbajack_file(self.cache, "list", 1)
+        wfile.parent.mkdir(parents=True)
+        with zipfile.ZipFile(wfile, "w") as z:
+            z.writestr("modlist", json.dumps(modlist))
+            z.writestr("i1", "+A Mod\n")
+            z.writestr("i2", "[General]\n")
+            z.writestr("p1", octodelta([("data", b"x=2\n")]))
+        dest = m.wj_archive_file(self.cache, modlist["Archives"][0])
+        dest.parent.mkdir(parents=True)
+        shutil.copyfile(archive, dest)
+
+    def test_build_and_plan(self):
+        self.build_list()
+        tree = m.build_wabbajack(self.cache, "list", 1)
+        self.assertEqual((tree / "mods/A Mod/meshes/a.nif").read_bytes(), b"mesh")
+        self.assertEqual((tree / "mods/A Mod/textures/sky.dds").read_bytes(), b"sky")   # from the archive inside
+        self.assertEqual((tree / "mods/A Mod/a.ini").read_bytes(), b"x=2\n")             # patched
+        self.assertFalse((tree / "ModOrganizer.ini").exists())                            # MO2's own: not needed
+        mods = m.plan_wabbajack(self.cache, "list", 1)
+        self.assertEqual([x["name"] for x in mods], ["A Mod"])
+        self.assertEqual(sorted(f["to"] for f in mods[0]["files"]),
+                         ["Data/a.ini", "Data/meshes/a.nif", "Data/textures/sky.dds"])
+
+    def test_installs_from_the_built_folders_and_keeps_them(self):
+        self.build_list()
+        m.build_wabbajack(self.cache, "list", 1)
+        root = self.base / "game"
+        (root / "Data").mkdir(parents=True)
+        plan = {"mods": m.plan_wabbajack(self.cache, "list", 1)}
+        rec = m.install(plan, root, "22380", {})
+        self.assertEqual((root / "Data/meshes/a.nif").read_bytes(), b"mesh")
+        self.assertTrue((m.wj_tree(self.cache, "list", 1) / "mods/A Mod/meshes/a.nif").exists())   # linked, not moved
+        self.assertEqual(len(rec["files"]), 3)
+
+
+class Heroic(unittest.TestCase):
+    def test_gog_game_and_prefix(self):
+        with tempfile.TemporaryDirectory() as d:
+            heroic, game, prefix = Path(d) / "heroic", Path(d) / "Games/Fallout New Vegas", Path(d) / "Prefixes/FNV"
+            (heroic / "gog_store").mkdir(parents=True)
+            (heroic / "GamesConfig").mkdir()
+            (prefix / "pfx/drive_c/users/steamuser").mkdir(parents=True)
+            (heroic / "gog_store/installed.json").write_text(json.dumps(
+                {"installed": [{"appName": "1454587428", "install_path": str(game), "platform": "windows"}]}))
+            (heroic / "GamesConfig/1454587428.json").write_text(json.dumps({"1454587428": {"winePrefix": str(prefix)}}))
+            self.assertEqual(m.game_dir("gog:1454587428", heroic=heroic), game)
+            self.assertIsNone(m.game_dir("gog:1", heroic=heroic))
+            self.assertEqual(m.prefix_of("gog:1454587428", game, heroic=heroic), prefix / "pfx")
+            self.assertEqual(m.installed_file("gog:1454587428").name, "gog-1454587428.json")
+
+    def test_steam_prefix_beside_its_library(self):
+        root = Path("/lib/steamapps/common/Fallout New Vegas")
+        self.assertEqual(m.prefix_of("22380", root), Path("/lib/steamapps/compatdata/22380"))
+
+
+class NewVegas(unittest.TestCase):
+    def test_ini_tweaks_merge(self):
+        base = "[Archive]\nbInvalidateOlderFiles=0\nSArchiveList=a.bsa\n[Display]\niSize W=1280\n"
+        out = m.ini_merge(base, "[Archive]\nbInvalidateOlderFiles=1\n[General]\nsLanguage=ENGLISH\n")
+        self.assertIn("bInvalidateOlderFiles=1", out)
+        self.assertNotIn("bInvalidateOlderFiles=0", out)
+        self.assertIn("SArchiveList=a.bsa", out)
+        self.assertIn("[General]\nsLanguage=ENGLISH", out)
+
+    def test_empty_bsa(self):
+        self.assertEqual(len(m.EMPTY_BSA), 36)
+        self.assertEqual(m.EMPTY_BSA[:4], b"BSA\0")
 
 
 if __name__ == "__main__":
