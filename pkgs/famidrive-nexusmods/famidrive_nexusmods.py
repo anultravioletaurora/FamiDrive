@@ -69,6 +69,9 @@ import xxhash
 API = "https://api.nexusmods.com"
 GRAPHQL = API + "/v2/graphql"
 BSDTAR = os.environ.get("FAMIDRIVE_BSDTAR", "@bsdtar@")
+# The Unarchiver, for what libarchive can't unpack: solid RAR archives.
+# Found on the first box 2026-10-10, in NakeyJakey's New Vegas.
+UNAR = os.environ.get("FAMIDRIVE_UNAR", "@unar@")
 TOAST = "@toast@"
 STATE = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share") / "famidrive/nexusmods"
 STEAM = Path.home() / ".local/share/Steam"
@@ -533,12 +536,18 @@ def place(mod, members, download=None, read=None, picks=None):
 
 
 def read_member(archive, member):
-    return subprocess.run([BSDTAR, "-xOf", str(archive), member], check=True, capture_output=True).stdout
+    r = subprocess.run([BSDTAR, "-xOf", str(archive), member], capture_output=True)
+    if r.returncode == 0:
+        return r.stdout
+    return subprocess.run([UNAR, "-q", "-o", "-", str(archive), member], check=True, capture_output=True).stdout
 
 
 def members_of(archive):
     r = subprocess.run([BSDTAR, "-tf", str(archive)], capture_output=True, text=True)
-    return r.stdout.splitlines() if r.returncode == 0 else None
+    if r.returncode == 0:
+        return r.stdout.splitlines()
+    r = subprocess.run([os.path.join(os.path.dirname(UNAR), "lsar"), str(archive)], capture_output=True, text=True)
+    return r.stdout.splitlines()[1:] if r.returncode == 0 else None   # lsar's first line names the archive
 
 
 def install_order(collection, mods):
@@ -781,10 +790,17 @@ def build_wabbajack(cache, slug, revision, progress=None):
             groups.setdefault(d["ArchiveHashPath"][0], []).append(d)
     work = STATE / "tmp"
     work.mkdir(parents=True, exist_ok=True)
+
+    def done(d):   # built before, by a run that stopped partway
+        f = tree / norm(d["To"])
+        return f.exists() and f.stat().st_size == d.get("Size", -1)
     for n, (h, ds) in enumerate(groups.items(), 1):
         archive = wj_archive_file(cache, by_hash[h])
         if progress:
             progress(n, len(groups), by_hash[h].get("Name", ""))
+        ds = [d for d in ds if not done(d)]
+        if not ds:
+            continue
         with tempfile.TemporaryDirectory(dir=work) as tmp:
             files = {k.lower(): v for k, v in extracted(archive, tmp).items()}
             nested = {}
@@ -1007,7 +1023,11 @@ def winners(plan):
 def extracted(archive, into):
     """Unpack an archive; {normalised member path: file} (a ZIP made on
     Windows can unpack with backslashes in its names)."""
-    subprocess.run([BSDTAR, "-xf", str(archive), "-C", str(into)], check=True, capture_output=True)
+    r = subprocess.run([BSDTAR, "-xf", str(archive), "-C", str(into)], capture_output=True)
+    if r.returncode != 0:
+        shutil.rmtree(into, ignore_errors=True)
+        Path(into).mkdir(parents=True)
+        subprocess.run([UNAR, "-q", "-D", "-o", str(into), "-f", str(archive)], check=True, capture_output=True)
     out = {}
     for p in Path(into).rglob("*"):
         if p.is_file():
