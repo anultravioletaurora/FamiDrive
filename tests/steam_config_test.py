@@ -125,6 +125,23 @@ class Test(unittest.TestCase):
         self.assertIn('"LaunchOptions"\t\t"A=\\"b\\" %command%"', steam_apps)
         self.assertNotIn("LaunchOptions", text.split('"Software"')[0])
 
+    def test_launch_options_taken_out_are_cleared(self):
+        self.run_settings({"launchOptions": {"Valheim": "./start_game_bepinex.sh %command%"}})
+        self.run_settings({"launchOptions": {}})
+        steam_apps = self.local.read_text().split('"Software"')[1]
+        self.assertIn('"LaunchOptions"\t\t""', steam_apps)
+        self.assertIn('"Playtime"\t\t"100"', steam_apps)
+
+    def test_launch_options_changed_in_steam_stay(self):
+        self.run_settings({"launchOptions": {"Valheim": "./start_game_bepinex.sh %command%"}})
+        self.local.write_text(self.local.read_text().replace("./start_game_bepinex.sh %command%", "mine"))
+        self.run_settings({"launchOptions": {}})
+        self.assertIn('"LaunchOptions"\t\t"mine"', self.local.read_text())
+
+    def test_launch_options_never_set_stay(self):
+        self.run_settings({"launchOptions": {}})
+        self.assertIn('"LaunchOptions"\t\t"old"', self.local.read_text())
+
     def test_unchanged_files_untouched(self):
         self.run_settings({"launchOptions": {"Not Installed": "x"}})
         self.assertEqual(self.local.read_text(), LOCALCONFIG)

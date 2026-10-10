@@ -558,9 +558,11 @@ on first launch, but not the Battle.net app.
 
 **Steam: ❔ Untested.** Windows only, so it runs under Proton.
 
-- **Mods:** Thunderstore, through BepInEx, the same as Valheim. FamiDrive
-  already declares Valheim's mods in Nix (`famidrive.valheim.mods`); the
-  same could work here. Worth an issue once the plain game is tested.
+- **Mods:** Thunderstore, through BepInEx, declared per player with
+  `famidrive.players.<name>.thunderstore.games."632360".mods`
+  ([MODDING.md](MODDING.md#thunderstore)), which installs BepInEx, the
+  mods, and the launch options `WINEDLLOVERRIDES="winhttp=n,b" %command%`
+  for that player. Not yet run on a box.
 - **To check:** controllers and rumble, online co-op through Steam, and
   modded play with friends who use r2modman.
 
@@ -818,10 +820,12 @@ update 1.0.3 from RomM.
 **Steam: ✅ Works.**
 
 - **Runs on:** native, with mods through BepInEx.
-- **Mods:** declared with `famidrive.valheim.mods` (Thunderstore ids
-  and hashes), which installs BepInEx, the mods, and the launch option
-  `./start_game_bepinex.sh %command%`. Tested on a copy of the first
-  box's install; not yet played that way.
+- **Mods:** declared per player with
+  `famidrive.players.<name>.thunderstore.games."892970".mods`
+  (Thunderstore ids and hashes, [MODDING.md](MODDING.md#thunderstore)),
+  which installs BepInEx, the mods, and the launch options
+  `./start_game_bepinex.sh %command%` for that player. Tested on a copy
+  of the first box's install; not yet played that way.
 - **Graphics:** runs on Vulkan, which the game picks on its own.
 
 ### Wii Sports

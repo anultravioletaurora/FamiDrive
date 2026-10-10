@@ -48,7 +48,6 @@ SECTIONS = [
      "3D Pinball Space Cadet, in the Ports system, playing your own copy of the game's files."),
     ("Minecraft", ["famidrive.minecraft"],
      "Minecraft through Prism Launcher, in the Desktop system (`lanes` has `\"minecraft\"`)."),
-    ("Valheim", ["famidrive.valheim"], "Valheim mods, for playing on a modded server."),
     ("PC saves", ["famidrive.pcSaves"], "Syncing PC games' saves that Steam Cloud doesn't."),
     ("Online play", ["famidrive.online"], "Emulator netplay, through the servers in Servers."),
     ("Systems", ["famidrive.systems"],

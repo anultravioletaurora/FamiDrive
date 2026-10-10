@@ -10,7 +10,9 @@ Writes FamiDrive's Steam settings into Steam's own config files:
   except the games in steamInputGames (names or app ids), which get it on.
   true leaves Steam's own choice alone.
 - launchOptions: {game: options}, each game's launch options, in each
-  Steam user's localconfig.vdf.
+  Steam user's localconfig.vdf. What it sets is remembered (STATE): a
+  game taken out of the list later gets its launch options cleared,
+  unless they were changed in Steam since.
 
 Steam rewrites both files when it exits, so this only sticks while Steam
 isn't running: the session runs it just before starting Steam.
@@ -26,6 +28,7 @@ import sys
 from pathlib import Path
 
 STEAM = Path.home() / ".local/share/Steam"
+STATE = Path.home() / ".local/share/famidrive/steam-launch-options.json"
 
 # Steam installs its own tools as apps too (keep in step with
 # famidrive-generators).
@@ -169,6 +172,31 @@ def set_app_keys(wanted, depth):
         vdf.save()
 
 
+def clear_app_keys(stale, depth):
+    """stale: {appid: {key: value}}. Each key that still has that value
+    is emptied; one changed since (by the player, in Steam) stays."""
+    for path in STEAM.glob("userdata/*/config/localconfig.vdf"):
+        vdf = Vdf(path)
+        found = vdf.find("apps", depth=depth)
+        if found is None:
+            continue
+        head, close = found
+        ind = vdf.indent(head)
+        for appid, (i, end) in vdf.children(head, close).items():
+            for key, value in stale.get(appid, {}).items():
+                for j in range(i + 2, end):
+                    if vdf.lines[j].strip() == f'"{key}"\t\t"{vdf_string(value)}"':
+                        vdf.lines[j] = f'{ind}\t"{key}"\t\t""'
+        vdf.save()
+
+
+def read_state():
+    try:
+        return json.loads(STATE.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
 def main():
     settings = json.loads(sys.argv[1])
     games = None
@@ -209,8 +237,17 @@ def main():
         a = appid(game)
         if a:
             keys[a] = {"LaunchOptions": options}
+    before = read_state()
+    stale = {a: {"LaunchOptions": o} for a, o in before.items()
+             if keys.get(a, {}).get("LaunchOptions") != o}
+    if stale:
+        clear_app_keys(stale, depth=4)
     if keys:
         set_app_keys(keys, depth=4)
+    now = {a: k["LaunchOptions"] for a, k in keys.items()}
+    if now != before:
+        STATE.parent.mkdir(parents=True, exist_ok=True)
+        STATE.write_text(json.dumps(now))
 
 
 if __name__ == "__main__":
