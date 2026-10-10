@@ -158,6 +158,70 @@ say which one is real.
 - **Default:** `null`
 - **Example:** `"63CA1C4C81D775E24288780D17344942"`
 
+### `famidrive.players.<name>.nexusmods.apiKeyFile`
+
+Their Nexus Mods personal API key (nexusmods.com, Site
+preferences, API Keys), for an account with premium.
+
+- **Type:** null or absolute path
+- **Default:** their sops secret, `<name>/nexusmods`
+
+### `famidrive.players.<name>.nexusmods.games`
+
+Collections to download for their Steam games, by Steam app
+id. Downloaded in the background into their cache
+(~/.cache/famidrive/nexusmods), each file checked against the
+collection's checksum, with a plan of where each file goes in
+the game's folder. Nothing is installed in the game yet.
+
+- **Type:** attribute set of (submodule)
+- **Default:** `{ }`
+- **Example:** `{ "1091500".collection = { slug = "iszwwe"; revision = 481; }; }   # Cyberpunk 2077`
+
+### `famidrive.players.<name>.nexusmods.games.<name>.choices`
+
+Options to pick in mods with an installer (FOMOD) that the
+collection leaves to the player, by mod name: the names of the
+options, as the installer shows them. Unset, each installer's
+own default (its first option, when one must be picked).
+
+- **Type:** attribute set of list of string
+- **Default:** `{ }`
+- **Example:** 
+
+  ```nix
+  {
+    "WTNC Config" = [
+      "Cyberpunk THING"
+    ];
+  }
+  ```
+
+### `famidrive.players.<name>.nexusmods.games.<name>.collection`
+
+The collection (modpack) for this game.
+
+- **Type:** submodule
+- **Default:** none; required when used
+
+### `famidrive.players.<name>.nexusmods.games.<name>.collection.revision`
+
+Which revision of it. Pinned, like a flake input: a curator's
+new revision is only used once it's set here, so a working
+setup doesn't change under a player.
+
+- **Type:** positive integer, meaning >0
+- **Default:** none; required when used
+- **Example:** `481`
+
+### `famidrive.players.<name>.nexusmods.games.<name>.collection.slug`
+
+The collection's id, the last part of its address on nexusmods.com.
+
+- **Type:** string
+- **Default:** none; required when used
+- **Example:** `"iszwwe"`
+
 ### `famidrive.players.<name>.overlays.performance.enable`
 
 MangoHud's performance overlay (frame rate, frame times, CPU and

@@ -373,6 +373,8 @@ bob:
 - `retroachievements`: the player's RetroAchievements password, for
   players with `retroAchievements.username` set.
 - `rpcn`: their RPCN password, only for PS3 with `famidrive.online.enable`.
+- `nexusmods`: their Nexus Mods personal API key, for players with
+  `nexusmods.games` set. Downloading needs a premium Nexus Mods account.
 
 Before 2026-10-10 these were top-level keys (`romm-token-alice`,
 `retroachievements-alice`, `rpcn-password-alice`). Move each under its

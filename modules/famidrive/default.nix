@@ -130,6 +130,7 @@ in
     ./boot.nix
     ./overlays.nix
     ./retroachievements.nix
+    ./nexusmods.nix
     ./settings.nix
     (lib.mkRemovedOptionModule [ "famidrive" "user" ] "Each player is listed in famidrive.players instead: famidrive.players.<name>.user is their Linux account.")
     (lib.mkRemovedOptionModule [ "famidrive" "owner" ] "Each player is listed in famidrive.players instead: famidrive.players.<name>.owner is their RomM username.")

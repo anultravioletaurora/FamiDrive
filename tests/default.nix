@@ -203,6 +203,33 @@ in
   quit = unit "quit" ../pkgs/famidrive-quit/famidrive_quit.py pkgs.python3;
   cheevos = unit "cheevos" ../pkgs/famidrive-cheevos/famidrive_cheevos.py
     (pkgs.python3.withPackages (ps: [ ps.requests ]));
+  nexusmods = unit "nexusmods" ../pkgs/famidrive-nexusmods/famidrive_nexusmods.py
+    (pkgs.python3.withPackages (ps: [ ps.requests ]));
+
+  # Nexus Mods for one player of two: their key, and their collections
+  # downloaded in the background, as them.
+  box-nexusmods = expect "nexusmods" {
+    famidrive = {
+      enable = true;
+      romm.enable = false;
+      guest.enable = true;
+      players.alice.nexusmods.games."1091500" = {
+        collection = { slug = "iszwwe"; revision = 481; };
+        choices."WTNC Config" = [ "Cyberpunk THING" ];
+      };
+      players.bob = { };
+    };
+  } (c: [
+    (check "an API key secret for the player with collections, owned by them, and none for the others"
+      (c.sops.secrets ? "alice/nexusmods" && c.sops.secrets."alice/nexusmods".owner == "alice"
+        && !(c.sops.secrets ? "bob/nexusmods") && !(c.sops.secrets ? "guest/nexusmods")))
+    (check "their collections download and are planned as them, daily, and nobody else's"
+      (let s = c.systemd.services.famidrive-nexusmods-alice.serviceConfig; in
+        s.User == "alice" && lib.length s.ExecStart == 2
+          && lib.hasInfix "famidrive-nexusmods fetch" (lib.head s.ExecStart)
+          && c.systemd.timers ? famidrive-nexusmods-alice
+          && !(c.systemd.services ? famidrive-nexusmods-bob)))
+  ]);
 
   # Overlays: the box's positions, a player's own, MangoHud for one player.
   box-overlays = expect "overlays" {
