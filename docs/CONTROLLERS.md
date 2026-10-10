@@ -786,6 +786,10 @@ Tested on the first box: Ghost Recon Wildlands' EULA, accepted with an
 8BitDo Ultimate 2 (left stick to the Accept button, then A). Steam then
 went on to process the game's shaders.
 
+Steam's own "use a controller with this game" prompt is answered the same
+way, and can be turned off for every game from it. Found on the first
+box 2026-10-10, before Star Wars Jedi: Fallen Order.
+
 ## Typing on the TV
 
 Sign-ins and search boxes are the hardest part of a box with no

@@ -578,14 +578,17 @@ Tracked with the other launchers in #57.
 
 ### Star Wars Jedi: Fallen Order
 
-**Steam: ❔ Untested.** Expect the same EA hurdle as
-[Jedi: Survivor](#star-wars-jedi-survivor): Steam's copy runs the EA app
-first, which installs and asks for a sign-in. FamiDrive shows its windows
-now, but they want a mouse or keyboard.
+**Steam: ✅ Works.** 2026-10-10, on the first box: plays really well.
 
-- **To check:** whether the EA app gets out of the way after the first
-  sign-in, controllers and rumble, and quitting back to ES-DE with the EA
-  app still running behind.
+- **EA app:** Steam's copy runs the EA app first, which wants a sign-in
+  (a mouse or keyboard for now, #119). The account was already signed in
+  from [Jedi: Survivor](#star-wars-jedi-survivor), so it went straight
+  through.
+- **Steam's controller prompt** came up first (a suggestion to use a
+  controller with the game). It was dismissed, and turned off for every
+  game, with the controller as a mouse ([Steam's prompts](CONTROLLERS.md#steams-prompts)).
+- **To check:** rumble, and quitting back to ES-DE with the EA app still
+  running behind.
 
 ### Star Wars Jedi: Survivor
 
