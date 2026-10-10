@@ -1220,6 +1220,81 @@ def ini_merge(base, tweaks):
     return "\n".join(out) + "\n"
 
 
+def screen_size():
+    """The TV's preferred mode, from the kernel: the first mode of the
+    first connected output (no display server needed). 1920x1080 when
+    there's none."""
+    for status in sorted(Path("/sys/class/drm").glob("card*-*/status")):
+        try:
+            if status.read_text().strip() != "connected":
+                continue
+            w, h = (status.parent / "modes").read_text().split()[0].split("x")
+            return int(w), int(h.rstrip("i"))
+        except (OSError, IndexError, ValueError):
+            continue
+    return 1920, 1080
+
+
+def nv_inis(root, profile, screen):
+    """{name: text} of New Vegas's INIs (My Games/FalloutNV): the profile's,
+    with what the game needs to start on a TV through gamescope.
+
+    FalloutPrefs.ini is made the way Bethesda's launcher makes it on its
+    first run: the game's defaults (Fallout_default.ini) and its Very High
+    preset, under the profile's own settings. Found on the first box
+    2026-10-10: NakeyJakey's profile has only three of its sections, and
+    with no [Display] the game took itself for set up on other hardware:
+    it starts the launcher and exits at "Initializing Renderer" (with the
+    launcher swapped for the game, over and over) when its
+    uVideoDeviceIdentifierPart keys don't match the graphics card's
+    identifier. DXVK's is all zeros, which the launcher recorded.
+
+    Over every INI: windowed at the screen's size (gamescope shows it full
+    screen), no MSAA (New Vegas Reloaded wants it off), and the controller
+    on (the profile turns it off, for a mouse and keyboard)."""
+    def text(path):
+        f = resolve(root, path) if root else None
+        return f.read_text(errors="replace") if f and f.exists() else ""
+    w, h = screen
+    display = "[Display]\nbFull Screen=0\niMultiSample=0\n"
+    out = {}
+    for src, name in (("fallout.ini", "Fallout.ini"), ("falloutcustom.ini", "FalloutCustom.ini")):
+        if (profile / src).exists():
+            t = (profile / src).read_text(errors="replace")
+            if name == "Fallout.ini" and (profile / "initweaks.ini").exists():
+                t = ini_merge(t, (profile / "initweaks.ini").read_text(errors="replace"))
+            out[name] = ini_merge(t, display)
+    prefs = ini_merge(text("Fallout_default.ini"), text("VeryHigh.ini"))
+    if (profile / "falloutprefs.ini").exists():
+        prefs = ini_merge(prefs, (profile / "falloutprefs.ini").read_text(errors="replace"))
+    ids = "".join(f"uVideoDeviceIdentifierPart{i}=0\n" for i in range(1, 5))
+    ours = f"{display}{ids}iSize W={w}\niSize H={h}\n[Interface]\nbDisable360Controller=0\n"
+    out["FalloutPrefs.ini"] = ini_merge(prefs, ours)
+    return out
+
+
+NV_REG_KEY = "[Software\\\\Wow6432Node\\\\Bethesda Softworks\\\\FalloutNV]"
+
+
+def nv_registry(prefix, root):
+    """The one registry value GOG's install script sets
+    (HKLM\\Software\\Bethesda Softworks\\FalloutNV, Installed Path: the game's
+    folder), when the prefix doesn't have it. Heroic hadn't set it on the
+    first box. Written into the prefix's system.reg while Wine isn't
+    running there (the game isn't). True when it was added."""
+    reg = Path(prefix) / "system.reg"
+    try:
+        text = reg.read_text(errors="replace")
+    except OSError:
+        return False
+    if NV_REG_KEY.lower() in text.lower():
+        return False
+    folder = ("Z:" + str(root).replace("/", "\\") + "\\").replace("\\", "\\\\")   # escaped, as .reg files are
+    with open(reg, "a") as f:
+        f.write(f'\n{NV_REG_KEY} {int(time.time())}\n"Installed Path"="{folder}"\n')
+    return True
+
+
 # An empty BSA (version 104: Fallout 3 and New Vegas), for the profile's
 # "Fallout - Invalidation.bsa", which MO2 makes so loose files win over
 # the game's own archives.
@@ -1270,13 +1345,10 @@ def newvegas(record, root, prefix, profile, extras, nx, cache):
         raise RuntimeError("no prefix for the game yet: start it once, then rebuild")
     user = windows_user(prefix)
     docs = user / "Documents/My Games/FalloutNV"
-    tweaks = (profile / "initweaks.ini").read_text(errors="replace") if (profile / "initweaks.ini").exists() else ""
-    for src, name in (("fallout.ini", "Fallout.ini"), ("falloutprefs.ini", "FalloutPrefs.ini"), ("falloutcustom.ini", "FalloutCustom.ini")):
-        if (profile / src).exists():
-            text = (profile / src).read_text(errors="replace")
-            if name == "Fallout.ini" and tweaks:
-                text = ini_merge(text, tweaks)
-            place_outside(record, docs / name, text.encode())
+    for name, text in nv_inis(root, profile, screen_size()).items():
+        place_outside(record, docs / name, text.encode())
+    if nv_registry(prefix, root):
+        log("newvegas: set the game's Installed Path in its prefix")
     plugins = (profile / "plugins.txt").read_bytes()
     place_outside(record, user / "AppData/Local/FalloutNV/plugins.txt", plugins)
     # Plugin order by date, from loadorder.txt.

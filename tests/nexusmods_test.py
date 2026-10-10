@@ -401,6 +401,54 @@ class Heroic(unittest.TestCase):
 
 
 class NewVegas(unittest.TestCase):
+    def nv_game(self, d):
+        root, profile = d / "game", d / "profile"
+        root.mkdir()
+        profile.mkdir()
+        (root / "Fallout_default.ini").write_text("[General]\nsLanguage=ENGLISH\n[Display]\niSize W=640\niSize H=480\nbFull Screen=1\n[Interface]\nbDisable360Controller=0\n")
+        (root / "VeryHigh.ini").write_text("[Display]\niMultiSample=4\niShadowMapResolution=1024\n")
+        (profile / "falloutprefs.ini").write_text("[Controls]\nbGamePadRumble=1\n[Interface]\nbDisable360Controller=1\n")
+        (profile / "fallout.ini").write_text("[Display]\nbFull Screen=1\niMultiSample=0\n[Archive]\nbInvalidateOlderFiles=0\n")
+        (profile / "falloutcustom.ini").write_text("[Display]\nbFull Screen=1\n")
+        (profile / "initweaks.ini").write_text("[Archive]\nbInvalidateOlderFiles=1\n")
+        return root, profile
+
+    def test_prefs_made_as_the_launcher_would(self):
+        with tempfile.TemporaryDirectory() as d:
+            root, profile = self.nv_game(Path(d))
+            inis = m.nv_inis(root, profile, (3840, 2160))
+            prefs = inis["FalloutPrefs.ini"]
+            for line in ("sLanguage=ENGLISH", "iShadowMapResolution=1024", "bGamePadRumble=1",
+                         "iSize W=3840", "iSize H=2160", "bFull Screen=0", "iMultiSample=0",
+                         "uVideoDeviceIdentifierPart1=0", "uVideoDeviceIdentifierPart4=0",
+                         "bDisable360Controller=0"):
+                self.assertIn(line, prefs.splitlines())
+            self.assertNotIn("iSize W=640", prefs)
+            self.assertIn("bInvalidateOlderFiles=1", inis["Fallout.ini"])
+            for name in ("Fallout.ini", "FalloutCustom.ini"):
+                self.assertIn("bFull Screen=0", inis[name].splitlines())
+                self.assertNotIn("bFull Screen=1", inis[name])
+
+    def test_installed_path_once(self):
+        with tempfile.TemporaryDirectory() as d:
+            prefix = Path(d)
+            (prefix / "system.reg").write_text("WINE REGISTRY Version 2\n")
+            self.assertTrue(m.nv_registry(prefix, "/home/a/Games/Fallout New Vegas"))
+            self.assertFalse(m.nv_registry(prefix, "/home/a/Games/Fallout New Vegas"))
+            text = (prefix / "system.reg").read_text()
+            self.assertEqual(text.count("Bethesda Softworks"), 1)
+            self.assertIn("[Software\\\\Wow6432Node\\\\Bethesda Softworks\\\\FalloutNV]", text)
+            self.assertIn('"Installed Path"="Z:\\\\home\\\\a\\\\Games\\\\Fallout New Vegas\\\\"', text)
+
+    def test_no_registry_without_a_prefix(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertFalse(m.nv_registry(Path(d), "/x"))
+
+    def test_screen_size_has_a_fallback(self):
+        w, h = m.screen_size()
+        self.assertGreater(w, 0)
+        self.assertGreater(h, 0)
+
     def test_ini_tweaks_merge(self):
         base = "[Archive]\nbInvalidateOlderFiles=0\nSArchiveList=a.bsa\n[Display]\niSize W=1280\n"
         out = m.ini_merge(base, "[Archive]\nbInvalidateOlderFiles=1\n[General]\nsLanguage=ENGLISH\n")
