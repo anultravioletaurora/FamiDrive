@@ -810,9 +810,10 @@ How controllers reach the emulators. Per-controller results are in [CONTROLLERS.
 
 ### `famidrive.controllers.bluetoothPairing`
 
-"Pair a Controller" in Settings, and a "Forget" entry for each
-paired controller: Bluetooth pairing from the couch, with no SSH.
-The entries appear only on a box with a Bluetooth adapter.
+A Controllers system with "Pair a Controller" (always first), and a
+"Forget" entry for each paired controller: Bluetooth pairing from
+the couch, with no SSH. The entries appear only on a box with a
+Bluetooth adapter (ES-DE hides a system with nothing in it).
 
 - **Type:** boolean
 - **Default:** `true`

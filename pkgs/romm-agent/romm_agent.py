@@ -784,13 +784,14 @@ def link_switch_mods():
 
 # Running in famidrive-launch, these aren't games: the pull doesn't wait
 # for a film to end.
-NOT_GAMES = {"media", "settings"}
+NOT_GAMES = {"media", "settings", "controllers"}
 
 
 def game_running():
     """Whether any player is in a game: a famidrive-launch process for a
-    system that isn't Media or Settings. Read from /proc, since the pull
-    runs as its own account and can't see players' runtime folders."""
+    system that isn't Media, Settings or Controllers. Read from /proc,
+    since the pull runs as its own account and can't see players' runtime
+    folders."""
     for cmdline in Path("/proc").glob("[0-9]*/cmdline"):
         try:
             args = cmdline.read_bytes().split(b"\0")
