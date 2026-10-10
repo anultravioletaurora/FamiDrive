@@ -18,6 +18,31 @@ let
   ];
   kinds = types.enum [ "notice" "alert" "progress" "achievement" ];
 
+  # What the performance overlay can show, by FamiDrive's name, and the
+  # MangoHud settings for each (MangoHud 0.8; with legacy_layout off it
+  # shows exactly these, in this order).
+  stats = {
+    fps = [ "fps" ];
+    frametime = [ "frametime" "frame_timing" ];   # the number, then its graph
+    cpu = [ "cpu_stats" ];                        # CPU load, %
+    cpu_temp = [ "cpu_temp" ];
+    gpu = [ "gpu_stats" ];                        # GPU load, %
+    gpu_temp = [ "gpu_temp" ];
+    ram = [ "ram" ];                              # memory in use
+    vram = [ "vram" ];                            # graphics memory in use
+  };
+  stat = types.enum (lib.attrNames stats);
+  value = types.oneOf [ types.bool types.int types.float types.str ];
+
+  mangohudConf = perf: lib.concatStringsSep "\n" ([
+    "legacy_layout=0"
+    "position=${perf.position}"
+  ] ++ lib.concatMap (s: stats.${s}) perf.show
+    ++ lib.optionals (perf.layout == "row") [ "horizontal" "horizontal_stretch=0" "hud_compact" ]
+    ++ [ "background_alpha=0.4" "round_corners=8" ]
+    ++ lib.mapAttrsToList (k: v: if v == true then k else if v == false then "${k}=0" else "${k}=${toString v}") perf.settings
+  ) + "\n";
+
   # The box's options, or (player = true) a player's, where null means
   # "the box's".
   overlayOptions = player:
@@ -44,6 +69,21 @@ let
           session.
         '';
         position = opt position "middle-left" "Where the performance overlay shows up.";
+        show = opt (types.listOf stat) [ "fps" "frametime" "gpu" "gpu_temp" "cpu" "cpu_temp" "ram" "vram" ] ''
+          What it shows, in this order: `"fps"` (frame rate), `"frametime"`
+          (frame time, and its graph), `"cpu"` and `"gpu"` (load, in
+          percent), `"cpu_temp"` and `"gpu_temp"`, `"ram"` and `"vram"`
+          (memory and graphics memory in use).
+        '';
+        layout = opt (types.enum [ "column" "row" ]) "column" ''
+          `"column"`: one stat under another. `"row"`: all of them on one
+          line, a bar along the edge it's placed at.
+        '';
+        settings = opt (types.attrsOf value) { } ''
+          Any other MangoHud setting, by its name in MangoHud.conf, over
+          FamiDrive's: `true` turns one on, `false` off, anything else is
+          its value. For example `{ font_size = 20; background_alpha = 0.2; }`.
+        '';
       };
     };
 
@@ -54,7 +94,7 @@ let
           if v == null then cfg.overlays.${section}.${name} else v;
     in {
       toasts = { position = pick "toasts" "position"; hide = pick "toasts" "hide"; };
-      performance = { enable = pick "performance" "enable"; position = pick "performance" "position"; };
+      performance = lib.genAttrs [ "enable" "position" "show" "layout" "settings" ] (pick "performance");
     };
 
   toastSpec = pkgs.writeText "famidrive-toast.json" (builtins.toJSON {
@@ -105,20 +145,7 @@ in
     famidrive.playerHome = { famidrivePlayer, ... }:
       let perf = (resolve famidrivePlayer).performance; in
       lib.mkIf perf.enable {
-        xdg.configFile."MangoHud/MangoHud.conf".text = ''
-          position=${perf.position}
-          fps
-          frametime
-          frame_timing
-          gpu_stats
-          gpu_temp
-          cpu_stats
-          cpu_temp
-          ram
-          vram
-          background_alpha=0.4
-          round_corners=8
-        '';
+        xdg.configFile."MangoHud/MangoHud.conf".text = mangohudConf perf;
       };
   };
 }

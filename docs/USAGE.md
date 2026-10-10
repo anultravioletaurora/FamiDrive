@@ -232,11 +232,38 @@ session.
 - **Type:** null or boolean
 - **Default:** the box's (`famidrive.overlays`)
 
+### `famidrive.players.<name>.overlays.performance.layout`
+
+`"column"`: one stat under another. `"row"`: all of them on one
+line, a bar along the edge it's placed at.
+
+- **Type:** null or one of "column", "row"
+- **Default:** the box's (`famidrive.overlays`)
+
 ### `famidrive.players.<name>.overlays.performance.position`
 
 Where the performance overlay shows up.
 
 - **Type:** null or one of "top-left", "top-center", "top-right", "middle-left", "middle-right", "bottom-left", "bottom-center", "bottom-right"
+- **Default:** the box's (`famidrive.overlays`)
+
+### `famidrive.players.<name>.overlays.performance.settings`
+
+Any other MangoHud setting, by its name in MangoHud.conf, over
+FamiDrive's: `true` turns one on, `false` off, anything else is
+its value. For example `{ font_size = 20; background_alpha = 0.2; }`.
+
+- **Type:** null or (attribute set of (boolean or signed integer or floating point number or string))
+- **Default:** the box's (`famidrive.overlays`)
+
+### `famidrive.players.<name>.overlays.performance.show`
+
+What it shows, in this order: `"fps"` (frame rate), `"frametime"`
+(frame time, and its graph), `"cpu"` and `"gpu"` (load, in
+percent), `"cpu_temp"` and `"gpu_temp"`, `"ram"` and `"vram"`
+(memory and graphics memory in use).
+
+- **Type:** null or (list of (one of "cpu", "cpu_temp", "fps", "frametime", "gpu", "gpu_temp", "ram", "vram"))
 - **Default:** the box's (`famidrive.overlays`)
 
 ### `famidrive.players.<name>.overlays.toasts.hide`
@@ -1644,12 +1671,52 @@ session.
 - **Type:** boolean
 - **Default:** `false`
 
+### `famidrive.overlays.performance.layout`
+
+`"column"`: one stat under another. `"row"`: all of them on one
+line, a bar along the edge it's placed at.
+
+- **Type:** one of "column", "row"
+- **Default:** `"column"`
+
 ### `famidrive.overlays.performance.position`
 
 Where the performance overlay shows up.
 
 - **Type:** one of "top-left", "top-center", "top-right", "middle-left", "middle-right", "bottom-left", "bottom-center", "bottom-right"
 - **Default:** `"middle-left"`
+
+### `famidrive.overlays.performance.settings`
+
+Any other MangoHud setting, by its name in MangoHud.conf, over
+FamiDrive's: `true` turns one on, `false` off, anything else is
+its value. For example `{ font_size = 20; background_alpha = 0.2; }`.
+
+- **Type:** attribute set of (boolean or signed integer or floating point number or string)
+- **Default:** `{ }`
+
+### `famidrive.overlays.performance.show`
+
+What it shows, in this order: `"fps"` (frame rate), `"frametime"`
+(frame time, and its graph), `"cpu"` and `"gpu"` (load, in
+percent), `"cpu_temp"` and `"gpu_temp"`, `"ram"` and `"vram"`
+(memory and graphics memory in use).
+
+- **Type:** list of (one of "cpu", "cpu_temp", "fps", "frametime", "gpu", "gpu_temp", "ram", "vram")
+- **Default:** 
+
+  ```nix
+  [
+    "fps"
+    "frametime"
+    "gpu"
+    "gpu_temp"
+    "cpu"
+    "cpu_temp"
+    "ram"
+    "vram"
+  ]
+  ```
 
 ### `famidrive.overlays.toasts.hide`
 

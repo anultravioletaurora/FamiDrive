@@ -244,16 +244,26 @@ in
         toasts = { position = "bottom-right"; hide = [ "progress" ]; };
         performance = { enable = true; position = "top-right"; };
       };
-      players.bob = { };
+      players.bob.overlays.performance = {
+        enable = true;
+        layout = "row";
+        show = [ "fps" "cpu" "gpu" "ram" "vram" ];
+        settings = { font_size = 20; frame_timing = false; };
+      };
     };
   } (c: let r = c.famidrive.overlays.resolved; in [
     (check "a player's own toast position and hidden kinds, the box's for the rest"
       (r.alice.toasts == { position = "bottom-right"; hide = [ "progress" ]; }
         && r.bob.toasts.position == "top-left" && r.guest.toasts.position == "top-left"))
-    (check "MangoHud only for the player who turned it on, where they put it"
-      (r.alice.performance.enable && !r.bob.performance.enable
+    (check "MangoHud only for the players who turned it on, where they put it"
+      (r.alice.performance.enable && !(r.guest.performance.enable)
         && lib.hasInfix "position=top-right" c.home-manager.users.alice.xdg.configFile."MangoHud/MangoHud.conf".text
-        && !(c.home-manager.users.bob.xdg.configFile ? "MangoHud/MangoHud.conf")))
+        && !(c.home-manager.users.guest.xdg.configFile ? "MangoHud/MangoHud.conf")))
+    (check "a player's own stats in one row, in their order, with their own settings"
+      (let conf = c.home-manager.users.bob.xdg.configFile."MangoHud/MangoHud.conf".text; in
+        lib.hasInfix "fps\ncpu_stats\ngpu_stats\nram\nvram\nhorizontal" conf
+          && !(lib.hasInfix "gpu_temp" conf) && lib.hasInfix "font_size=20" conf
+          && lib.hasInfix "frame_timing=0" conf && lib.hasInfix "legacy_layout=0" conf))
     (check "the toast daemon starts with every session"
       (lib.hasInfix "famidrive-toast daemon" c.famidrive.sessionSetup
         && lib.any (p: lib.getName p == "famidrive-toast") c.environment.systemPackages))
