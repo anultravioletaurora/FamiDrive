@@ -778,9 +778,11 @@ one (`famidrive-padmouse`):
 | Start | Enter (not while Select is held: Select + Start still quits) |
 
 It switches off once the prompt is answered, so the game gets the pad to
-itself. Windows installers that run before a game (Rockstar's, the EA app)
-are a different case: Proton's own helper already lets a controller move
-between their buttons.
+itself. It's also on while a game's first-time setup runs (Rockstar's
+launcher, the EA app's installer): some of those take a controller's
+focus moves, but the EA app's installer for Star Wars Jedi: Survivor kept
+its focus on the close button, so its "Let's Go" needs the pointer
+(left stick to it, then A).
 
 Tested on the first box: Ghost Recon Wildlands' EULA, accepted with an
 8BitDo Ultimate 2 (left stick to the Accept button, then A). Steam then
