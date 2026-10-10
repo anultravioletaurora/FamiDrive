@@ -302,6 +302,11 @@ DLC, on GE-Proton7-50 (Heroic's choice).
   shows windows from anything the launch started, and Heroic launches get
   the status screen ("Setting up the game", with the runtimes' download
   as a bar, then "Starting").
+- **In the menu:** it showed up in a GOG system of its own, with the
+  theme's fallback art (Art Book Next has none for GOG), named
+  "Fallout_ New Vegas Ultimate Edition" (a file name can't have a ":"),
+  with no details. Heroic's games are now Desktop entries, named and
+  described from Heroic's store cache, with its cover and background.
 
 - **Mods:** NakeyJakey's New Vegas, a Wabbajack list of 336 mods, as a
   Nexus Mods collection (`ezlocx`) through FamiDrive (#166,

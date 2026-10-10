@@ -1,18 +1,24 @@
 """famidrive-generate LANE SOURCE_DIR OUT_DIR
-famidrive-generate heroic HEROIC_CONFIG_DIR ROMS_DIR
+famidrive-generate heroic HEROIC_CONFIG_DIR DESKTOP_DIR
 famidrive-generate steam-media STEAMAPPS_DIR OUT_DIR
+famidrive-generate heroic-media HEROIC_CONFIG_DIR DESKTOP_DIR
 
 Rewrite OUT_DIR so it holds exactly one placeholder per installed game in
 SOURCE_DIR. Each placeholder's *content* is the launch ID that famidrive-launch
 hands to the real launcher. Its filename is the display name ES-DE shows.
 
-heroic writes one folder per store Heroic Games Launcher brings (gog,
-epic, amazon) under ROMS_DIR, each with its installed games.
+heroic writes the installed games of each store Heroic Games Launcher
+brings into the Desktop system's folder, one extension per store (.gog,
+.epic, .amazon).
 
 steam-media gives those Steam placeholders Steam's own art and details,
 by app ID: the cover, logo and hero image Steam keeps on disk for its
 library (fetched from Steam's CDN when it hasn't), and the description,
 developer, publisher, genres and release date from the Steam store.
+
+heroic-media does the same for Heroic's games, from Heroic's own store
+cache: the store's name for the game (a file name can't have a ":"), its
+description, developer and genres, and its cover and background images.
 """
 
 import json
@@ -209,16 +215,16 @@ def library_image(steamapps, appid, names):
     return None
 
 
-def put_media(kind, stem, data, ext):
-    """One image into ES-DE's media folder for Steam. Art already there
-    for the game (scraped before) is moved to
-    downloaded_media-before-steam, not deleted."""
-    folder = ESDE / "downloaded_media/steam" / kind
+def put_media(kind, stem, data, ext, system="steam"):
+    """One image into ES-DE's media folder for a system (Steam's, or
+    Desktop's for Heroic's games). Art already there for the game (scraped
+    before) is moved to downloaded_media-before-steam, not deleted."""
+    folder = ESDE / "downloaded_media" / system / kind
     folder.mkdir(parents=True, exist_ok=True)
     dest = folder / (stem + ext)
     for old in folder.glob(glob_escape(stem) + ".*"):
         if not old.name.endswith(".part"):
-            aside = ESDE / "downloaded_media-before-steam/steam" / kind
+            aside = ESDE / "downloaded_media-before-steam" / system / kind
             aside.mkdir(parents=True, exist_ok=True)
             old.rename(aside / old.name)
     tmp = dest.with_name(dest.name + ".part")
@@ -261,7 +267,7 @@ def steam_media(steamapps, out):
     CACHE.mkdir(parents=True, exist_ok=True)
     state_file.write_text(json.dumps(state, indent=2))
     gamelist = ESDE / "gamelists/steam/gamelist.xml"
-    merged = merge_steam_gamelist(gamelist, fields)
+    merged = merge_gamelist(gamelist, {f"{stem}.steam": f for stem, f in fields.items()}, FROM_STEAM)
     if merged is not None:
         gamelist.parent.mkdir(parents=True, exist_ok=True)
         tmp = gamelist.with_name("gamelist.xml.part")
@@ -269,24 +275,24 @@ def steam_media(steamapps, out):
         tmp.rename(gamelist)
 
 
-def merge_steam_gamelist(gamelist, fields):
-    """The player's Steam gamelist with Steam's fields set for each game:
-    Steam has the say on what a game is, the player on how they've played
-    it. None when nothing changed."""
+def merge_gamelist(gamelist, fields, keys):
+    """A player's game list with the store's fields (keys) set for each
+    entry, by file name: the store has the say on what a game is, the
+    player on how they've played it. None when nothing changed."""
     try:
         root = ET.parse(gamelist).getroot()
     except (OSError, ET.ParseError):
         root = ET.Element("gameList")
     by_path = {g.findtext("path"): g for g in root.findall("game")}
     changed = False
-    for stem, f in sorted(fields.items()):
-        path = f"./{stem}.steam"
+    for filename, f in sorted(fields.items()):
+        path = f"./{filename}"
         game = by_path.get(path)
         if game is None:
             game = ET.SubElement(root, "game")
             ET.SubElement(game, "path").text = path
             changed = True
-        for tag in FROM_STEAM:
+        for tag in keys:
             el = game.find(tag)
             if tag not in f:
                 continue
@@ -301,16 +307,116 @@ def merge_steam_gamelist(gamelist, fields):
     return b'<?xml version="1.0"?>\n' + ET.tostring(root, encoding="utf-8") + b"\n"
 
 
+# ---------------------------------------------------------------- Heroic's art
+
+# ES-DE's media folder -> Heroic's image for the game, from its store
+# cache: a portrait cover (art_square), the wide one (art_cover), the
+# background. GOG's images server sends any of its images as JPEG when
+# asked for .jpg (some are WebP).
+HEROIC_ART = {"covers": "art_square", "screenshots": "art_cover",
+              "fanart": "art_background", "marquees": "art_logo"}
+FROM_HEROIC = ("name", "desc", "developer", "genre")
+
+
+def cut_description(text, limit=1200):
+    text = html_text(text)
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    end = max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
+    return cut[:end + 1] if end > limit // 2 else cut + "…"
+
+
+def heroic_fields(game):
+    extra = game.get("extra") or {}
+    about = extra.get("about") or {}
+    fields = {"name": game.get("title") or "",
+              "desc": cut_description(about.get("description") or about.get("shortDescription")
+                                      or game.get("description") or ""),
+              "developer": game.get("developer") or "",
+              "genre": ", ".join(g for g in extra.get("genres") or [] if isinstance(g, str))}
+    return {k: v.strip() for k, v in fields.items() if v and v.strip()}
+
+
+def image_url(url):
+    if "images.gog.com/" in url:
+        url = re.sub(r"\.(webp|png)(?=$|\?)", ".jpg", url)
+    return url
+
+
+def heroic_media(src, out):
+    """Heroic's names, details and art for every Heroic entry in out (the
+    Desktop folder)."""
+    fields = {}
+    for store, (_, cache, key) in HEROIC_STORES.items():
+        library = read_json(src / "store_cache" / f"{cache}.json") or {}
+        games = {str(g.get("app_name")): g for g in library.get(key) or [] if isinstance(g, dict)}
+        for entry in sorted(out.glob(f"*.{store}")):
+            game = games.get(entry.read_text().strip())
+            if not game:
+                continue
+            fields[entry.name] = heroic_fields(game)
+            for kind, k in HEROIC_ART.items():
+                url = game.get(k)
+                if not url or any((ESDE / "downloaded_media/desktop" / kind).glob(glob_escape(entry.stem) + ".*")):
+                    continue
+                try:
+                    data = fetch(image_url(url))
+                except OSError:
+                    continue   # next run
+                put_media(kind, entry.stem, data, ".png" if data[:4] == b"\x89PNG" else ".jpg", "desktop")
+    gamelist = ESDE / "gamelists/desktop/gamelist.xml"
+    merged = merge_gamelist(gamelist, fields, FROM_HEROIC)
+    if merged is not None:
+        gamelist.parent.mkdir(parents=True, exist_ok=True)
+        tmp = gamelist.with_name("gamelist.xml.part")
+        tmp.write_bytes(merged)
+        tmp.rename(gamelist)
+
+
+def heroic_moved(roms):
+    """Heroic's games were one system per store (gog, epic, amazon) until
+    2026-10-10, now Desktop entries: the old placeholders go, and each
+    store's game list entries (play counts, favorites) join Desktop's."""
+    desktop = ESDE / "gamelists/desktop/gamelist.xml"
+    for store in HEROIC_STORES:
+        for old in (roms / store).glob(f"*.{store}"):
+            old.unlink()
+        old_list = ESDE / "gamelists" / store / "gamelist.xml"
+        try:
+            games = ET.parse(old_list).getroot().findall("game")
+        except (OSError, ET.ParseError):
+            continue
+        try:
+            root = ET.parse(desktop).getroot()
+        except (OSError, ET.ParseError):
+            root = ET.Element("gameList")
+        have = {g.findtext("path") for g in root.findall("game")}
+        for g in games:
+            if g.findtext("path") not in have:
+                root.append(g)
+        ET.indent(root, space="\t")
+        desktop.parent.mkdir(parents=True, exist_ok=True)
+        desktop.write_bytes(b'<?xml version="1.0"?>\n' + ET.tostring(root, encoding="utf-8") + b"\n")
+        old_list.rename(old_list.with_name("gamelist.xml.moved-to-desktop"))
+
+
 def main():
     if sys.argv[1] == "steam-media":
         started = time.monotonic()
         steam_media(Path(sys.argv[2]), Path(sys.argv[3]))
         print(f"Steam art and details: {time.monotonic() - started:.0f} s", file=sys.stderr)
         return
+    if sys.argv[1] == "heroic-media":
+        started = time.monotonic()
+        heroic_media(Path(sys.argv[2]), Path(sys.argv[3]))
+        print(f"Heroic art and details: {time.monotonic() - started:.0f} s", file=sys.stderr)
+        return
     lane, src, out = sys.argv[1], Path(sys.argv[2]), Path(sys.argv[3])
     if lane == "heroic":
+        heroic_moved(out.parent)
         for store in HEROIC_STORES:
-            write_placeholders(out / store, "." + store, heroic(src, store))
+            write_placeholders(out, "." + store, heroic(src, store))
         return
     reader, ext = LANES[lane]
     write_placeholders(out, ext, reader(src))
