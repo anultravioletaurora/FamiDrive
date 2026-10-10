@@ -8,6 +8,7 @@ import importlib.util
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 SCRIPT = Path(sys.argv.pop(1)).resolve()
@@ -74,6 +75,36 @@ class Entries(unittest.TestCase):
                              ["Forget DualShock 4.setting", "Pair a Controller.setting", "Steam Settings.setting"])
             m.write_entries(d, m.plan_entries(False, []))
             self.assertEqual([p.name for p in d.iterdir()], ["Steam Settings.setting"])
+
+    def test_pair_first_in_a_new_list(self):
+        with tempfile.TemporaryDirectory() as d:
+            g = Path(d) / "gamelists/controllers/gamelist.xml"
+            m.pair_first(g)
+            game = ET.parse(g).getroot().find("game")
+            self.assertEqual(game.findtext("path"), "./Pair a Controller.setting")
+            self.assertEqual(game.findtext("sortname"), "0")
+
+    def test_pair_first_keeps_what_es_de_wrote(self):
+        with tempfile.TemporaryDirectory() as d:
+            g = Path(d) / "gamelist.xml"
+            g.write_text('<?xml version="1.0"?><gameList>'
+                         '<game><path>./Pair a Controller.setting</path><name>Pair a Controller</name><playcount>3</playcount></game>'
+                         '<game><path>./Forget DualSense.setting</path><name>Forget DualSense</name></game>'
+                         '</gameList>')
+            m.pair_first(g)
+            m.pair_first(g)
+            games = ET.parse(g).getroot().findall("game")
+            self.assertEqual(len(games), 2)
+            self.assertEqual(games[0].findtext("playcount"), "3")
+            self.assertEqual([s.text for s in games[0].findall("sortname")], ["0"])
+            self.assertIsNone(games[1].find("sortname"))
+
+    def test_pair_first_leaves_an_unreadable_list(self):
+        with tempfile.TemporaryDirectory() as d:
+            g = Path(d) / "gamelist.xml"
+            g.write_text("<gameList><game>")
+            m.pair_first(g)
+            self.assertEqual(g.read_text(), "<gameList><game>")
 
 
 if __name__ == "__main__":

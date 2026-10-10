@@ -380,10 +380,13 @@ in
         && lib.hasInfix "XDG_CURRENT_DESKTOP=FamiDrive" c.famidrive.systems.settings.command
         && lib.hasInfix "watch-comet" c.famidrive.systems.gog.before
         && !(lib.hasInfix "watch-comet" c.famidrive.systems.epic.before)))
-    (check "Bluetooth pairing in Settings: entries written each session, pair and forget launch"
+    (check "Bluetooth pairing in Controllers, not Settings: entries written each session (old ones cleared from Settings), pair and forget launch"
       (lib.hasInfix "famidrive-bluetooth entries" c.famidrive.sessionSetup
-        && lib.hasInfix "famidrive-bluetooth pair" c.famidrive.systems.settings.command
-        && lib.hasInfix "famidrive-bluetooth forget" c.famidrive.systems.settings.command))
+        && lib.hasInfix "/roms/controllers" c.famidrive.sessionSetup
+        && c.famidrive.systems.controllers.theme == "_default"
+        && lib.hasInfix "famidrive-bluetooth pair" c.famidrive.systems.controllers.command
+        && lib.hasInfix "famidrive-bluetooth forget" c.famidrive.systems.controllers.command
+        && !(lib.hasInfix "famidrive-bluetooth" c.famidrive.systems.settings.command)))
     (check "RetroArch and Dolphin games have the unlock watcher; Eden's don't"
       (lib.hasInfix "famidrive-cheevos" c.famidrive.systems.psx.before
         && lib.hasInfix "--log-file" c.famidrive.systems.n64.command

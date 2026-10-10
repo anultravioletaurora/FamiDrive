@@ -1,16 +1,20 @@
 """famidrive-bluetooth: pair and forget Bluetooth controllers from the couch.
 
-    famidrive-bluetooth entries DIR     Settings entries for this box (session start)
+    famidrive-bluetooth entries DIR [OLD...]
+                                        Controllers entries for this box (session start)
     famidrive-bluetooth pair [SECONDS]  find a controller in pairing mode and pair it
     famidrive-bluetooth forget ADDRESS  forget a paired controller
 
-No screens of its own: the entries are ES-DE games in the Settings system,
+No screens of its own: the entries are ES-DE games in the Controllers system,
 drawn by the player's theme like any other, and what happens while pairing
 shows as toasts (famidrive-toast), also in the theme's look.
 
 `entries` writes "Pair a Controller" and one "Forget <name>" per paired
-controller into DIR (the player's Settings folder), each a .setting file
-holding what settings.nix runs for it, and removes its old ones. A box
+controller into DIR (the player's Controllers folder), each a .setting
+file holding what settings.nix runs for it, and removes its old ones,
+there and in each OLD folder (Settings, where they used to be). Pairing
+is always the first entry, by its Sort name in ES-DE's game list for the
+folder (~/ES-DE/gamelists/<folder's name>/gamelist.xml). A box
 with no Bluetooth adapter gets none, so the entries only show where
 pairing can work. ES-DE reads the folder when it starts, so a controller
 paired or forgotten changes the list from the next session.
@@ -28,6 +32,7 @@ import re
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 BLUEZ = "org.bluez"
@@ -95,7 +100,7 @@ def safe(name):
 
 
 def plan_entries(has_adapter, paired):
-    """{file name: contents} for the Settings folder. `paired` is a list
+    """{file name: contents} for the Controllers folder. `paired` is a list
     of (address, name) for paired controllers, in order."""
     if not has_adapter:
         return {}
@@ -123,6 +128,36 @@ def write_entries(folder, planned):
         p = folder / name
         if not p.exists() or p.read_text() != what:
             p.write_text(what)
+
+
+def pair_first(gamelist):
+    """Gives Pair a Controller the Sort name "0" in ES-DE's game list, so
+    it's first whatever's paired. ES-DE keeps the list's other entries
+    (play counts) itself; one it can't read is left alone."""
+    gamelist = Path(gamelist)
+    path = f"./{PAIR_ENTRY}.setting"
+    try:
+        tree = ET.parse(gamelist)
+    except FileNotFoundError:
+        tree = ET.ElementTree(ET.Element("gameList"))
+    except (OSError, ET.ParseError):
+        return
+    root = tree.getroot()
+    game = next((g for g in root.iter("game") if g.findtext("path") == path), None)
+    if game is None:
+        game = ET.SubElement(root, "game")
+        ET.SubElement(game, "path").text = path
+        ET.SubElement(game, "name").text = PAIR_ENTRY
+    sortname = game.find("sortname")
+    if sortname is not None and sortname.text == "0":
+        return
+    if sortname is None:
+        sortname = ET.SubElement(game, "sortname")
+    sortname.text = "0"
+    gamelist.parent.mkdir(parents=True, exist_ok=True)
+    tmp = Path(str(gamelist) + ".famidrive-tmp")
+    tree.write(tmp, encoding="utf-8", xml_declaration=True)
+    tmp.replace(gamelist)
 
 
 def toast(*args):
@@ -332,11 +367,11 @@ async def forget(address):
     ad = await iface(bus, adapter, "org.bluez.Adapter1")
     await ad.call_remove_device(path)
     toast("--kind", "notice", "--icon", "controller", f"{name} forgotten",
-          "Pair it again from Settings to use it.")
+          "Pair it again from Controllers to use it.")
     return 0
 
 
-async def entries(folder):
+async def entries(folder, old=()):
     try:
         bus = await system_bus()
         objs = await managed_objects(bus)
@@ -345,13 +380,18 @@ async def entries(folder):
         objs = {}
     adapter = first_adapter(objs)
     write_entries(folder, plan_entries(adapter is not None, paired_controllers(objs, adapter) if adapter else []))
+    if adapter is not None:
+        pair_first(Path.home() / "ES-DE/gamelists" / Path(folder).name / "gamelist.xml")
+    for o in old:
+        if Path(o).is_dir():
+            write_entries(o, {})
     return 0
 
 
 def main():
     args = sys.argv[1:]
-    if args[:1] == ["entries"] and len(args) == 2:
-        return asyncio.run(entries(args[1]))
+    if args[:1] == ["entries"] and len(args) >= 2:
+        return asyncio.run(entries(args[1], args[2:]))
     if args[:1] == ["pair"] and len(args) <= 2:
         return asyncio.run(pair(int(args[1]) if len(args) == 2 else 60))
     if args[:1] == ["forget"] and len(args) == 2:

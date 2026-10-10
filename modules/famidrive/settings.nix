@@ -8,14 +8,19 @@
 #                           remove their games; heroic lane
 #   Jellyfin Media Player   the Jellyfin app, with its sign-in and its
 #                           own settings menu; media.jellyfin.enable
-#   Pair a Controller,      Bluetooth pairing (famidrive-bluetooth), with
-#   Forget <controller>     toasts for what's happening; only on a box
-#                           with a Bluetooth adapter, checked each session;
-#                           controllers.bluetoothPairing
 #   Wi-Fi: <network>,       join a network, forget one, see the wired
 #   Forget Wi-Fi: <network>, port's state (famidrive-network); written each
 #   Ethernet                session for the box's own adapters;
 #                           networkSettings
+#
+# And a Controllers system beside it, for Bluetooth pairing, which crowded
+# Settings out with one Forget entry per controller:
+#
+#   Forget <controller>,    Bluetooth pairing (famidrive-bluetooth), with
+#   Pair a Controller       toasts for what's happening; only on a box
+#                           with a Bluetooth adapter, checked each session;
+#                           controllers.bluetoothPairing. Pairing is
+#                           always first, by its sort name.
 { config, lib, pkgs, ... }:
 
 let
@@ -48,9 +53,10 @@ in
     type = lib.types.bool;
     default = true;
     description = ''
-      "Pair a Controller" in Settings, and a "Forget" entry for each
-      paired controller: Bluetooth pairing from the couch, with no SSH.
-      The entries appear only on a box with a Bluetooth adapter.
+      A Controllers system with "Pair a Controller" (always first), and a
+      "Forget" entry for each paired controller: Bluetooth pairing from
+      the couch, with no SSH. The entries appear only on a box with a
+      Bluetooth adapter (ES-DE hides a system with nothing in it).
     '';
   };
 
@@ -67,7 +73,22 @@ in
   };
 
   config = lib.mkIf (cfg.enable && (entries != { } || bluetooth || network)) {
-    famidrive.systems.settings = {
+    famidrive.systems.controllers = lib.mkIf bluetooth {
+      fullname = "Controllers";
+      # Art Book Next has no controller or Bluetooth art: its fallback,
+      # chosen 2026-10-10, over borrowing another system's.
+      theme = "_default";
+      sortName = "zzzy";   # just before Settings
+      extensions = [ ".setting" ];
+      command = ''
+        case "$(cat "$ROM")" in
+          bluetooth-pair) exec ${pkgs.famidrive-bluetooth}/bin/famidrive-bluetooth pair ;;
+          bluetooth-forget\ *) exec ${pkgs.famidrive-bluetooth}/bin/famidrive-bluetooth forget "$(cut -d' ' -f2 "$ROM")" ;;
+        esac
+      '';
+    };
+
+    famidrive.systems.settings = lib.mkIf (entries != { } || network) {
       fullname = "Settings";
       theme = "tools";   # Art Book Next's tools art
       sortName = "zzzz";   # last in the system list, after every game system
@@ -77,19 +98,17 @@ in
           ${lib.optionalString steam ''steam) exec ${pkgs.gamescope-fg}/bin/gamescope-fg --steam bigpicture ;;''}
           ${lib.optionalString heroic ''heroic) XDG_CURRENT_DESKTOP=FamiDrive ${pkgs.heroic}/bin/heroic --fullscreen --no-sandbox ;;''}
           ${lib.optionalString jellyfin ''jellyfin) ${cfg.systems.media.command} ;;''}
-          ${lib.optionalString bluetooth ''
-            bluetooth-pair) exec ${pkgs.famidrive-bluetooth}/bin/famidrive-bluetooth pair ;;
-            bluetooth-forget\ *) exec ${pkgs.famidrive-bluetooth}/bin/famidrive-bluetooth forget "$(cut -d' ' -f2 "$ROM")" ;;
-          ''}
           ${lib.optionalString network ''network-*) exec ${pkgs.famidrive-network}/bin/famidrive-network launch "$ROM" ;;''}
         esac
       '';
     };
 
     # Bluetooth's entries follow the hardware and what's paired, so
-    # they're written as each session starts, not at switch.
+    # they're written as each session starts, not at switch. Ones left in
+    # Settings, where they were before Controllers, are taken out there.
     famidrive.sessionSetup = lib.optionalString bluetooth ''
-      ${pkgs.famidrive-bluetooth}/bin/famidrive-bluetooth entries "$HOME/.local/share/famidrive/roms/settings" \
+      ${pkgs.famidrive-bluetooth}/bin/famidrive-bluetooth entries "$HOME/.local/share/famidrive/roms/controllers" \
+        "$HOME/.local/share/famidrive/roms/settings" \
         || echo "famidrive-session: couldn't list Bluetooth controllers" >&2
     '' + lib.optionalString network ''
       ${pkgs.famidrive-network}/bin/famidrive-network entries "$HOME/.local/share/famidrive/roms/settings" \

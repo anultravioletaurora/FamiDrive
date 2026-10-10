@@ -554,9 +554,10 @@ NixOS, but isn't covered here.
    playing?" with more than one player.
 8. **First run, on the TV:**
    - **Controllers:** 2.4 GHz dongles and wired pads work as they are.
-     For a Bluetooth pad, put it in pairing mode and launch Settings →
-     Pair a Controller: the first one found is paired, and toasts say
-     how it went. Settings → Forget <controller> unpairs one.
+     For a Bluetooth pad, put it in pairing mode and launch Controllers
+     → Pair a Controller (always the first entry): the first pad found
+     is paired, and toasts say how it went. Controllers → Forget
+     <controller> unpairs one.
      [CONTROLLERS.md](docs/CONTROLLERS.md) has each pad's notes.
    - **Wi-Fi:** Settings lists the networks in range as "Wi-Fi:
      <network>". An open one joins when launched. For one with a
