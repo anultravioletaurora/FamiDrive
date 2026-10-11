@@ -548,7 +548,8 @@ describes will need once it's built.
 ### `famidrive.players.<name>.voice.discord.enable`
 
 Whether to enable Discord voice chat alongside a game, running the whole
-session, hidden until Settings' "Discord Voice Chat" brings it up.
+session, hidden until Settings' "Discord Voice Chat" brings
+it up.
 
 - **Type:** boolean
 - **Default:** `false`
