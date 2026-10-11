@@ -50,7 +50,7 @@ SECTIONS = [
      "Minecraft through Prism Launcher, in the Desktop system (`lanes` has `\"minecraft\"`)."),
     ("PC saves", ["famidrive.pcSaves"], "Syncing PC games' saves that Steam Cloud doesn't."),
     ("Online play", ["famidrive.online"], "Emulator netplay, through the servers in Servers."),
-    ("Systems", ["famidrive.systems"],
+    ("Systems", ["famidrive.systems", "famidrive.dolphin"],
      "The systems in ES-DE's menu. FamiDrive fills these in for every console it supports; most "
      "boxes never set them."),
 ]

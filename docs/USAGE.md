@@ -1663,6 +1663,16 @@ Network, on its own: each player signed in to their RPCN account
 
 The systems in ES-DE's menu. FamiDrive fills these in for every console it supports; most boxes never set them.
 
+### `famidrive.dolphin.internalResolution`
+
+Dolphin's internal rendering resolution (GameCube and Wii), as a
+multiple of the native 640x528: `0` auto-matches the window size,
+`1` is native, `6` is roughly 4K. Set once here rather than in
+Dolphin's own settings, which `lockKeys` resets on every rebuild.
+
+- **Type:** integer between 0 and 12 (both inclusive)
+- **Default:** `1`
+
 ### `famidrive.systems`
 
 The systems in ES-DE's menu, by ES-DE's folder name for them. Every
