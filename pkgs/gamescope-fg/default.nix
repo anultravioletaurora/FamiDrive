@@ -18,16 +18,23 @@
 #                                    a game another launcher starts (Heroic): the
 #                                    status screen until its window is up
 #   gamescope-fg --voice-start CMD...
-#                                    starts CMD once, tagged but not shown, and keeps
-#                                    tagging its windows for as long as it runs
+#                                    starts CMD, tagged but not shown, fullscreens its
+#                                    main window, and relaunches it if it quits
 #   gamescope-fg --voice-show       puts it on top until Select + Start or its own
 #                                    quit lowers it again; CMD keeps running either way
 #
 # Voice chat (#168) is the first thing that runs the whole session, shown
-# only sometimes: Vesktop starts with the session (--voice-start) and never
-# exits with a quit, unlike a game. --voice-show leaves a famidrive-game.close
-# that lowers it instead of killing it, the same way Big Picture's leaves one
-# that asks Steam to close it instead.
+# only sometimes: the client starts with the session (--voice-start) and is
+# meant to keep running, unlike a game. --voice-show leaves a
+# famidrive-game.close that lowers it instead of killing it, the same way
+# Big Picture's leaves one that asks Steam to close it instead.
+#
+# Its own window is forced fullscreen (gamescope treats a client's
+# _NET_WM_STATE_FULLSCREEN request the same as any game's), so its in-app
+# minimize/maximize/close controls aren't on screen to hit by accident. A
+# player found that window's close button with no way back to the client
+# once they did (#168); --voice-start now relaunches the client if it ever
+# quits, so Settings' "Discord Voice Chat" always has one to show again.
 #
 # Only windows from the program's own session are tagged (each runs under
 # setsid, matched by _NET_WM_PID). Found on the first box 2026-10-05: tagging
@@ -40,11 +47,11 @@
 # whole tree gets closed (it isn't in a group of its own);
 # famidrive-game.close holds a command to run instead of killing anything
 # (Big Picture: closing it must not take the Steam client with it).
-{ writeShellApplication, xprop, xwininfo, xrestop, procps, util-linux, gnugrep, coreutils, socat, famidrive-status, famidrive-padmouse }:
+{ writeShellApplication, xprop, xwininfo, xrestop, wmctrl, procps, util-linux, gnugrep, coreutils, socat, famidrive-status, famidrive-padmouse }:
 
 writeShellApplication {
   name = "gamescope-fg";
-  runtimeInputs = [ xprop xwininfo xrestop procps util-linux gnugrep coreutils socat famidrive-status famidrive-padmouse ];
+  runtimeInputs = [ xprop xwininfo xrestop wmctrl procps util-linux gnugrep coreutils socat famidrive-status famidrive-padmouse ];
   text = ''
     FRONTEND=1
     GAME=2
@@ -460,18 +467,36 @@ writeShellApplication {
 
     if [ "''${1:-}" = "--voice-start" ]; then
       shift
-      setsid "$@" &
-      pid=$!
-      echo "$pid" > "$run/famidrive-voice.pid"
-      # Never added to the base layer here, so nothing changes on screen;
-      # --voice-show does that. Keeps tagging for as long as it runs:
-      # Vesktop can open windows (a picture, a link) after its first.
-      while kill -0 "$pid" 2>/dev/null; do
-        tag_session "$VOICE" "$pid"
+      win_file="$run/famidrive-voice.win"
+      while true; do
+        rm -f "$win_file"
+        setsid "$@" &
+        pid=$!
+        echo "$pid" > "$run/famidrive-voice.pid"
+        # Never added to the base layer here, so nothing changes on screen;
+        # --voice-show does that. Keeps tagging for as long as it runs: the
+        # client can open windows (a picture, a link) after its first.
+        while kill -0 "$pid" 2>/dev/null; do
+          tag_session "$VOICE" "$pid"
+          # Its first window only, fullscreen so its own close button isn't
+          # on screen to hit by accident; a later one (an image, a link)
+          # is tagged but left windowed.
+          if [ ! -s "$win_file" ]; then
+            for wid in $(windows); do
+              xprop -id "$wid" STEAM_GAME 2>/dev/null | grep -q "= $VOICE$" || continue
+              echo "$wid" > "$win_file"
+              wmctrl -i -r "$wid" -b add,fullscreen 2>/dev/null || true
+              break
+            done
+          fi
+          sleep 1
+        done
+        rm -f "$run/famidrive-voice.pid"
+        # Only a crash or the client quitting on its own gets here:
+        # --voice-hide only lowers it (famidrive-game.close), never kills
+        # it. Start it again so there's always one to show (#168).
         sleep 1
       done
-      rm -f "$run/famidrive-voice.pid"
-      exit 0
     fi
 
     if [ "''${1:-}" = "--voice-hide" ]; then
