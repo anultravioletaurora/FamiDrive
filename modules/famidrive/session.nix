@@ -60,6 +60,10 @@ let
       export DXVK_HDR=1
     ''}
     ${lib.optionalString (hasLane "steam") ''
+      # The idle copy (famidrive-steam-background, below) has to be gone
+      # before its settings files are edited and before this session
+      # starts its own; famidrive-end-session brings it back on the way out.
+      systemctl --user stop famidrive-steam-background.service 2>/dev/null || true
       # Proton pins, Steam Input and launch options, written while Steam
       # isn't running (pkgs/famidrive-steam-config). A player's own launch
       # options (their mods') go over the box's.
@@ -404,8 +408,6 @@ in
       modulePath = "${config.security.pam.package}/lib/security/pam_succeed_if.so";
       args = [ "user" "ingroup" "famidrive" "quiet" ];
     };
-    users.users.greeter.extraGroups = lib.mkIf picker [ "video" "input" "render" ];
-
     # Powering off and rebooting from the TV: ES-DE's Quit menu (as a
     # player) and "Who's playing?" (as the greeter). Without this, logind
     # asks for a password whenever anyone else is logged in, an SSH login
@@ -426,6 +428,41 @@ in
       # Players write their own picture; sticky, so not anyone else's.
       "d ${avatarDir} 3775 greeter famidrive -"
     ];
+
+    # Steam idle in the background from boot, for players with Steam
+    # configured (famidrive.lanes' "steam"), so Remote Play and remote
+    # installs work before anyone's picked that player on "Who's
+    # playing?". Needs lingering (a user service that starts and keeps
+    # running without a login session); the session above stops it before
+    # starting its own copy, and famidrive-end-session starts it again.
+    users.users = lib.optionalAttrs (hasLane "steam")
+      (lib.mapAttrs' (_: p: lib.nameValuePair p.user { linger = true; })
+        (lib.filterAttrs (_: p: !p.isGuest) cfg.allPlayers))
+      // {
+        greeter.extraGroups = lib.mkIf picker [ "video" "input" "render" ];
+      };
+
+    famidrive.playerHome = { lib, famidrivePlayer, ... }:
+      lib.mkIf (hasLane "steam" && !famidrivePlayer.isGuest) {
+        # No gamescope, no window: a plain Xvfb, just enough of a display
+        # for Steam's own UI to start. Stopped before this player's own
+        # session starts Steam under gamescope (above), so there's never two.
+        systemd.user.services.famidrive-steam-background = {
+          Unit = {
+            Description = "Steam, idle, until ${famidrivePlayer.displayName} is picked on the TV";
+            After = [ "network-online.target" ];
+          };
+          Install.WantedBy = [ "default.target" ];
+          Service = {
+            Environment = "PATH=/run/current-system/sw/bin:/run/wrappers/bin";
+            ExecStart = "${pkgs.xvfb-run}/bin/xvfb-run -a steam -silent";
+            ExecStop = "steam -shutdown";
+            TimeoutStopSec = 30;
+            Restart = "on-failure";
+            RestartSec = 30;
+          };
+        };
+      };
 
     hardware.graphics.enable = true;
     hardware.bluetooth.enable = true;
