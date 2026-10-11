@@ -8,11 +8,11 @@
 #                           remove their games; heroic lane
 #   Jellyfin Media Player   the Jellyfin app, with its sign-in and its
 #                           own settings menu; media.jellyfin.enable
-#   Discord Voice Chat      Vesktop's own window: sign in, pick a channel,
-#                           mute; only for a player with
+#   Discord Voice Chat      the client's own window: sign in, pick a
+#                           channel, mute; only for a player with
 #                           players.<name>.voice.discord.enable (voice.nix).
-#                           Closing it (Select + Start) lowers it; Vesktop
-#                           keeps running and the call keeps going
+#                           Closing it (Select + Start) lowers it; the
+#                           client keeps running and the call keeps going
 #   Wi-Fi: <network>,       join a network, forget one, see the wired
 #   Forget Wi-Fi: <network>, port's state (famidrive-network); written each
 #   Ethernet                session for the box's own adapters;

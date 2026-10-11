@@ -1,16 +1,18 @@
-# Voice chat with friends from the couch (#168). Discord only so far,
-# through Vesktop (Vencord's client; nixpkgs builds it, and Vencord plays
-# better with PipeWire and Wayland than Discord's own app), running the
-# whole session for players who turn it on, hidden until they go to
-# Settings' "Discord Voice Chat" (settings.nix) to sign in, pick a
-# channel, or check who's there; closing that puts ES-DE back without
-# ending the call, the same way Big Picture does for Steam.
+# Voice chat with friends from the couch (#168). Discord by default,
+# official: an account only ever used that way stays on Discord's own
+# terms, so this keeps working if they ever crack down on client mods.
+# `client = "vesktop"` switches a player to Vencord's client instead,
+# which the future overlay and controller mute/deafen (#168) will need a
+# plugin for. Either way it runs the whole session for players who turn
+# it on, hidden until they go to Settings' "Discord Voice Chat"
+# (settings.nix) to sign in, pick a channel, or check who's there;
+# closing that puts ES-DE back without ending the call, the same way Big
+# Picture does for Steam.
 #
 # The Vencord plugin #168 describes (voice state out to a socket,
 # mute/deafen back in) and the overlay that would read it aren't built
-# yet; signing in, joining and muting all happen in Vesktop's own window
-# for now. Discord's terms forbid client mods, which is why this is
-# opt-in per player, not box-wide.
+# yet; signing in, joining and muting all happen in the client's own
+# window for now. Opt-in per player, not box-wide, either way.
 { config, lib, pkgs, ... }:
 
 let
@@ -21,15 +23,28 @@ let
   # so has no `voice` attribute at all (overlays.nix's `resolve` does the
   # same for `overlays`).
   voiceUsers = lib.filterAttrs (_: p: p.voice.discord.enable or false) cfg.allPlayers;
+  client = p: if p.voice.discord.client == "vesktop" then pkgs.vesktop else pkgs.discord;
+  clientBin = p: if p.voice.discord.client == "vesktop" then "vesktop" else "discord";
 in
 {
   options.famidrive.players = mkOption {
     type = types.attrsOf (types.submodule {
       options.voice.discord = {
         enable = mkEnableOption ''
-          Discord voice chat alongside a game, through Vesktop, running
-          the whole session, hidden until Settings' "Discord Voice Chat"
-          brings it up'';
+          Discord voice chat alongside a game, running the whole
+          session, hidden until Settings' "Discord Voice Chat" brings
+          it up'';
+        client = mkOption {
+          type = types.enum [ "discord" "vesktop" ];
+          default = "discord";
+          description = ''
+            `"discord"`, the official app, or `"vesktop"` (Vencord's
+            client). The official app is the default so this keeps
+            working on Discord's own terms; Vesktop is there for a
+            player who wants it, and is what the overlay this issue
+            describes will need once it's built.
+          '';
+        };
         mic = mkOption {
           type = types.nullOr types.str;
           default = null;
@@ -56,8 +71,8 @@ in
           ''}
           # Hidden until Settings' "Discord Voice Chat" (settings.nix)
           # raises it; gamescope never shows an untagged, non-base window,
-          # so no flag of Vesktop's own is relied on for that.
-          ${pkgs.gamescope-fg}/bin/gamescope-fg --voice-start ${pkgs.vesktop}/bin/vesktop &
+          # so no flag of the client's own is relied on for that.
+          ${pkgs.gamescope-fg}/bin/gamescope-fg --voice-start ${client p}/bin/${clientBin p} &
           ;;
       '') voiceUsers)}
       esac
@@ -65,7 +80,7 @@ in
 
     famidrive.playerHome = { famidrivePlayer, ... }:
       lib.mkIf (famidrivePlayer.voice.discord.enable or false) {
-        home.packages = [ pkgs.vesktop ];
+        home.packages = [ (client famidrivePlayer) ];
       };
   };
 }

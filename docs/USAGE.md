@@ -534,11 +534,21 @@ Their Linux account. Made if it doesn't exist yet.
 - **Type:** string
 - **Default:** `"‹name›"`
 
+### `famidrive.players.<name>.voice.discord.client`
+
+`"discord"`, the official app, or `"vesktop"` (Vencord's
+client). The official app is the default so this keeps
+working on Discord's own terms; Vesktop is there for a
+player who wants it, and is what the overlay this issue
+describes will need once it's built.
+
+- **Type:** one of "discord", "vesktop"
+- **Default:** `"discord"`
+
 ### `famidrive.players.<name>.voice.discord.enable`
 
-Whether to enable Discord voice chat alongside a game, through Vesktop,
-running the whole session, hidden until Settings' "Discord Voice Chat"
-brings it up.
+Whether to enable Discord voice chat alongside a game, running the whole
+session, hidden until Settings' "Discord Voice Chat" brings it up.
 
 - **Type:** boolean
 - **Default:** `false`
