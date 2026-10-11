@@ -35,6 +35,9 @@ of games you own. See [Your games](#your-games).
 
 ## Docs
 
+- [Architecture](docs/ARCHITECTURE.md): what the flake, the module and
+  each package do, and how they hand off to each other from boot to a
+  game on the TV
 - [Comparison](docs/COMPARISON.md): FamiDrive next to SteamOS, Bazzite,
   ChimeraOS, Jovian-NixOS, Batocera and Windows with Playnite, and when to
   pick one of those instead
