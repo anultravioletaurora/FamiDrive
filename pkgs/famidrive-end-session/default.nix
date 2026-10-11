@@ -6,6 +6,10 @@
 # downloads tidy that way, and doesn't stay behind in a session nobody's
 # using. Then the whole session ends (logind), which takes everything else
 # in it along.
+#
+# Its idle background copy (famidrive-steam-background, session.nix) comes
+# back once it's gone, so Remote Play and remote installs keep working
+# until this player is picked again.
 { writeShellApplication, procps, systemd, coreutils }:
 
 writeShellApplication {
@@ -19,6 +23,7 @@ writeShellApplication {
         sleep 0.5
       done
     fi
+    systemctl --user start famidrive-steam-background.service > /dev/null 2>&1 || true
     if [ -n "''${XDG_SESSION_ID:-}" ]; then
       exec loginctl terminate-session "$XDG_SESSION_ID"
     fi
