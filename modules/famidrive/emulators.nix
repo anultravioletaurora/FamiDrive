@@ -261,6 +261,17 @@ in
     internal = true;
   };
 
+  options.famidrive.dolphin.internalResolution = mkOption {
+    type = types.ints.between 0 12;
+    default = 1;
+    description = ''
+      Dolphin's internal rendering resolution (GameCube and Wii), as a
+      multiple of the native 640x528: `0` auto-matches the window size,
+      `1` is native, `6` is roughly 4K. Set once here rather than in
+      Dolphin's own settings, which `lockKeys` resets on every rebuild.
+    '';
+  };
+
   config = lib.mkIf cfg.enable {
     # The library's RetroArch BIOS files (romm-agent firmwareDir), linked
     # into this player's RetroArch system folder. Anything a core made
@@ -781,7 +792,11 @@ in
           # HD texture packs from RomM (romm-agent textures): Dolphin's
           # "Load Custom Textures", and preloading them so they don't
           # stutter in as they're first seen.
-          keys.Settings = { HiresTextures = "True"; CacheHiresTextures = "True"; };
+          keys.Settings = {
+            HiresTextures = "True";
+            CacheHiresTextures = "True";
+            InternalResolution = cfg.dolphin.internalResolution;
+          };
         }}
         ${seedLib.lockKeys {
           format = "keyValue";
