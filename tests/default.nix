@@ -272,6 +272,7 @@ in
         show = [ "fps" "cpu" "gpu" "ram" "vram" ];
         settings = { font_size = 20; frame_timing = false; };
       };
+      players.bob.overlays.voice = { enable = true; show = [ "members" "speaking" ]; };
     };
   } (c: let r = c.famidrive.overlays.resolved; in [
     (check "a player's own toast position and hidden kinds, the box's for the rest"
@@ -289,6 +290,50 @@ in
     (check "the toast daemon starts with every session"
       (lib.hasInfix "famidrive-toast daemon" c.famidrive.sessionSetup
         && lib.any (p: lib.getName p == "famidrive-toast") c.environment.systemPackages))
+    (check "voice overlay: a player's own, top-right for the rest, who haven't turned it on"
+      (r.bob.voice == { enable = true; position = "top-right"; show = [ "members" "speaking" ]; hideWhenIdle = true; }
+        && !r.alice.voice.enable && r.alice.voice.position == "top-right"))
+  ]);
+
+  # Voice chat (#168): only a player who turns it on gets a client,
+  # running the whole session hidden until Settings' "Discord Voice
+  # Chat" raises it; their mic is set as the session's default input,
+  # where they gave one. Discord's own app by default (its terms forbid
+  # client mods); Vesktop for a player who asks for it (carol).
+  box-voice = expect "voice" {
+    famidrive = {
+      enable = true;
+      romm.enable = false;
+      players.alice = { };
+      players.bob.voice.discord = {
+        enable = true;
+        mic = "alsa_input.usb-Logitech_HD_Webcam_C920-02.analog-stereo";
+      };
+      players.carol.voice.discord = { enable = true; client = "vesktop"; };
+    };
+  } (c: [
+    (check "bob gets the official app by default; carol asked for Vesktop; alice gets neither"
+      (lib.any (p: lib.getName p == "discord") c.home-manager.users.bob.home.packages
+        && !(lib.any (p: lib.getName p == "vesktop") c.home-manager.users.bob.home.packages)
+        && lib.any (p: lib.getName p == "vesktop") c.home-manager.users.carol.home.packages
+        && !(lib.any (p: lib.getName p == "discord") c.home-manager.users.carol.home.packages)
+        && !(lib.any (p: lib.getName p == "discord" || lib.getName p == "vesktop") c.home-manager.users.alice.home.packages)))
+    (check "bob's session starts his client hidden (gamescope-fg, not a client flag) and sets his mic; alice's doesn't mention it"
+      (lib.hasInfix "bob)" c.famidrive.sessionSetup
+        && lib.hasInfix "gamescope-fg --voice-start" c.famidrive.sessionSetup
+        && lib.hasInfix "/bin/discord" c.famidrive.sessionSetup
+        && !(lib.hasInfix "start-minimized" c.famidrive.sessionSetup)
+        && lib.hasInfix "pactl set-default-source" c.famidrive.sessionSetup
+        && lib.hasInfix "Logitech_HD_Webcam_C920" c.famidrive.sessionSetup
+        && !(lib.hasInfix "alice)" c.famidrive.sessionSetup)))
+    (check "carol's session starts Vesktop instead"
+      (lib.hasInfix "carol)" c.famidrive.sessionSetup && lib.hasInfix "/bin/vesktop" c.famidrive.sessionSetup))
+    (check "only bob gets a Discord Voice Chat entry, raising it without killing it on quit"
+      (lib.hasInfix "discord-voice) exec" c.famidrive.systems.settings.command
+        && lib.hasInfix "gamescope-fg --voice-show" c.famidrive.systems.settings.command
+        && lib.hasInfix "discord-voice > \"$d/Discord Voice Chat.setting\"" c.home-manager.users.bob.home.activation.famidriveSettings.data
+        && !(lib.hasInfix "discord-voice > \"$d/Discord Voice Chat.setting\"" c.home-manager.users.alice.home.activation.famidriveSettings.data)
+        && lib.hasInfix "rm -f \"$d/Discord Voice Chat.setting\"" c.home-manager.users.alice.home.activation.famidriveSettings.data))
   ]);
 
   # PS3 online on its own (not online.enable): each player signed in to

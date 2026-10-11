@@ -366,6 +366,38 @@ Where toasts show up.
 - **Type:** null or one of "top-left", "top-center", "top-right", "middle-left", "middle-right", "bottom-left", "bottom-center", "bottom-right"
 - **Default:** the box's (`famidrive.overlays`)
 
+### `famidrive.players.<name>.overlays.voice.enable`
+
+A panel over the game or menu with who's in the player's voice
+channel and who's talking. Not drawn yet: turning this on saves
+the setting, nothing more, until #168's overlay daemon exists.
+
+- **Type:** null or boolean
+- **Default:** the box's (`famidrive.overlays`)
+
+### `famidrive.players.<name>.overlays.voice.hideWhenIdle`
+
+Hidden entirely when nobody's talking.
+
+- **Type:** null or boolean
+- **Default:** the box's (`famidrive.overlays`)
+
+### `famidrive.players.<name>.overlays.voice.position`
+
+Where it shows up.
+
+- **Type:** null or one of "top-left", "top-center", "top-right", "middle-left", "middle-right", "bottom-left", "bottom-center", "bottom-right"
+- **Default:** the box's (`famidrive.overlays`)
+
+### `famidrive.players.<name>.overlays.voice.show`
+
+What it shows: `"members"` (everyone in the channel),
+`"speaking"` (whoever's talking right now), `"self"` (the
+player's own mute and deafen state).
+
+- **Type:** null or (list of (one of "members", "speaking", "self"))
+- **Default:** the box's (`famidrive.overlays`)
+
 ### `famidrive.players.<name>.owner`
 
 Their RomM username. Their token is issued by this user, the box
@@ -501,6 +533,38 @@ Their Linux account. Made if it doesn't exist yet.
 
 - **Type:** string
 - **Default:** `"‹name›"`
+
+### `famidrive.players.<name>.voice.discord.client`
+
+`"discord"`, the official app, or `"vesktop"` (Vencord's
+client). The official app is the default so this keeps
+working on Discord's own terms; Vesktop is there for a
+player who wants it, and is what the overlay this issue
+describes will need once it's built.
+
+- **Type:** one of "discord", "vesktop"
+- **Default:** `"discord"`
+
+### `famidrive.players.<name>.voice.discord.enable`
+
+Whether to enable Discord voice chat alongside a game, running the whole
+session, hidden until Settings' "Discord Voice Chat" brings
+it up.
+
+- **Type:** boolean
+- **Default:** `false`
+- **Example:** `true`
+
+### `famidrive.players.<name>.voice.discord.mic`
+
+PipeWire source to use as their microphone in voice chat (its
+name, as `pactl list sources short` shows it), set as the
+default input for their session. Null leaves whatever
+PipeWire already picked.
+
+- **Type:** null or string
+- **Default:** `null`
+- **Example:** `"alsa_input.usb-Logitech_HD_Webcam_C920-02.analog-stereo"`
 
 ### `famidrive.primaryPlayer`
 
@@ -1874,3 +1938,41 @@ Where toasts show up.
 
 - **Type:** one of "top-left", "top-center", "top-right", "middle-left", "middle-right", "bottom-left", "bottom-center", "bottom-right"
 - **Default:** `"bottom-right"`
+
+### `famidrive.overlays.voice.enable`
+
+A panel over the game or menu with who's in the player's voice
+channel and who's talking. Not drawn yet: turning this on saves
+the setting, nothing more, until #168's overlay daemon exists.
+
+- **Type:** boolean
+- **Default:** `false`
+
+### `famidrive.overlays.voice.hideWhenIdle`
+
+Hidden entirely when nobody's talking.
+
+- **Type:** boolean
+- **Default:** `true`
+
+### `famidrive.overlays.voice.position`
+
+Where it shows up.
+
+- **Type:** one of "top-left", "top-center", "top-right", "middle-left", "middle-right", "bottom-left", "bottom-center", "bottom-right"
+- **Default:** `"top-right"`
+
+### `famidrive.overlays.voice.show`
+
+What it shows: `"members"` (everyone in the channel),
+`"speaking"` (whoever's talking right now), `"self"` (the
+player's own mute and deafen state).
+
+- **Type:** list of (one of "members", "speaking", "self")
+- **Default:** 
+
+  ```nix
+  [
+    "speaking"
+  ]
+  ```
