@@ -17,6 +17,7 @@ let
     "bottom-left" "bottom-center" "bottom-right"
   ];
   kinds = types.enum [ "notice" "alert" "progress" "achievement" ];
+  voiceShow = types.enum [ "members" "speaking" "self" ];
 
   # What the performance overlay can show, by FamiDrive's name, and the
   # MangoHud settings for each (MangoHud 0.8; with legacy_layout off it
@@ -85,16 +86,34 @@ let
           its value. For example `{ font_size = 20; background_alpha = 0.2; }`.
         '';
       };
+      # Not drawn yet (#168): no daemon reads this. The data model for
+      # when voice.nix's Vencord plugin and an overlay daemon exist, so a
+      # player's choice here doesn't move once they do.
+      voice = {
+        enable = opt types.bool false ''
+          A panel over the game or menu with who's in the player's voice
+          channel and who's talking. Not drawn yet: turning this on saves
+          the setting, nothing more, until #168's overlay daemon exists.
+        '';
+        position = opt position "top-right" "Where it shows up.";
+        show = opt (types.listOf voiceShow) [ "speaking" ] ''
+          What it shows: `"members"` (everyone in the channel),
+          `"speaking"` (whoever's talking right now), `"self"` (the
+          player's own mute and deafen state).
+        '';
+        hideWhenIdle = opt types.bool true "Hidden entirely when nobody's talking.";
+      };
     };
 
   # Each player's settings, the box's filling in what they leave unset.
   resolve = p:
-    let mine = p.overlays or { toasts = { }; performance = { }; };
+    let mine = p.overlays or { toasts = { }; performance = { }; voice = { }; };
         pick = section: name: let v = mine.${section}.${name} or null; in
           if v == null then cfg.overlays.${section}.${name} else v;
     in {
       toasts = { position = pick "toasts" "position"; hide = pick "toasts" "hide"; };
       performance = lib.genAttrs [ "enable" "position" "show" "layout" "settings" ] (pick "performance");
+      voice = lib.genAttrs [ "enable" "position" "show" "hideWhenIdle" ] (pick "voice");
     };
 
   toastSpec = pkgs.writeText "famidrive-toast.json" (builtins.toJSON {

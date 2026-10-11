@@ -1,14 +1,15 @@
 # Voice chat with friends from the couch (#168). Discord only so far,
 # through Vesktop (Vencord's client; nixpkgs builds it, and Vencord plays
-# better with PipeWire and Wayland than Discord's own app), started
-# hidden with the session for players who turn it on.
+# better with PipeWire and Wayland than Discord's own app), running the
+# whole session for players who turn it on, hidden until they go to
+# Settings' "Discord Voice Chat" (settings.nix) to sign in, pick a
+# channel, or check who's there; closing that puts ES-DE back without
+# ending the call, the same way Big Picture does for Steam.
 #
-# This is only the first "to check first" from #168: the client running
-# alongside a game without stealing gamescope's focus. The Vencord
-# plugin the issue describes (voice state out to a socket, mute/deafen
-# back in) and the overlay that would read it aren't built yet; until
-# then, signing in, joining a channel and muting all happen in Vesktop's
-# own window. Discord's terms forbid client mods, which is why this is
+# The Vencord plugin #168 describes (voice state out to a socket,
+# mute/deafen back in) and the overlay that would read it aren't built
+# yet; signing in, joining and muting all happen in Vesktop's own window
+# for now. Discord's terms forbid client mods, which is why this is
 # opt-in per player, not box-wide.
 { config, lib, pkgs, ... }:
 
@@ -26,9 +27,9 @@ in
     type = types.attrsOf (types.submodule {
       options.voice.discord = {
         enable = mkEnableOption ''
-          Discord voice chat alongside a game, through Vesktop, started
-          hidden with the session
-        '';
+          Discord voice chat alongside a game, through Vesktop, running
+          the whole session, hidden until Settings' "Discord Voice Chat"
+          brings it up'';
         mic = mkOption {
           type = types.nullOr types.str;
           default = null;
@@ -53,11 +54,10 @@ in
             pactl set-default-source ${lib.escapeShellArg p.voice.discord.mic} \
               || echo "famidrive-session: couldn't set the voice microphone" >&2
           ''}
-          # --start-minimized is Discord's own flag, carried over by most
-          # forks; VERIFY it keeps Vesktop's window off gamescope (no
-          # window of its own should take focus, #168) and still lets a
-          # player reach the QR sign-in the first time.
-          ${pkgs.vesktop}/bin/vesktop --start-minimized &
+          # Hidden until Settings' "Discord Voice Chat" (settings.nix)
+          # raises it; gamescope never shows an untagged, non-base window,
+          # so no flag of Vesktop's own is relied on for that.
+          ${pkgs.gamescope-fg}/bin/gamescope-fg --voice-start ${pkgs.vesktop}/bin/vesktop &
           ;;
       '') voiceUsers)}
       esac

@@ -8,6 +8,11 @@
 #                           remove their games; heroic lane
 #   Jellyfin Media Player   the Jellyfin app, with its sign-in and its
 #                           own settings menu; media.jellyfin.enable
+#   Discord Voice Chat      Vesktop's own window: sign in, pick a channel,
+#                           mute; only for a player with
+#                           players.<name>.voice.discord.enable (voice.nix).
+#                           Closing it (Select + Start) lowers it; Vesktop
+#                           keeps running and the call keeps going
 #   Wi-Fi: <network>,       join a network, forget one, see the wired
 #   Forget Wi-Fi: <network>, port's state (famidrive-network); written each
 #   Ethernet                session for the box's own adapters;
@@ -30,8 +35,12 @@ let
   jellyfin = cfg.media.jellyfin.enable;
   bluetooth = cfg.controllers.bluetoothPairing;
   network = cfg.networkSettings && config.networking.networkmanager.enable;
+  voiceUsers = lib.filterAttrs (_: p: p.voice.discord.enable or false) cfg.allPlayers;
+  voice = voiceUsers != { };
 
-  # Placeholder file name (what ES-DE shows) -> what it opens.
+  # Placeholder file name (what ES-DE shows) -> what it opens. Every
+  # player's folder gets these alike; Discord Voice Chat is only this
+  # player's own (added in playerHome below, not here).
   entries =
     lib.optionalAttrs steam { "Steam Settings" = "steam"; }
     // lib.optionalAttrs heroic { "Heroic Games Launcher" = "heroic"; }
@@ -72,7 +81,7 @@ in
     '';
   };
 
-  config = lib.mkIf (cfg.enable && (entries != { } || bluetooth || network)) {
+  config = lib.mkIf (cfg.enable && (entries != { } || bluetooth || network || voice)) {
     famidrive.systems.controllers = lib.mkIf bluetooth {
       fullname = "Controllers";
       # Art Book Next has no controller or Bluetooth art: its fallback,
@@ -88,7 +97,7 @@ in
       '';
     };
 
-    famidrive.systems.settings = lib.mkIf (entries != { } || network) {
+    famidrive.systems.settings = lib.mkIf (entries != { } || network || voice) {
       fullname = "Settings";
       theme = "tools";   # Art Book Next's tools art
       sortName = "zzzz";   # last in the system list, after every game system
@@ -99,6 +108,7 @@ in
           ${lib.optionalString heroic ''heroic) XDG_CURRENT_DESKTOP=FamiDrive ${pkgs.heroic}/bin/heroic --fullscreen --no-sandbox ;;''}
           ${lib.optionalString jellyfin ''jellyfin) ${cfg.systems.media.command} ;;''}
           ${lib.optionalString network ''network-*) exec ${pkgs.famidrive-network}/bin/famidrive-network launch "$ROM" ;;''}
+          ${lib.optionalString voice ''discord-voice) exec ${pkgs.gamescope-fg}/bin/gamescope-fg --voice-show ;;''}
         esac
       '';
     };
@@ -130,16 +140,20 @@ in
     # Each player's own Settings folder, rewritten on every boot and
     # switch. An entry whose feature is turned off is removed with it, and
     # so is the old Switch Player (ES-DE's own Quit does that now).
-    famidrive.playerHome = { lib, famidrivePlayer, ... }: {
+    famidrive.playerHome = { lib, famidrivePlayer, ... }:
+      let myEntries = entries // lib.optionalAttrs (famidrivePlayer.voice.discord.enable or false)
+            { "Discord Voice Chat" = "discord-voice"; };
+      in {
       home.activation.famidriveSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         d=${lib.escapeShellArg "${famidrivePlayer.roms}/settings"}
         mkdir -p "$d"
         ${lib.concatStrings (lib.mapAttrsToList (name: what: ''
           printf '%s' ${what} > "$d/${name}.setting"
-        '') entries)}
+        '') myEntries)}
         ${lib.concatMapStrings (name: ''
           rm -f "$d/${name}.setting"
-        '') (lib.filter (n: !(entries ? ${n})) [ "Steam Settings" "Heroic Games Launcher" "Jellyfin Media Player" "Switch Player" ])}
+        '') (lib.filter (n: !(myEntries ? ${n}))
+          [ "Steam Settings" "Heroic Games Launcher" "Jellyfin Media Player" "Discord Voice Chat" "Switch Player" ])}
         ${lib.optionalString steam ''
           # ES-DE sorts by name; Steam Settings goes first by its sort name.
           # ES-DE rewrites gamelists itself (play counts), so this is only a

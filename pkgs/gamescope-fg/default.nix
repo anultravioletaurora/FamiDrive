@@ -17,6 +17,17 @@
 #   gamescope-fg --launcher ROM CMD...
 #                                    a game another launcher starts (Heroic): the
 #                                    status screen until its window is up
+#   gamescope-fg --voice-start CMD...
+#                                    starts CMD once, tagged but not shown, and keeps
+#                                    tagging its windows for as long as it runs
+#   gamescope-fg --voice-show       puts it on top until Select + Start or its own
+#                                    quit lowers it again; CMD keeps running either way
+#
+# Voice chat (#168) is the first thing that runs the whole session, shown
+# only sometimes: Vesktop starts with the session (--voice-start) and never
+# exits with a quit, unlike a game. --voice-show leaves a famidrive-game.close
+# that lowers it instead of killing it, the same way Big Picture's leaves one
+# that asks Steam to close it instead.
 #
 # Only windows from the program's own session are tagged (each runs under
 # setsid, matched by _NET_WM_PID). Found on the first box 2026-10-05: tagging
@@ -38,6 +49,7 @@ writeShellApplication {
     FRONTEND=1
     GAME=2
     STATUS=3   # famidrive-status, while a Steam game gets going
+    VOICE=4    # Vesktop (voice.nix), hidden until --voice-show raises it
     run="''${XDG_RUNTIME_DIR:-/tmp/famidrive-$(id -u)}"
     mkdir -p "$run"
 
@@ -444,6 +456,49 @@ writeShellApplication {
       base "$FRONTEND"
       wait "$pid"
       exit $?
+    fi
+
+    if [ "''${1:-}" = "--voice-start" ]; then
+      shift
+      setsid "$@" &
+      pid=$!
+      echo "$pid" > "$run/famidrive-voice.pid"
+      # Never added to the base layer here, so nothing changes on screen;
+      # --voice-show does that. Keeps tagging for as long as it runs:
+      # Vesktop can open windows (a picture, a link) after its first.
+      while kill -0 "$pid" 2>/dev/null; do
+        tag_session "$VOICE" "$pid"
+        sleep 1
+      done
+      rm -f "$run/famidrive-voice.pid"
+      exit 0
+    fi
+
+    if [ "''${1:-}" = "--voice-hide" ]; then
+      touch "$run/famidrive-voice.hide"
+      exit 0
+    fi
+
+    if [ "''${1:-}" = "--voice-show" ]; then
+      pid=$(cat "$run/famidrive-voice.pid" 2>/dev/null || true)
+      if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
+        echo "gamescope-fg: voice chat isn't running this session" >&2
+        exit 1
+      fi
+      # Select + Start runs this instead of killing Vesktop (as Big
+      # Picture's famidrive-game.close asks Steam to close it instead).
+      echo "$0 --voice-hide" > "$run/famidrive-game.close"
+      famidrive-padmouse &
+      pointer_pid=$!
+      trap 'kill "$pointer_pid" 2>/dev/null || true; rm -f "$run/famidrive-game.close"' EXIT
+      rm -f "$run/famidrive-voice.hide"
+      base "$VOICE,$FRONTEND"
+      while [ ! -e "$run/famidrive-voice.hide" ] && kill -0 "$pid" 2>/dev/null; do
+        sleep 0.3
+      done
+      rm -f "$run/famidrive-voice.hide"
+      base "$FRONTEND"
+      exit 0
     fi
 
     # setsid gives the game its own session and process group. A background

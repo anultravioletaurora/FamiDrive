@@ -272,6 +272,7 @@ in
         show = [ "fps" "cpu" "gpu" "ram" "vram" ];
         settings = { font_size = 20; frame_timing = false; };
       };
+      players.bob.overlays.voice = { enable = true; show = [ "members" "speaking" ]; };
     };
   } (c: let r = c.famidrive.overlays.resolved; in [
     (check "a player's own toast position and hidden kinds, the box's for the rest"
@@ -289,11 +290,14 @@ in
     (check "the toast daemon starts with every session"
       (lib.hasInfix "famidrive-toast daemon" c.famidrive.sessionSetup
         && lib.any (p: lib.getName p == "famidrive-toast") c.environment.systemPackages))
+    (check "voice overlay: a player's own, top-right for the rest, who haven't turned it on"
+      (r.bob.voice == { enable = true; position = "top-right"; show = [ "members" "speaking" ]; hideWhenIdle = true; }
+        && !r.alice.voice.enable && r.alice.voice.position == "top-right"))
   ]);
 
-  # Voice chat (#168): only a player who turns it on gets Vesktop,
-  # started hidden with their session; their mic is set as the session's
-  # default input, where they gave one.
+  # Voice chat (#168): only a player who turns it on gets Vesktop, running
+  # the whole session hidden until Settings' "Discord Voice Chat" raises
+  # it; their mic is set as the session's default input, where they gave one.
   box-voice = expect "voice" {
     famidrive = {
       enable = true;
@@ -308,12 +312,20 @@ in
     (check "only bob gets Vesktop"
       (lib.any (p: lib.getName p == "vesktop") c.home-manager.users.bob.home.packages
         && !(lib.any (p: lib.getName p == "vesktop") c.home-manager.users.alice.home.packages)))
-    (check "bob's session starts it hidden and sets his mic; alice's doesn't mention it"
+    (check "bob's session starts it hidden (gamescope-fg, not a Vesktop flag) and sets his mic; alice's doesn't mention it"
       (lib.hasInfix "bob)" c.famidrive.sessionSetup
-        && lib.hasInfix "vesktop --start-minimized" c.famidrive.sessionSetup
+        && lib.hasInfix "gamescope-fg --voice-start" c.famidrive.sessionSetup
+        && lib.hasInfix "/bin/vesktop" c.famidrive.sessionSetup
+        && !(lib.hasInfix "start-minimized" c.famidrive.sessionSetup)
         && lib.hasInfix "pactl set-default-source" c.famidrive.sessionSetup
         && lib.hasInfix "Logitech_HD_Webcam_C920" c.famidrive.sessionSetup
         && !(lib.hasInfix "alice)" c.famidrive.sessionSetup)))
+    (check "only bob gets a Discord Voice Chat entry, raising it without killing it on quit"
+      (lib.hasInfix "discord-voice) exec" c.famidrive.systems.settings.command
+        && lib.hasInfix "gamescope-fg --voice-show" c.famidrive.systems.settings.command
+        && lib.hasInfix "discord-voice > \"$d/Discord Voice Chat.setting\"" c.home-manager.users.bob.home.activation.famidriveSettings.data
+        && !(lib.hasInfix "discord-voice > \"$d/Discord Voice Chat.setting\"" c.home-manager.users.alice.home.activation.famidriveSettings.data)
+        && lib.hasInfix "rm -f \"$d/Discord Voice Chat.setting\"" c.home-manager.users.alice.home.activation.famidriveSettings.data))
   ]);
 
   # PS3 online on its own (not online.enable): each player signed in to
