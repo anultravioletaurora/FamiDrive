@@ -291,6 +291,31 @@ in
         && lib.any (p: lib.getName p == "famidrive-toast") c.environment.systemPackages))
   ]);
 
+  # Voice chat (#168): only a player who turns it on gets Vesktop,
+  # started hidden with their session; their mic is set as the session's
+  # default input, where they gave one.
+  box-voice = expect "voice" {
+    famidrive = {
+      enable = true;
+      romm.enable = false;
+      players.alice = { };
+      players.bob.voice.discord = {
+        enable = true;
+        mic = "alsa_input.usb-Logitech_HD_Webcam_C920-02.analog-stereo";
+      };
+    };
+  } (c: [
+    (check "only bob gets Vesktop"
+      (lib.any (p: lib.getName p == "vesktop") c.home-manager.users.bob.home.packages
+        && !(lib.any (p: lib.getName p == "vesktop") c.home-manager.users.alice.home.packages)))
+    (check "bob's session starts it hidden and sets his mic; alice's doesn't mention it"
+      (lib.hasInfix "bob)" c.famidrive.sessionSetup
+        && lib.hasInfix "vesktop --start-minimized" c.famidrive.sessionSetup
+        && lib.hasInfix "pactl set-default-source" c.famidrive.sessionSetup
+        && lib.hasInfix "Logitech_HD_Webcam_C920" c.famidrive.sessionSetup
+        && !(lib.hasInfix "alice)" c.famidrive.sessionSetup)))
+  ]);
+
   # PS3 online on its own (not online.enable): each player signed in to
   # RPCN with their own account, the guest not.
   box-ps3-online = expect "ps3-online" {

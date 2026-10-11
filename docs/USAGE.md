@@ -502,6 +502,26 @@ Their Linux account. Made if it doesn't exist yet.
 - **Type:** string
 - **Default:** `"‹name›"`
 
+### `famidrive.players.<name>.voice.discord.enable`
+
+Whether to enable Discord voice chat alongside a game, through Vesktop, started
+hidden with the session.
+
+- **Type:** boolean
+- **Default:** `false`
+- **Example:** `true`
+
+### `famidrive.players.<name>.voice.discord.mic`
+
+PipeWire source to use as their microphone in voice chat (its
+name, as `pactl list sources short` shows it), set as the
+default input for their session. Null leaves whatever
+PipeWire already picked.
+
+- **Type:** null or string
+- **Default:** `null`
+- **Example:** `"alsa_input.usb-Logitech_HD_Webcam_C920-02.analog-stereo"`
+
 ### `famidrive.primaryPlayer`
 
 The box's main player. Their RomM token is the one the shared

@@ -114,6 +114,7 @@ in
     ./generators.nix
     ./pc-saves.nix
     ./online.nix
+    ./voice.nix
     ./media.nix
     ./endpoints.nix
     ./controllers.nix
