@@ -324,9 +324,10 @@ in
       Give games FamiDrive knows about the launch options they need
       (lib/steam-games.nix), so nobody has to find them out again:
       Cyberpunk 2077 skips its launcher (`--launcher-skip`), whose window
-      stays black on the TV, and for a player who mods it through Nexus
-      Mods also loads the mods' DLLs. A game in `launchOptions` gets
-      that instead. Off: only what `launchOptions` and mods set.
+      stays black on the TV, and a player's modded games load their mods
+      (Cyberpunk 2077 through Nexus Mods; Valheim and Risk of Rain 2
+      through Thunderstore). A game in `launchOptions` gets that instead.
+      Off: only what `launchOptions` and players' own set.
     '';
   };
 

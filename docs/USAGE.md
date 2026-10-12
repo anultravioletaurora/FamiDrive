@@ -505,10 +505,11 @@ The game's BepInExPack on Thunderstore, by Author-Name-Version.
 
 The game's launch options in Steam that load BepInEx, for this
 player only: a Windows game under Proton needs the winhttp
-override above. Cleared again when the game is taken out.
+override above. null: the box's (`steam.launchOptions`). Set
+back when the game is taken out.
 
 - **Type:** null or string
-- **Default:** the game's, for Valheim and Risk of Rain 2
+- **Default:** the game's, for Valheim and Risk of Rain 2 (lib/steam-games.nix), unless `steam.launchOptions` has the game
 - **Example:** `"WINEDLLOVERRIDES=\"winhttp=n,b\" %command%"`
 
 ### `famidrive.players.<name>.thunderstore.games.<name>.mods`
@@ -1224,9 +1225,10 @@ installed yet are skipped until they are.
 Give games FamiDrive knows about the launch options they need
 (lib/steam-games.nix), so nobody has to find them out again:
 Cyberpunk 2077 skips its launcher (`--launcher-skip`), whose window
-stays black on the TV, and for a player who mods it through Nexus
-Mods also loads the mods' DLLs. A game in `launchOptions` gets
-that instead. Off: only what `launchOptions` and mods set.
+stays black on the TV, and a player's modded games load their mods
+(Cyberpunk 2077 through Nexus Mods; Valheim and Risk of Rain 2
+through Thunderstore). A game in `launchOptions` gets that instead.
+Off: only what `launchOptions` and players' own set.
 
 - **Type:** boolean
 - **Default:** `true`

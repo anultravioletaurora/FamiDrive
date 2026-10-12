@@ -286,7 +286,9 @@ famidrive.players.alice.thunderstore.games = {
 - **Taking a game out** clears its launch options, so it starts
   unmodded; its files stay in the game's folder.
 - **Other games:** FamiDrive knows Valheim's and Risk of Rain 2's BepInEx
-  pack and launch options. For another BepInEx game, set its
+  pack and launch options (the launch options are in
+  [`lib/steam-games.nix`](../modules/famidrive/lib/steam-games.nix), with
+  every other game's). For another BepInEx game, set its
   `bepinex.package`, `bepinex.hash` and `launchOptions` too. A Windows
   game under Proton loads BepInEx with
   `WINEDLLOVERRIDES="winhttp=n,b" %command%`.
