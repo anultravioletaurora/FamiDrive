@@ -64,6 +64,13 @@ let
       # before its settings files are edited and before this session
       # starts its own; famidrive-end-session brings it back on the way out.
       systemctl --user stop famidrive-steam-background.service 2>/dev/null || true
+      # And any other Steam of this player's still on its way out (an
+      # earlier session's): `steam -silent` below would only hand itself
+      # to it, and this session's games would go to a Steam with no screen.
+      for _ in $(seq 1 30); do
+        ${pkgs.procps}/bin/pgrep -u "$(id -u)" -x steam > /dev/null || break
+        sleep 0.5
+      done
       # Proton pins, Steam Input and launch options, written while Steam
       # isn't running (pkgs/famidrive-steam-config). A player's own launch
       # options (their mods') go over the box's.
@@ -456,7 +463,20 @@ in
           Service = {
             Environment = "PATH=/run/current-system/sw/bin:/run/wrappers/bin";
             ExecStart = "${pkgs.xvfb-run}/bin/xvfb-run -a steam -silent";
-            ExecStop = "steam -shutdown";
+            # Asks Steam to quit, then waits for it: systemd sends SIGTERM
+            # to whatever's left the moment ExecStop returns. By full path,
+            # since systemd looks a command up in its own PATH, not
+            # Environment's. Found on the first box 2026-10-12: a bare
+            # `steam` failed (203/EXEC), so Steam was killed mid-work
+            # each time a player was picked, and the session's own Steam
+            # that started a second later ignored every -applaunch.
+            ExecStop = toString (pkgs.writeShellScript "famidrive-steam-background-stop" ''
+              steam -shutdown > /dev/null 2>&1 || true
+              for _ in $(seq 1 50); do
+                kill -0 "$MAINPID" 2> /dev/null || exit 0
+                sleep 0.5
+              done
+            '');
             TimeoutStopSec = 30;
             Restart = "on-failure";
             RestartSec = 30;
