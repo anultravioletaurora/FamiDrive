@@ -305,6 +305,17 @@ The collection's id, the last part of its address on nexusmods.com.
 - **Default:** none; required when used
 - **Example:** `"iszwwe"`
 
+### `famidrive.players.<name>.nexusmods.games.<name>.launchOptions`
+
+The game's launch options in Steam while it's modded, for this
+player only, over the box's. null: the box's (`steam.launchOptions`,
+or FamiDrive's own for the game). A Steam game only; set back
+when the game is taken out.
+
+- **Type:** null or string
+- **Default:** what loads the mods, for a game FamiDrive knows (lib/steam-games.nix), unless `steam.launchOptions` has the game
+- **Example:** `"WINEDLLOVERRIDES=\"winmm,version=n,b\" %command% --launcher-skip"`
+
 ### `famidrive.players.<name>.overlays.performance.enable`
 
 MangoHud's performance overlay (frame rate, frame times, CPU and
@@ -1208,11 +1219,25 @@ installed yet are skipped until they are.
   }
   ```
 
+### `famidrive.steam.defaultLaunchOptions`
+
+Give games FamiDrive knows about the launch options they need
+(lib/steam-games.nix), so nobody has to find them out again:
+Cyberpunk 2077 skips its launcher (`--launcher-skip`), whose window
+stays black on the TV, and for a player who mods it through Nexus
+Mods also loads the mods' DLLs. A game in `launchOptions` gets
+that instead. Off: only what `launchOptions` and mods set.
+
+- **Type:** boolean
+- **Default:** `true`
+
 ### `famidrive.steam.launchOptions`
 
 Games' launch options, by name (as Steam and ES-DE show it) or app
 id. Set at the start of each session; a game not listed keeps what
-was set in Steam.
+was set in Steam, or gets FamiDrive's own (`defaultLaunchOptions`).
+A game set here gets exactly this, in place of FamiDrive's, for
+every player, mods or not.
 
 - **Type:** attribute set of string
 - **Default:** `{ }`
@@ -1220,7 +1245,7 @@ was set in Steam.
 
   ```nix
   {
-    "Cyberpunk 2077" = "WINEDLLOVERRIDES=\"winmm,version=n,b\" %command%";
+    "Cyberpunk 2077" = "WINEDLLOVERRIDES=\"winmm,version=n,b\" %command% --launcher-skip";
   }
   ```
 

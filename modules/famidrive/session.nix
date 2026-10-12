@@ -9,11 +9,21 @@
 let
   inherit (lib) mkOption types;
   cfg = config.famidrive;
+  steamGames = import ./lib/steam-games.nix { inherit lib; };
 
-  # famidrive-steam-config's settings, with a player's own launch options.
+  # Launch options FamiDrive knows games need (lib/steam-games.nix), for
+  # the games the host hasn't set its own for, by app id or name.
+  knownLaunchOptions = lib.optionalAttrs cfg.steam.defaultLaunchOptions
+    (lib.filterAttrs (appid: _: !steamGames.setIn cfg.steam.launchOptions appid) steamGames.plain);
+
+  # famidrive-steam-config's settings, with a player's own launch options
+  # (by app id) over the box's. A box entry by the same game's name is
+  # dropped, or both would reach the tool and the name's would win.
   steamSettings = own: lib.escapeShellArg (builtins.toJSON {
     inherit (cfg.steam) compatTools steamInput steamInputGames;
-    launchOptions = cfg.steam.launchOptions // own;
+    launchOptions = lib.filterAttrs
+      (game: _: !lib.any (appid: (steamGames.games.${appid}.name or null) == game) (lib.attrNames own))
+      (knownLaunchOptions // cfg.steam.launchOptions) // own;
   });
   hasLane = l: lib.elem l cfg.lanes;
 
@@ -291,17 +301,32 @@ in
     type = types.attrsOf (types.attrsOf types.str);
     default = { };
     internal = true;
-    description = "Launch options for one player only, by their user, over `launchOptions` (thunderstore.nix).";
+    description = "Launch options for one player only, by their user, over `launchOptions` (thunderstore.nix, nexusmods.nix).";
   };
 
   options.famidrive.steam.launchOptions = mkOption {
     type = types.attrsOf types.str;
     default = { };
-    example = { "Cyberpunk 2077" = ''WINEDLLOVERRIDES="winmm,version=n,b" %command%''; };
+    example = { "Cyberpunk 2077" = ''WINEDLLOVERRIDES="winmm,version=n,b" %command% --launcher-skip''; };
     description = ''
       Games' launch options, by name (as Steam and ES-DE show it) or app
       id. Set at the start of each session; a game not listed keeps what
-      was set in Steam.
+      was set in Steam, or gets FamiDrive's own (`defaultLaunchOptions`).
+      A game set here gets exactly this, in place of FamiDrive's, for
+      every player, mods or not.
+    '';
+  };
+
+  options.famidrive.steam.defaultLaunchOptions = mkOption {
+    type = types.bool;
+    default = true;
+    description = ''
+      Give games FamiDrive knows about the launch options they need
+      (lib/steam-games.nix), so nobody has to find them out again:
+      Cyberpunk 2077 skips its launcher (`--launcher-skip`), whose window
+      stays black on the TV, and for a player who mods it through Nexus
+      Mods also loads the mods' DLLs. A game in `launchOptions` gets
+      that instead. Off: only what `launchOptions` and mods set.
     '';
   };
 

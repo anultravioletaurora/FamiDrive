@@ -80,6 +80,13 @@ famidrive.players.alice.nexusmods.games."1091500" = {   # Cyberpunk 2077
   ```
   Optional mods in a collection (Vortex asks about each) are installed
   like the rest; `skip` is how to leave one out.
+- **Launch options:** for a game FamiDrive knows, the ones that load its
+  mods are set in Steam for that player only. Cyberpunk 2077 gets
+  `WINEDLLOVERRIDES="winmm,version=n,b" %command% --launcher-skip`, so
+  Cyber Engine Tweaks and RED4ext load and its launcher is skipped.
+  Set the game's `launchOptions` to use other ones; they go back to the
+  box's when the game is taken out. Other games are listed in
+  [`lib/steam-games.nix`](../modules/famidrive/lib/steam-games.nix).
 
 ### What a rebuild does
 

@@ -252,15 +252,24 @@ Warfare's Legacy Edition.
   (5,575 files, 23 GB of archives): "looks preem". redscript compiled
   every script, RED4ext and Cyber Engine Tweaks loaded with no errors.
   The Proton launch option below is still needed.
-- **Launch options:** `WINEDLLOVERRIDES="winmm,version=n,b" %command%`,
-  set in Steam (or `steam.launchOptions`). Cyber Engine Tweaks and
-  RED4ext load through them.
+- **Launch options:** set by FamiDrive (`steam.defaultLaunchOptions`):
+  `%command% --launcher-skip` for everyone, and
+  `WINEDLLOVERRIDES="winmm,version=n,b" %command% --launcher-skip` for a
+  player who mods it through Nexus Mods. Cyber Engine Tweaks and RED4ext
+  load through the override. Before that, set in Steam by hand.
 - **Launching:** works. Steam's window shows briefly, then a black screen
   for about 37 s while the game starts, then the game. It used to drop
   back to ES-DE with the game running behind it: Steam swaps the process
   it starts for another, three times in 40 s, and FamiDrive followed only
   the first. Fixed in `ac82a59`. The status screen now covers the wait
   with "Starting" (see [Steam launches](#steam-launches)).
+- **REDlauncher:** 2026-10-12, on the first box: a black screen and no
+  game. CD Projekt's launcher (REDlauncher 5.0) was up and waiting for
+  Play to be clicked, but its window draws nothing under gamescope. The
+  game hadn't started since 2026-10-10 03:49, and that launch only got
+  through because an earlier launcher had hung ("Another instance of
+  REDlauncher is running, and not responding. Will run the game").
+  `--launcher-skip` fixed it, and is now FamiDrive's default.
 - **Performance:** 2026-10-10, the game's own benchmark on the first
   box, with NCR and the High-Res Graphics Pack – MAXIMUM installed, at
   4K on the TV with every graphics setting at its highest (a custom

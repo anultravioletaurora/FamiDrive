@@ -253,6 +253,29 @@ in
             c.systemd.services.famidrive-nexusmods-alice.serviceConfig.ExecStart)))); in
         map (x: x.slug) spec.games."1091500".collections == [ "iszwwe" "g0tcm4" ]
           && spec.games."1091500".choices."WTNC Config" == [ "Cyberpunk THING" ]))
+    (check "a known game's mods load for the player who mods it, launcher skipped; the other player keeps the box's"
+      (c.famidrive.steam.playerLaunchOptions.alice."1091500"
+          == ''WINEDLLOVERRIDES="winmm,version=n,b" %command% --launcher-skip''
+        && !(c.famidrive.steam.playerLaunchOptions ? bob)))
+  ]);
+
+  # A host's own launch options for a game FamiDrive knows, by its name:
+  # those, for every player, mods or not.
+  box-launch-options = expect "launch-options" {
+    famidrive = {
+      enable = true;
+      romm.enable = false;
+      steam.launchOptions."Cyberpunk 2077" = "%command%";
+      players.alice.nexusmods.games."1091500".collection = { slug = "iszwwe"; revision = 481; };
+      players.bob.nexusmods.games."1091500" = {
+        collection = { slug = "iszwwe"; revision = 481; };
+        launchOptions = "mine %command%";
+      };
+    };
+  } (c: [
+    (check "the host's, by name, over FamiDrive's modded ones; a player's own over both"
+      (!(c.famidrive.steam.playerLaunchOptions ? alice)
+        && c.famidrive.steam.playerLaunchOptions.bob."1091500" == "mine %command%"))
   ]);
 
   # Overlays: the box's positions, a player's own, MangoHud for one player.
