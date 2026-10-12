@@ -160,13 +160,24 @@ options.
 
 ### BattleBit Remastered
 
-**Steam: 🟡 Runs, no controller yet.** Launches through Proton. Steam's
-store page says "Partial Controller Support".
+**Steam: 🟡 Playable, with Steam Input on and a keyboard-and-mouse
+layout.** Launches through Proton Experimental. Steam's store page says
+"Partial Controller Support", but the game has no gamepad support of its
+own: it reads only keyboard and mouse. Keep Steam Input on for it
+(`steam.steamInputGames`) and give it a layout that turns the pad into
+keys and a mouse (Big Picture → the game → Controller → Browse layouts,
+Community or the "Keyboard (WASD) and Mouse" template). Steam keeps the
+layout for the game. No aim assist: aiming is a mouse on a stick.
 
 - **2026-10-12, controllers, Steam Input off (FamiDrive's default):** ❌
   neither the DualShock 4 (Bluetooth) nor the Xbox Wireless Controller
   (Bluetooth) did anything, in the menus or on the shooting range.
   Steam Input on (`steam.steamInputGames`) is next to try.
+- **2026-10-12, Steam Input on, Steam's default layout:** ❌ still
+  nothing. That layout shows the game a virtual Xbox pad, which it
+  ignores like the real ones.
+- **2026-10-12, Steam Input on, a community keyboard-and-mouse layout:**
+  ✅ works.
 
 ### Call of Duty: Black Ops III
 
@@ -944,7 +955,7 @@ of each session. Games that do better with it are listed in
 | Game | Steam Input on | Steam Input off |
 |---|---|---|
 | Left 4 Dead 2 | works, right prompts: **kept on** | no shooting |
-| BattleBit Remastered | ❔ | no pad at all (DualShock 4, Xbox Wireless Controller) |
+| BattleBit Remastered | works with a keyboard-and-mouse layout (no native pad support): **kept on** | no pad at all (DualShock 4, Xbox Wireless Controller) |
 | Rocket League | no pad at all | works, split-screen too |
 | Street Fighter 6 | works, two players | works, two players |
 
