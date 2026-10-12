@@ -314,13 +314,34 @@ writeShellApplication {
       # ES-DE came back over a launch that was still going. The only limit
       # is on silence: two minutes with no launch step logged and no game
       # (Steam ignored the request, or the game died before its launcher
-      # was seen). Select + Start gives up at any time.
+      # was seen). Select + Start gives up at any time. In seconds, not
+      # rounds of the loop: found on the first box 2026-10-12, each round
+      # took well over its half second, and two minutes came out past five.
+      #
+      # Steam answering at all is checked sooner: it logs a launch step
+      # within seconds of being asked. Found on the first box 2026-10-12:
+      # a Steam that took the request through its pipe and never acted on
+      # it, for every game, until it was restarted. A Steam that's only
+      # just started (or that -applaunch started) gets longer, for its
+      # own startup and update check.
+      steam_pid=$(pgrep -o -u "$(id -u)" -x steam || true)
+      steam_age=$(ps -o etimes= -p "''${steam_pid:-0}" 2>/dev/null | tr -d ' ' || true)
+      if [ "''${steam_age:-0}" -ge 60 ]; then answer_limit=30; else answer_limit=180; fi
+      asked=$SECONDS
       pid=""
       retried=""
-      idle=0
+      quiet=$SECONDS
       last=""
-      while [ "$idle" -lt 240 ]; do
+      while [ $((SECONDS - quiet)) -lt 120 ]; do
         steps=$(since)
+        if [ -z "$steps" ] && [ $((SECONDS - asked)) -ge "$answer_limit" ]; then
+          echo "gamescope-fg: Steam didn't answer -applaunch $appid in ''${answer_limit}s; see $log" >&2
+          status failed "Steam isn't answering. Quit from ES-DE's menu to restart it, then try again."
+          base "$STATUS,$FRONTEND"
+          for _ in $(seq 1 16); do status_tag; sleep 0.5; done
+          base "$FRONTEND"
+          exit 1
+        fi
         # The game's processes count only once Steam says it has started
         # the game. Found on the first box 2026-10-05: Steam runs a game's
         # install script (ProcessingInstallScript) through the same
@@ -356,7 +377,8 @@ writeShellApplication {
               sleep 0.5
             done
             seen=$(wc -l < "$log" 2>/dev/null || echo 0)
-            idle=0
+            quiet=$SECONDS
+            asked=$SECONDS
             last=""
             SDL_GAMECONTROLLER_IGNORE_DEVICES="''${FAMIDRIVE_STEAM_SDL_IGNORE:-}" steam -applaunch "$appid"
             continue
@@ -403,9 +425,9 @@ writeShellApplication {
         status_tag
         if [ "$now" != "$last" ] || [ -n "$install" ]; then
           last="$now"
-          idle=0
-        elif ! grep -qE "DownloadingDepots|ProcessingShaderCache|RunningInstallScript|waiting for user response" <<< "$now"; then
-          idle=$((idle + 1))
+          quiet=$SECONDS
+        elif grep -qE "DownloadingDepots|ProcessingShaderCache|RunningInstallScript|waiting for user response" <<< "$now"; then
+          quiet=$SECONDS
         fi
         sleep 0.5
       done
