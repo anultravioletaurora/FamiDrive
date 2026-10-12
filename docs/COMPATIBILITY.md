@@ -24,6 +24,7 @@ behave differently in each. For a console game it's the emulator.
   - [Animal Crossing: New Horizons](#animal-crossing-new-horizons) (Switch)
   - [Assassin's Creed Valhalla](#assassins-creed-valhalla) (PC)
   - [Back 4 Blood](#back-4-blood) (PC)
+  - [BattleBit Remastered](#battlebit-remastered) (PC)
   - [Call of Duty: Black Ops III](#call-of-duty-black-ops-iii) (PC)
   - [Call of Duty: Infinite Warfare](#call-of-duty-infinite-warfare) (PC)
   - [Call of Duty: Modern Warfare Remastered](#call-of-duty-modern-warfare-remastered) (PC)
@@ -84,7 +85,7 @@ otherwise.
 | CPU | AMD Ryzen 9 7900X |
 | GPU | AMD Radeon RX 7900 XTX (24 GB) |
 | Display | 4K TV, 120 Hz, HDR on (`display.hdr = true`, `display.refresh = 120`) |
-| Controllers | 8BitDo Ultimate 2 (2.4 GHz dongle), Xbox Wireless Controller (Bluetooth), DualSense (Bluetooth), a PowerA GameCube-style pad for Switch (USB), first-party Wii Remotes, a Wii guitar on a Raphnet adapter ([CONTROLLERS.md](CONTROLLERS.md)) |
+| Controllers | 8BitDo Ultimate 2 (2.4 GHz dongle), Xbox Wireless Controller (Bluetooth), DualSense (Bluetooth), DualShock 4 (Bluetooth), a PowerA GameCube-style pad for Switch (USB), first-party Wii Remotes, a Wii guitar on a Raphnet adapter ([CONTROLLERS.md](CONTROLLERS.md)) |
 | FamiDrive | `f2b8769` and later, October 2026 |
 
 **The second box:** a small office PC, installed fresh from the README.
@@ -156,6 +157,16 @@ options.
   were oversaturated: the sun blinding, shadows too dark to see into.
 - **Controllers:** the 8BitDo plays well, rumble included, with Steam
   Input off.
+
+### BattleBit Remastered
+
+**Steam: 🟡 Runs, no controller yet.** Launches through Proton. Steam's
+store page says "Partial Controller Support".
+
+- **2026-10-12, controllers, Steam Input off (FamiDrive's default):** ❌
+  neither the DualShock 4 (Bluetooth) nor the Xbox Wireless Controller
+  (Bluetooth) did anything, in the menus or on the shooting range.
+  Steam Input on (`steam.steamInputGames`) is next to try.
 
 ### Call of Duty: Black Ops III
 
@@ -618,6 +629,8 @@ on first launch, but not the Battle.net app.
   overlay is off. Dismiss it and play. Steam's overlay doesn't come up
   over games in FamiDrive's session yet, so buying in-game items, which
   Steam confirms in its overlay, won't work (2026-10-09).
+- **2026-10-12, DualShock 4 (Bluetooth), Steam Input off:** ✅ every
+  control right, rumble worked, and the game showed PlayStation glyphs.
 
 ### Street Fighter 6
 
@@ -868,6 +881,8 @@ update 1.0.3 from RomM.
   `./start_game_bepinex.sh %command%` for that player. Tested on a copy
   of the first box's install; not yet played that way.
 - **Graphics:** runs on Vulkan, which the game picks on its own.
+- **2026-10-12, controllers, Steam Input off:** ✅ the DualShock 4
+  (Bluetooth) and the 8BitDo both worked.
 
 ### Wii Sports
 
@@ -906,6 +921,15 @@ again. Select + Start gives up at any time. Steam's "Allow background
 processing" (Settings → Downloads → Shader Pre-Caching) should mean fewer
 shader waits at launch.
 
+- **2026-10-12, first box:** ❌ Rocket League and Cyberpunk 2077 each sat
+  on "Asking Steam" for over five minutes, then went back to ES-DE. Steam
+  had taken the launch through its pipe and logged nothing back, for
+  every game, until it was restarted. Cause: the idle background Steam
+  (#187) was killed instead of shut down when the player was picked
+  (its stop command failed, `203/EXEC`). Fixed in #191, which also gives
+  up after 30 s when Steam doesn't answer at all, with a message saying
+  to restart it.
+
 ### Controllers in Steam games
 
 Steam Input sits between the pad and a game: it hides the real pad and
@@ -920,6 +944,7 @@ of each session. Games that do better with it are listed in
 | Game | Steam Input on | Steam Input off |
 |---|---|---|
 | Left 4 Dead 2 | works, right prompts: **kept on** | no shooting |
+| BattleBit Remastered | ❔ | no pad at all (DualShock 4, Xbox Wireless Controller) |
 | Rocket League | no pad at all | works, split-screen too |
 | Street Fighter 6 | works, two players | works, two players |
 

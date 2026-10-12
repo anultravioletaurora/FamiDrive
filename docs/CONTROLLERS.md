@@ -38,7 +38,7 @@ yet is listed below as ❔ until someone does.
 | [Xbox 360 controller, wired](#xbox-360-controller-wired) | USB | ✅ | ❔ | ✅ | ❔ | ❔ | ❔ | ❔ | ✅ |
 | [Xbox One controller, wired](#xbox-one-controller-wired) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Original Xbox controller (Duke)](#original-xbox-controller-duke) | Xbox-to-USB cable | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
-| [DualShock 4](#dualshock-4) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
+| [DualShock 4](#dualshock-4) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ✅ | ✅ Rocket League | ❔ |
 | [Razer Raiju Tournament Edition](#razer-raiju) | USB / Bluetooth | ✅ | ❔ | ✅ | ❔ | ❔ | ❔ | ❔ | ✅ |
 | [PS3 Sixaxis / DualShock 3](#ps3-sixaxis--dualshock-3) | USB / Bluetooth | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [PS2 controllers on a USB adapter](#ps2-controllers-on-a-usb-adapter) | USB adapter | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
@@ -233,6 +233,11 @@ Which of the two the result below was from isn't recorded.
   (FamiDrive's default). Every button did what was expected, the game
   showed Xbox glyphs, and the controller could tab to and press a
   launch dialog's OK.
+- **2026-10-12, Steam:** ❌ in [BattleBit
+  Remastered](COMPATIBILITY.md#battlebit-remastered), with Steam Input
+  off: nothing in the menus or on the shooting range. The DualShock 4
+  did no better, so it's the game. This pad's kernel log said
+  `045e:0b13`, "Xbox Wireless Controller (modern)".
 
 - **Driver:** xpadneo, which the test box's host config turns on
   (`hardware.xpadneo.enable`). FamiDrive doesn't add it itself. Under
@@ -286,8 +291,20 @@ the black and white buttons come through.
 
 ## DualShock 4
 
-❔ Untested. The kernel driver is `hid-playstation` on recent kernels.
-SDL knows the pad. Things to note:
+Over Bluetooth, on the first box.
+
+- **2026-10-12, Steam games, Steam Input off (FamiDrive's default):** ✅
+  [Rocket League](COMPATIBILITY.md#rocket-league): every control right,
+  rumble worked, PlayStation glyphs. [Valheim](COMPATIBILITY.md#valheim)
+  worked too. ❌ [BattleBit Remastered](COMPATIBILITY.md#battlebit-remastered)
+  didn't see it, nor the Xbox pad: that's the game.
+
+- **IDs:** `054c:09cc` (the second DualShock 4 model), Bluetooth.
+- **Driver:** `hid-playstation`. It also adds "Wireless Controller
+  Motion Sensors" and "Wireless Controller Touchpad" input devices.
+- **SDL name:** "PS4 Controller" (ES-DE's log).
+
+Still to check:
 
 - the touchpad, which can show up as a mouse
 - the light bar
