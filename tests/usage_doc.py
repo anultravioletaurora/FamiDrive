@@ -91,7 +91,7 @@ def render(options):
         "# Usage",
         "",
         "Every option a box's `configuration.nix` can set, under `famidrive.`. For",
-        "setting up a box, start with [Using it](../README.md#using-it) in the README.",
+        "setting up a box, start with [INSTALLATION.md](INSTALLATION.md).",
         "",
         "Options without a default have to be set when the feature that uses them",
         "is on; every other option is optional.",

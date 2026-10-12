@@ -363,6 +363,24 @@ in
     description = "Refresh rate gamescope asks the TV for. null = the TV's preferred mode.";
   };
 
+  options.famidrive.display.scale = mkOption {
+    type = types.oneOf [ types.int types.float ];
+    default = 1.5;
+    example = 2;
+    description = ''
+      How much to enlarge things for this TV. Two couch problems, one
+      number:
+        - Chromium's own UI scale (`--force-device-scale-factor`),
+          passed to Discord, Vesktop and Equibop (`voice.nix`): their
+          fonts and icons are a desktop app's, tiny from a couch.
+        - Plymouth's boot screen (`boot.nix`), rounded to the
+          nearest whole number and clamped to 1-4, the only sizes it has
+          pre-rendered images for.
+      It can't tell how far away a TV is: the default, 1.5, is sized for
+      a 4K TV (rounding to 2 for Plymouth); use 1 on a 1080p one.
+    '';
+  };
+
   options.famidrive.cec.enable = lib.mkEnableOption ''
     HDMI-CEC TV power-on. Deferred to project phase 2 (spec.md); off by
     default and untested. AMD discrete GPUs don't expose CEC on Linux, so

@@ -1,7 +1,7 @@
 # Usage
 
 Every option a box's `configuration.nix` can set, under `famidrive.`. For
-setting up a box, start with [Using it](../README.md#using-it) in the README.
+setting up a box, start with [INSTALLATION.md](INSTALLATION.md).
 
 Options without a default have to be set when the feature that uses them
 is on; every other option is optional.
@@ -536,13 +536,14 @@ Their Linux account. Made if it doesn't exist yet.
 
 ### `famidrive.players.<name>.voice.discord.client`
 
-`"discord"`, the official app, or `"vesktop"` (Vencord's
-client). The official app is the default so this keeps
-working on Discord's own terms; Vesktop is there for a
-player who wants it, and is what the overlay this issue
-describes will need once it's built.
+`"discord"`, the official app, or a client mod's desktop
+app: `"vesktop"` (Vencord) or `"equibop"` (Equicord). The
+official app is the default so this keeps working on
+Discord's own terms; Vesktop and Equibop are there for a
+player who wants one, and are what the overlay this issue
+describes will need a plugin for once it's built.
 
-- **Type:** one of "discord", "vesktop"
+- **Type:** one of "discord", "vesktop", "equibop"
 - **Default:** `"discord"`
 
 ### `famidrive.players.<name>.voice.discord.enable`
@@ -747,9 +748,10 @@ Load the graphics driver in the initrd (by `famidrive.gpu`: AMD,
 Intel, or both for `"auto"`), so the boot screen is drawn at the
 TV's own resolution from the start. Without it, the boot screen
 starts on the firmware's low-resolution framebuffer, scaled up
-by `scale`, until the driver loads from the system disk. Found on
-both test boxes 2026-10-10: a blocky spinner for the first 13
-seconds. Costs a larger initrd (the driver and its firmware).
+by `famidrive.display.scale`, until the driver loads from the
+system disk. Found on both test boxes 2026-10-10: a blocky
+spinner for the first 13 seconds. Costs a larger initrd (the
+driver and its firmware).
 
 - **Type:** boolean
 - **Default:** `true`
@@ -761,22 +763,6 @@ Whether to enable a boot screen (Plymouth) in place of console text while the bo
 - **Type:** boolean
 - **Default:** `true`
 - **Example:** `true`
-
-### `famidrive.boot.splash.scale`
-
-How large Plymouth draws the boot screen. It can't tell how far
-away a TV is, so on a 4K TV it draws everything tiny at 1. The
-default, 4, is for a 4K TV; use 2 on a 1080p one.
-
-With `earlyGraphics` (the default) the boot screen is at the TV's
-resolution from the start. Without it, the first seconds are the
-firmware's lower resolution, where the spinner looks larger and
-blockier, then shrinks when the driver takes over. Found on the
-first box 2026-10-07: at 2 the spinner looked right on the
-firmware's screen and tiny at 4K.
-
-- **Type:** integer between 1 and 4 (both inclusive)
-- **Default:** `4`
 
 ### `famidrive.boot.splash.theme`
 
@@ -839,6 +825,23 @@ Refresh rate gamescope asks the TV for. null = the TV's preferred mode.
 - **Type:** null or (positive integer, meaning >0)
 - **Default:** `null`
 - **Example:** `120`
+
+### `famidrive.display.scale`
+
+How much to enlarge things for this TV. Two couch problems, one
+number:
+  - Chromium's own UI scale (`--force-device-scale-factor`),
+    passed to Discord, Vesktop and Equibop (`voice.nix`): their
+    fonts and icons are a desktop app's, tiny from a couch.
+  - Plymouth's boot screen (`boot.nix`), rounded to the
+    nearest whole number and clamped to 1-4, the only sizes it has
+    pre-rendered images for.
+It can't tell how far away a TV is: the default, 1.5, is sized for
+a 4K TV (rounding to 2 for Plymouth); use 1 on a 1080p one.
+
+- **Type:** signed integer or floating point number
+- **Default:** `1.5`
+- **Example:** `2`
 
 ### `famidrive.display.vrr`
 

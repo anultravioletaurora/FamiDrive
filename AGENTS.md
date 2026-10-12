@@ -19,14 +19,15 @@ Two real boxes run FamiDrive so far. In docs, comments and commits they
 are only ever "the first box" and "the second box":
 
 - **The first box:** a big AMD gaming PC (Ryzen 9 7900X, Radeon RX 7900
-  XTX) on a 4K120 HDR TV. An existing NixOS box moved over (the README's
-  "Moving an existing NixOS box over"). Several players and a guest.
-  Most results in the docs come from it.
+  XTX) on a 4K120 HDR TV. An existing NixOS box moved over ("Existing
+  NixOS install" in [INSTALLATION.md](docs/INSTALLATION.md)). Several
+  players and a guest. Most results in the docs come from it.
 - **The second box:** a small Intel office PC (Dell OptiPlex 3070 Micro,
   i5-9500T, UHD 630 graphics, 16 GB) on a TV at 1080p, wired Ethernet,
-  no Bluetooth. A fresh install straight from the README, with one
-  player and no guest, so it boots past "Who's playing?" into ES-DE. It's
-  the check that the README's install steps work as written and that a
+  no Bluetooth. A fresh install straight from
+  [INSTALLATION.md](docs/INSTALLATION.md), with one player and no guest,
+  so it boots past "Who's playing?" into ES-DE. It's the check that the
+  install steps work as written and that a
   low-end Intel box is enough for the older consoles.
 
 Results from either go in the docs with the box named that way and a
@@ -128,10 +129,10 @@ straight to main.
 ## Docs
 
 - [README.md](README.md) is the front page: what FamiDrive is, its
-  status, installing, and a **Docs** list linking every page in `docs/`.
+  status, a pointer to installing, and a **Docs** list linking every page in `docs/`.
 - `docs/` holds the rest, all Markdown, so it can become a GitHub Pages
-  site later: [COMPARISON.md](docs/COMPARISON.md),
-  [USAGE.md](docs/USAGE.md) (generated, never edited by hand except to
+  site later: [INSTALLATION.md](docs/INSTALLATION.md),
+  [COMPARISON.md](docs/COMPARISON.md), [USAGE.md](docs/USAGE.md) (generated, never edited by hand except to
   mirror an option's description exactly), [COMPATIBILITY.md](docs/COMPATIBILITY.md)
   and [CONTROLLERS.md](docs/CONTROLLERS.md). A new page goes in `docs/`
   and gets a line in the README's Docs list. Links between pages in
@@ -169,7 +170,8 @@ the exact commands.
   - A default a host may want to change is `lib.mkDefault`.
   - An app whose saves sync under a RomM entry made by hand
     (`famidrive.romm.apps`, like Clone Hero and YARG) gets a row in the
-    README's "RomM entries to add by hand" table.
+    "RomM entries to add by hand" table in
+    [INSTALLATION.md](docs/INSTALLATION.md).
   - A renamed or removed option gets `mkRemovedOptionModule` or
     `mkRenamedOptionModule` with a message that says what to use instead.
 - **Players:**

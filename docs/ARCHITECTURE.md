@@ -22,8 +22,8 @@ settings), it calls `nixpkgs.lib.nixosSystem` with this flake's pinned
 `nixpkgs` and `nixosModules.default` (the `famidrive` module, home-manager
 and sops-nix wired in). There are no hosts in this repo — every real box
 is a small private flake elsewhere that imports this one and calls
-`mkBox` on its own `configuration.nix` (see the README's
-[Using it](../README.md#using-it)).
+`mkBox` on its own `configuration.nix` (see
+[INSTALLATION.md](INSTALLATION.md)).
 
 ## The module: one option surface, many imports
 
