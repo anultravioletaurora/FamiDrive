@@ -165,8 +165,8 @@ layout.** Launches through Proton Experimental. Steam's store page says
 "Partial Controller Support", but the game has no gamepad support of its
 own: it reads only keyboard and mouse. Keep Steam Input on for it
 (`steam.steamInputGames`) and give it a layout that turns the pad into
-keys and a mouse (Big Picture → the game → Controller → Browse layouts,
-Community or the "Keyboard (WASD) and Mouse" template). Steam keeps the
+keys and a mouse (Big Picture → the game → Controller → Browse layouts
+→ Community, and pick the one with the most thumbs up). Steam keeps the
 layout for the game. No aim assist: aiming is a mouse on a stick.
 
 - **2026-10-12, controllers, Steam Input off (FamiDrive's default):** ❌
@@ -176,8 +176,8 @@ layout for the game. No aim assist: aiming is a mouse on a stick.
 - **2026-10-12, Steam Input on, Steam's default layout:** ❌ still
   nothing. That layout shows the game a virtual Xbox pad, which it
   ignores like the real ones.
-- **2026-10-12, Steam Input on, a community keyboard-and-mouse layout:**
-  ✅ works.
+- **2026-10-12, Steam Input on, the community layout with the most
+  thumbs up:** ✅ worked perfectly.
 
 ### Call of Duty: Black Ops III
 
