@@ -95,7 +95,7 @@ in
       esac
     '';
 
-    famidrive.playerHome = { famidrivePlayer, ... }:
+    famidrive.playerHome = { lib, famidrivePlayer, ... }:
       lib.mkIf (famidrivePlayer.voice.discord.enable or false) {
         home.packages = [ (client famidrivePlayer) ];
         # Vesktop and Equibop draw their own minimize/maximize/close

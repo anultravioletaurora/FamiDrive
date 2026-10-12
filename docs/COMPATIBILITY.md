@@ -87,7 +87,8 @@ otherwise.
 | Controllers | 8BitDo Ultimate 2 (2.4 GHz dongle), Xbox Wireless Controller (Bluetooth), DualSense (Bluetooth), a PowerA GameCube-style pad for Switch (USB), first-party Wii Remotes, a Wii guitar on a Raphnet adapter ([CONTROLLERS.md](CONTROLLERS.md)) |
 | FamiDrive | `f2b8769` and later, October 2026 |
 
-**The second box:** a small office PC, installed fresh from the README.
+**The second box:** a small office PC, installed fresh from
+[INSTALLATION.md](INSTALLATION.md).
 
 | | |
 |---|---|
