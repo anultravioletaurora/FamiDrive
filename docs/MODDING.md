@@ -80,6 +80,13 @@ famidrive.players.alice.nexusmods.games."1091500" = {   # Cyberpunk 2077
   ```
   Optional mods in a collection (Vortex asks about each) are installed
   like the rest; `skip` is how to leave one out.
+- **Launch options:** for a game FamiDrive knows, the ones that load its
+  mods are set in Steam for that player only. Cyberpunk 2077 gets
+  `WINEDLLOVERRIDES="winmm,version=n,b" %command% --launcher-skip`, so
+  Cyber Engine Tweaks and RED4ext load and its launcher is skipped.
+  Set the game's `launchOptions` to use other ones; they go back to the
+  box's when the game is taken out. Other games are listed in
+  [`lib/steam-games.nix`](../modules/famidrive/lib/steam-games.nix).
 
 ### What a rebuild does
 
@@ -279,7 +286,9 @@ famidrive.players.alice.thunderstore.games = {
 - **Taking a game out** clears its launch options, so it starts
   unmodded; its files stay in the game's folder.
 - **Other games:** FamiDrive knows Valheim's and Risk of Rain 2's BepInEx
-  pack and launch options. For another BepInEx game, set its
+  pack and launch options (the launch options are in
+  [`lib/steam-games.nix`](../modules/famidrive/lib/steam-games.nix), with
+  every other game's). For another BepInEx game, set its
   `bepinex.package`, `bepinex.hash` and `launchOptions` too. A Windows
   game under Proton loads BepInEx with
   `WINEDLLOVERRIDES="winhttp=n,b" %command%`.

@@ -13,6 +13,7 @@
 let
   inherit (lib) mkOption types;
   cfg = config.famidrive;
+  steamGames = import ./lib/steam-games.nix { inherit lib; };
 
   # Every player has the service, mods or not: one whose mods were all
   # taken out of the config needs it to take them out of the game.
@@ -73,7 +74,7 @@ let
     };
   };
 
-  game = types.submodule {
+  game = types.submodule ({ name, ... }: {
     options = {
       collections = mkOption {
         type = types.listOf collectionType;
@@ -106,8 +107,22 @@ let
           own default (its first option, when one must be picked).
         '';
       };
+      launchOptions = mkOption {
+        type = types.nullOr types.str;
+        default =
+          if cfg.steam.defaultLaunchOptions && !steamGames.setIn cfg.steam.launchOptions name
+          then steamGames.modded name else null;
+        defaultText = lib.literalMD "what loads the mods, for a game FamiDrive knows (lib/steam-games.nix), unless `steam.launchOptions` has the game";
+        example = ''WINEDLLOVERRIDES="winmm,version=n,b" %command% --launcher-skip'';
+        description = ''
+          The game's launch options in Steam while it's modded, for this
+          player only, over the box's. null: the box's (`steam.launchOptions`,
+          or FamiDrive's own for the game). A Steam game only; set back
+          when the game is taken out.
+        '';
+      };
     };
-  };
+  });
 in
 {
   options.famidrive.players = mkOption {
@@ -152,6 +167,11 @@ in
 
   config = lib.mkIf cfg.enable {
     environment.systemPackages = lib.mkIf (withMods != { }) [ pkgs.famidrive-nexusmods ];
+
+    # What loads a modded game's mods, for its players only (session.nix).
+    famidrive.steam.playerLaunchOptions = lib.mapAttrs' (_: p: lib.nameValuePair p.user
+      (lib.filterAttrs (_: o: o != null) (lib.mapAttrs (_: g: g.launchOptions) p.nexusmods.games)))
+      (lib.filterAttrs (_: p: lib.any (g: g.launchOptions != null) (lib.attrValues p.nexusmods.games)) withMods);
 
     sops.secrets = lib.mapAttrs' (name: p: lib.nameValuePair "${name}/nexusmods" { owner = p.user; })
       (lib.filterAttrs (_: p: p.nexusmods.apiKeyFile == null) withMods);

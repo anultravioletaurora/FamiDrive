@@ -10,6 +10,7 @@
 let
   inherit (lib) mkOption types;
   cfg = config.famidrive;
+  steamGames = import ./lib/steam-games.nix { inherit lib; };
   hasLane = l: lib.elem l cfg.lanes;
 
   thunderstore = ident: hash:
@@ -26,25 +27,17 @@ let
       inherit hash;
     };
 
-  # What FamiDrive knows about each game: its BepInExPack and the launch
-  # options that load it. Other games set both themselves.
+  # What FamiDrive knows about each game's BepInExPack. The launch options
+  # that load it are in lib/steam-games.nix, with every other game's.
+  # Other games set both themselves.
   known = {
-    # Valheim's Linux build, through BepInExPack's own start script.
-    "892970" = {
-      bepinex = {
-        package = "denikson-BepInExPack_Valheim-5.4.2351";
-        hash = "sha256-vOYxSXl2qTl3zrCOFmcS5sMdFSRJVvifF98JKpti4p8=";
-      };
-      launchOptions = "./start_game_bepinex.sh %command%";
+    "892970".bepinex = {   # Valheim
+      package = "denikson-BepInExPack_Valheim-5.4.2351";
+      hash = "sha256-vOYxSXl2qTl3zrCOFmcS5sMdFSRJVvifF98JKpti4p8=";
     };
-    # Risk of Rain 2, a Windows game under Proton: BepInEx loads through
-    # the pack's winhttp.dll, which Wine only uses when told to.
-    "632360" = {
-      bepinex = {
-        package = "bbepis-BepInExPack-5.4.2122";
-        hash = "sha256-ipjDz6g8kg0hxEfgt2BsiiarIYw1xHg5Sh+wgO+9tSc=";
-      };
-      launchOptions = ''WINEDLLOVERRIDES="winhttp=n,b" %command%'';
+    "632360".bepinex = {   # Risk of Rain 2
+      package = "bbepis-BepInExPack-5.4.2122";
+      hash = "sha256-ipjDz6g8kg0hxEfgt2BsiiarIYw1xHg5Sh+wgO+9tSc=";
     };
   };
 
@@ -90,13 +83,16 @@ let
       };
       launchOptions = mkOption {
         type = types.nullOr types.str;
-        default = known.${name}.launchOptions or null;
-        defaultText = lib.literalMD "the game's, for Valheim and Risk of Rain 2";
+        default =
+          if cfg.steam.defaultLaunchOptions && !steamGames.setIn cfg.steam.launchOptions name
+          then steamGames.modded name else null;
+        defaultText = lib.literalMD "the game's, for Valheim and Risk of Rain 2 (lib/steam-games.nix), unless `steam.launchOptions` has the game";
         example = ''WINEDLLOVERRIDES="winhttp=n,b" %command%'';
         description = ''
           The game's launch options in Steam that load BepInEx, for this
           player only: a Windows game under Proton needs the winhttp
-          override above. Cleared again when the game is taken out.
+          override above. null: the box's (`steam.launchOptions`). Set
+          back when the game is taken out.
         '';
       };
     };
@@ -154,12 +150,13 @@ in
 
   config = lib.mkIf (cfg.enable && hasLane "steam" && players != { }) {
     assertions = lib.concatLists (lib.mapAttrsToList (name: p: lib.mapAttrsToList (appid: g: {
-      assertion = g.bepinex.package != null && g.launchOptions != null;
+      assertion = g.bepinex.package != null
+        && (g.launchOptions != null || steamGames.setIn cfg.steam.launchOptions appid);
       message = "famidrive.players.${name}.thunderstore.games.\"${appid}\": FamiDrive doesn't know this game; set its bepinex.package, bepinex.hash and launchOptions.";
     }) p.thunderstore.games) players);
 
     famidrive.steam.playerLaunchOptions = lib.mapAttrs' (_: p: lib.nameValuePair p.user
-      (lib.mapAttrs (_: g: g.launchOptions) p.thunderstore.games)) players;
+      (lib.filterAttrs (_: o: o != null) (lib.mapAttrs (_: g: g.launchOptions) p.thunderstore.games))) players;
 
     famidrive.playerHome = { lib, famidrivePlayer, ... }:
       lib.mkIf (players ? ${famidrivePlayer.name}) {
