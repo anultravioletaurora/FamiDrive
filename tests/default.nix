@@ -201,6 +201,8 @@ in
     (pkgs.python3.withPackages (ps: [ ps.pygame-ce ]));
 
   toast = unit "toast" ../pkgs/famidrive-toast/famidrive_toast.py pkgs.python3;
+  status = unit "status" ../pkgs/famidrive-status/famidrive_status.py
+    (pkgs.python3.withPackages (ps: [ ps.pygame-ce ]));
   pads = unit "pads" ../pkgs/famidrive-pads/famidrive_pads.py pkgs.python3;
   bluetooth = unit "bluetooth" ../pkgs/famidrive-bluetooth/famidrive_bluetooth.py pkgs.python3;
   network = unit "network" ../pkgs/famidrive-network/famidrive_network.py pkgs.python3;
