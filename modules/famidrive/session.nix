@@ -509,6 +509,15 @@ in
           Install.WantedBy = [ "default.target" ];
           Service = {
             Environment = "PATH=/run/current-system/sw/bin:/run/wrappers/bin";
+            # The same Steam settings the session writes, before this Steam
+            # starts too. Found on the first box 2026-10-13: another
+            # player's background Steam still had "Guide Button Focuses
+            # Steam" on, heard Guide on the TV's pads (players are in the
+            # input group) and played its sounds under FamiDrive's menu.
+            ExecStartPre = toString (pkgs.writeShellScript "famidrive-steam-background-settings" ''
+              ${pkgs.famidrive-steam-config}/bin/famidrive-steam-config ${steamSettings (cfg.steam.playerLaunchOptions.${famidrivePlayer.user} or { })} \
+                || echo "famidrive-steam-background: couldn't apply Steam settings" >&2
+            '');
             ExecStart = "${pkgs.xvfb-run}/bin/xvfb-run -a steam -silent";
             # Asks Steam to quit, then waits for it: systemd sends SIGTERM
             # to whatever's left the moment ExecStop returns. By full path,

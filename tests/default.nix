@@ -526,6 +526,9 @@ in
           && lib.hasInfix "famidrive-network launch" c.famidrive.systems.settings.command
           && lib.hasInfix "org.freedesktop.NetworkManager." c.security.polkit.extraConfig))
       (check "a switch restarts the session when it changed" c.systemd.services.greetd.restartIfChanged)
+      (check "each player's background Steam gets FamiDrive's Steam settings (Guide isn't Steam's) before it starts"
+        (lib.all (u: lib.hasInfix "famidrive-steam-background-settings"
+          c.home-manager.users.${u}.systemd.user.services.famidrive-steam-background.Service.ExecStartPre) [ "alice" "bob" ]))
       (check "the Guide menu freezes emulators, and opens Steam's and Desktop games' own pause menus"
         (c.famidrive.systems.gc.guideMenu == "freeze" && c.famidrive.systems.steam.guideMenu == "pause"
           && c.famidrive.systems.desktop.guideMenu == "pause"))
