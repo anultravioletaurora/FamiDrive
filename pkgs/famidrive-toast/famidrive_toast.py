@@ -554,14 +554,37 @@ def pausable():
         return True
 
 
-def pad_changes(before, after, playing):
-    """The toasts for pads that came and went between two scans."""
+IDLE_OFF = "famidrive-idle-off.json"   # pads famidrive-quit just switched off for being idle
+
+
+def idle_off(run=None, now=None):
+    """{pad name: idle minutes} for pads famidrive-quit switched off in the
+    last minute (its famidrive-idle-off.json)."""
+    try:
+        found = json.loads(((run or sock_path().parent) / IDLE_OFF).read_text())
+    except (OSError, ValueError):
+        return {}
+    now = time.time() if now is None else now
+    return {o["name"]: o.get("minutes") for o in found if isinstance(o, dict) and now - o.get("at", 0) < 60}
+
+
+def pad_changes(before, after, playing, switched_off=None):
+    """The toasts for pads that came and went between two scans. A pad
+    famidrive-quit switched off for being idle (switched_off: {name:
+    minutes}) gets a plain notice saying so, in a game too: the player is
+    likely to pick it up again and play on, not quit."""
     toasts = []
+    switched_off = switched_off or {}
     for dev, name in sorted(after.items()):
         if dev not in before:
             toasts.append({"kind": "notice", "icon": "controller", "title": "Controller connected", "detail": name})
     for dev, name in sorted(before.items()):
-        if dev not in after:
+        if dev not in after and name in switched_off:
+            minutes = switched_off[name]
+            idle = f"was idle for {minutes:g} minutes" if minutes else "was idle"
+            toasts.append({"kind": "notice", "icon": "controller", "title": "Controller switched off",
+                           "detail": f"{name} {idle}. Turn it back on to keep playing."})
+        elif dev not in after:
             detail = name
             if playing:
                 detail += ". To play on with another controller, quit with Select + Start and start the game again."
@@ -590,7 +613,7 @@ def watch_controllers(interval=1.5):
     while True:
         time.sleep(interval)
         after = connected_pads()
-        for t in pad_changes(before, after, in_game()) + battery_changes(warned, pad_batteries()):
+        for t in pad_changes(before, after, in_game(), idle_off()) + battery_changes(warned, pad_batteries()):
             send(t)
         before = after
 

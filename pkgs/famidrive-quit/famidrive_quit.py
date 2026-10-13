@@ -91,6 +91,7 @@ TRIGGERS = (ABS_Z, ABS_RZ, ABS_GAS, ABS_BRAKE)
 # are the real pad's again, so they don't move the menu twice.
 STEAM_VIRTUAL = (0x28de, 0x11ff)
 TOAST_SOCK = RUN / "famidrive-toast.sock"
+IDLE_OFF = RUN / "famidrive-idle-off.json"   # for the toast daemon: say why a pad went
 BLUETOOTH = os.environ.get("FAMIDRIVE_QUIT_BLUETOOTH", "@famidrivebluetooth@")
 BUS_BLUETOOTH = 0x05
 WARN_BEFORE = 60.0  # seconds: the "going to sleep" toast, before an idle pad is let go
@@ -295,6 +296,23 @@ def bluetooth_address(dev):
     if dev.info.bustype == BUS_BLUETOOTH and re.fullmatch(r"([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}", uniq):
         return uniq
     return None
+
+
+def note_idle_off(name, minutes, path=None):
+    """Tell the toast daemon this pad is being switched off for being
+    idle, so its "disconnected" toast says that instead (the last few
+    minutes' worth; the daemon only looks back a minute)."""
+    path = path or IDLE_OFF
+    now = time.time()
+    try:
+        found = [o for o in json.loads(path.read_text()) if now - o.get("at", 0) < 300]
+    except (OSError, ValueError, AttributeError):
+        found = []
+    found.append({"name": name, "minutes": minutes, "at": now})
+    try:
+        path.write_text(json.dumps(found))
+    except OSError:
+        pass
 
 
 def send_toast(toast, path=None):
@@ -613,6 +631,7 @@ def main():
             elif step == "off":
                 used[fd] = now   # once; it goes away when it's off
                 log(f"{devices[fd].name} idle for {idle_after / 60:g} min, switching it off")
+                note_idle_off(devices[fd].name, idle_after / 60)
                 subprocess.Popen([BLUETOOTH, "disconnect", address], start_new_session=True)
 
         for fd, t in since.items():

@@ -4,6 +4,7 @@
 """
 
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -229,6 +230,23 @@ class Controllers(unittest.TestCase):
         gone = t.pad_changes(b, {}, playing=True)[0]
         self.assertEqual(gone["kind"], "alert")
         self.assertIn("Select + Start", gone["detail"])
+
+    def test_switched_off_for_being_idle(self):
+        a = {"/d/1": "DualSense Wireless Controller"}
+        toast = t.pad_changes(a, {}, playing=True, switched_off={"DualSense Wireless Controller": 10})[0]
+        self.assertEqual((toast["kind"], toast["title"]), ("notice", "Controller switched off"))
+        self.assertEqual(toast["detail"], "DualSense Wireless Controller was idle for 10 minutes. Turn it back on to keep playing.")
+        self.assertNotIn("Select + Start", toast["detail"])
+        # Another pad going still gets the usual alert.
+        self.assertEqual(t.pad_changes(a, {}, playing=True, switched_off={"Pad": 10})[0]["title"], "Controller disconnected")
+
+    def test_idle_off_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / t.IDLE_OFF).write_text(json.dumps([
+                {"name": "Old Pad", "minutes": 10, "at": 1000},
+                {"name": "DualSense Wireless Controller", "minutes": 10, "at": 1950}]))
+            self.assertEqual(t.idle_off(Path(d), now=2000), {"DualSense Wireless Controller": 10})
+            self.assertEqual(t.idle_off(Path(d) / "missing", now=2000), {})
 
     def test_low_battery_once_until_charged(self):
         warned = set()
