@@ -607,7 +607,7 @@ in
           && c.famidrive.systems.psx.saveSync))
       (check "one Desktop system, for Minecraft and Clone Hero both; Ports' game list copied over once"
         (!(c.famidrive.systems ? minecraft)
-          && lib.sort lib.lessThan c.famidrive.systems.desktop.extensions == [ ".amazon" ".epic" ".gog" ".port" ".prism" ]
+          && lib.sort lib.lessThan c.famidrive.systems.desktop.extensions == [ ".port" ".prism" ]
           && lib.hasInfix "prismlauncher" c.famidrive.systems.desktop.command
           && lib.hasInfix "clonehero" c.famidrive.systems.desktop.command
           # Saving after a game is outside it, where a quit can't skip it.
