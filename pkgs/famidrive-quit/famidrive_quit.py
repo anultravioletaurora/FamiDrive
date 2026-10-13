@@ -83,6 +83,7 @@ TRIGGERS = (ABS_Z, ABS_RZ, ABS_GAS, ABS_BRAKE)
 STEAM_VIRTUAL = (0x28de, 0x11ff)
 TOAST_SOCK = RUN / "famidrive-toast.sock"
 HOLD_PRESS = 0.1    # seconds a button pressed for the game is held
+RELEASE_WAIT = 2.0  # seconds to wait for the player to let go of it first
 
 
 def log(msg):
@@ -346,7 +347,7 @@ def freeze_game(on):
     signal_all(targets, signal.SIGSTOP if on else signal.SIGCONT)
 
 
-def press(dev, code, what, wait=0.0, hold=HOLD_PRESS, background=False):
+def press(dev, code, what, wait=0.0, hold=HOLD_PRESS, background=False, still=lambda: True):
     """Press a button for the game, as if on the pad itself (a "pause"
     game, a PC one): Start as the menu opens, so the game opens its own
     pause menu, and B as it closes, to back out of it. Held for a few of
@@ -354,10 +355,22 @@ def press(dev, code, what, wait=0.0, hold=HOLD_PRESS, background=False):
     misses a press and release between two. Freezing a PC game instead
     stopped it, but showed no pause menu, and that wasn't what was wanted;
     taking its focus, so it paused itself, left a fullscreen game
-    minimized (first box, 2026-10-13)."""
+    minimized (first box, 2026-10-13).
+
+    Not while the player holds the same button: the kernel already has
+    it down, so a press of ours would be dropped, and the player letting
+    go would reach the game as a release with no press. Found on the
+    first box 2026-10-13: closing the menu with B left Cyberpunk's pause
+    menu open. And not once still() says it's no longer wanted (the menu
+    opened again meanwhile: it would get the press itself)."""
     def go():
         time.sleep(wait)
         try:
+            deadline = time.monotonic() + RELEASE_WAIT
+            while code in dev.active_keys() and time.monotonic() < deadline:
+                time.sleep(0.02)
+            if not still():
+                return
             dev.write(EV_KEY, code, 1)
             dev.syn()
             time.sleep(hold)
@@ -518,10 +531,9 @@ def main():
                                 if reply.get("do") == "quit":
                                     quit_game()
                                 elif reply.get("do") == "resume" and "b" in buttons_of[fd]:
-                                    # A moment later: the button that closed the menu
-                                    # is still held, and letting it go would cut the
-                                    # press short.
-                                    press(dev, buttons_of[fd]["b"], "B", wait=0.15, background=True)
+                                    # Once the button that closed the menu is let go.
+                                    press(dev, buttons_of[fd]["b"], "B", wait=0.05, background=True,
+                                          still=lambda: not menu)
                     elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 1:
                         guide_down.add(fd)
                     elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 0 and fd in guide_down:

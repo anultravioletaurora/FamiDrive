@@ -152,10 +152,20 @@ class Mode(unittest.TestCase):
 class PressStart(unittest.TestCase):
     def test_presses_and_lets_go(self):
         sent = []
+        held = [[0x131], [0x131], []]   # B held for two looks, then let go
         dev = type("Pad", (), {"name": "Pad", "write": lambda self, *ev: sent.append(ev),
-                               "syn": lambda self: sent.append("syn")})()
-        m.press(dev, 0x13b, "Start", hold=0)
-        self.assertEqual(sent, [(m.EV_KEY, 0x13b, 1), "syn", (m.EV_KEY, 0x13b, 0), "syn"])
+                               "syn": lambda self: sent.append("syn"),
+                               "active_keys": lambda self: held.pop(0) if len(held) > 1 else held[0]})()
+        m.press(dev, 0x131, "B", hold=0)
+        self.assertEqual(sent, [(m.EV_KEY, 0x131, 1), "syn", (m.EV_KEY, 0x131, 0), "syn"])
+        self.assertEqual(held, [[]])   # it waited for the let-go
+
+    def test_not_when_no_longer_wanted(self):
+        sent = []
+        dev = type("Pad", (), {"name": "Pad", "write": lambda self, *ev: sent.append(ev),
+                               "syn": lambda self: sent.append("syn"), "active_keys": lambda self: []})()
+        m.press(dev, 0x131, "B", hold=0, still=lambda: False)
+        self.assertEqual(sent, [])
 
 
 class AskMenu(unittest.TestCase):
