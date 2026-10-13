@@ -184,7 +184,9 @@ layout for the game. No aim assist: aiming is a mouse on a stick.
 ### Call of Duty: Black Ops Cold War
 
 **Battle.net: ❔ Untested.** Never sold on Steam, so it needs the
-Battle.net app, and FamiDrive has no Battle.net lane yet (#57).
+Battle.net app: through Lutris, in the Lutris system (#205). Lutris's
+installer for it is a "script for existing install of Battle.net", so
+Battle.net goes in through Lutris first.
 
 - **Expected:** ProtonDB has reports of it running. Proton Experimental
   had Battle.net and Cold War fixes in December 2025, but Valve later
@@ -637,8 +639,8 @@ on first launch, but not the Battle.net app.
   screen's progress bar was stuck at 0% (fixed in #59).
 
 - **Other launchers:** Battle.net's own copy runs through the Battle.net
-  app. FamiDrive has no Battle.net lane yet (#57), so only the Steam copy
-  plays for now. One account can play through either.
+  app, which FamiDrive runs through Lutris (#205); not tried for
+  Overwatch yet. One account can play through either.
 - **Still to check:** matchmaking, rumble, and a second controller.
 
 ### Palworld

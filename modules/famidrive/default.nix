@@ -133,6 +133,7 @@ in
     ./retroachievements.nix
     ./nexusmods.nix
     ./settings.nix
+    ./stores.nix
     (lib.mkRemovedOptionModule [ "famidrive" "user" ] "Each player is listed in famidrive.players instead: famidrive.players.<name>.user is their Linux account.")
     (lib.mkRemovedOptionModule [ "famidrive" "owner" ] "Each player is listed in famidrive.players instead: famidrive.players.<name>.owner is their RomM username.")
     (lib.mkRemovedOptionModule [ "famidrive" "romm" "tokenFile" ] "Each player has their own: famidrive.players.<name>.romm.tokenFile.")
@@ -180,21 +181,23 @@ in
       only (no RomM), and Steam if they sign in to theirs'';
 
     lanes = mkOption {
-      # "gog" stays in the enum only so the assertion below can say what
-      # replaced it; the lane itself was never finished.
-      type = types.listOf (types.enum [ "roms" "steam" "heroic" "gog" "minecraft" ]);
+      # "gog" and "heroic" stay in the enum only so the assertions below
+      # can say what replaced them.
+      type = types.listOf (types.enum [ "roms" "steam" "stores" "minecraft" "heroic" "gog" ]);
       default = [ "roms" ];
       description = ''
         Which launch lanes this box carries:
 
         - `"roms"`: the consoles, through their emulators.
         - `"steam"`: each player's Steam library.
-        - `"heroic"`: each player's GOG, Epic Games Store and Amazon
-          Games libraries, through Heroic Games Launcher, in Desktop.
+        - `"stores"`: each player's games from the other PC stores (GOG,
+          Epic, Amazon, Battle.net, EA, Ubisoft, Humble Bundle), each
+          through the launcher `stores` names for it: Lutris's in the
+          Lutris system, Heroic's Epic games in the Epic system.
         - `"minecraft"`: Prism Launcher's instances, in Desktop.
 
         An emulation-only box is `[ "roms" ]` and skips Steam, Proton,
-        Heroic and Prism entirely.
+        Lutris, Heroic and Prism entirely.
       '';
     };
 
@@ -352,7 +355,10 @@ in
       message = "famidrive.primaryPlayer: with more than one player, say whose RomM token pulls the library.";
     } {
       assertion = !(lib.elem "gog" cfg.lanes);
-      message = "famidrive.lanes: \"gog\" is now \"heroic\", which brings GOG, the Epic Games Store and Amazon Games through Heroic Games Launcher.";
+      message = "famidrive.lanes: \"gog\" is now \"stores\", which brings GOG and the other PC stores; famidrive.stores says what runs each.";
+    } {
+      assertion = !(lib.elem "heroic" cfg.lanes);
+      message = "famidrive.lanes: \"heroic\" is now \"stores\". Heroic runs only Epic by default, and GOG and Amazon go through Lutris; set famidrive.stores.gog = \"heroic\" (and .amazon) to keep them in Heroic.";
     }];
 
     # One Linux account per player. Group famidrive can read the shared

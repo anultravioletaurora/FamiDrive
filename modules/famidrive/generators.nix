@@ -17,17 +17,28 @@ let
   source = p: {
     steam = "${p.home}/.local/share/Steam/steamapps";
     heroic = "${p.home}/.config/heroic";
+    lutris = "${p.home}/.local/share/lutris";
     minecraft = "${p.home}/.local/share/PrismLauncher/instances";
   };
   watched = p: {
     steam = [ (source p).steam ];
     # Heroic's installed-games files, one per store (famidrive_generate.py).
-    heroic = map (f: "${(source p).heroic}/${f}") [
-      "gog_store/installed.json"
-      "legendaryConfig/legendary/installed.json"
-      "nile_config/nile/installed.json"
-    ];
+    heroic = map (s: "${(source p).heroic}/${heroicInstalled.${s}}") heroicStores;
+    # Lutris's database, where an install or uninstall is written.
+    lutris = [ "${(source p).lutris}/pga.db" ];
     minecraft = [ (source p).minecraft ];
+  };
+  heroicInstalled = {
+    gog = "gog_store/installed.json";
+    epic = "legendaryConfig/legendary/installed.json";
+    amazon = "nile_config/nile/installed.json";
+  };
+  # The stores Heroic runs on this box (stores.nix). Its generator runs
+  # whenever the stores lane is on, even with none, so it takes out the
+  # entries of a store that moved to Lutris.
+  heroicStores = cfg.launchers.heroic;
+  args = {
+    heroic = " ${lib.concatStringsSep " " heroicStores}";
   };
 
   mkGenerator = p: lane: {
@@ -43,15 +54,16 @@ let
         serviceConfig = {
           Type = "oneshot";
           User = p.user;
-          # Minecraft's and Heroic's entries live in the Desktop system's
-          # folder (Heroic's with an extension per store).
-          ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate ${lane} ${(source p).${lane}} ${p.roms}${folder lane}";
+          # Minecraft's entries live in the Desktop system's folder.
+          # Heroic's are in each store's system (famidrive_generate.py),
+          # so it gets the whole folder.
+          ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate ${lane} ${(source p).${lane}} ${p.roms}${folder lane}${args.${lane} or ""}";
         };
         # Steam's (and Heroic's) art and details for new games, once the
         # menu entries are in place, without holding up the session: a
         # first run can take a minute or two (a store lookup per game).
         onSuccess = lib.optional (lane == "steam") "famidrive-steam-media-${p.name}.service"
-          ++ lib.optional (lane == "heroic") "famidrive-heroic-media-${p.name}.service";
+          ++ lib.optional (lane == "heroic" && heroicStores != [ ]) "famidrive-heroic-media-${p.name}.service";
       };
     } // lib.optionalAttrs (lane == "steam") {
       "famidrive-steam-media-${p.name}" = {
@@ -64,32 +76,37 @@ let
           ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate steam-media ${(source p).steam} ${p.roms}/steam";
         };
       };
-    } // lib.optionalAttrs (lane == "heroic") {
+    } // lib.optionalAttrs (lane == "heroic" && heroicStores != [ ]) {
       # The names, details and art in Heroic's own store cache, with images
       # from the stores' servers.
       "famidrive-heroic-media-${p.name}" = {
-        description = "Heroic's art and details for ${p.displayName}'s GOG, Epic and Amazon games in ES-DE";
+        description = "Heroic's art and details for ${p.displayName}'s Heroic games in ES-DE";
         wants = [ "network-online.target" ];
         after = [ "network-online.target" ];
         serviceConfig = {
           Type = "oneshot";
           User = p.user;
-          ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate heroic-media ${(source p).heroic} ${p.roms}/desktop";
+          ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate heroic-media ${(source p).heroic} ${p.roms}${args.heroic}";
         };
       };
     };
     # No MakeDirectory: it would make the folder as root inside the
     # player's home (and a root-owned Steam folder breaks Steam's first
     # start). systemd watches the nearest parent that exists instead.
-    paths."famidrive-gen-${lane}-${p.name}" = {
-      wantedBy = [ "multi-user.target" ];
-      pathConfig.PathChanged = (watched p).${lane};
+    # Heroic with no store to watch still runs once at boot, above.
+    paths = lib.optionalAttrs ((watched p).${lane} != [ ]) {
+      "famidrive-gen-${lane}-${p.name}" = {
+        wantedBy = [ "multi-user.target" ];
+        pathConfig.PathChanged = (watched p).${lane};
+      };
     };
   };
 
-  folder = lane: { minecraft = "/desktop"; heroic = "/desktop"; }.${lane} or "/${lane}";
+  folder = lane: { minecraft = "/desktop"; heroic = ""; }.${lane} or "/${lane}";
 
-  lanes = lib.filter hasLane [ "steam" "heroic" "minecraft" ];
+  lanes = lib.filter hasLane [ "steam" "minecraft" ]
+    ++ lib.optional (hasLane "stores") "heroic"
+    ++ lib.optional (cfg.launchers.lutris != [ ]) "lutris";
 in
 {
   config = lib.mkIf cfg.enable {

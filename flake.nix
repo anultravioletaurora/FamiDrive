@@ -60,6 +60,11 @@
         heroic = unstable.heroic;
         proton-ge-bin = unstable.proton-ge-bin;
         umu-launcher = unstable.umu-launcher;
+        # Lutris runs Windows games through umu and GE-Proton, its default
+        # ("ge-proton", which umu downloads), and finds umu only on PATH
+        # (lutris/util/wine/proton.py, 0.5.23). nixpkgs' Lutris doesn't
+        # bring it.
+        lutris = prev.lutris.override { extraPkgs = _: [ final.umu-launcher ]; };
 
         es-de = final.callPackage ./pkgs/es-de { };
         tcli = final.callPackage ./pkgs/tcli { };

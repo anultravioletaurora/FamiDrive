@@ -207,8 +207,10 @@ NixOS, but isn't covered here.
      Settings → Ethernet shows the wired port: cable, address, speed and
      hardware address. The lists are as they were when ES-DE started.
    - **Steam:** sign in under Settings → Steam Settings.
-   - **GOG, Epic, Amazon:** sign in under Settings → Heroic Games
-     Launcher, if `lanes` has `"heroic"`.
+   - **The other PC stores**, if `lanes` has `"stores"`: Epic under
+     Settings → Heroic Games Launcher; GOG, Amazon, Battle.net, EA,
+     Ubisoft and Humble Bundle under Settings → Lutris
+     (`famidrive.stores` says which launcher has each).
    - **Jellyfin:** sign in once in Media.
    - **RomM:** with a token, the library pull starts by itself (every
      30 minutes). To start it now, over SSH:
@@ -400,7 +402,7 @@ RomM along the way.
 ## Secrets
 
 Server addresses aren't secret and go in `configuration.nix`. Logins for
-Jellyfin, Steam and Heroic's stores (GOG, Epic, Amazon) happen once in
+Jellyfin, Steam and the PC stores (in Heroic and Lutris) happen once in
 each app, on the TV. The only secrets are in the host's `secrets.yaml`,
 encrypted with [sops](https://github.com/getsops/sops) to the box's
 [age](https://github.com/FiloSottile/age) key plus yours, and read on the

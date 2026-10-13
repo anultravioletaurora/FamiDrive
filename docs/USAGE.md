@@ -23,6 +23,7 @@ is on; every other option is optional.
 - [Switch](#switch)
 - [Controllers](#controllers)
 - [Steam](#steam)
+- [Other PC stores](#other-pc-stores)
 - [Media](#media)
 - [Clone Hero](#clone-hero)
 - [YARG](#yarg)
@@ -61,14 +62,16 @@ Which launch lanes this box carries:
 
 - `"roms"`: the consoles, through their emulators.
 - `"steam"`: each player's Steam library.
-- `"heroic"`: each player's GOG, Epic Games Store and Amazon
-  Games libraries, through Heroic Games Launcher, in Desktop.
+- `"stores"`: each player's games from the other PC stores (GOG,
+  Epic, Amazon, Battle.net, EA, Ubisoft, Humble Bundle), each
+  through the launcher `stores` names for it: Lutris's in the
+  Lutris system, Heroic's Epic games in the Epic system.
 - `"minecraft"`: Prism Launcher's instances, in Desktop.
 
 An emulation-only box is `[ "roms" ]` and skips Steam, Proton,
-Heroic and Prism entirely.
+Lutris, Heroic and Prism entirely.
 
-- **Type:** list of (one of "roms", "steam", "heroic", "gog", "minecraft")
+- **Type:** list of (one of "roms", "steam", "stores", "minecraft", "heroic", "gog")
 - **Default:** 
 
   ```nix
@@ -1300,6 +1303,66 @@ expect Steam Input.
     "Left 4 Dead 2"
   ]
   ```
+
+## Other PC stores
+
+GOG, Epic, Amazon, Battle.net, EA, Ubisoft and Humble Bundle (`lanes` has `"stores"`): what runs each one's games. Lutris's are in the Lutris system, Heroic's Epic games in the Epic system, and Heroic's GOG and Amazon games in Desktop.
+
+### `famidrive.stores.amazon`
+
+What runs Amazon games: `"lutris"` or `"heroic"`,
+or `null` for none. Only on a box whose `lanes` has `"stores"`.
+
+- **Type:** null or one of "lutris", "heroic"
+- **Default:** `"lutris"`
+
+### `famidrive.stores.battlenet`
+
+What runs Battle.net games: `"lutris"`,
+or `null` for none. Only on a box whose `lanes` has `"stores"`.
+
+- **Type:** null or value "lutris" (singular enum)
+- **Default:** `"lutris"`
+
+### `famidrive.stores.ea`
+
+What runs EA games: `"lutris"`,
+or `null` for none. Only on a box whose `lanes` has `"stores"`.
+
+- **Type:** null or value "lutris" (singular enum)
+- **Default:** `"lutris"`
+
+### `famidrive.stores.epic`
+
+What runs Epic Games Store games: `"heroic"` or `"lutris"`,
+or `null` for none. Only on a box whose `lanes` has `"stores"`.
+
+- **Type:** null or one of "heroic", "lutris"
+- **Default:** `"heroic"`
+
+### `famidrive.stores.gog`
+
+What runs GOG games: `"lutris"` or `"heroic"`,
+or `null` for none. Only on a box whose `lanes` has `"stores"`.
+
+- **Type:** null or one of "lutris", "heroic"
+- **Default:** `"lutris"`
+
+### `famidrive.stores.humble`
+
+What runs Humble Bundle games: `"lutris"`,
+or `null` for none. Only on a box whose `lanes` has `"stores"`.
+
+- **Type:** null or value "lutris" (singular enum)
+- **Default:** `"lutris"`
+
+### `famidrive.stores.ubisoft`
+
+What runs Ubisoft Connect games: `"lutris"`,
+or `null` for none. Only on a box whose `lanes` has `"stores"`.
+
+- **Type:** null or value "lutris" (singular enum)
+- **Default:** `"lutris"`
 
 ## Media
 

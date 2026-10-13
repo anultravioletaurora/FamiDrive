@@ -94,7 +94,8 @@ of games you own. See [Your games](#your-games).
 | Atari 2600 / 5200 / 7800 / Jaguar | [RetroArch](https://www.retroarch.com) + [Stella](https://stella-emu.github.io), [Atari800](https://github.com/libretro/libretro-atari800), [ProSystem](https://github.com/libretro/prosystem-libretro), [Virtual Jaguar](https://github.com/libretro/virtualjaguar-libretro) | [`libretro.stella`](https://search.nixos.org/packages?channel=26.05&show=libretro.stella), [`libretro.atari800`](https://search.nixos.org/packages?channel=26.05&show=libretro.atari800), [`libretro.prosystem`](https://search.nixos.org/packages?channel=26.05&show=libretro.prosystem), [`libretro.virtualjaguar`](https://search.nixos.org/packages?channel=26.05&show=libretro.virtualjaguar) | — | RomM |
 | Atari Lynx | [RetroArch](https://www.retroarch.com) + [Handy](https://github.com/libretro/libretro-handy) | [`libretro.handy`](https://search.nixos.org/packages?channel=26.05&show=libretro.handy) | — | RomM |
 | Steam | [Steam](https://store.steampowered.com), started hidden, with [Proton-GE](https://github.com/GloriousEggroll/proton-ge-custom) available | [`steam`](https://search.nixos.org/packages?channel=26.05&show=steam), [`proton-ge-bin`](https://search.nixos.org/packages?channel=26.05&show=proton-ge-bin) | Steam Cloud | Your Steam library |
-| GOG, Epic Games Store, Amazon Games | [Heroic Games Launcher](https://heroicgameslauncher.com), each store its own system | [`heroic`](https://search.nixos.org/packages?channel=26.05&show=heroic) | Each store's cloud saves | Your libraries in each store |
+| GOG, Amazon, Battle.net, EA, Ubisoft, Humble Bundle | [Lutris](https://lutris.net), in the Lutris system | [`lutris`](https://search.nixos.org/packages?channel=26.05&show=lutris) | — | Your libraries in each store |
+| Epic Games Store | [Heroic Games Launcher](https://heroicgameslauncher.com), in the Epic system | [`heroic`](https://search.nixos.org/packages?channel=26.05&show=heroic) | Epic's cloud saves | Your Epic library |
 | Minecraft | [Prism Launcher](https://prismlauncher.org) | [`prismlauncher`](https://search.nixos.org/packages?channel=26.05&show=prismlauncher) | — | Your Prism instances, and ones declared in Nix |
 | Clone Hero, YARG | [Clone Hero](https://clonehero.net) and [YARG](https://yarg.in), in the Desktop system | [`clonehero`](https://search.nixos.org/packages?channel=26.05&show=clonehero), [`yarg`](https://search.nixos.org/packages?channel=26.05&show=yarg) | ✅ (scores and profiles) | Songs declared in Nix, downloaded once for the box |
 | The Tux games | [SuperTuxKart](https://supertuxkart.net), [SuperTux](https://www.supertux.org), [SuperTux Party](https://supertux.party), [SuperTux Advance](https://github.com/KelvinShadewing/supertux-advance), [Extreme Tux Racer](https://sourceforge.net/projects/extremetuxracer/) and [Tux Paint](https://tuxpaint.org), in the Desktop system | [`supertuxkart`](https://search.nixos.org/packages?channel=26.05&show=supertuxkart), [`supertux`](https://search.nixos.org/packages?channel=26.05&show=supertux), [`extremetuxracer`](https://search.nixos.org/packages?channel=26.05&show=extremetuxracer), [`tuxpaint`](https://search.nixos.org/packages?channel=26.05&show=tuxpaint), FamiDrive's own ([`pkgs/supertuxparty`](pkgs/supertuxparty), [`pkgs/supertux-advance`](pkgs/supertux-advance)) | — | Come with their levels, tracks and boards |
@@ -178,7 +179,8 @@ modules/famidrive/
   emulators.nix              famidrive.systems: the one table of systems, emulators and save layouts
   frontend.nix               es_systems.xml generated from famidrive.systems; famidrive-launch
   romm-agent.nix             library + firmware pull, save reconcile timer
-  generators.nix             Steam / Heroic / Prism menu entries, regenerated when installs change
+  generators.nix             Steam / Heroic / Lutris / Prism menu entries, regenerated when installs change
+  stores.nix                 famidrive.stores: Lutris or Heroic for each PC store; the Lutris system
   pc-saves.nix               Syncthing for PC saves, the one thing RomM can't hold yet
   online.nix                 famidrive.online.enable fills in each emulator's netplay settings
   media.nix                  famidrive.media.kodi / .jellyfin: "Media" entries for Kodi and Jellyfin
@@ -250,9 +252,11 @@ planning doc for now and will move into this repo.
 - The Steam lane, with Proton pins and Steam Input set from Nix, Steam's
   Big Picture as a Settings entry, a status screen while Steam
   updates, processes shaders or starts a game, and each game's art and
-  details from Steam itself. GOG, Epic and Amazon through Heroic
-  (`lanes` has `"heroic"`), in Desktop, with their names, art and
-  details from Heroic and the same status screen. Results per game are in
+  details from Steam itself. The other PC stores (`lanes` has
+  `"stores"`): Epic through Heroic, in the Epic system, with its names,
+  art and details from Heroic and the same status screen; GOG, Amazon,
+  Battle.net, EA, Ubisoft and Humble Bundle through Lutris, in the
+  Lutris system (`famidrive.stores` picks per store). Results per game are in
   [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 - Toasts over whatever's on the TV, in the player's theme, with an icon
   each: a save going up to RomM, or not. Toasts show bottom right by
@@ -310,6 +314,8 @@ planning doc for now and will move into this repo.
 - The Heroic lane (GOG, Epic, Amazon) hasn't run against a signed-in
   Heroic yet. The installed-games files it reads were taken from
   Heroic's source and are marked `VERIFY`.
+- The Lutris system hasn't run on a box yet (#205). What it reads from
+  Lutris's database was taken from Lutris's source.
 - Online play needs servers that don't exist yet.
 - The "home" button (back to the menu, or straight into Jellyfin, from
   inside a game) has no design yet.
@@ -359,9 +365,11 @@ famidrive = {
   their menu, so a game both play is downloaded twice. Steam Family lets
   a family share one copy of each *purchase* (each account still keeps
   its own download).
-- **GOG, Epic and Amazon:** each player signs in to their own stores once,
-  in Settings → Heroic Games Launcher, and installs games there. Their
-  games show up in Desktop, with each store's name, art and details.
+- **The other PC stores:** each player signs in to their own stores
+  once and installs games there: Epic in Settings → Heroic Games
+  Launcher, the rest (GOG, Amazon, Battle.net, EA, Ubisoft, Humble
+  Bundle) in Settings → Lutris. Epic's games show up in the Epic system,
+  with Epic's names, art and details; Lutris's in the Lutris system.
 - **The guest:** no RomM, so their saves stay on this box. They can sign
   in to their own Steam or play without it.
 - **Switching and turning off:** ES-DE's Quit menu (Start → Quit) has

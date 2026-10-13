@@ -34,6 +34,10 @@ SECTIONS = [
     ("Controllers", ["famidrive.controllers"],
      "How controllers reach the emulators. Per-controller results are in [CONTROLLERS.md](CONTROLLERS.md)."),
     ("Steam", ["famidrive.steam"], "The Steam lane (`lanes` has `\"steam\"`)."),
+    ("Other PC stores", ["famidrive.stores"],
+     "GOG, Epic, Amazon, Battle.net, EA, Ubisoft and Humble Bundle (`lanes` has `\"stores\"`): what "
+     "runs each one's games. Lutris's are in the Lutris system, Heroic's Epic games in the Epic "
+     "system, and Heroic's GOG and Amazon games in Desktop."),
     ("Media", ["famidrive.media"], "Video apps in ES-DE's Media system."),
     ("Clone Hero", ["famidrive.cloneHero"], "Clone Hero, in the Desktop system."),
     ("YARG", ["famidrive.yarg"],
