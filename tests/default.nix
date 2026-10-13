@@ -682,6 +682,13 @@ in
           && c.famidrive.systems.lutris.extensions == [ ".lutris" ]
           && lib.hasInfix "gamescope-fg --launcher \"$ROM\"" c.famidrive.systems.lutris.command
           && lib.hasInfix "lutris:rungameid/" c.famidrive.systems.lutris.command))
+      (check "Lutris is at the TV's scale (1.5: GTK's 2, its text at 0.75 of that)"
+        (let w = c.famidrive.lutris.text;
+             lutrisBin = builtins.unsafeDiscardStringContext "${c.famidrive.lutris}/bin/lutris";
+        in
+          lib.hasInfix "GDK_SCALE=2" w && lib.hasInfix "GDK_DPI_SCALE=0.75" w
+            && lib.hasInfix lutrisBin c.famidrive.systems.lutris.command
+            && lib.hasInfix lutrisBin c.famidrive.systems.settings.command))
       (check "Lutris's menu entries follow its database, per player"
         (lib.hasInfix "famidrive-generate lutris /home/bob/.local/share/lutris /home/bob/.local/share/famidrive/roms/lutris"
             c.systemd.services.famidrive-gen-lutris-bob.serviceConfig.ExecStart

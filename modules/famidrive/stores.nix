@@ -37,6 +37,20 @@ let
   };
 
   lutrisStores = cfg.launchers.lutris;
+
+  # Lutris is GTK 3, which only scales by whole numbers (GDK_SCALE): the
+  # nearest one to display.scale, as Plymouth's, with text then sized
+  # to display.scale exactly (GDK_DPI_SCALE). At 1.5: widgets and icons
+  # twice their size, text one and a half times. Found on the first box
+  # 2026-10-13: under gamescope, Lutris's window filled the 4K screen at
+  # desktop size, unreadable from the couch.
+  scale = cfg.display.scale * 1.0;
+  gdkScale = lib.max 1 (builtins.floor (scale + 0.5));
+  lutris = pkgs.writeShellScriptBin "lutris" ''
+    export GDK_SCALE=${toString gdkScale}
+    export GDK_DPI_SCALE=${toString (scale / gdkScale)}
+    exec ${pkgs.lutris}/bin/lutris "$@"
+  '';
 in
 {
   options.famidrive.stores = {
@@ -49,6 +63,13 @@ in
     humble = store { name = "Humble Bundle"; launchers = [ "lutris" ]; default = "lutris"; };
   };
 
+  options.famidrive.lutris = mkOption {
+    type = types.package;
+    internal = true;
+    readOnly = true;
+    description = "Lutris, at the TV's scale (`display.scale`).";
+  };
+
   options.famidrive.launchers = mkOption {
     type = types.attrsOf (types.listOf types.str);
     internal = true;
@@ -58,6 +79,7 @@ in
 
   config = lib.mkMerge [
     {
+      famidrive.lutris = lutris;
       famidrive.launchers = lib.genAttrs [ "heroic" "lutris" ] (l:
         lib.optionals on (lib.filter (s: cfg.stores.${s} == l) (lib.attrNames cfg.stores)));
 
@@ -79,10 +101,10 @@ in
         fullname = "Lutris";
         theme = "lutris";   # Art Book Next's Lutris art
         extensions = [ ".lutris" ];
-        command = ''${pkgs.gamescope-fg}/bin/gamescope-fg --launcher "$ROM" ${pkgs.lutris}/bin/lutris "lutris:rungameid/$(cat "$ROM")"'';
+        command = ''${pkgs.gamescope-fg}/bin/gamescope-fg --launcher "$ROM" ${lutris}/bin/lutris "lutris:rungameid/$(cat "$ROM")"'';
       };
 
-      environment.systemPackages = [ pkgs.lutris ];
+      environment.systemPackages = [ lutris ];
 
       # The stores this box runs through Lutris are its services (its
       # sidebar, where a player signs in and installs); the others are

@@ -848,6 +848,8 @@ number:
   - Chromium's own UI scale (`--force-device-scale-factor`),
     passed to Discord, Vesktop and Equibop (`voice.nix`): their
     fonts and icons are a desktop app's, tiny from a couch.
+  - Lutris's window (`stores.nix`): GTK's scale, rounded to the
+    nearest whole number, with its text at this scale exactly.
   - Plymouth's boot screen (`boot.nix`), rounded to the
     nearest whole number and clamped to 1-4, the only sizes it has
     pre-rendered images for.
