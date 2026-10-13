@@ -44,6 +44,9 @@ WHITE = (255, 255, 255)
 DIM = (153, 153, 153)        # the theme's help text
 BAR_BG = (68, 68, 68)        # its selected-row grey
 PANEL = (17, 17, 17, 230)    # its help bar
+# How fast a bar catches up with a new reading: about two thirds of the
+# way in this many seconds. Readings come every 2 seconds.
+EASE = 0.35
 
 # state -> (headline, explanation)
 TEXT = {
@@ -221,6 +224,22 @@ def gb(n):
     return f"{n / 1e9:.1f} GB"
 
 
+def ease_toward(shown, target, dt, tau=EASE):
+    """A bar's shown fraction moved toward its latest reading: an ease-out,
+    quick at first and settling gently, so the bar glides between readings
+    instead of jumping to each one. Found on the first box 2026-10-13: the
+    shader bar moved in steps, one every 2 seconds."""
+    if shown is None:
+        return target
+    return target + (shown - target) * math.exp(-dt / tau)
+
+
+def draw_bar(screen, left, y, width, height, fraction):
+    pygame.draw.rect(screen, BAR_BG, (left, y, width, height), border_radius=height // 2)
+    pygame.draw.rect(screen, WHITE, (left, y, max(height, int(width * min(max(fraction, 0), 1))), height),
+                     border_radius=height // 2)
+
+
 def main():
     if sys.argv[1] == "--rom":
         appid, rom, status_file = None, sys.argv[2], Path(sys.argv[3])
@@ -274,8 +293,12 @@ def main():
     done = total = 0
     shaders = None
     next_read = 0.0
+    shown = {}   # bar -> the fraction it shows now, easing toward its reading
     clock = pygame.time.Clock()
     while True:
+        # 30 frames a second: enough for the bars to glide, and light while
+        # the game is compiling its shaders on the same CPU.
+        dt = clock.tick(30) / 1000
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return
@@ -330,10 +353,9 @@ def main():
                 if last_bytes is None or done != last_bytes:
                     last_bytes, last_t = done, now
             if total > 10_000_000:   # a real download, not a few files' bookkeeping
-                bar_w, bar_h = width, int(14 * u)
-                pygame.draw.rect(screen, BAR_BG, (left, y, bar_w, bar_h), border_radius=bar_h // 2)
-                pygame.draw.rect(screen, WHITE, (left, y, max(bar_h, int(bar_w * min(done / total, 1))), bar_h),
-                                 border_radius=bar_h // 2)
+                bar_h = int(14 * u)
+                shown[state] = ease_toward(shown.get(state), min(done / total, 1), dt)
+                draw_bar(screen, left, y, width, bar_h, shown[state])
                 y += bar_h + int(16 * u)
                 line = f"{gb(done)} of {gb(total)}"
                 if rate:
@@ -348,12 +370,12 @@ def main():
                 next_read = now + 2
                 shaders = shader_progress(appid)
             if shaders is not None:
-                bar_w, bar_h = width, int(14 * u)
-                pygame.draw.rect(screen, BAR_BG, (left, y, bar_w, bar_h), border_radius=bar_h // 2)
-                pygame.draw.rect(screen, WHITE, (left, y, max(bar_h, int(bar_w * shaders / 100)), bar_h),
-                                 border_radius=bar_h // 2)
+                bar_h = int(14 * u)
+                shown[state] = ease_toward(shown.get(state), shaders / 100, dt)
+                draw_bar(screen, left, y, width, bar_h, shown[state])
                 y += bar_h + int(16 * u)
-                screen.blit(body_f.render(f"{shaders}%", True, WHITE), (left, y))
+                # The number counts up with the bar.
+                screen.blit(body_f.render(f"{round(shown[state] * 100)}%", True, WHITE), (left, y))
                 y += body_f.get_linesize() + int(8 * u)
 
         for line in wrap(body, body_f, width):
@@ -372,7 +394,6 @@ def main():
 
         display.blit(screen, (0, 0))
         pygame.display.flip()
-        clock.tick(30)
 
 
 if __name__ == "__main__":
