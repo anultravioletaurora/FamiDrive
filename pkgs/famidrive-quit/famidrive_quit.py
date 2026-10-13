@@ -81,6 +81,7 @@ TRIGGERS = (ABS_Z, ABS_RZ, ABS_GAS, ABS_BRAKE)
 # are the real pad's again, so they don't move the menu twice.
 STEAM_VIRTUAL = (0x28de, 0x11ff)
 TOAST_SOCK = RUN / "famidrive-toast.sock"
+PAUSE_WAIT = 0.25   # seconds between the menu closing and Pause game's Start press
 
 
 def log(msg):
@@ -160,13 +161,13 @@ def generic_roles(keys, vendor, product, db, name=""):
 
 
 def menu_buttons(keys, vendor, product, driver, db, name=""):
-    """{"guide", "a", "b": key code} on this device, as far as it has them.
+    """{"guide", "a", "b", "start": key code} on this device, as far as it has them.
     A pad with a driver of its own names them; a hid-generic one is looked
     up like its Select and Start."""
     if driver == "hid-generic":
         found = generic_roles(keys, vendor, product, db, name)
-        return {r: found[r] for r in ("guide", "a", "b") if r in found}
-    named = {"guide": BTN_MODE, "a": BTN_SOUTH, "b": BTN_EAST}
+        return {r: found[r] for r in ("guide", "a", "b", "start") if r in found}
+    named = {"guide": BTN_MODE, "a": BTN_SOUTH, "b": BTN_EAST, "start": e.BTN_START}
     return {r: c for r, c in named.items() if c in keys}
 
 
@@ -179,7 +180,7 @@ class PadNav:
     PUSH, BACK = 0.6, 0.3
 
     def __init__(self, buttons, ranges):
-        self.keys = {c: {"guide": "close", "a": "select", "b": "back"}[r] for r, c in buttons.items()}
+        self.keys = {c: {"guide": "close", "a": "select", "b": "back"}[r] for r, c in buttons.items() if r != "start"}
         self.ranges = ranges      # {abs code: (min, max)}
         self.pushed = {}          # stick axis -> the direction it's held in
 
@@ -230,8 +231,8 @@ def let_go(held, axes, driver):
 
 def ask_menu(command, path=None):
     """Hand the toast daemon a menu command; its reply ({"open": bool, and
-    "do": "quit" or "pause" for what the player picked}), or {} without
-    one."""
+    "do": "quit", or "pause" to press Start for the game's own pause
+    menu}), or {} without one."""
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
             s.settimeout(2)
@@ -307,13 +308,26 @@ def game_targets():
     return targets
 
 
-def pause_game(on):
-    """Freeze the game (SIGSTOP) or let it go on (SIGCONT): the menu's
-    Pause game, for a game that can't pause itself or that's offline. An
-    online game would drop off its server, so it's the player's choice."""
-    targets = game_targets()
-    log(("pausing" if on else "unpausing") + f" the game ({len(targets)} targets)")
-    signal_all(targets, signal.SIGSTOP if on else signal.SIGCONT)
+def press_start(dev, code, wait=PAUSE_WAIT):
+    """The menu's Pause game: press Start on the pad that picked it, so the
+    game opens its own pause menu. Freezing the game instead (SIGSTOP) was
+    tried first; it stopped the game but showed no pause menu, and wasn't
+    what was wanted (first box, 2026-10-13). After a moment, once the menu
+    has let the pads go and the game has its focus back: many games read
+    no pads while they don't have it."""
+    def press():
+        time.sleep(wait)
+        try:
+            dev.write(EV_KEY, code, 1)
+            dev.syn()
+            time.sleep(0.08)
+            dev.write(EV_KEY, code, 0)
+            dev.syn()
+            log(f"pressed Start on {dev.name} for the game's pause menu")
+        except OSError as err:
+            log(f"couldn't press Start on {dev.name}: {err}")
+
+    threading.Thread(target=press, daemon=True).start()
 
 
 def quit_game():
@@ -333,7 +347,6 @@ def quit_game():
     log(f"quitting game ({targets[0]}...)")
     if not signal_all(targets, signal.SIGTERM):
         return
-    signal_all(targets, signal.SIGCONT)   # a paused game can't act on SIGTERM
 
     def force():
         deadline = time.monotonic() + GRACE
@@ -381,21 +394,18 @@ def main():
     navs = {}           # fd -> PadNav, or None for a pad whose presses are another's
     drivers = {}        # fd -> its kernel driver
     guides = {}         # fd -> its Guide key code, if it has one
+    starts = {}         # fd -> its Start key code, if it has one
     menu = False        # whether the menu is open, and every pad grabbed
-    paused = False      # whether the menu froze the game
     guide_down = set()  # fds whose Guide went down while the menu was closed
     last_scan = 0.0
     db = load_paddb(PADDB)
 
     def close_menu():
-        nonlocal menu, paused
+        nonlocal menu
         menu = False
         guide_down.clear()
         for dev in devices.values():
             ungrab(dev)
-        if paused:
-            pause_game(False)
-            paused = False
 
     while True:
         # The session (gamescope-fg) is our parent; when it's gone, so are we.
@@ -425,6 +435,7 @@ def main():
                     drivers[fd] = driver
                     buttons = menu_buttons(keys, dev.info.vendor, dev.info.product, driver, db, dev.name)
                     guides[fd] = buttons.get("guide")
+                    starts[fd] = buttons.get("start")
                     ranges = {c: (i.min, i.max) for c, i in dev.capabilities().get(e.EV_ABS, [])}
                     navs[fd] = None if (dev.info.vendor, dev.info.product) == STEAM_VIRTUAL else PadNav(buttons, ranges)
                     names = "+".join(str(e.BTN.get(c) or e.KEY.get(c) or c) for c in sorted(combo))
@@ -453,14 +464,13 @@ def main():
                         command = navs[fd] and navs[fd].feed(ev.type, ev.code, ev.value)
                         if command:
                             reply = ask_menu(command)
-                            if reply.get("do") == "pause" and not paused:
-                                pause_game(True)
-                                paused = True
                             if not reply.get("open"):
                                 close_menu()
                                 log("menu closed")
                                 if reply.get("do") == "quit":
                                     quit_game()
+                                elif reply.get("do") == "pause" and starts[fd] is not None:
+                                    press_start(dev, starts[fd])
                     elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 1:
                         guide_down.add(fd)
                     elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 0 and fd in guide_down:
@@ -480,7 +490,7 @@ def main():
             except OSError:
                 # Unplugged, out of range or switched off.
                 log(f"lost {dev.name}")
-                for table in (devices, combos, held, since, navs, drivers, guides):
+                for table in (devices, combos, held, since, navs, drivers, guides, starts):
                     del table[fd]
                 try:
                     dev.close()

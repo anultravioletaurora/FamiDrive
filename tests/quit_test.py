@@ -85,10 +85,10 @@ class Combo(unittest.TestCase):
     def test_menu_buttons(self):
         xpad = [0x130, 0x131, 0x133, 0x134, 0x13a, 0x13b, 0x13c]
         self.assertEqual(m.menu_buttons(xpad, 0x2dc8, 0x310b, "xpad", self.db),
-                         {"guide": 0x13c, "a": 0x130, "b": 0x131})
-        # The Raiju's entry has no guide: only A and B, by number.
+                         {"guide": 0x13c, "a": 0x130, "b": 0x131, "start": 0x13b})
+        # The Raiju's entry has no guide: A, B and Start, by number.
         self.assertEqual(m.menu_buttons(RAIJU, 0x1532, 0x1007, "hid-generic", self.db),
-                         {"a": 0x131, "b": 0x132})
+                         {"a": 0x131, "b": 0x132, "start": 0x139})
         self.assertEqual(m.menu_buttons(RAIJU, 0x1234, 0x5678, "hid-generic", self.db), {})
 
 
@@ -134,6 +134,20 @@ class LetGo(unittest.TestCase):
     def test_generic_pad_z_may_be_a_stick(self):
         self.assertEqual(m.let_go([], {m.ABS_Z: (200, 0, 255)}, "hid-generic"), [(m.EV_ABS, m.ABS_Z, 127)])
         self.assertEqual(m.let_go([], {m.ABS_Z: (127, 0, 255)}, "hid-generic"), [])
+
+
+class PressStart(unittest.TestCase):
+    def test_presses_and_lets_go(self):
+        sent = []
+        dev = type("Pad", (), {"name": "Pad", "write": lambda self, *ev: sent.append(ev),
+                               "syn": lambda self: sent.append("syn")})()
+        m.press_start(dev, 0x13b, wait=0)
+        import time
+        for _ in range(50):
+            if len(sent) == 4:
+                break
+            time.sleep(0.02)
+        self.assertEqual(sent, [(m.EV_KEY, 0x13b, 1), "syn", (m.EV_KEY, 0x13b, 0), "syn"])
 
 
 class AskMenu(unittest.TestCase):

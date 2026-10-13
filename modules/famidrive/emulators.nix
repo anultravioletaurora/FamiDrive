@@ -656,11 +656,17 @@ in
     # 2026-10-06: as a system of their own they showed as a second Ports,
     # with the same art). Every instance starts fullscreen, whoever made
     # it (pkgs/famidrive-prism).
+    #
+    # SDL_JOYSTICK_HIDAPI=0: Controlify's SDL reads pads through the
+    # kernel's input devices, not their raw HID ones. FamiDrive's menu
+    # (Guide) takes the input devices from the game while it's open; it
+    # can't take the raw ones. Found on the first box 2026-10-13: with a
+    # DualShock 4, Minecraft kept moving under the menu.
     famidrive.desktop = lib.mkMerge [
       (lib.mkIf (hasLane "minecraft") {
         ".prism".command = ''
           ${pkgs.famidrive-prism}/bin/famidrive-prism fullscreen "$HOME/.local/share/PrismLauncher/instances/$(cat "$ROM")"
-          ${pkgs.prismlauncher}/bin/prismlauncher --launch "$(cat "$ROM")"
+          SDL_JOYSTICK_HIDAPI=0 ${pkgs.prismlauncher}/bin/prismlauncher --launch "$(cat "$ROM")"
         '';
       })
       # GOG, the Epic Games Store and Amazon Games, all through Heroic, as

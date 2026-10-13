@@ -270,10 +270,8 @@ class GuideMenu(unittest.TestCase):
         menu = t.Menu()
         menu.command("open", True)
         menu.command("down", True)
-        self.assertEqual(menu.command("select", True), {"open": True, "do": "pause"})
-        self.assertTrue(menu.paused)
-        self.assertEqual((menu.items, menu.sel), (["Resume", "Quit game"], 0))
-        self.assertEqual(menu.command("select", True), {"open": False})   # Resume
+        # Closes, and famidrive-quit presses Start for the game's own pause menu.
+        self.assertEqual(menu.command("select", True), {"open": False, "do": "pause"})
         # Big Picture or the voice client: no pausing those.
         menu.command("open", True, pausable=False)
         self.assertEqual(menu.items, ["Resume", "Quit game"])
