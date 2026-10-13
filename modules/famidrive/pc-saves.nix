@@ -10,7 +10,7 @@
 let
   inherit (lib) mkOption types;
   cfg = config.famidrive;
-  pcLanes = lib.any (l: lib.elem l cfg.lanes) [ "steam" "gog" ];
+  pcLanes = lib.any (l: lib.elem l cfg.lanes) [ "steam" "stores" ];
   p = cfg.allPlayers.${cfg.primaryPlayer};
 in
 {

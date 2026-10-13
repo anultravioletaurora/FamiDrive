@@ -179,7 +179,7 @@ A few things worth calling out:
 
 [modules/famidrive/emulators.nix](../modules/famidrive/emulators.nix)
 defines `famidrive.systems`, the single table every console, Steam,
-Heroic, Minecraft, Clone Hero/YARG, osu!, the Tux games and Settings all
+Heroic, Lutris, Minecraft, Clone Hero/YARG, osu!, the Tux games and Settings all
 register themselves into — one attrset per ES-DE folder name, with its
 full name, extensions, launch command, RomM platform, save layout and
 theme. Nothing reads individual option trees for "what systems exist";
@@ -194,8 +194,9 @@ everything downstream reads this one table:
   player's own save layout) into JSON configs under
   `/etc/famidrive/romm/` for the agent to read.
 - **[generators.nix](../modules/famidrive/generators.nix)** fills in the
-  per-player systems (`steam`, `heroic` via `desktop`, `minecraft` via
-  `desktop`) whose entries aren't static — see below.
+  per-player systems (`steam`, `epic` and `desktop` from Heroic,
+  `lutris`, `minecraft` via `desktop`) whose entries aren't static — see
+  below.
 
 RetroArch-run systems share one RetroArch build (`retroarch.withCores`,
 one core per system) and one controller/save setup; everything else
@@ -230,11 +231,12 @@ just stay on the box.
 
 [modules/famidrive/generators.nix](../modules/famidrive/generators.nix)
 and [pkgs/famidrive-generators](../pkgs/famidrive-generators) (Python)
-exist because Steam, Heroic and Prism each keep their own idea of
+exist because Steam, Heroic, Lutris and Prism each keep their own idea of
 "installed games" that Nix can't declare — a player installs and
 uninstalls through the app itself. A systemd path unit per
 player-and-lane watches that lane's install manifest (Steam's
-`steamapps/`, Heroic's three stores' `installed.json` files, Prism's
+`steamapps/`, Heroic's stores' `installed.json` files, Lutris's
+`pga.db`, Prism's
 `instances/`) and reruns `famidrive-generate <lane> <source> <out>` on
 any change, which rewrites that lane's ES-DE placeholder folder to hold
 exactly one placeholder file per installed game — the placeholder's
@@ -319,7 +321,8 @@ surgery as that player at session start or home-manager activation.
 | [pc-saves.nix](../modules/famidrive/pc-saves.nix) | — | Syncthing for PC/GOG saves (the one save path RomM can't model yet), on the primary player's account, folder IDs prefixed with their RomM username |
 | [gpu.nix](../modules/famidrive/gpu.nix) | [famidrive-hardware](../pkgs/famidrive-hardware) | `famidrive.gpu` (`auto`/`amd`/`intel`/`nvidia`) picks drivers; a boot-time check warns when the setting doesn't match the hardware |
 | [boot.nix](../modules/famidrive/boot.nix) | — | Plymouth boot splash in place of console text |
-| [settings.nix](../modules/famidrive/settings.nix) | — | The Settings and Controllers ES-DE systems: Steam Settings, Heroic, Jellyfin, Wi-Fi/Ethernet and Bluetooth pairing entries, each player's own, rewritten every session |
+| [stores.nix](../modules/famidrive/stores.nix) | [famidrive-generators](../pkgs/famidrive-generators) | `famidrive.stores`: Lutris or Heroic (or neither) for each PC store other than Steam; the Lutris system, and the stores Lutris shows as its services |
+| [settings.nix](../modules/famidrive/settings.nix) | — | The Settings and Controllers ES-DE systems: Steam Settings, Heroic, Lutris, Jellyfin, Wi-Fi/Ethernet and Bluetooth pairing entries, each player's own, rewritten every session |
 | [endpoints.nix](../modules/famidrive/endpoints.nix) | — | Every server address (`romm`, `jellyfin`, `rpcn`, `edenRoomHost`, `xeniaWebServices`, ...) in one place, no defaults, so a host fails loudly at build time instead of silently pointing nowhere |
 
 Steam-specific config editing has its own tool,

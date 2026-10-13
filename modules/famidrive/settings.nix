@@ -4,8 +4,13 @@
 #
 #   Steam Settings          Steam's Big Picture (Proton per game, launch
 #                           options, Steam Input, downloads); steam lane
-#   Heroic Games Launcher   sign in to GOG, Epic and Amazon, install and
-#                           remove their games; heroic lane
+#   Heroic Games Launcher   sign in to the stores Heroic runs (Epic, by
+#                           default), install and remove their games;
+#                           stores lane (stores.nix)
+#   Lutris                  sign in to the stores Lutris runs (GOG,
+#                           Amazon, Battle.net, EA, Ubisoft, Humble
+#                           Bundle, by default), install and remove their
+#                           games; stores lane
 #   Jellyfin Media Player   the Jellyfin app, with its sign-in and its
 #                           own settings menu; media.jellyfin.enable
 #   Discord Voice Chat      the client's own window: sign in, pick a
@@ -31,7 +36,8 @@
 let
   cfg = config.famidrive;
   steam = lib.elem "steam" cfg.lanes;
-  heroic = lib.elem "heroic" cfg.lanes;
+  heroic = cfg.launchers.heroic != [ ];
+  lutris = cfg.launchers.lutris != [ ];
   jellyfin = cfg.media.jellyfin.enable;
   bluetooth = cfg.controllers.bluetoothPairing;
   network = cfg.networkSettings && config.networking.networkmanager.enable;
@@ -44,6 +50,7 @@ let
   entries =
     lib.optionalAttrs steam { "Steam Settings" = "steam"; }
     // lib.optionalAttrs heroic { "Heroic Games Launcher" = "heroic"; }
+    // lib.optionalAttrs lutris { "Lutris" = "lutris"; }
     // lib.optionalAttrs jellyfin { "Jellyfin Media Player" = "jellyfin"; };
 
   gamelist = pkgs.writeText "gamelist.xml" ''
@@ -106,6 +113,7 @@ in
         case "$(cat "$ROM")" in
           ${lib.optionalString steam ''steam) exec ${pkgs.gamescope-fg}/bin/gamescope-fg --steam bigpicture ;;''}
           ${lib.optionalString heroic ''heroic) XDG_CURRENT_DESKTOP=FamiDrive ${pkgs.heroic}/bin/heroic --fullscreen --no-sandbox ;;''}
+          ${lib.optionalString lutris ''lutris) ${pkgs.lutris}/bin/lutris ;;''}
           ${lib.optionalString jellyfin ''jellyfin) ${cfg.systems.media.command} ;;''}
           ${lib.optionalString network ''network-*) exec ${pkgs.famidrive-network}/bin/famidrive-network launch "$ROM" ;;''}
           ${lib.optionalString voice ''discord-voice) exec ${pkgs.gamescope-fg}/bin/gamescope-fg --voice-show ;;''}
@@ -153,7 +161,7 @@ in
         ${lib.concatMapStrings (name: ''
           rm -f "$d/${name}.setting"
         '') (lib.filter (n: !(myEntries ? ${n}))
-          [ "Steam Settings" "Heroic Games Launcher" "Jellyfin Media Player" "Discord Voice Chat" "Switch Player" ])}
+          [ "Steam Settings" "Heroic Games Launcher" "Lutris" "Jellyfin Media Player" "Discord Voice Chat" "Switch Player" ])}
         ${lib.optionalString steam ''
           # ES-DE sorts by name; Steam Settings goes first by its sort name.
           # ES-DE rewrites gamelists itself (play counts), so this is only a

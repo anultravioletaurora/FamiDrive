@@ -9,6 +9,7 @@ made-up Steam library cache.
 
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -121,23 +122,33 @@ class Test(unittest.TestCase):
             (heroic / path).write_text(json.dumps(data))
         return heroic
 
-    def test_heroic_games_go_in_desktop(self):
+    def test_heroic_games_go_in_their_stores_systems(self):
         heroic = self.heroic_config()
-        desktop = self.home / "roms/desktop"
-        desktop.mkdir(parents=True)
-        (desktop / "Uninstalled.epic").write_text("gone")
-        (desktop / "Clone Hero.port").write_text("clonehero")   # not Heroic's
-        self.run_tool("heroic", str(heroic), str(desktop))
-        self.assertEqual((desktop / "Hollow Knight_ Voidheart.gog").read_text(), "1207658924")
-        self.assertEqual((desktop / "Fortnite.epic").read_text(), "Fortnite")
-        self.assertEqual((desktop / "Some Prime Game.amazon").read_text(), "amzn1.adg.product.abc")
-        self.assertFalse((desktop / "Uninstalled.epic").exists())
-        self.assertTrue((desktop / "Clone Hero.port").exists())
+        roms = self.home / "roms"
+        (roms / "epic").mkdir(parents=True)
+        (roms / "epic/Uninstalled.epic").write_text("gone")
+        (roms / "desktop").mkdir(parents=True)
+        (roms / "desktop/Clone Hero.port").write_text("clonehero")   # not Heroic's
+        self.run_tool("heroic", str(heroic), str(roms), "gog", "epic", "amazon")
+        self.assertEqual((roms / "desktop/Hollow Knight_ Voidheart.gog").read_text(), "1207658924")
+        self.assertEqual((roms / "epic/Fortnite.epic").read_text(), "Fortnite")
+        self.assertEqual((roms / "desktop/Some Prime Game.amazon").read_text(), "amzn1.adg.product.abc")
+        self.assertFalse((roms / "epic/Uninstalled.epic").exists())
+        self.assertTrue((roms / "desktop/Clone Hero.port").exists())
+
+    def test_heroic_lists_only_the_stores_it_runs(self):
+        heroic = self.heroic_config()
+        roms = self.home / "roms"
+        (roms / "desktop").mkdir(parents=True)
+        (roms / "desktop/Hollow Knight_ Voidheart.gog").write_text("1207658924")
+        self.run_tool("heroic", str(heroic), str(roms), "epic")
+        self.assertTrue((roms / "epic/Fortnite.epic").exists())
+        self.assertEqual(list((roms / "desktop").iterdir()), [])
 
     def test_heroic_never_signed_in_gives_no_entries(self):
-        desktop = self.home / "roms/desktop"
-        self.run_tool("heroic", str(self.home / ".config/heroic"), str(desktop))
-        self.assertEqual(list(desktop.iterdir()), [])
+        roms = self.home / "roms"
+        self.run_tool("heroic", str(self.home / ".config/heroic"), str(roms), "gog", "epic", "amazon")
+        self.assertEqual([p for p in roms.rglob("*") if p.is_file()], [])
 
     def test_heroic_games_move_from_their_old_systems(self):
         heroic = self.heroic_config()
@@ -152,12 +163,34 @@ class Test(unittest.TestCase):
         (lists / "desktop").mkdir(parents=True)
         (lists / "desktop/gamelist.xml").write_text(
             '<?xml version="1.0"?><gameList><game><path>./Clone Hero.port</path><playcount>2</playcount></game></gameList>')
-        self.run_tool("heroic", str(heroic), str(roms / "desktop"))
+        self.run_tool("heroic", str(heroic), str(roms), "gog", "epic", "amazon")
         self.assertFalse((roms / "gog/Hollow Knight_ Voidheart.gog").exists())
         games = {g.findtext("path"): g for g in ET.parse(lists / "desktop/gamelist.xml").getroot().iter("game")}
         self.assertEqual(games["./Hollow Knight_ Voidheart.gog"].findtext("playcount"), "7")
         self.assertEqual(games["./Clone Hero.port"].findtext("playcount"), "2")
-        self.assertFalse((lists / "gog/gamelist.xml").exists())
+        self.assertEqual(ET.parse(lists / "gog/gamelist.xml").getroot().findall("game"), [])
+
+    def test_epic_games_move_from_desktop_to_epic(self):
+        heroic = self.heroic_config()
+        roms = self.home / "roms"
+        (roms / "desktop").mkdir(parents=True)
+        (roms / "desktop/Fortnite.epic").write_text("Fortnite")
+        lists = self.home / "ES-DE/gamelists"
+        (lists / "desktop").mkdir(parents=True)
+        (lists / "desktop/gamelist.xml").write_text(
+            '<?xml version="1.0"?><gameList><game><path>./Fortnite.epic</path><favorite>true</favorite></game>'
+            '<game><path>./Clone Hero.port</path><playcount>2</playcount></game></gameList>')
+        covers = self.home / "ES-DE/downloaded_media/desktop/covers"
+        covers.mkdir(parents=True)
+        (covers / "Fortnite.jpg").write_bytes(b"cover")
+        self.run_tool("heroic", str(heroic), str(roms), "epic")
+        self.assertFalse((roms / "desktop/Fortnite.epic").exists())
+        self.assertTrue((roms / "epic/Fortnite.epic").exists())
+        epic = {g.findtext("path"): g for g in ET.parse(lists / "epic/gamelist.xml").getroot().iter("game")}
+        self.assertEqual(epic["./Fortnite.epic"].findtext("favorite"), "true")
+        desktop = [g.findtext("path") for g in ET.parse(lists / "desktop/gamelist.xml").getroot().iter("game")]
+        self.assertEqual(desktop, ["./Clone Hero.port"])
+        self.assertEqual((self.home / "ES-DE/downloaded_media/epic/covers/Fortnite.jpg").read_bytes(), b"cover")
 
     def test_heroic_games_get_heroics_name_details_and_art(self):
         square = self.home / "square.jpg"
@@ -169,14 +202,14 @@ class Test(unittest.TestCase):
             "art_square": square.as_uri(), "art_background": background.as_uri(),
             "extra": {"about": {"description": "Forge your own path\r\n in <b>Hallownest</b>."},
                       "genres": ["Action", "Adventure"]}}]}})
-        desktop = self.home / "roms/desktop"
-        self.run_tool("heroic", str(heroic), str(desktop))
+        roms = self.home / "roms"
+        self.run_tool("heroic", str(heroic), str(roms), "gog")
         lists = self.home / "ES-DE/gamelists/desktop"
         lists.mkdir(parents=True)
         (lists / "gamelist.xml").write_text(
             '<?xml version="1.0"?><gameList><game><path>./Hollow Knight_ Voidheart.gog</path>'
             '<name>Old</name><playcount>3</playcount></game></gameList>')
-        self.run_tool("heroic-media", str(heroic), str(desktop))
+        self.run_tool("heroic-media", str(heroic), str(roms), "gog")
         game = next(g for g in ET.parse(lists / "gamelist.xml").getroot().iter("game")
                     if g.findtext("path") == "./Hollow Knight_ Voidheart.gog")
         self.assertEqual(game.findtext("name"), "Hollow Knight: Voidheart")
@@ -187,6 +220,61 @@ class Test(unittest.TestCase):
         media = self.home / "ES-DE/downloaded_media/desktop"
         self.assertEqual((media / "covers/Hollow Knight_ Voidheart.jpg").read_bytes(), b"cover")
         self.assertEqual((media / "fanart/Hollow Knight_ Voidheart.png").read_bytes(), b"\x89PNG background")
+
+    def lutris_db(self, games, hidden=()):
+        data = self.home / ".local/share/lutris"
+        data.mkdir(parents=True, exist_ok=True)
+        con = sqlite3.connect(data / "pga.db")
+        con.executescript("""
+            CREATE TABLE games (id INTEGER PRIMARY KEY, name TEXT, slug TEXT, runner TEXT,
+                                installed INTEGER, service TEXT);
+            CREATE TABLE categories (id INTEGER PRIMARY KEY, name TEXT UNIQUE);
+            CREATE TABLE games_categories (game_id INTEGER, category_id INTEGER);
+            INSERT INTO categories VALUES (1, '.hidden');""")
+        con.executemany("INSERT INTO games VALUES (?, ?, ?, ?, ?, ?)", games)
+        con.executemany("INSERT INTO games_categories VALUES (?, 1)", [(i,) for i in hidden])
+        con.commit()
+        con.close()
+        return data
+
+    def test_lutris_games_go_in_the_lutris_system(self):
+        data = self.lutris_db([
+            (1, "Call of Duty: Black Ops Cold War", "call-of-duty-black-ops-cold-war", "wine", 1, None),
+            (2, "Not Installed", "not-installed", "wine", 0, "gog"),
+            (3, "A Steam Game", "a-steam-game", "steam", 1, "steam"),
+            (4, "Hidden Game", "hidden-game", "wine", 1, "gog"),
+            (5, "Hollow Knight", "hollow-knight", "linux", 1, "gog"),
+        ], hidden=[4])
+        (data / "coverart").mkdir()
+        (data / "coverart/call-of-duty-black-ops-cold-war.jpg").write_bytes(b"cover")
+        out = self.home / "roms/lutris"
+        out.mkdir(parents=True)
+        (out / "Uninstalled.lutris").write_text("9")
+        self.run_tool("lutris", str(data), str(out))
+        self.assertEqual(sorted(p.name for p in out.iterdir()),
+                         ["Call of Duty_ Black Ops Cold War.lutris", "Hollow Knight.lutris"])
+        self.assertEqual((out / "Call of Duty_ Black Ops Cold War.lutris").read_text(), "1")
+        game = next(ET.parse(self.home / "ES-DE/gamelists/lutris/gamelist.xml").getroot().iter("game"))
+        self.assertEqual(game.findtext("name"), "Call of Duty: Black Ops Cold War")
+        self.assertEqual((self.home / "ES-DE/downloaded_media/lutris/covers/Call of Duty_ Black Ops Cold War.jpg")
+                         .read_bytes(), b"cover")
+
+    def test_lutris_never_opened_gives_no_entries(self):
+        out = self.home / "roms/lutris"
+        self.run_tool("lutris", str(self.home / ".local/share/lutris"), str(out))
+        self.assertEqual(list(out.iterdir()), [])
+
+    def test_lutris_database_unreadable_keeps_the_entries(self):
+        data = self.home / ".local/share/lutris"
+        data.mkdir(parents=True)
+        (data / "pga.db").write_bytes(b"not a database")
+        out = self.home / "roms/lutris"
+        out.mkdir(parents=True)
+        (out / "Kept.lutris").write_text("1")
+        r = subprocess.run([sys.executable, str(SCRIPT), "lutris", str(data), str(out)],
+                           env={**os.environ, "HOME": str(self.home)}, capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertTrue((out / "Kept.lutris").exists())
 
     def test_a_game_the_store_doesnt_know_still_gets_its_art(self):
         self.install(1, "Some Delisted Game")

@@ -81,7 +81,7 @@ let
     networking.networkmanager.enable = true;   # as NixOS's installer sets it up
     famidrive = {
       enable = true;
-      lanes = [ "roms" "steam" "heroic" "minecraft" ];
+      lanes = [ "roms" "steam" "stores" "minecraft" ];
       players = {
         alice.romm.tokenFile = "/run/secrets/alice-token";
         alice.thunderstore.games = {
@@ -419,7 +419,8 @@ in
       enable = true;
       romm.enable = false;
       guest.enable = true;
-      lanes = [ "roms" "steam" "heroic" ];   # Steam and Heroic: systems with no emulator
+      lanes = [ "roms" "steam" "stores" ];   # Steam, Heroic and Lutris: systems with no emulator
+      stores.gog = "heroic";   # for GOG's achievements through Comet
       players.alice.retroAchievements = { username = "alice-ra"; hardcore = true; };
       players.bob = { };
     };
@@ -451,10 +452,15 @@ in
     (check "Heroic sends desktop notifications (not taken for Steam Deck Game Mode) and its games get the status screen; GOG games have the Comet watcher"
       (lib.hasInfix "XDG_CURRENT_DESKTOP=FamiDrive" c.famidrive.systems.desktop.command
         && lib.hasInfix "gamescope-fg --launcher \"$ROM\"" c.famidrive.systems.desktop.command
+        && lib.hasInfix "XDG_CURRENT_DESKTOP=FamiDrive" c.famidrive.systems.epic.command
         && lib.hasInfix "XDG_CURRENT_DESKTOP=FamiDrive" c.famidrive.systems.settings.command
         && lib.hasInfix "*.gog)" c.famidrive.systems.desktop.before
         && lib.hasInfix "watch-comet" c.famidrive.systems.desktop.before
-        && !(lib.hasInfix "*.epic)" c.famidrive.systems.desktop.before)))
+        && !(lib.hasInfix "*.amazon)" c.famidrive.systems.desktop.command)
+        && !(lib.hasInfix "*.epic)" c.famidrive.systems.desktop.command)))
+    (check "a store set to Heroic is Heroic's in Lutris's services too: off there"
+      (lib.hasInfix "services gog False" c.home-manager.users.alice.home.activation.famidriveLutris.data
+        && lib.hasInfix "services amazon True" c.home-manager.users.alice.home.activation.famidriveLutris.data))
     (check "Bluetooth pairing in Controllers, not Settings: entries written each session (old ones cleared from Settings), pair and forget launch"
       (lib.hasInfix "famidrive-bluetooth entries" c.famidrive.sessionSetup
         && lib.hasInfix "/roms/controllers" c.famidrive.sessionSetup
@@ -652,17 +658,35 @@ in
       (check "Heroic gets the GE-Proton Steam has, as its default when it has none"
         (lib.hasInfix "GE-Proton-FamiDrive" c.home-manager.users.bob.home.activation.famidriveHeroicProton.data
           && lib.hasInfix "defaultSettings.wineVersion" c.home-manager.users.bob.home.activation.famidriveHeroicProton.data))
-      (check "GOG, Epic and Amazon games are Desktop entries, launched through Heroic, with Heroic's art and details"
-        (lib.all (s: !(c.famidrive.systems ? ${s}) && lib.hasInfix "runner=" c.famidrive.systems.desktop.command
-            && lib.elem ".${s}" c.famidrive.systems.desktop.extensions)
-          [ "gog" "epic" "amazon" ]
-          && lib.hasInfix "/roms/desktop" c.systemd.services.famidrive-gen-heroic-bob.serviceConfig.ExecStart
-          && lib.hasInfix "heroic-media" c.systemd.services.famidrive-heroic-media-bob.serviceConfig.ExecStart))
-      (check "Heroic's menu entries follow its installed-games files, per player"
-        (lib.hasInfix "legendaryConfig/legendary/installed.json"
-          (toString c.systemd.paths.famidrive-gen-heroic-bob.pathConfig.PathChanged)))
-      (check "Heroic is in Settings, for sign-in and installs"
-        (lib.hasInfix "Heroic Games Launcher.setting" c.home-manager.users.alice.home.activation.famidriveSettings.data))
+      (check "by default Heroic runs only Epic, in the Epic system with Art Book Next's Epic art and Heroic's art and details"
+        (c.famidrive.launchers.heroic == [ "epic" ]
+          && c.famidrive.systems.epic.theme == "epic"
+          && c.famidrive.systems.epic.extensions == [ ".epic" ]
+          && lib.hasInfix "runner=legendary" c.famidrive.systems.epic.command
+          && !(lib.any (s: c.famidrive.systems ? ${s} || lib.elem ".${s}" c.famidrive.systems.desktop.extensions) [ "gog" "amazon" ])
+          && lib.hasSuffix "/home/bob/.local/share/famidrive/roms epic" c.systemd.services.famidrive-gen-heroic-bob.serviceConfig.ExecStart
+          && lib.hasSuffix " epic" c.systemd.services.famidrive-heroic-media-bob.serviceConfig.ExecStart))
+      (check "Heroic's menu entries follow its installed-games files, per player, only for its stores"
+        (toString c.systemd.paths.famidrive-gen-heroic-bob.pathConfig.PathChanged
+          == "/home/bob/.config/heroic/legendaryConfig/legendary/installed.json"))
+      (check "every other store goes through Lutris, in the Lutris system with Art Book Next's Lutris art"
+        (c.famidrive.launchers.lutris == [ "amazon" "battlenet" "ea" "gog" "humble" "ubisoft" ]
+          && c.famidrive.systems.lutris.theme == "lutris"
+          && c.famidrive.systems.lutris.extensions == [ ".lutris" ]
+          && lib.hasInfix "gamescope-fg --launcher \"$ROM\"" c.famidrive.systems.lutris.command
+          && lib.hasInfix "lutris:rungameid/" c.famidrive.systems.lutris.command))
+      (check "Lutris's menu entries follow its database, per player"
+        (lib.hasInfix "famidrive-generate lutris /home/bob/.local/share/lutris /home/bob/.local/share/famidrive/roms/lutris"
+            c.systemd.services.famidrive-gen-lutris-bob.serviceConfig.ExecStart
+          && toString c.systemd.paths.famidrive-gen-lutris-bob.pathConfig.PathChanged == "/home/bob/.local/share/lutris/pga.db"))
+      (check "Lutris's services are the stores it runs, Steam's off"
+        (let a = c.home-manager.users.bob.home.activation.famidriveLutris.data; in
+          lib.hasInfix "services gog True" a && lib.hasInfix "services battlenet True" a
+            && lib.hasInfix "services egs False" a && lib.hasInfix "services steam False" a))
+      (check "Heroic and Lutris are in Settings, for sign-in and installs"
+        (lib.hasInfix "Heroic Games Launcher.setting" c.home-manager.users.alice.home.activation.famidriveSettings.data
+          && lib.hasInfix "Lutris.setting" c.home-manager.users.alice.home.activation.famidriveSettings.data
+          && lib.hasInfix "/bin/lutris ;;" c.famidrive.systems.settings.command))
       (check "Steam's art and details after each Steam menu update, not before the session"
         (c.systemd.services.famidrive-gen-steam-alice.onSuccess == [ "famidrive-steam-media-alice.service" ]
           && !(lib.elem "display-manager.service" (c.systemd.services.famidrive-steam-media-alice.wantedBy or [ ]))))
