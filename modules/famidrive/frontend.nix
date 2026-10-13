@@ -291,6 +291,18 @@ in
           target = "$HOME/ES-DE/settings/es_settings.xml";
           keys = lib.mapAttrs (_: v: { type = "string"; value = v; }) theme.defaults;
         })}
+        ${seedLib.defaultKeys {
+          target = "$HOME/ES-DE/settings/es_settings.xml";
+          keys = {
+            # Internal collection names ("recent" is Last Played), not
+            # labels. A player can still turn these off from the menu.
+            CollectionSystemsAuto = { type = "string"; value = "recent, favorites"; };
+            # Home screen opens on Last Played instead of the first system
+            # by sort order. "" (ES-DE's default) falls back to that first
+            # system, so this only takes effect before a player sets it.
+            StartupSystem = { type = "string"; value = "recent"; };
+          };
+        }}
       '';
     };
   };
