@@ -82,7 +82,7 @@ TRIGGERS = (ABS_Z, ABS_RZ, ABS_GAS, ABS_BRAKE)
 # are the real pad's again, so they don't move the menu twice.
 STEAM_VIRTUAL = (0x28de, 0x11ff)
 TOAST_SOCK = RUN / "famidrive-toast.sock"
-PAUSE_WAIT = 0.25   # seconds between the menu closing and Pause game's Start press
+HOLD_PRESS = 0.1    # seconds a button pressed for the game is held
 
 
 def log(msg):
@@ -232,8 +232,8 @@ def let_go(held, axes, driver):
 
 def ask_menu(command, path=None):
     """Hand the toast daemon a menu command; its reply ({"open": bool, and
-    "do": "quit", or "pause" to press Start for the game's own pause
-    menu}), or {} without one."""
+    "do": "quit", or "resume" to press B to back out of the game's own
+    pause menu}), or {} without one."""
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
             s.settimeout(2)
@@ -310,12 +310,20 @@ def game_targets():
 
 
 def game_mode():
-    """The running game's guideMenu: "freeze", "start" or "focus"."""
+    """What the menu does with the running game: its guideMenu ("freeze"
+    or "pause"), or "none" with no game, or for Steam's Big Picture and
+    the voice client, which leave a polite way to close them instead
+    (famidrive-game.close) and aren't games."""
+    try:
+        if not game_targets() or CLOSE_FILE.read_text().strip():
+            return "none"
+    except OSError:
+        pass
     try:
         mode = MENU_FILE.read_text().strip()
     except OSError:
-        return "start"
-    return mode if mode in ("freeze", "start", "focus") else "start"
+        return "pause"
+    return mode if mode in ("freeze", "pause") else "pause"
 
 
 def freeze_game(on):
@@ -328,27 +336,31 @@ def freeze_game(on):
     signal_all(targets, signal.SIGSTOP if on else signal.SIGCONT)
 
 
-def press(dev, code, what, wait=PAUSE_WAIT):
-    """Press a button on the pad that closed the menu, for the game: Start
-    for Pause game, so a PC game opens its own pause menu (freezing it
-    instead stopped it, but showed no pause menu, and that wasn't what was
-    wanted: first box, 2026-10-13); B for a game that paused itself when
-    the menu took its focus (Minecraft), to close its pause screen. After
-    a moment, once the menu has let the pads go and the game has its focus
-    back: many games read no pads while they don't have it."""
-    def press():
+def press(dev, code, what, wait=0.0, hold=HOLD_PRESS, background=False):
+    """Press a button for the game, as if on the pad itself (a "pause"
+    game, a PC one): Start as the menu opens, so the game opens its own
+    pause menu, and B as it closes, to back out of it. Held for a few of
+    the game's frames: a game that reads the pad's state once a frame
+    misses a press and release between two. Freezing a PC game instead
+    stopped it, but showed no pause menu, and that wasn't what was wanted;
+    taking its focus, so it paused itself, left a fullscreen game
+    minimized (first box, 2026-10-13)."""
+    def go():
         time.sleep(wait)
         try:
             dev.write(EV_KEY, code, 1)
             dev.syn()
-            time.sleep(0.08)
+            time.sleep(hold)
             dev.write(EV_KEY, code, 0)
             dev.syn()
             log(f"pressed {what} on {dev.name} for the game")
         except OSError as err:
             log(f"couldn't press {what} on {dev.name}: {err}")
 
-    threading.Thread(target=press, daemon=True).start()
+    if background:
+        threading.Thread(target=go, daemon=True).start()
+    else:
+        go()
 
 
 def quit_game():
@@ -495,10 +507,11 @@ def main():
                                 log("menu closed")
                                 if reply.get("do") == "quit":
                                     quit_game()
-                                else:
-                                    role, name = {"pause": ("start", "Start"), "resume": ("b", "B")}.get(reply.get("do"), (None, None))
-                                    if role in buttons_of[fd]:
-                                        press(dev, buttons_of[fd][role], name)
+                                elif reply.get("do") == "resume" and "b" in buttons_of[fd]:
+                                    # A moment later: the button that closed the menu
+                                    # is still held, and letting it go would cut the
+                                    # press short.
+                                    press(dev, buttons_of[fd]["b"], "B", wait=0.15, background=True)
                     elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 1:
                         guide_down.add(fd)
                     elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 0 and fd in guide_down:
@@ -513,9 +526,13 @@ def main():
                         if ask_menu("open").get("open"):
                             menu = True
                             log("menu opened")
-                            if game_targets() and game_mode() == "freeze":
+                            mode = game_mode()
+                            if mode == "freeze":
                                 freeze_game(True)
                                 frozen = True
+                            elif mode == "pause" and "start" in buttons_of[fd]:
+                                # Before the grab, which would keep it from the game.
+                                press(dev, buttons_of[fd]["start"], "Start")
                             for fd2, dev2 in devices.items():
                                 grab(dev2, drivers[fd2])
             except OSError:

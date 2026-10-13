@@ -526,9 +526,9 @@ in
           && lib.hasInfix "famidrive-network launch" c.famidrive.systems.settings.command
           && lib.hasInfix "org.freedesktop.NetworkManager." c.security.polkit.extraConfig))
       (check "a switch restarts the session when it changed" c.systemd.services.greetd.restartIfChanged)
-      (check "the Guide menu freezes emulators, leaves Steam games running for their own pause menu, and takes Minecraft's focus"
-        (c.famidrive.systems.gc.guideMenu == "freeze" && c.famidrive.systems.steam.guideMenu == "start"
-          && lib.hasInfix "echo focus > " c.famidrive.systems.desktop.before))
+      (check "the Guide menu freezes emulators, and opens Steam's and Desktop games' own pause menus"
+        (c.famidrive.systems.gc.guideMenu == "freeze" && c.famidrive.systems.steam.guideMenu == "pause"
+          && c.famidrive.systems.desktop.guideMenu == "pause"))
       (check "a host's own cleanup choice wins" (c.nix.gc.options == "--delete-older-than 30d"))
       (check "Thunderstore mods are each player's own: BepInEx loads only in their Steam, Valheim's and Risk of Rain 2's known"
         (lib.hasInfix "famidrive-thunderstore" c.home-manager.users.alice.home.activation.famidriveThunderstore.data

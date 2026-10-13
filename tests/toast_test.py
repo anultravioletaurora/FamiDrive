@@ -243,17 +243,16 @@ class GuideMenu(unittest.TestCase):
         menu = t.Menu()
         self.assertEqual(menu.command("down", True), {"open": False})   # nothing until it's open
         self.assertEqual(menu.command("open", True), {"open": True})
-        self.assertEqual(menu.items, ["Resume", "Pause game", "Quit game"])
+        self.assertEqual(menu.items, ["Resume", "Quit game"])
         menu.command("up", True)
         self.assertEqual(menu.sel, 0)
         for _ in range(3):
             menu.command("down", True)
-        self.assertEqual(menu.sel, 2)
+        self.assertEqual(menu.sel, 1)
 
     def test_quit_asks_first(self):
         menu = t.Menu()
         menu.command("open", True)
-        menu.command("down", True)
         menu.command("down", True)
         self.assertEqual(menu.command("select", True), {"open": True})
         self.assertEqual((menu.view, menu.items, menu.sel), ("confirm", ["Cancel", "Quit"], 0))
@@ -264,50 +263,36 @@ class GuideMenu(unittest.TestCase):
         self.assertEqual((menu.open, menu.view), (True, "main"))
         menu.command("select", True)
         menu.command("down", True)
+        # Quitting presses nothing for the game.
         self.assertEqual(menu.command("select", True), {"open": False, "do": "quit"})
-
-    def test_pause(self):
-        menu = t.Menu()
-        menu.command("open", True)
-        menu.command("down", True)
-        # Closes, and famidrive-quit presses Start for the game's own pause menu.
-        self.assertEqual(menu.command("select", True), {"open": False, "do": "pause"})
-        # Big Picture or the voice client: no pausing those.
-        menu.command("open", True, pausable=False)
-        self.assertEqual(menu.items, ["Resume", "Quit game"])
 
     def test_modes(self):
         menu = t.Menu()
-        # An emulator: frozen while the menu is open, so it's paused already.
-        menu.command("open", True, mode="freeze")
-        self.assertEqual((menu.items, menu.note), (["Resume", "Quit game"], "Game paused"))
-        self.assertEqual(menu.command("select", True), {"open": False})
-        # Minecraft: paused itself when it lost focus; closing presses B,
-        # however the menu closes, but not after Quit.
+        # A PC game: B backs out of its pause menu however the menu closes.
         for cmd in ("select", "back", "close"):
-            menu.command("open", True, mode="focus")
-            self.assertEqual((menu.items, menu.note), (["Resume", "Quit game"], ""))
+            menu.command("open", True, mode="pause")
+            self.assertEqual(menu.note, "")
             self.assertEqual(menu.command(cmd, True), {"open": False, "do": "resume"})
-        menu.command("open", True, mode="focus")
-        menu.command("down", True)
-        menu.command("select", True)
-        menu.command("down", True)
-        self.assertEqual(menu.command("select", True), {"open": False, "do": "quit"})
+        # An emulator: stopped while the menu is open, nothing to press.
+        menu.command("open", True, mode="freeze")
+        self.assertEqual(menu.note, "Game paused")
+        self.assertEqual(menu.command("select", True), {"open": False})
+        # Big Picture or the voice client: left alone.
+        menu.command("open", True, pausable=False)
+        self.assertEqual(menu.command("back", True), {"open": False})
         # Out of a game, nothing to resume.
-        menu.command("open", False, mode="focus")
-        self.assertEqual(menu.command("back", False), {"open": False})
+        menu.command("open", False)
+        self.assertEqual((menu.items, menu.command("back", False)), (["Close"], {"open": False}))
 
     def test_back_and_close(self):
         menu = t.Menu()
         for cmd in ("back", "close", "select"):
             menu.command("open", False)
-            self.assertEqual(menu.items, ["Close"])
             self.assertEqual(menu.command(cmd, False), {"open": False})
         menu.command("open", True)
         menu.command("down", True)
-        menu.command("down", True)
         menu.command("select", True)
-        self.assertEqual(menu.command("close", True), {"open": False})   # Guide closes from anywhere
+        self.assertEqual(menu.command("close", True), {"open": False, "do": "resume"})   # Guide closes from anywhere
 
 
 class Look(unittest.TestCase):

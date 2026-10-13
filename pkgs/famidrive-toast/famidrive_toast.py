@@ -486,13 +486,13 @@ def in_game():
 
 def game_mode():
     """What the Guide menu does with the running game (a system's
-    guideMenu, written by the launch): "freeze", "start" or "focus".
-    "start" when the launch said nothing."""
+    guideMenu, written by the launch): "freeze" or "pause". "pause" when
+    the launch said nothing."""
     try:
         mode = (sock_path().parent / "famidrive-game.menu").read_text().strip()
     except OSError:
-        return "start"
-    return mode if mode in ("freeze", "start", "focus") else "start"
+        return "pause"
+    return mode if mode in ("freeze", "pause") else "pause"
 
 
 def pausable():
@@ -557,43 +557,39 @@ def watch_controllers(interval=1.5):
 # the menu is still open, and what famidrive-quit should do ("quit").
 
 class Menu:
-    """The menu's state. Pure: whether a game is running, and whether it
-    can be paused, are passed in.
+    """The menu's state. Pure: whether a game is running, whether it's one
+    to pause, and its guideMenu are passed in.
 
-    In a game: Resume, Pause game (closes the menu and presses Start, so
-    the game opens its own pause menu) and Quit game, which asks first,
-    since anything not saved is lost. Out of one: Close."""
+    In a game: Resume, and Quit game, which asks first, since anything not
+    saved is lost. Out of one: Close. A "freeze" game (an emulator) is
+    stopped while the menu is open; a "pause" one (a PC game) has Start
+    pressed as it opens, for its own pause menu, and B as the menu closes
+    ("do": "resume"), unless it closed by quitting."""
 
     def __init__(self):
         self.open = False
         self.view = "main"   # or "confirm": Quit game's "are you sure?"
         self.items = []
         self.sel = 0
-        self.playing = self.pausable = False
-        self.mode, self.note = "start", ""
+        self.playing = False
+        self.mode, self.note = "pause", ""
 
     def _main(self):
         self.view = "main"
-        if not self.playing:
-            self.items = ["Close"]
-        else:
-            self.items = ["Resume"] + (["Pause game"] if self.pausable else []) + ["Quit game"]
+        self.items = ["Resume", "Quit game"] if self.playing else ["Close"]
 
-    def command(self, cmd, playing, pausable=True, mode="start"):
-        """mode: the game's guideMenu. Pause game is only for "start"; a
-        frozen game ("freeze") is already paused, and one that pauses
-        itself when it loses focus ("focus") is too, and gets its pause
-        screen closed again when the menu closes ("do": "resume")."""
+    def command(self, cmd, playing, pausable=True, mode="pause"):
         reply = self._command(cmd, playing, pausable, mode)
-        if cmd != "open" and not reply["open"] and "do" not in reply and self.playing and self.mode == "focus":
+        if cmd != "open" and not reply["open"] and "do" not in reply and self.playing and self.mode == "pause":
             reply["do"] = "resume"
         return reply
 
     def _command(self, cmd, playing, pausable, mode):
         if cmd == "open":
-            self.open, self.sel, self.mode = True, 0, mode
-            self.playing, self.pausable = playing, playing and pausable and mode == "start"
-            self.note = "Game paused" if playing and mode == "freeze" else ""
+            self.open, self.sel, self.playing = True, 0, playing
+            # Big Picture and the voice client aren't games to pause.
+            self.mode = mode if playing and pausable else "none"
+            self.note = "Game paused" if self.mode == "freeze" else ""
             self._main()
             return self.state()
         if not self.open:
@@ -608,9 +604,6 @@ class Menu:
             self.sel = max(0, self.sel - 1)
         elif cmd == "down":
             self.sel = min(len(self.items) - 1, self.sel + 1)
-        elif cmd == "select" and item == "Pause game":
-            self.open = False
-            return {"open": False, "do": "pause"}
         elif cmd == "select" and item == "Quit game":
             self.view, self.items, self.sel = "confirm", ["Cancel", "Quit"], 0
         elif cmd == "select" and item == "Quit":
@@ -1096,14 +1089,15 @@ def daemon(spec_file, player):
     focus_atom, cardinal = d.intern_atom("STEAM_INPUT_FOCUS"), Xatom.CARDINAL
     blur = {k: d.intern_atom(k) for k in ("GAMESCOPE_BLUR_MODE", "GAMESCOPE_BLUR_RADIUS", "GAMESCOPE_BLUR_FADE_DURATION")}
 
-    def over_game(on, focus=False):
-        """While the menu is up: gamescope blurs the game behind it, and
-        gives this window the keyboard focus (as it does Steam's overlay),
-        so the game sees itself lose focus, only for a game whose
-        guideMenu is "focus": Minecraft pauses itself then. Not for any
-        game: Rocket League went black for good when it lost its focus
-        (first box, 2026-10-13). Blur mode 2 is always, 0 off."""
-        win.change_property(focus_atom, cardinal, 32, [1 if on and focus else 0])
+    def over_game(on):
+        """While the menu is up, gamescope blurs the game behind it (blur
+        mode 2 is always, 0 off). The menu never takes the game's focus
+        (STEAM_INPUT_FOCUS, as Steam's overlay does): a fullscreen game
+        minimizes itself when it loses focus, and nothing under gamescope
+        restores it. Found on the first box 2026-10-13: Rocket League
+        went black for good, and Minecraft (GLFW) stayed minimized, at
+        its 10 frames a second for a minimized window."""
+        win.change_property(focus_atom, cardinal, 32, [0])
         root.change_property(blur["GAMESCOPE_BLUR_RADIUS"], cardinal, 32, [BLUR_RADIUS])
         root.change_property(blur["GAMESCOPE_BLUR_FADE_DURATION"], cardinal, 32, [BLUR_FADE_MS])
         root.change_property(blur["GAMESCOPE_BLUR_MODE"], cardinal, 32, [2 if on else 0])
@@ -1190,7 +1184,7 @@ def daemon(spec_file, player):
             menu_drawn = None
         if menu.open:
             if menu_drawn is None:   # just opened
-                over_game(True, focus=menu.playing and menu.mode == "focus")
+                over_game(True)
                 sheet = open_menu()
                 menu_drawn = sheet["key"]
             if sheet["phase"] == "in" and slide_step(sheet):

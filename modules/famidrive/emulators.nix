@@ -62,15 +62,14 @@ let
         description = "Shell run just after the command, outside it, even when the player quits with Select + Start.";
       };
       guideMenu = mkOption {
-        type = types.enum [ "freeze" "start" "focus" ];
-        default = "start";
+        type = types.enum [ "freeze" "pause" ];
+        default = "pause";
         description = ''
           What the Guide menu does with the game while it's open:
-          `freeze` stops it (an emulator: the menu is its pause), `start`
-          leaves it running and offers Pause game, which presses Start for
-          the game's own pause menu (a PC game, which may be online), and
-          `focus` takes its focus, so it pauses itself, and presses B when
-          the menu closes (Minecraft).
+          `freeze` stops it (an emulator: the menu is its pause); `pause`
+          presses Start as the menu opens, for the game's own pause menu,
+          and B as it closes, to back out of it (a PC game, which may be
+          online and can't be stopped).
         '';
       };
     };
@@ -80,7 +79,7 @@ let
   # entry's guideMenu), picked by its extension. The launch has already
   # written the system's own; this replaces it.
   menuByExtension = table:
-    let parts = lib.filterAttrs (_: p: p.guideMenu != "start") table;
+    let parts = lib.filterAttrs (_: p: p.guideMenu != "pause") table;
     in lib.optionalString (parts != { }) ''
       case "$ROM" in
       ${lib.concatStrings (lib.mapAttrsToList (ext: p: ''
@@ -210,15 +209,14 @@ let
         description = "Pull each game's save from RomM before it starts and push it back after.";
       };
       guideMenu = mkOption {
-        type = types.enum [ "freeze" "start" "focus" ];
+        type = types.enum [ "freeze" "pause" ];
         default = "freeze";
         description = ''
           What the Guide menu does with the game while it's open:
-          `freeze` stops it (an emulator: the menu is its pause), `start`
-          leaves it running and offers Pause game, which presses Start for
-          the game's own pause menu (a PC game, which may be online), and
-          `focus` takes its focus, so it pauses itself, and presses B when
-          the menu closes (Minecraft).
+          `freeze` stops it (an emulator: the menu is its pause); `pause`
+          presses Start as the menu opens, for the game's own pause menu,
+          and B as it closes, to back out of it (a PC game, which may be
+          online and can't be stopped).
         '';
       };
       # Per-emulator layout mapping is still an open question (roms.md
@@ -665,10 +663,8 @@ in
           # -applaunch returns at once; gamescope-fg --steam waits for the game.
           command = ''${pkgs.gamescope-fg}/bin/gamescope-fg --steam "$(cat "$ROM")"'';
           theme = "steam";
-          # Freezing a Steam game froze Steam's own launch scripts with it;
-          # and many are online. Found on the first box 2026-10-13: taking
-          # Rocket League's focus (focus) blacked out its screen for good.
-          guideMenu = "start";
+          # Many Steam games are online, and can't be stopped.
+          guideMenu = "pause";
         };
       })
       (lib.mkIf (cfg.desktop != { }) {
@@ -677,7 +673,7 @@ in
           theme = "desktop";   # Art Book Next's desktop art
           extensions = lib.attrNames cfg.desktop;
           command = byExtension cfg.desktop "command";
-          guideMenu = "start";
+          guideMenu = "pause";
           before = menuByExtension cfg.desktop + byExtension cfg.desktop "before";
           after = byExtension cfg.desktop "after";
         };
@@ -688,7 +684,7 @@ in
           theme = "ports";   # Art Book Next's ports art
           extensions = lib.attrNames cfg.ports;
           command = byExtension cfg.ports "command";
-          guideMenu = "start";
+          guideMenu = "pause";
           before = menuByExtension cfg.ports + byExtension cfg.ports "before";
           after = byExtension cfg.ports "after";
         };
@@ -707,9 +703,6 @@ in
     # DualShock 4, Minecraft kept moving under the menu.
     famidrive.desktop = lib.mkMerge [
       (lib.mkIf (hasLane "minecraft") {
-        # Minecraft pauses itself when it loses focus, and its pause screen
-        # closes on B. Found on the first box 2026-10-13.
-        ".prism".guideMenu = "focus";
         ".prism".command = ''
           ${pkgs.famidrive-prism}/bin/famidrive-prism fullscreen "$HOME/.local/share/PrismLauncher/instances/$(cat "$ROM")"
           SDL_JOYSTICK_HIDAPI=0 ${pkgs.prismlauncher}/bin/prismlauncher --launch "$(cat "$ROM")"
