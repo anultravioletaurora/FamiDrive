@@ -230,7 +230,8 @@ def let_go(held, axes, driver):
 
 def ask_menu(command, path=None):
     """Hand the toast daemon a menu command; its reply ({"open": bool, and
-    "do": "quit" when the player picked Quit game}), or {} without one."""
+    "do": "quit" or "pause" for what the player picked}), or {} without
+    one."""
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
             s.settimeout(2)
@@ -291,16 +292,8 @@ def signal_all(targets, sig):
     return alive
 
 
-def quit_game():
-    try:
-        close = CLOSE_FILE.read_text().strip()
-    except OSError:
-        close = ""
-    if close:
-        log(f"closing: {close}")
-        subprocess.Popen(shlex.split(close), start_new_session=True)
-        return
-
+def game_targets():
+    """The running game's processes: [("pid", n) or ("group", n)]."""
     targets = []
     pgid = read_pid(PGID_FILE)
     root = read_pid(TREE_FILE)
@@ -311,12 +304,36 @@ def quit_game():
         targets += [("pid", pid) for pid in tree(root)]
     if pgid:
         targets.append(("group", pgid))
+    return targets
+
+
+def pause_game(on):
+    """Freeze the game (SIGSTOP) or let it go on (SIGCONT): the menu's
+    Pause game, for a game that can't pause itself or that's offline. An
+    online game would drop off its server, so it's the player's choice."""
+    targets = game_targets()
+    log(("pausing" if on else "unpausing") + f" the game ({len(targets)} targets)")
+    signal_all(targets, signal.SIGSTOP if on else signal.SIGCONT)
+
+
+def quit_game():
+    try:
+        close = CLOSE_FILE.read_text().strip()
+    except OSError:
+        close = ""
+    if close:
+        log(f"closing: {close}")
+        subprocess.Popen(shlex.split(close), start_new_session=True)
+        return
+
+    targets = game_targets()
     if not targets:
         log("combo held, but no game is running")
         return
-    log(f"quitting game (tree {root}, group {pgid})")
+    log(f"quitting game ({targets[0]}...)")
     if not signal_all(targets, signal.SIGTERM):
         return
+    signal_all(targets, signal.SIGCONT)   # a paused game can't act on SIGTERM
 
     def force():
         deadline = time.monotonic() + GRACE
@@ -365,14 +382,20 @@ def main():
     drivers = {}        # fd -> its kernel driver
     guides = {}         # fd -> its Guide key code, if it has one
     menu = False        # whether the menu is open, and every pad grabbed
+    paused = False      # whether the menu froze the game
+    guide_down = set()  # fds whose Guide went down while the menu was closed
     last_scan = 0.0
     db = load_paddb(PADDB)
 
     def close_menu():
-        nonlocal menu
+        nonlocal menu, paused
         menu = False
+        guide_down.clear()
         for dev in devices.values():
             ungrab(dev)
+        if paused:
+            pause_game(False)
+            paused = False
 
     while True:
         # The session (gamescope-fg) is our parent; when it's gone, so are we.
@@ -430,14 +453,25 @@ def main():
                         command = navs[fd] and navs[fd].feed(ev.type, ev.code, ev.value)
                         if command:
                             reply = ask_menu(command)
+                            if reply.get("do") == "pause" and not paused:
+                                pause_game(True)
+                                paused = True
                             if not reply.get("open"):
                                 close_menu()
                                 log("menu closed")
                                 if reply.get("do") == "quit":
                                     quit_game()
-                    elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 0:
+                    elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 1:
+                        guide_down.add(fd)
+                    elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 0 and fd in guide_down:
                         # On letting go: the game has seen the press and
                         # the release, so Guide isn't left held down in it.
+                        # Only a press that began with the menu closed: the
+                        # Guide press that closed it lets go here too, and
+                        # opened it again. Found on the first box
+                        # 2026-10-12: Guide flickered the menu instead of
+                        # closing it.
+                        guide_down.discard(fd)
                         if ask_menu("open").get("open"):
                             menu = True
                             log("menu opened")

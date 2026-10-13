@@ -58,7 +58,13 @@ SUCCESS = (76, 187, 106, 255)
 GOLD = (232, 184, 64, 255)
 SECONDS = {"notice": 4.0, "alert": 7.0, "achievement": 6.0, "progress": 2.0, "success": 5.0}
 STALE_PROGRESS = 120.0
-DIM = (0, 0, 0, 110)   # over the game while the menu is up
+DIM = (0, 0, 0, 165)   # over the game while the menu is up
+BLUR_RADIUS = 18       # gamescope's blur of the game behind the menu (its most is 19)
+BLUR_FADE_MS = 200
+# The panel springs in from the right: stiffness and damping per second,
+# a little under critical, so it overshoots a touch and settles.
+SPRING_K, SPRING_C = 260.0, 20.0
+
 MAX_SHOWN = 3          # toasts on screen at once, stacked from the corner
 URGENT = ("alert", "achievement")   # a progress toast nobody updates is let go
 FADE = 0.25
@@ -94,6 +100,24 @@ def read(path):
 
 
 # --- The player's theme ---------------------------------------------------
+
+def opaque(color):
+    """A theme's panel color half again as opaque: a see-through theme
+    color (Art Book Next's) let a busy game show through the text. Found
+    on the first box 2026-10-12."""
+    return (*color[:3], min(255, int(color[3] * 1.5)))
+
+
+def spring(x, v, target, dt):
+    """One step of the panel's spring: (x, v) after dt seconds, in small
+    steps so a slow frame doesn't throw it off."""
+    steps = max(1, int(dt / 0.004))
+    h = dt / steps
+    for _ in range(steps):
+        v += (-SPRING_K * (x - target) - SPRING_C * v) * h
+        x += v * h
+    return x, v
+
 
 def hex_color(value):
     """ES-DE's RRGGBB or RRGGBBAA, as an RGBA tuple; None if it isn't one."""
@@ -462,6 +486,16 @@ def in_game():
     return (sock_path().parent / "famidrive-game.pgid").exists()
 
 
+def pausable():
+    """Whether the running thing can be frozen: not Steam's Big Picture or
+    the voice client, which leave a polite way to close them instead
+    (famidrive-game.close) and aren't games."""
+    try:
+        return not (sock_path().parent / "famidrive-game.close").read_text().strip()
+    except OSError:
+        return True
+
+
 def pad_changes(before, after, playing):
     """The toasts for pads that came and went between two scans."""
     toasts = []
@@ -514,30 +548,58 @@ def watch_controllers(interval=1.5):
 # the menu is still open, and what famidrive-quit should do ("quit").
 
 class Menu:
-    """The menu's state. Pure: whether a game is running is passed in."""
+    """The menu's state. Pure: whether a game is running, and whether it
+    can be paused, are passed in.
+
+    In a game: Resume, Pause game (freezes it; the player's call, as an
+    online game would drop off its server) and Quit game, which asks
+    first, since anything not saved is lost. Out of one: Close."""
 
     def __init__(self):
         self.open = False
+        self.view = "main"   # or "confirm": Quit game's "are you sure?"
         self.items = []
         self.sel = 0
+        self.paused = False
+        self.playing = self.pausable = False
 
-    def command(self, cmd, playing):
+    def _main(self):
+        self.view = "main"
+        if not self.playing:
+            self.items = ["Close"]
+        else:
+            self.items = ["Resume"] + (["Pause game"] if self.pausable and not self.paused else []) + ["Quit game"]
+
+    def command(self, cmd, playing, pausable=True):
         if cmd == "open":
-            self.open, self.sel = True, 0
-            self.items = ["Resume", "Quit game"] if playing else ["Close"]
+            self.open, self.sel, self.paused = True, 0, False
+            self.playing, self.pausable = playing, playing and pausable
+            self._main()
             return self.state()
         if not self.open:
             return self.state()
-        if cmd in ("close", "back"):
+        item = self.items[self.sel]
+        if cmd == "close" or (cmd == "back" and self.view == "main"):
             self.open = False
+        elif cmd == "back" or (cmd == "select" and item == "Cancel"):
+            self._main()
+            self.sel = self.items.index("Quit game")
         elif cmd == "up":
             self.sel = max(0, self.sel - 1)
         elif cmd == "down":
             self.sel = min(len(self.items) - 1, self.sel + 1)
-        elif cmd == "select":
+        elif cmd == "select" and item == "Pause game":
+            self.paused = True
+            self._main()
+            self.sel = 0
+            return {"open": True, "do": "pause"}
+        elif cmd == "select" and item == "Quit game":
+            self.view, self.items, self.sel = "confirm", ["Cancel", "Quit"], 0
+        elif cmd == "select" and item == "Quit":
             self.open = False
-            if self.items[self.sel] == "Quit game":
-                return {"open": False, "do": "quit"}
+            return {"open": False, "do": "quit"}
+        elif cmd == "select":   # Resume, Close
+            self.open = False
         return self.state()
 
     def state(self):
@@ -740,7 +802,7 @@ def daemon(spec_file, player):
         bar_h = int(8 * u) if toast["kind"] == "progress" else 0
         inner = max(isz, text_h + (gap + bar_h if bar_h else 0))
         surf = pygame.Surface((width, inner + 2 * pad), pygame.SRCALPHA, 32)
-        pygame.draw.rect(surf, colors["panel"], surf.get_rect(), border_radius=radius)
+        pygame.draw.rect(surf, opaque(colors["panel"]), surf.get_rect(), border_radius=radius)
         if toast["kind"] in ("alert", "achievement", "success"):
             accent = {"alert": ALERT, "achievement": GOLD, "success": SUCCESS}[toast["kind"]]
             pygame.draw.rect(surf, accent, (0, radius, int(5 * u), surf.get_height() - 2 * radius))
@@ -787,17 +849,17 @@ def daemon(spec_file, player):
         out.blit(panel, (spread, spread))
         return out
 
-    def put(surf, pos):
-        """Copy an RGBA surface into the window, premultiplied, as BGRA rows
-        in chunks the X server takes in one request each."""
+    def put(surf, pos, target=None):
+        """Copy an RGBA surface into the window (or a pixmap), premultiplied,
+        as BGRA rows in chunks the X server takes in one request each."""
         s = surf.premul_alpha()
         data = pygame.image.tobytes(s, "BGRA")
         w, h = s.get_size()
         rows = max(1, 200_000 // (w * 4))
         for top in range(0, h, rows):
             n = min(rows, h - top)
-            win.put_image(gc, pos[0], pos[1] + top, w, n, X.ZPixmap, 32, 0,
-                          data[top * w * 4:(top + n) * w * 4])
+            (target or win).put_image(gc, pos[0], pos[1] + top, w, n, X.ZPixmap, 32, 0,
+                                      data[top * w * 4:(top + n) * w * 4])
 
     def clear(rect):
         if rect:
@@ -817,7 +879,7 @@ def daemon(spec_file, player):
         text, dim, solid = colors["text"], colors["dim"], (*colors["panel"][:3], 255)
         faint = (*text[:3], 30)
         surf = pygame.Surface((pw, sh), pygame.SRCALPHA, 32)
-        surf.fill((*colors["panel"][:3], 245))
+        surf.fill(opaque(colors["panel"]))
         y = m
         surf.blit(title_f.render(time.strftime("%-I:%M %p"), True, text), (m, y))
         y += title_f.get_linesize() + int(30 * u)
@@ -852,6 +914,16 @@ def daemon(spec_file, player):
             surf.blit(tile, (m + (i % 2) * (tw + tg), y + (i // 2) * (th + tg)))
         y += (len(shown) + 1) // 2 * (th + tg) + int(24 * u)
 
+        if menu.view == "confirm":
+            surf.blit(title_f.render("Quit the game?", True, text), (m, y))
+            y += title_f.get_linesize()
+            for line in wrap("Anything since your last save will be lost.", detail_f, pw - 2 * m):
+                surf.blit(detail_f.render(line, True, dim), (m, y))
+                y += detail_f.get_linesize()
+            y += int(18 * u)
+        elif menu.paused:
+            surf.blit(detail_f.render("Game paused", True, dim), (m, y))
+            y += detail_f.get_linesize() + int(12 * u)
         bh = int(64 * u)
         for i, item in enumerate(menu.items):
             on = i == menu.sel
@@ -870,22 +942,81 @@ def daemon(spec_file, player):
             x += g + int(10 * u) + label.get_width() + int(32 * u)
         return surf
 
+    def menu_key(pads):
+        return (menu.view, menu.sel, menu.paused, tuple(menu.items), tuple(pads), time.strftime("%-I:%M"))
+
     def draw_menu(before):
-        """Draw the menu if it changed; returns what's drawn now. When it
-        has just opened, the whole screen is dimmed behind it once."""
+        """Redraw the settled menu if it changed; returns what's drawn now."""
         pads = pad_status()
-        key = (menu.sel, tuple(menu.items), tuple(pads), time.strftime("%-I:%M"))
+        key = menu_key(pads)
         if key == before:
             return before
         panel = render_menu(pads, theme_colors(theme, color_scheme(Path.home())))
-        if before is None:
-            canvas = pygame.Surface((sw, sh), pygame.SRCALPHA, 32)
-            canvas.fill(DIM)
-            canvas.blit(panel, (sw - panel.get_width(), 0))
-            put(canvas, (0, 0))
-        else:
-            put(panel, (sw - panel.get_width(), 0))
+        put(panel, (sw - panel.get_width(), 0))
         return key
+
+    def open_menu():
+        """Dim the screen and start the panel's slide in. The panel goes to
+        the X server once, as a pixmap, and each frame of the slide is a
+        copy from it there: sending a 4K panel's pixels every frame would
+        be far too slow. It's drawn wider than it is, in its own color, so
+        the overshoot never shows an edge."""
+        pads = pad_status()
+        colors = theme_colors(theme, color_scheme(Path.home()))
+        panel = render_menu(pads, colors)
+        pw, ext = panel.get_width(), int(80 * u)
+        dimmed = pygame.Surface((sw, sh), pygame.SRCALPHA, 32)
+        dimmed.fill(DIM)
+        put(dimmed, (0, 0))
+        wide = pygame.Surface((pw + ext, sh), pygame.SRCALPHA, 32)
+        wide.blit(panel, (0, 0))
+        wide.fill(opaque(colors["panel"]), (pw, 0, ext, sh))
+        pix = win.create_pixmap(pw + ext, sh, 32)
+        put(wide, (0, 0), pix)
+        strip = win.create_pixmap(ext, sh, 32)
+        put(dimmed.subsurface((0, 0, ext, sh)), (0, 0), strip)
+        return {"x": float(sw), "v": 0.0, "t": time.monotonic(), "at": sw, "pw": pw, "ext": ext,
+                "pix": pix, "strip": strip, "key": menu_key(pads)}
+
+    def slide_step(sl):
+        """Move the panel one frame along its spring; True once it's settled."""
+        now = time.monotonic()
+        target = sw - sl["pw"]
+        sl["x"], sl["v"] = spring(sl["x"], sl["v"], target, min(0.05, now - sl["t"]))
+        sl["t"] = now
+        done = abs(sl["x"] - target) < 0.5 and abs(sl["v"]) < 5
+        x = target if done else max(target - sl["ext"], int(round(sl["x"])))
+        if x > sl["at"]:   # springing back right: put the dim back where it was
+            win.copy_area(gc, sl["strip"], 0, 0, x - sl["at"], sh, sl["at"], 0)
+        if x < sw:
+            win.copy_area(gc, sl["pix"], 0, 0, min(sl["pw"] + sl["ext"], sw - x), sh, x, 0)
+        sl["at"] = x
+        return done
+
+    def end_slide(sl):
+        if sl:
+            sl["pix"].free()
+            sl["strip"].free()
+
+    root = scr.root
+    focus_atom, cardinal = d.intern_atom("STEAM_INPUT_FOCUS"), Xatom.CARDINAL
+    blur = {k: d.intern_atom(k) for k in ("GAMESCOPE_BLUR_MODE", "GAMESCOPE_BLUR_RADIUS", "GAMESCOPE_BLUR_FADE_DURATION")}
+
+    def over_game(on):
+        """While the menu is up: gamescope blurs the game behind it, and
+        gives this window the keyboard focus (as it does Steam's overlay),
+        so the game sees itself lose focus. Many games stop reading pads
+        then (SDL does by default), even ones that read a pad's hidraw
+        device, which the grab can't stop: Minecraft (Controlify) with a
+        DualShock 4 on the first box 2026-10-12. Blur mode 2 is always,
+        0 off."""
+        win.change_property(focus_atom, cardinal, 32, [1 if on else 0])
+        root.change_property(blur["GAMESCOPE_BLUR_RADIUS"], cardinal, 32, [BLUR_RADIUS])
+        root.change_property(blur["GAMESCOPE_BLUR_FADE_DURATION"], cardinal, 32, [BLUR_FADE_MS])
+        root.change_property(blur["GAMESCOPE_BLUR_MODE"], cardinal, 32, [2 if on else 0])
+        d.flush()
+
+    over_game(False)   # a daemon that died with the menu up left them on
 
     path = sock_path()
     srv = listen(path, 0o600)
@@ -913,6 +1044,7 @@ def daemon(spec_file, player):
     snapshots = os.environ.get("FAMIDRIVE_TOAST_SNAPSHOT")
     drawn = None   # (x, y, w, h) of the stack on screen now
     menu_drawn = None   # what the menu showed when last drawn, while it's up
+    slide = None        # the panel's slide in, while it's moving
     last = None    # what was drawn, to skip redrawing a still stack
     colors, rendered, ys = {}, {}, {}   # per toast: its scheme, its last render, its animated y
     gap = int(16 * u)
@@ -926,7 +1058,7 @@ def daemon(spec_file, player):
         # show once it's closed; the menu redraws for the clock and
         # batteries every second.
         busy = menu.open or bool(queue.tick(now)) or drawn is not None
-        wait = 1.0 if menu.open else 1 / 30 if busy else None
+        wait = 1 / 60 if slide else 1.0 if menu.open else 1 / 30 if busy else None
         ready, _, _ = select.select([*servers, xfd], [], [], wait)
         for server in (x for x in servers if x in ready):
             conn, _ = server.accept()
@@ -946,20 +1078,34 @@ def daemon(spec_file, player):
                     if not isinstance(msg, dict):
                         continue
                     if "menu" not in msg:
-                        queue.add(msg, time.monotonic())
+                        # The menu lists the controllers already: no toast
+                        # for one coming or going under it, to show later.
+                        if not (menu.open and msg.get("icon") == "controller"):
+                            queue.add(msg, time.monotonic())
                     elif server is srv:   # the session's own socket only, not the shared one
                         try:
-                            conn.sendall(json.dumps(menu.command(msg["menu"], in_game())).encode() + b"\n")
+                            conn.sendall(json.dumps(menu.command(msg["menu"], in_game(), pausable())).encode() + b"\n")
                         except OSError:
                             pass
         if xfd in ready:
             while d.pending_events():
                 d.next_event()   # also notices when gamescope has gone
         if menu.open:
-            menu_drawn = draw_menu(menu_drawn)
+            if menu_drawn is None:   # just opened
+                over_game(True)
+                slide = open_menu()
+                menu_drawn = slide["key"]
+            if slide and slide_step(slide):
+                end_slide(slide)
+                slide = None
+            if not slide:   # changes made while it slid in show once it's settled
+                menu_drawn = draw_menu(menu_drawn)
             d.flush()
             continue
         if menu_drawn is not None:   # just closed: take it down, redraw any toasts
+            end_slide(slide)
+            slide = None
+            over_game(False)
             clear((0, 0, sw, sh))
             menu_drawn = drawn = last = None
         shown = queue.tick(time.monotonic())

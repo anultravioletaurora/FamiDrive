@@ -243,22 +243,67 @@ class GuideMenu(unittest.TestCase):
         menu = t.Menu()
         self.assertEqual(menu.command("down", True), {"open": False})   # nothing until it's open
         self.assertEqual(menu.command("open", True), {"open": True})
-        self.assertEqual(menu.items, ["Resume", "Quit game"])
+        self.assertEqual(menu.items, ["Resume", "Pause game", "Quit game"])
         menu.command("up", True)
         self.assertEqual(menu.sel, 0)
-        menu.command("down", True)
-        menu.command("down", True)
-        self.assertEqual(menu.sel, 1)
-        self.assertEqual(menu.command("select", True), {"open": False, "do": "quit"})
+        for _ in range(3):
+            menu.command("down", True)
+        self.assertEqual(menu.sel, 2)
 
-    def test_resume_back_and_close(self):
+    def test_quit_asks_first(self):
         menu = t.Menu()
         menu.command("open", True)
-        self.assertEqual(menu.command("select", True), {"open": False})
-        for cmd in ("back", "close"):
+        menu.command("down", True)
+        menu.command("down", True)
+        self.assertEqual(menu.command("select", True), {"open": True})
+        self.assertEqual((menu.view, menu.items, menu.sel), ("confirm", ["Cancel", "Quit"], 0))
+        menu.command("select", True)   # Cancel: back on Quit game
+        self.assertEqual((menu.view, menu.items[menu.sel]), ("main", "Quit game"))
+        menu.command("select", True)
+        menu.command("back", True)     # B backs out of the question, not the menu
+        self.assertEqual((menu.open, menu.view), (True, "main"))
+        menu.command("select", True)
+        menu.command("down", True)
+        self.assertEqual(menu.command("select", True), {"open": False, "do": "quit"})
+
+    def test_pause(self):
+        menu = t.Menu()
+        menu.command("open", True)
+        menu.command("down", True)
+        self.assertEqual(menu.command("select", True), {"open": True, "do": "pause"})
+        self.assertTrue(menu.paused)
+        self.assertEqual((menu.items, menu.sel), (["Resume", "Quit game"], 0))
+        self.assertEqual(menu.command("select", True), {"open": False})   # Resume
+        # Big Picture or the voice client: no pausing those.
+        menu.command("open", True, pausable=False)
+        self.assertEqual(menu.items, ["Resume", "Quit game"])
+
+    def test_back_and_close(self):
+        menu = t.Menu()
+        for cmd in ("back", "close", "select"):
             menu.command("open", False)
             self.assertEqual(menu.items, ["Close"])
             self.assertEqual(menu.command(cmd, False), {"open": False})
+        menu.command("open", True)
+        menu.command("down", True)
+        menu.command("down", True)
+        menu.command("select", True)
+        self.assertEqual(menu.command("close", True), {"open": False})   # Guide closes from anywhere
+
+
+class Look(unittest.TestCase):
+    def test_opaque(self):
+        self.assertEqual(t.opaque((10, 20, 30, 100)), (10, 20, 30, 150))
+        self.assertEqual(t.opaque((10, 20, 30, 238)), (10, 20, 30, 255))
+
+    def test_spring_overshoots_a_little_and_settles(self):
+        x, v, lowest = 1920.0, 0.0, 1920.0
+        for _ in range(120):   # two seconds at 60 frames a second
+            x, v = t.spring(x, v, 1280, 1 / 60)
+            lowest = min(lowest, x)
+        self.assertLess(lowest, 1280 - 10)     # a visible overshoot
+        self.assertGreater(lowest, 1280 - 80)  # within the panel's spare width
+        self.assertAlmostEqual(x, 1280, delta=0.5)
 
 
 class Sockets(unittest.TestCase):
