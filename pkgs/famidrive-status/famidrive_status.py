@@ -374,8 +374,10 @@ def main():
                 shown[state] = ease_toward(shown.get(state), shaders / 100, dt)
                 draw_bar(screen, left, y, width, bar_h, shown[state])
                 y += bar_h + int(16 * u)
-                # The number counts up with the bar.
-                screen.blit(body_f.render(f"{round(shown[state] * 100)}%", True, WHITE), (left, y))
+                # The number is Steam's own, as soon as it's read: only the
+                # bar eases. Found on the first box 2026-10-13: a number
+                # counting up through values Steam never gave looked wrong.
+                screen.blit(body_f.render(f"{shaders}%", True, WHITE), (left, y))
                 y += body_f.get_linesize() + int(8 * u)
 
         for line in wrap(body, body_f, width):
