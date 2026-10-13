@@ -13,6 +13,10 @@ Writes FamiDrive's Steam settings into Steam's own config files:
   Steam user's localconfig.vdf. What it sets is remembered (STATE): a
   game taken out of the list later gets its launch options cleared,
   unless they were changed in Steam since.
+- guideFocusesSteam: false turns off Steam's "Guide Button Focuses Steam"
+  (Controller_CheckGuideButton, in each Steam user's localconfig.vdf).
+  Guide is FamiDrive's menu; with it on, Steam reacted to Guide too, with
+  its sounds behind the menu (first box, 2026-10-12).
 
 Steam rewrites both files when it exits, so this only sticks while Steam
 isn't running: the session runs it just before starting Steam.
@@ -190,6 +194,25 @@ def clear_app_keys(stale, depth):
         vdf.save()
 
 
+def set_top_key(key, value):
+    """A key straight inside UserLocalConfigStore, in each localconfig.vdf.
+    Steam writes it at the end of the file once it's changed in Steam."""
+    for path in STEAM.glob("userdata/*/config/localconfig.vdf"):
+        vdf = Vdf(path)
+        line = f'\t"{key}"\t\t"{vdf_string(value)}"'
+        for i, old in enumerate(vdf.lines):
+            if old.startswith(f'\t"{key}"\t'):
+                vdf.lines[i] = line
+                break
+        else:
+            end = max((i for i, old in enumerate(vdf.lines) if old.rstrip() == "}"), default=None)
+            if end is None:
+                log(f"no end to {path}; skipped")
+                continue
+            vdf.lines.insert(end, line)
+        vdf.save()
+
+
 def read_state():
     try:
         return json.loads(STATE.read_text())
@@ -231,6 +254,9 @@ def main():
                 keys[a] = {"UseSteamControllerConfig": "2"}
     if keys:
         set_app_keys(keys, depth=1)
+
+    if settings.get("guideFocusesSteam") is False:
+        set_top_key("Controller_CheckGuideButton", "0")
 
     keys = {}   # launch options
     for game, options in settings.get("launchOptions", {}).items():

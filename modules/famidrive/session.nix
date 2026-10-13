@@ -21,6 +21,8 @@ let
   # dropped, or both would reach the tool and the name's would win.
   steamSettings = own: lib.escapeShellArg (builtins.toJSON {
     inherit (cfg.steam) compatTools steamInput steamInputGames;
+    # Guide is FamiDrive's menu (pkgs/famidrive-quit), not Steam's.
+    guideFocusesSteam = false;
     launchOptions = lib.filterAttrs
       (game: _: !lib.any (appid: (steamGames.games.${appid}.name or null) == game) (lib.attrNames own))
       (knownLaunchOptions // cfg.steam.launchOptions) // own;
@@ -81,7 +83,7 @@ let
         ${pkgs.procps}/bin/pgrep -u "$(id -u)" -x steam > /dev/null || break
         sleep 0.5
       done
-      # Proton pins, Steam Input and launch options, written while Steam
+      # Proton pins, Steam Input, launch options and Guide, written while Steam
       # isn't running (pkgs/famidrive-steam-config). A player's own launch
       # options (their mods') go over the box's.
       case "$(id -un)" in

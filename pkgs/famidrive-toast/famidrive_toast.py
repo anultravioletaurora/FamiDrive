@@ -677,6 +677,7 @@ def daemon(spec_file, player):
     win.change_property(d.intern_atom("STEAM_OVERLAY"), Xatom.CARDINAL, 32, [1])
     win.map()
     gc = win.create_gc()
+    fill_gc = win.create_gc()   # for solid fills the X server does itself
     d.flush()
 
     def fnt(path, size):
@@ -849,21 +850,44 @@ def daemon(spec_file, player):
         out.blit(panel, (spread, spread))
         return out
 
-    def put(surf, pos, target=None):
+    def bgra(color):
+        """One pixel of color, premultiplied, the way put sends it."""
+        px = pygame.Surface((1, 1), pygame.SRCALPHA, 32)
+        px.fill(color)
+        return pygame.image.tobytes(px.premul_alpha(), "BGRA")
+
+    def put(surf, pos, target=None, skip=None, prev=None):
         """Copy an RGBA surface into the window (or a pixmap), premultiplied,
-        as BGRA rows in chunks the X server takes in one request each."""
+        as BGRA rows in chunks the X server takes in one request each.
+        skip: a color the target is already filled with; chunks that are
+        only that color aren't sent. Found on the first box 2026-10-13:
+        sending a 4K screen's worth of pixels made the menu come out
+        noticeably after the blur behind it. prev: what was last sent to
+        the same place; chunks that haven't changed aren't sent either.
+        Returns what was sent, for the next one's prev."""
         s = surf.premul_alpha()
         data = pygame.image.tobytes(s, "BGRA")
         w, h = s.get_size()
         rows = max(1, 200_000 // (w * 4))
+        solid = bgra(skip) * (w * rows) if skip else None
         for top in range(0, h, rows):
             n = min(rows, h - top)
-            (target or win).put_image(gc, pos[0], pos[1] + top, w, n, X.ZPixmap, 32, 0,
-                                      data[top * w * 4:(top + n) * w * 4])
+            chunk = data[top * w * 4:(top + n) * w * 4]
+            if (solid and chunk == solid[:len(chunk)]) or (prev and chunk == prev[top * w * 4:(top + n) * w * 4]):
+                continue
+            (target or win).put_image(gc, pos[0], pos[1] + top, w, n, X.ZPixmap, 32, 0, chunk)
+        return data
+
+    def fill_solid(target, color, rect):
+        """Fill a rect with one color on the X server: nothing sent but the
+        rect, however big."""
+        b, g, r, a = bgra(color)
+        fill_gc.change(foreground=(a << 24) | (r << 16) | (g << 8) | b)
+        target.fill_rectangle(fill_gc, *rect)
 
     def clear(rect):
         if rect:
-            put(pygame.Surface(rect[2:], pygame.SRCALPHA, 32), rect[:2])
+            fill_solid(win, (0, 0, 0, 0), rect)
 
     def fill(surf, color, rect, r=0):
         """A filled rounded rect blended onto surf: drawing straight onto a
@@ -945,38 +969,48 @@ def daemon(spec_file, player):
     def menu_key(pads):
         return (menu.view, menu.sel, menu.paused, tuple(menu.items), tuple(pads), time.strftime("%-I:%M"))
 
-    def draw_menu(before):
-        """Redraw the settled menu if it changed; returns what's drawn now."""
+    def draw_menu(sheet, before):
+        """Redraw the settled menu if it changed; returns what's drawn now.
+        Drawn into the panel's pixmap, then copied onto the screen in one
+        go, so it never shows half drawn."""
         pads = pad_status()
         key = menu_key(pads)
         if key == before:
             return before
-        panel = render_menu(pads, theme_colors(theme, color_scheme(Path.home())))
-        put(panel, (sw - panel.get_width(), 0))
+        sheet["data"] = put(wide_panel(pads), (0, 0), sheet["pix"], prev=sheet["data"])
+        win.copy_area(gc, sheet["pix"], 0, 0, sheet["pw"], sh, sw - sheet["pw"], 0)
         return key
+
+    def wide_panel(pads):
+        """The panel, with its spare width to the right for the overshoot."""
+        colors = theme_colors(theme, color_scheme(Path.home()))
+        panel = render_menu(pads, colors)
+        pw, ext = panel.get_width(), int(80 * u)
+        wide = pygame.Surface((pw + ext, sh), pygame.SRCALPHA, 32)
+        wide.blit(panel, (0, 0))
+        wide.fill(opaque(colors["panel"]), (pw, 0, ext, sh))
+        return wide
 
     def open_menu():
         """Dim the screen and start the panel's slide in. The panel goes to
         the X server once, as a pixmap, and each frame of the slide is a
-        copy from it there: sending a 4K panel's pixels every frame would
-        be far too slow. It's drawn wider than it is, in its own color, so
-        the overshoot never shows an edge."""
+        copy from it there. It's drawn wider than it is, in its own color,
+        so the overshoot never shows an edge. The dim and the panel's color
+        are filled by the X server; only the rows with something on them
+        are sent."""
         pads = pad_status()
-        colors = theme_colors(theme, color_scheme(Path.home()))
-        panel = render_menu(pads, colors)
-        pw, ext = panel.get_width(), int(80 * u)
-        dimmed = pygame.Surface((sw, sh), pygame.SRCALPHA, 32)
-        dimmed.fill(DIM)
-        put(dimmed, (0, 0))
-        wide = pygame.Surface((pw + ext, sh), pygame.SRCALPHA, 32)
-        wide.blit(panel, (0, 0))
-        wide.fill(opaque(colors["panel"]), (pw, 0, ext, sh))
+        wide = wide_panel(pads)
+        ext = int(80 * u)
+        pw = wide.get_width() - ext
+        fill_solid(win, DIM, (0, 0, sw, sh))
         pix = win.create_pixmap(pw + ext, sh, 32)
-        put(wide, (0, 0), pix)
+        color = opaque(theme_colors(theme, color_scheme(Path.home()))["panel"])
+        fill_solid(pix, color, (0, 0, pw + ext, sh))
+        data = put(wide, (0, 0), pix, skip=color)
         strip = win.create_pixmap(ext, sh, 32)
-        put(dimmed.subsurface((0, 0, ext, sh)), (0, 0), strip)
+        fill_solid(strip, DIM, (0, 0, ext, sh))
         return {"x": float(sw), "v": 0.0, "t": time.monotonic(), "at": sw, "pw": pw, "ext": ext,
-                "pix": pix, "strip": strip, "key": menu_key(pads)}
+                "pix": pix, "strip": strip, "moving": True, "key": menu_key(pads), "data": data}
 
     def slide_step(sl):
         """Move the panel one frame along its spring; True once it's settled."""
@@ -993,7 +1027,7 @@ def daemon(spec_file, player):
         sl["at"] = x
         return done
 
-    def end_slide(sl):
+    def end_sheet(sl):
         if sl:
             sl["pix"].free()
             sl["strip"].free()
@@ -1044,7 +1078,7 @@ def daemon(spec_file, player):
     snapshots = os.environ.get("FAMIDRIVE_TOAST_SNAPSHOT")
     drawn = None   # (x, y, w, h) of the stack on screen now
     menu_drawn = None   # what the menu showed when last drawn, while it's up
-    slide = None        # the panel's slide in, while it's moving
+    sheet = None        # the menu's panel on the X server, and its slide in
     last = None    # what was drawn, to skip redrawing a still stack
     colors, rendered, ys = {}, {}, {}   # per toast: its scheme, its last render, its animated y
     gap = int(16 * u)
@@ -1058,7 +1092,7 @@ def daemon(spec_file, player):
         # show once it's closed; the menu redraws for the clock and
         # batteries every second.
         busy = menu.open or bool(queue.tick(now)) or drawn is not None
-        wait = 1 / 60 if slide else 1.0 if menu.open else 1 / 30 if busy else None
+        wait = 1 / 60 if sheet and sheet["moving"] else 1.0 if menu.open else 1 / 30 if busy else None
         ready, _, _ = select.select([*servers, xfd], [], [], wait)
         for server in (x for x in servers if x in ready):
             conn, _ = server.accept()
@@ -1093,18 +1127,17 @@ def daemon(spec_file, player):
         if menu.open:
             if menu_drawn is None:   # just opened
                 over_game(True)
-                slide = open_menu()
-                menu_drawn = slide["key"]
-            if slide and slide_step(slide):
-                end_slide(slide)
-                slide = None
-            if not slide:   # changes made while it slid in show once it's settled
-                menu_drawn = draw_menu(menu_drawn)
+                sheet = open_menu()
+                menu_drawn = sheet["key"]
+            if sheet["moving"] and slide_step(sheet):
+                sheet["moving"] = False
+            if not sheet["moving"]:   # changes made while it slid in show once it's settled
+                menu_drawn = draw_menu(sheet, menu_drawn)
             d.flush()
             continue
         if menu_drawn is not None:   # just closed: take it down, redraw any toasts
-            end_slide(slide)
-            slide = None
+            end_sheet(sheet)
+            sheet = None
             over_game(False)
             clear((0, 0, sw, sh))
             menu_drawn = drawn = last = None
