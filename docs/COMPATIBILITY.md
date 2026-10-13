@@ -307,6 +307,14 @@ Warfare's Legacy Edition.
   50–70% busy at 1.5 GHz and 105 W, 9 GB of video memory, about 7 CPU
   cores busy.
 
+- **2026-10-13, the Guide menu, on the first box:** ✅ the game freezes
+  while the menu is open (it's on FamiDrive's list of offline games), and
+  whatever it had open, its pause menu or the character screen, is still
+  there after. On a pad, Start opens its hub (inventory, map) and Select
+  (View) its pause menu; Esc opens the pause menu too.
+- **2026-10-13, DualShock 4:** ❌ not recognized by the game; the 8BitDo
+  was. Not looked at yet.
+
 **GOG: ❔ Untested.** The planned home for it: DRM-free, with the
 same REDmod support.
 
@@ -588,6 +596,13 @@ joins the server straight from launch.
   a browser on another device. No keyboard or browser needed on the box.
 - **Fullscreen:** opened in a window at first. FamiDrive now starts
   every Prism instance fullscreen; confirmed.
+- **2026-10-13, the Guide menu, on the first box:** ✅ the game keeps
+  running under the menu (it's online), and no pad reaches it. With a
+  DualShock 4 it did at first: Controlify read the pad's raw HID device,
+  which the menu can't take. FamiDrive now starts Minecraft with
+  `SDL_JOYSTICK_HIDAPI=0`, and the DualShock 4 is blocked like the rest.
+  Taking the game's focus instead left its window minimized, at Minecraft's
+  10 fps for a minimized window, until it was restarted.
 
 ### Need for Speed Heat
 
@@ -688,6 +703,10 @@ Experimental.
   Steam confirms in its overlay, won't work (2026-10-09).
 - **2026-10-12, DualShock 4 (Bluetooth), Steam Input off:** ✅ every
   control right, rumble worked, and the game showed PlayStation glyphs.
+- **2026-10-13, the Guide menu:** ✅ the game keeps running under the
+  menu, and no pad reaches it. Taking its focus (tried first) turned the
+  screen black for good: under Wine, a fullscreen game minimizes itself
+  when it loses focus.
 
 ### Street Fighter 6
 
@@ -803,6 +822,11 @@ works.
   went straight into a match. The PowerA GameCube-style pad was
   excellent, and its − + quit shortcut worked
   ([CONTROLLERS.md](CONTROLLERS.md#powera-gamecube-style-controller-for-switch)).
+
+- **2026-10-13, the Guide menu, on the first box:** ✅ Dolphin freezes
+  while the menu is open, so the match pauses, and picks up where it was.
+  With a DualShock 4, Dolphin had kept reading the pad under the menu
+  (through its raw HID device); frozen, it can't. Xbox controller too.
 
 - **RetroAchievements:** ✅ achievements unlock, with their toasts
   (2026-10-08). It needs a copy that matches one of RetroAchievements'

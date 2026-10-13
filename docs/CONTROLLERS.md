@@ -162,9 +162,21 @@ This is the house controller, and FamiDrive knows it by name
   the pad but had no button map for it, so it ignored the pad and kept
   offering to set it up. FamiDrive now gives every player's Kodi a map for
   it: the Xbox 360 pad's layout, which is the same under `xpad`.
+- **Guide menu:** ✅ the heart (home) button is Guide (`BTN_MODE`) under
+  `xpad`, and opens FamiDrive's menu, 2026-10-12.
+- **Battery:** not reported over the dongle; the Guide menu says "No
+  battery level".
+- **Sleep:** 2026-10-13, it switched itself off after a few minutes idle
+  mid-game, and Cyberpunk 2077 showed "Controller disconnected" until it
+  was woken. The dongle stays, so the box can't switch it off or warn
+  first (#204 does that for Bluetooth pads only).
+- **Its reports:** held in the hand, it reports its sticks' jitter many
+  times a second, with every button's state each time. A button pressed
+  from software on its input device is undone by its next report within a
+  millisecond, and raw events never go quiet, so idle has to mean no real
+  movement (2026-10-13).
 - **Still to check:**
   - how the analog triggers feel for GameCube L/R
-  - a pad going to sleep mid-game and waking up again
   - rumble in Steam games
 
 ## 8BitDo Ultimate 2 (Bluetooth)
@@ -305,6 +317,14 @@ Over Bluetooth, on the first box.
   Motion Sensors" and "Wireless Controller Touchpad" input devices.
 - **SDL name:** "PS4 Controller" (ES-DE's log).
 
+- **2026-10-12, the Guide menu:** ✅ the PS button opens it, and its
+  battery shows there.
+- **2026-10-13, raw HID:** SDL's own PlayStation driver (HIDAPI) reads it
+  through its hidraw device, which the Guide menu can't take from a game.
+  Minecraft (Controlify) kept moving under the menu until FamiDrive turned
+  that off for it (`SDL_JOYSTICK_HIDAPI=0`); Dolphin did too, and is
+  frozen under the menu instead. ❌ Cyberpunk 2077 didn't see it at all.
+
 Still to check:
 
 - the touchpad, which can show up as a mouse
@@ -380,6 +400,7 @@ which need USB or game support over Bluetooth.
   in Dolphin, [Rocket League](COMPATIBILITY.md#rocket-league) and
   [Tom Clancy's Ghost Recon Wildlands](COMPATIBILITY.md#tom-clancys-ghost-recon-wildlands),
   with rumble in Ghost Recon.
+- **2026-10-12, the Guide menu:** ✅ its battery shows there.
 - **Still to record:** USB, the adaptive triggers, and Select
   + Start (Share + Options).
 

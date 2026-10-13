@@ -215,6 +215,12 @@ planning doc for now and will move into this repo.
   the Art Book Next theme, GameCube (Dolphin) and Switch (Eden) games
   taking focus, the 8BitDo Ultimate 2 over 2.4 GHz, and quitting with
   Select + Start.
+- The Guide menu (the Xbox or PS button, the 8BitDo's heart): over any
+  game or ES-DE, each controller with its battery, Resume, and Quit
+  game with an "are you sure?" first. Emulators and offline games freeze
+  under it; online games keep running with the pads taken from them.
+  Tested on the first box with Melee, Cyberpunk 2077, Rocket League and
+  Minecraft.
 - "Who's playing?" with two players and a guest, each with their own
   saves, Steam and RomM account, and powering off from the controller.
 - On the second box, a Dell OptiPlex 3070 Micro with Intel UHD 630
