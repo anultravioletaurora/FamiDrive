@@ -48,9 +48,15 @@ let
       ${lib.concatStrings (lib.mapAttrsToList (name: s: ''
         ${name})
           ${lib.optionalString (s.saveSync && cfg.romm.enable) ''[ -z "$sync" ] || romm-agent save-pull ${name} "$ROM" || echo "famidrive-launch: save pull failed, launching with local save" >&2''}
+          # What the Guide menu does with this game (guideMenu), for
+          # famidrive-quit and the toast daemon; a Desktop entry's before
+          # may replace it.
+          menu_hint="''${XDG_RUNTIME_DIR:-/tmp/famidrive-$(id -u)}/famidrive-game.menu"
+          echo ${s.guideMenu} > "$menu_hint"
           ${s.before}
           rc=0
           gamescope-fg bash -c ${lib.escapeShellArg s.command} || rc=$?
+          rm -f "$menu_hint"
           ${s.after}
           ${lib.optionalString (s.saveSync && cfg.romm.enable) ''[ -z "$sync" ] || romm-agent save-push ${name} "$ROM" || { echo "famidrive-launch: save push failed, timer reconcile will retry" >&2; famidrive-toast --kind alert "Save not uploaded" "It stays on this box, and FamiDrive tries RomM again within 15 minutes."; }''}
           exit "$rc"

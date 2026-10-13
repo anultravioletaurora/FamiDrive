@@ -276,6 +276,27 @@ class GuideMenu(unittest.TestCase):
         menu.command("open", True, pausable=False)
         self.assertEqual(menu.items, ["Resume", "Quit game"])
 
+    def test_modes(self):
+        menu = t.Menu()
+        # An emulator: frozen while the menu is open, so it's paused already.
+        menu.command("open", True, mode="freeze")
+        self.assertEqual((menu.items, menu.note), (["Resume", "Quit game"], "Game paused"))
+        self.assertEqual(menu.command("select", True), {"open": False})
+        # Minecraft: paused itself when it lost focus; closing presses B,
+        # however the menu closes, but not after Quit.
+        for cmd in ("select", "back", "close"):
+            menu.command("open", True, mode="focus")
+            self.assertEqual((menu.items, menu.note), (["Resume", "Quit game"], ""))
+            self.assertEqual(menu.command(cmd, True), {"open": False, "do": "resume"})
+        menu.command("open", True, mode="focus")
+        menu.command("down", True)
+        menu.command("select", True)
+        menu.command("down", True)
+        self.assertEqual(menu.command("select", True), {"open": False, "do": "quit"})
+        # Out of a game, nothing to resume.
+        menu.command("open", False, mode="focus")
+        self.assertEqual(menu.command("back", False), {"open": False})
+
     def test_back_and_close(self):
         menu = t.Menu()
         for cmd in ("back", "close", "select"):

@@ -64,6 +64,7 @@ RUN = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/famidrive-{os.getuid()}")
 PGID_FILE = RUN / "famidrive-game.pgid"
 TREE_FILE = RUN / "famidrive-game.tree"
 CLOSE_FILE = RUN / "famidrive-game.close"
+MENU_FILE = RUN / "famidrive-game.menu"   # the game's guideMenu, from its launch
 COMBO = {e.BTN_SELECT, e.BTN_START}
 # SDL_GameControllerDB's gamecontrollerdb.txt (set by the package).
 PADDB = os.environ.get("FAMIDRIVE_QUIT_PADDB", "@gamecontrollerdb@")
@@ -308,13 +309,33 @@ def game_targets():
     return targets
 
 
-def press_start(dev, code, wait=PAUSE_WAIT):
-    """The menu's Pause game: press Start on the pad that picked it, so the
-    game opens its own pause menu. Freezing the game instead (SIGSTOP) was
-    tried first; it stopped the game but showed no pause menu, and wasn't
-    what was wanted (first box, 2026-10-13). After a moment, once the menu
-    has let the pads go and the game has its focus back: many games read
-    no pads while they don't have it."""
+def game_mode():
+    """The running game's guideMenu: "freeze", "start" or "focus"."""
+    try:
+        mode = MENU_FILE.read_text().strip()
+    except OSError:
+        return "start"
+    return mode if mode in ("freeze", "start", "focus") else "start"
+
+
+def freeze_game(on):
+    """Stop the game (SIGSTOP) while the menu is open, and let it go on
+    (SIGCONT) after: an emulator's pause. Found on the first box
+    2026-10-13: Dolphin kept reading a DualShock 4 under the menu, through
+    its hidraw device, which no grab covers; stopped, it reads nothing."""
+    targets = game_targets()
+    log(("freezing" if on else "thawing") + f" the game ({len(targets)} targets)")
+    signal_all(targets, signal.SIGSTOP if on else signal.SIGCONT)
+
+
+def press(dev, code, what, wait=PAUSE_WAIT):
+    """Press a button on the pad that closed the menu, for the game: Start
+    for Pause game, so a PC game opens its own pause menu (freezing it
+    instead stopped it, but showed no pause menu, and that wasn't what was
+    wanted: first box, 2026-10-13); B for a game that paused itself when
+    the menu took its focus (Minecraft), to close its pause screen. After
+    a moment, once the menu has let the pads go and the game has its focus
+    back: many games read no pads while they don't have it."""
     def press():
         time.sleep(wait)
         try:
@@ -323,9 +344,9 @@ def press_start(dev, code, wait=PAUSE_WAIT):
             time.sleep(0.08)
             dev.write(EV_KEY, code, 0)
             dev.syn()
-            log(f"pressed Start on {dev.name} for the game's pause menu")
+            log(f"pressed {what} on {dev.name} for the game")
         except OSError as err:
-            log(f"couldn't press Start on {dev.name}: {err}")
+            log(f"couldn't press {what} on {dev.name}: {err}")
 
     threading.Thread(target=press, daemon=True).start()
 
@@ -347,6 +368,7 @@ def quit_game():
     log(f"quitting game ({targets[0]}...)")
     if not signal_all(targets, signal.SIGTERM):
         return
+    signal_all(targets, signal.SIGCONT)   # a frozen game can't act on SIGTERM
 
     def force():
         deadline = time.monotonic() + GRACE
@@ -394,18 +416,22 @@ def main():
     navs = {}           # fd -> PadNav, or None for a pad whose presses are another's
     drivers = {}        # fd -> its kernel driver
     guides = {}         # fd -> its Guide key code, if it has one
-    starts = {}         # fd -> its Start key code, if it has one
+    buttons_of = {}     # fd -> its menu buttons ({"start", "b", ...: key code})
+    frozen = False      # whether the menu stopped the game
     menu = False        # whether the menu is open, and every pad grabbed
     guide_down = set()  # fds whose Guide went down while the menu was closed
     last_scan = 0.0
     db = load_paddb(PADDB)
 
     def close_menu():
-        nonlocal menu
+        nonlocal menu, frozen
         menu = False
         guide_down.clear()
         for dev in devices.values():
             ungrab(dev)
+        if frozen:
+            freeze_game(False)
+            frozen = False
 
     while True:
         # The session (gamescope-fg) is our parent; when it's gone, so are we.
@@ -435,7 +461,7 @@ def main():
                     drivers[fd] = driver
                     buttons = menu_buttons(keys, dev.info.vendor, dev.info.product, driver, db, dev.name)
                     guides[fd] = buttons.get("guide")
-                    starts[fd] = buttons.get("start")
+                    buttons_of[fd] = buttons
                     ranges = {c: (i.min, i.max) for c, i in dev.capabilities().get(e.EV_ABS, [])}
                     navs[fd] = None if (dev.info.vendor, dev.info.product) == STEAM_VIRTUAL else PadNav(buttons, ranges)
                     names = "+".join(str(e.BTN.get(c) or e.KEY.get(c) or c) for c in sorted(combo))
@@ -469,8 +495,10 @@ def main():
                                 log("menu closed")
                                 if reply.get("do") == "quit":
                                     quit_game()
-                                elif reply.get("do") == "pause" and starts[fd] is not None:
-                                    press_start(dev, starts[fd])
+                                else:
+                                    role, name = {"pause": ("start", "Start"), "resume": ("b", "B")}.get(reply.get("do"), (None, None))
+                                    if role in buttons_of[fd]:
+                                        press(dev, buttons_of[fd][role], name)
                     elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 1:
                         guide_down.add(fd)
                     elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 0 and fd in guide_down:
@@ -485,12 +513,15 @@ def main():
                         if ask_menu("open").get("open"):
                             menu = True
                             log("menu opened")
+                            if game_targets() and game_mode() == "freeze":
+                                freeze_game(True)
+                                frozen = True
                             for fd2, dev2 in devices.items():
                                 grab(dev2, drivers[fd2])
             except OSError:
                 # Unplugged, out of range or switched off.
                 log(f"lost {dev.name}")
-                for table in (devices, combos, held, since, navs, drivers, guides, starts):
+                for table in (devices, combos, held, since, navs, drivers, guides, buttons_of):
                     del table[fd]
                 try:
                     dev.close()

@@ -141,7 +141,7 @@ class PressStart(unittest.TestCase):
         sent = []
         dev = type("Pad", (), {"name": "Pad", "write": lambda self, *ev: sent.append(ev),
                                "syn": lambda self: sent.append("syn")})()
-        m.press_start(dev, 0x13b, wait=0)
+        m.press(dev, 0x13b, "Start", wait=0)
         import time
         for _ in range(50):
             if len(sent) == 4:

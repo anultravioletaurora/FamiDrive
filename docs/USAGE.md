@@ -1838,6 +1838,18 @@ The system's name in ES-DE's menu.
 - **Type:** string
 - **Default:** none; required when used
 
+### `famidrive.systems.<name>.guideMenu`
+
+What the Guide menu does with the game while it's open:
+`freeze` stops it (an emulator: the menu is its pause), `start`
+leaves it running and offers Pause game, which presses Start for
+the game's own pause menu (a PC game, which may be online), and
+`focus` takes its focus, so it pauses itself, and presses B when
+the menu closes (Minecraft).
+
+- **Type:** one of "freeze", "start", "focus"
+- **Default:** `"freeze"`
+
 ### `famidrive.systems.<name>.platform`
 
 ES-DE's platform for it, which picks its scraper.

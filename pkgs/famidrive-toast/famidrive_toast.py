@@ -484,6 +484,17 @@ def in_game():
     return (sock_path().parent / "famidrive-game.pgid").exists()
 
 
+def game_mode():
+    """What the Guide menu does with the running game (a system's
+    guideMenu, written by the launch): "freeze", "start" or "focus".
+    "start" when the launch said nothing."""
+    try:
+        mode = (sock_path().parent / "famidrive-game.menu").read_text().strip()
+    except OSError:
+        return "start"
+    return mode if mode in ("freeze", "start", "focus") else "start"
+
+
 def pausable():
     """Whether the running thing is a game, to pause: not Steam's Big
     Picture or the voice client, which leave a polite way to close them
@@ -559,6 +570,7 @@ class Menu:
         self.items = []
         self.sel = 0
         self.playing = self.pausable = False
+        self.mode, self.note = "start", ""
 
     def _main(self):
         self.view = "main"
@@ -567,10 +579,21 @@ class Menu:
         else:
             self.items = ["Resume"] + (["Pause game"] if self.pausable else []) + ["Quit game"]
 
-    def command(self, cmd, playing, pausable=True):
+    def command(self, cmd, playing, pausable=True, mode="start"):
+        """mode: the game's guideMenu. Pause game is only for "start"; a
+        frozen game ("freeze") is already paused, and one that pauses
+        itself when it loses focus ("focus") is too, and gets its pause
+        screen closed again when the menu closes ("do": "resume")."""
+        reply = self._command(cmd, playing, pausable, mode)
+        if cmd != "open" and not reply["open"] and "do" not in reply and self.playing and self.mode == "focus":
+            reply["do"] = "resume"
+        return reply
+
+    def _command(self, cmd, playing, pausable, mode):
         if cmd == "open":
-            self.open, self.sel = True, 0
-            self.playing, self.pausable = playing, playing and pausable
+            self.open, self.sel, self.mode = True, 0, mode
+            self.playing, self.pausable = playing, playing and pausable and mode == "start"
+            self.note = "Game paused" if playing and mode == "freeze" else ""
             self._main()
             return self.state()
         if not self.open:
@@ -686,13 +709,12 @@ def daemon(spec_file, player):
     regular, light = theme_fonts(theme)
     title_f, detail_f, small_f = fnt(regular, int(30 * u)), fnt(light, int(24 * u)), fnt(regular, int(18 * u))
     # The menu is read from the couch, so it's bigger and heavier than a
-    # toast: the theme's regular font throughout, never its light one, and
-    # labels bolder still. Found on the first box 2026-10-13: Art Book
-    # Next's light font (Mulish Light) was hard to read from 10 feet.
+    # toast: the theme's regular font throughout, never its light one.
+    # Found on the first box 2026-10-13: Art Book Next's light font
+    # (Mulish Light) was hard to read from 10 feet, and pygame's made-up
+    # bold on top of its regular one looked blocky.
     m_title, m_body, m_small = fnt(regular, int(34 * u)), fnt(regular, int(28 * u)), fnt(regular, int(22 * u))
-    m_label = fnt(regular, int(28 * u))
-    m_label.set_bold(True)
-    m_small.set_bold(True)
+    m_label = m_body
     pad, gap, radius = int(22 * u), int(18 * u), int(14 * u)
     width = int(600 * u)
     margin = int(40 * u)
@@ -951,7 +973,10 @@ def daemon(spec_file, player):
         y += (len(shown) + 1) // 2 * (th + tg) + int(24 * u)
 
         top = y
-        if menu.view == "confirm":
+        if menu.view == "main" and menu.note:
+            surf.blit(m_body.render(menu.note, True, dim), (m, y))
+            y += m_body.get_linesize() + int(10 * u)
+        elif menu.view == "confirm":
             surf.blit(m_title.render("Quit the game?", True, text), (m, y))
             y += m_title.get_linesize()
             for line in wrap("Any unsaved progress will be lost.", m_body, pw - 2 * m):
@@ -978,7 +1003,7 @@ def daemon(spec_file, player):
         return surf, (top, gy - int(24 * u))
 
     def menu_key(pads):
-        return (menu.view, menu.sel, tuple(menu.items), tuple(pads), time.strftime("%-I:%M"))
+        return (menu.view, menu.sel, menu.note, tuple(menu.items), tuple(pads), time.strftime("%-I:%M"))
 
     def dim_at(k):
         """The dim at k of its full strength (it fades in and out with the
@@ -1071,15 +1096,14 @@ def daemon(spec_file, player):
     focus_atom, cardinal = d.intern_atom("STEAM_INPUT_FOCUS"), Xatom.CARDINAL
     blur = {k: d.intern_atom(k) for k in ("GAMESCOPE_BLUR_MODE", "GAMESCOPE_BLUR_RADIUS", "GAMESCOPE_BLUR_FADE_DURATION")}
 
-    def over_game(on):
+    def over_game(on, focus=False):
         """While the menu is up: gamescope blurs the game behind it, and
         gives this window the keyboard focus (as it does Steam's overlay),
-        so the game sees itself lose focus. Many games stop reading pads
-        then (SDL does by default), even ones that read a pad's hidraw
-        device, which the grab can't stop: Minecraft (Controlify) with a
-        DualShock 4 on the first box 2026-10-12. Blur mode 2 is always,
-        0 off."""
-        win.change_property(focus_atom, cardinal, 32, [1 if on else 0])
+        so the game sees itself lose focus, only for a game whose
+        guideMenu is "focus": Minecraft pauses itself then. Not for any
+        game: Rocket League went black for good when it lost its focus
+        (first box, 2026-10-13). Blur mode 2 is always, 0 off."""
+        win.change_property(focus_atom, cardinal, 32, [1 if on and focus else 0])
         root.change_property(blur["GAMESCOPE_BLUR_RADIUS"], cardinal, 32, [BLUR_RADIUS])
         root.change_property(blur["GAMESCOPE_BLUR_FADE_DURATION"], cardinal, 32, [BLUR_FADE_MS])
         root.change_property(blur["GAMESCOPE_BLUR_MODE"], cardinal, 32, [2 if on else 0])
@@ -1154,7 +1178,7 @@ def daemon(spec_file, player):
                             queue.add(msg, time.monotonic())
                     elif server is srv:   # the session's own socket only, not the shared one
                         try:
-                            conn.sendall(json.dumps(menu.command(msg["menu"], in_game(), pausable())).encode() + b"\n")
+                            conn.sendall(json.dumps(menu.command(msg["menu"], in_game(), pausable(), game_mode())).encode() + b"\n")
                         except OSError:
                             pass
         if xfd in ready:
@@ -1166,7 +1190,7 @@ def daemon(spec_file, player):
             menu_drawn = None
         if menu.open:
             if menu_drawn is None:   # just opened
-                over_game(True)
+                over_game(True, focus=menu.playing and menu.mode == "focus")
                 sheet = open_menu()
                 menu_drawn = sheet["key"]
             if sheet["phase"] == "in" and slide_step(sheet):
