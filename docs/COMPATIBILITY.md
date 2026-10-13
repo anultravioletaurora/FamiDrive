@@ -25,6 +25,7 @@ behave differently in each. For a console game it's the emulator.
   - [Assassin's Creed Valhalla](#assassins-creed-valhalla) (PC)
   - [Back 4 Blood](#back-4-blood) (PC)
   - [BattleBit Remastered](#battlebit-remastered) (PC)
+  - [Call of Duty: Black Ops Cold War](#call-of-duty-black-ops-cold-war) (PC)
   - [Call of Duty: Black Ops III](#call-of-duty-black-ops-iii) (PC)
   - [Call of Duty: Infinite Warfare](#call-of-duty-infinite-warfare) (PC)
   - [Call of Duty: Modern Warfare Remastered](#call-of-duty-modern-warfare-remastered) (PC)
@@ -179,6 +180,27 @@ layout for the game. No aim assist: aiming is a mouse on a stick.
   ignores like the real ones.
 - **2026-10-12, Steam Input on, the community layout with the most
   thumbs up:** ✅ worked perfectly.
+
+### Call of Duty: Black Ops Cold War
+
+**Battle.net: ❔ Untested.** Never sold on Steam, so it needs the
+Battle.net app, and FamiDrive has no Battle.net lane yet (#57).
+
+- **Expected:** ProtonDB has reports of it running. Proton Experimental
+  had Battle.net and Cold War fixes in December 2025, but Valve later
+  took back its note that the game was playable. Ricochet, Call of
+  Duty's anti-cheat, doesn't support Linux, so expect online modes
+  (multiplayer, online Zombies) to be blocked; the campaign is the
+  likelier part to work.
+- **Ban risk:** try online modes on an account you don't mind losing,
+  or not at all. An anti-cheat that doesn't support Linux can flag a
+  Proton player instead of just refusing them.
+- **To check:**
+  - the Battle.net app under Proton, and signing in with a controller
+  - the campaign and offline Zombies, start to finish with a controller
+  - what happens in multiplayer: a clear refusal, or something worse
+  - rumble, and the game's windows counting as the game's
+    (`gamescope-fg`)
 
 ### Call of Duty: Black Ops III
 
