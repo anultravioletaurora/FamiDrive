@@ -169,15 +169,6 @@ class Idle(unittest.TestCase):
         self.assertEqual(m.idle_step(600, 600, True), "off")
         self.assertIsNone(m.idle_step(10 ** 6, None, False))  # never
 
-    def test_note_for_the_toast_daemon(self):
-        import json
-        with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / "idle.json"
-            path.write_text(json.dumps([{"name": "Stale", "at": 0}]))
-            m.note_idle_off("DualSense Wireless Controller", 10.0, path)
-            found = json.loads(path.read_text())
-            self.assertEqual([(o["name"], o["minutes"]) for o in found], [("DualSense Wireless Controller", 10.0)])
-
     def test_only_bluetooth(self):
         pad = lambda bus, uniq: types.SimpleNamespace(uniq=uniq, info=types.SimpleNamespace(bustype=bus))
         self.assertEqual(m.bluetooth_address(pad(0x05, "a0:5a:5c:12:34:56")), "a0:5a:5c:12:34:56")

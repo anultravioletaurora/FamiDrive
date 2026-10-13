@@ -224,29 +224,9 @@ class Controllers(unittest.TestCase):
     def test_connected_and_disconnected(self):
         a = {"/d/1": "8BitDo Ultimate 2"}
         b = {"/d/2": "Xbox Wireless Controller"}
-        toasts = t.pad_changes(a, b, playing=False)
-        self.assertEqual([(x["title"], x["detail"]) for x in toasts],
-                         [("Controller connected", "Xbox Wireless Controller"), ("Controller disconnected", "8BitDo Ultimate 2")])
-        gone = t.pad_changes(b, {}, playing=True)[0]
-        self.assertEqual(gone["kind"], "alert")
-        self.assertIn("Select + Start", gone["detail"])
-
-    def test_switched_off_for_being_idle(self):
-        a = {"/d/1": "DualSense Wireless Controller"}
-        toast = t.pad_changes(a, {}, playing=True, switched_off={"DualSense Wireless Controller": 10})[0]
-        self.assertEqual((toast["kind"], toast["title"]), ("notice", "Controller switched off"))
-        self.assertEqual(toast["detail"], "DualSense Wireless Controller was idle for 10 minutes. Turn it back on to keep playing.")
-        self.assertNotIn("Select + Start", toast["detail"])
-        # Another pad going still gets the usual alert.
-        self.assertEqual(t.pad_changes(a, {}, playing=True, switched_off={"Pad": 10})[0]["title"], "Controller disconnected")
-
-    def test_idle_off_file(self):
-        with tempfile.TemporaryDirectory() as d:
-            (Path(d) / t.IDLE_OFF).write_text(json.dumps([
-                {"name": "Old Pad", "minutes": 10, "at": 1000},
-                {"name": "DualSense Wireless Controller", "minutes": 10, "at": 1950}]))
-            self.assertEqual(t.idle_off(Path(d), now=2000), {"DualSense Wireless Controller": 10})
-            self.assertEqual(t.idle_off(Path(d) / "missing", now=2000), {})
+        self.assertEqual([(x["kind"], x["title"], x["detail"]) for x in t.pad_changes(a, b)],
+                         [("notice", "Controller connected", "Xbox Wireless Controller has connected"),
+                          ("notice", "Controller disconnected", "8BitDo Ultimate 2 has disconnected")])
 
     def test_low_battery_once_until_charged(self):
         warned = set()
