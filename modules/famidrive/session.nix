@@ -154,8 +154,9 @@ let
     fi
     # Nothing is running yet: clear what a crashed launch may have left.
     rm -f "''${XDG_RUNTIME_DIR:-/nonexistent}"/famidrive-game.*
-    # Hold Select + Start on any controller to quit the running game
-    # (pkgs/famidrive-quit). It exits on its own when the session ends.
+    # Hold Select + Start on any controller to quit the running game, and
+    # press Guide for the menu the toast daemon draws (pkgs/famidrive-quit).
+    # It exits on its own when the session ends.
     ${pkgs.famidrive-quit}/bin/famidrive-quit &
     # ES-DE through gamescope-fg, which labels its window and makes it what
     # gamescope shows (nothing does that without Steam; see gamescope-fg).

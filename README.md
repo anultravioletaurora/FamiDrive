@@ -183,7 +183,7 @@ modules/famidrive/
 pkgs/
   es-de/                     ES-DE 3.5.0 AppImage (ES-DE left nixpkgs on 2025-10-23)
   gamescope-fg/              sets STEAM_GAME on the game's window so gamescope focuses it
-  famidrive-quit/            hold Select + Start on any controller to quit the game
+  famidrive-quit/            hold Select + Start on any controller to quit the game; Guide opens the menu
   famidrive-picker/          "Who's playing?", greetd's greeter on a box with more than one player
   romm-agent/                Python: pull, firmware, save-pull/push, reconcile
   famidrive-generators/      Python: install manifests -> ES-DE menu entries

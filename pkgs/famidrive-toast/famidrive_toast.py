@@ -58,6 +58,7 @@ SUCCESS = (76, 187, 106, 255)
 GOLD = (232, 184, 64, 255)
 SECONDS = {"notice": 4.0, "alert": 7.0, "achievement": 6.0, "progress": 2.0, "success": 5.0}
 STALE_PROGRESS = 120.0
+DIM = (0, 0, 0, 110)   # over the game while the menu is up
 MAX_SHOWN = 3          # toasts on screen at once, stacked from the corner
 URGENT = ("alert", "achievement")   # a progress toast nobody updates is let go
 FADE = 0.25
@@ -438,6 +439,24 @@ def pad_batteries(sys_class=SYS):
     return out
 
 
+def pad_status(sys_class=SYS):
+    """[(name, battery percent or None)] for each connected controller,
+    for the menu. A battery is matched to its pad by the device both hang
+    off; a pad that reports none (the 8BitDo's 2.4 GHz dongle under xpad,
+    a wired pad) has None."""
+    levels = {}
+    for ps in sorted((sys_class / "power_supply").glob("*")):
+        try:
+            if (ps / "scope").read_text().strip() != "Device":
+                continue
+            levels[os.path.realpath(ps / "device")] = int((ps / "capacity").read_text().strip())
+        except (OSError, ValueError):
+            continue
+    # connected_pads keys a pad by its .../input folder, one below the
+    # device its battery hangs off.
+    return [(name, levels.get(str(Path(dev).parent))) for dev, name in connected_pads(sys_class).items()]
+
+
 def in_game():
     """Whether a game is running in this session (gamescope-fg's marker)."""
     return (sock_path().parent / "famidrive-game.pgid").exists()
@@ -482,6 +501,47 @@ def watch_controllers(interval=1.5):
         for t in pad_changes(before, after, in_game()) + battery_changes(warned, pad_batteries()):
             send(t)
         before = after
+
+
+# --- The Guide menu -----------------------------------------------------------
+#
+# Guide (the Xbox or PS button) opens FamiDrive's menu over whatever's on
+# the TV, drawn on this daemon's window like the toasts, in a panel on the
+# right, the side toasts show on. famidrive-quit watches the pads, grabs
+# them while the menu is open so the game doesn't see the presses, and
+# sends each one here as a command: {"menu": "open" | "up" | "down" |
+# "left" | "right" | "select" | "back" | "close"}. The reply says whether
+# the menu is still open, and what famidrive-quit should do ("quit").
+
+class Menu:
+    """The menu's state. Pure: whether a game is running is passed in."""
+
+    def __init__(self):
+        self.open = False
+        self.items = []
+        self.sel = 0
+
+    def command(self, cmd, playing):
+        if cmd == "open":
+            self.open, self.sel = True, 0
+            self.items = ["Resume", "Quit game"] if playing else ["Close"]
+            return self.state()
+        if not self.open:
+            return self.state()
+        if cmd in ("close", "back"):
+            self.open = False
+        elif cmd == "up":
+            self.sel = max(0, self.sel - 1)
+        elif cmd == "down":
+            self.sel = min(len(self.items) - 1, self.sel + 1)
+        elif cmd == "select":
+            self.open = False
+            if self.items[self.sel] == "Quit game":
+                return {"open": False, "do": "quit"}
+        return self.state()
+
+    def state(self):
+        return {"open": self.open}
 
 
 # --- The daemon -------------------------------------------------------------
@@ -536,6 +596,7 @@ def daemon(spec_file, player):
     me = player_spec(spec, player)
     theme = spec.get("theme")
     queue = Queue(me["hide"])
+    menu = Menu()
 
     pygame.font.init()
     d = xdisplay.Display()
@@ -742,6 +803,90 @@ def daemon(spec_file, player):
         if rect:
             put(pygame.Surface(rect[2:], pygame.SRCALPHA, 32), rect[:2])
 
+    def fill(surf, color, rect, r=0):
+        """A filled rounded rect blended onto surf: drawing straight onto a
+        32-bit surface replaces its pixels, alpha and all, which would cut a
+        see-through hole in the panel for a faint fill."""
+        tmp = pygame.Surface(rect[2:], pygame.SRCALPHA, 32)
+        pygame.draw.rect(tmp, color, tmp.get_rect(), border_radius=r)
+        surf.blit(tmp, rect[:2])
+
+    def render_menu(pads, colors):
+        """The menu's panel: the screen's full height, on the right."""
+        pw, m = int(640 * u), int(40 * u)
+        text, dim, solid = colors["text"], colors["dim"], (*colors["panel"][:3], 255)
+        faint = (*text[:3], 30)
+        surf = pygame.Surface((pw, sh), pygame.SRCALPHA, 32)
+        surf.fill((*colors["panel"][:3], 245))
+        y = m
+        surf.blit(title_f.render(time.strftime("%-I:%M %p"), True, text), (m, y))
+        y += title_f.get_linesize() + int(30 * u)
+
+        surf.blit(small_f.render("CONTROLLERS", True, dim), (m, y))
+        y += small_f.get_linesize() + int(12 * u)
+        if not pads:
+            surf.blit(detail_f.render("No controllers connected", True, dim), (m, y))
+            y += detail_f.get_linesize() + int(24 * u)
+        tg, ip, isz = int(14 * u), int(16 * u), int(40 * u)
+        tw, th = (pw - 2 * m - tg) // 2, int(170 * u)
+        shown = pads[:8]
+        for i, (name, level) in enumerate(shown):
+            tile = pygame.Surface((tw, th), pygame.SRCALPHA, 32)
+            fill(tile, faint, (0, 0, tw, th), radius)
+            tile.blit(drawn_icon("controller", isz, text), (ip, ip))
+            if level is not None:
+                pct = detail_f.render(f"{level}%", True, text)
+                tile.blit(pct, (tw - ip - pct.get_width(), ip + (isz - pct.get_height()) // 2))
+            ly = ip + isz + int(8 * u)
+            for line in wrap(name, detail_f, tw - 2 * ip)[:2]:
+                tile.blit(detail_f.render(ellipsize(line, detail_f, tw - 2 * ip), True, text), (ip, ly))
+                ly += detail_f.get_linesize()
+            if level is None:   # the 8BitDo's dongle, a wired pad: the kernel gives no level
+                note = small_f.render("No battery level", True, dim)
+                tile.blit(note, (ip, th - ip - note.get_height()))
+            else:
+                bh, bw = int(8 * u), tw - 2 * ip
+                fill(tile, (*text[:3], 60), (ip, th - ip - bh, bw, bh), bh // 2)
+                fill(tile, ALERT if level <= LOW else SUCCESS,
+                     (ip, th - ip - bh, max(bh, bw * level // 100), bh), bh // 2)
+            surf.blit(tile, (m + (i % 2) * (tw + tg), y + (i // 2) * (th + tg)))
+        y += (len(shown) + 1) // 2 * (th + tg) + int(24 * u)
+
+        bh = int(64 * u)
+        for i, item in enumerate(menu.items):
+            on = i == menu.sel
+            fill(surf, text if on else faint, (m, y, pw - 2 * m, bh), int(10 * u))
+            label = detail_f.render(item, True, solid if on else text)
+            surf.blit(label, (m + int(24 * u), y + (bh - label.get_height()) // 2))
+            y += bh + int(12 * u)
+
+        x, gy, g = m, sh - m - int(36 * u), int(36 * u)
+        for letter, what in (("A", "Select"), ("B", "Back")):
+            pygame.draw.circle(surf, text, (x + g // 2, gy + g // 2), g // 2)
+            glyph = small_f.render(letter, True, solid)
+            surf.blit(glyph, (x + (g - glyph.get_width()) // 2, gy + (g - glyph.get_height()) // 2))
+            label = detail_f.render(what, True, dim)
+            surf.blit(label, (x + g + int(10 * u), gy + (g - label.get_height()) // 2))
+            x += g + int(10 * u) + label.get_width() + int(32 * u)
+        return surf
+
+    def draw_menu(before):
+        """Draw the menu if it changed; returns what's drawn now. When it
+        has just opened, the whole screen is dimmed behind it once."""
+        pads = pad_status()
+        key = (menu.sel, tuple(menu.items), tuple(pads), time.strftime("%-I:%M"))
+        if key == before:
+            return before
+        panel = render_menu(pads, theme_colors(theme, color_scheme(Path.home())))
+        if before is None:
+            canvas = pygame.Surface((sw, sh), pygame.SRCALPHA, 32)
+            canvas.fill(DIM)
+            canvas.blit(panel, (sw - panel.get_width(), 0))
+            put(canvas, (0, 0))
+        else:
+            put(panel, (sw - panel.get_width(), 0))
+        return key
+
     path = sock_path()
     srv = listen(path, 0o600)
     if srv is None:
@@ -767,6 +912,7 @@ def daemon(spec_file, player):
     xfd = d.fileno()
     snapshots = os.environ.get("FAMIDRIVE_TOAST_SNAPSHOT")
     drawn = None   # (x, y, w, h) of the stack on screen now
+    menu_drawn = None   # what the menu showed when last drawn, while it's up
     last = None    # what was drawn, to skip redrawing a still stack
     colors, rendered, ys = {}, {}, {}   # per toast: its scheme, its last render, its animated y
     gap = int(16 * u)
@@ -776,8 +922,12 @@ def daemon(spec_file, player):
         # cleared on the pass after they expire. Waiting for the next
         # event first left them on screen until another toast came, for
         # good in a game (first box, 2026-10-09).
-        busy = bool(queue.tick(now)) or drawn is not None
-        ready, _, _ = select.select([*servers, xfd], [], [], 1 / 30 if busy else None)
+        # While the menu is up, toasts wait (the queue isn't ticked) and
+        # show once it's closed; the menu redraws for the clock and
+        # batteries every second.
+        busy = menu.open or bool(queue.tick(now)) or drawn is not None
+        wait = 1.0 if menu.open else 1 / 30 if busy else None
+        ready, _, _ = select.select([*servers, xfd], [], [], wait)
         for server in (x for x in servers if x in ready):
             conn, _ = server.accept()
             with conn:
@@ -788,14 +938,30 @@ def daemon(spec_file, player):
                         buf += chunk
                 except OSError:
                     pass
-            for line in buf.splitlines():
-                try:
-                    queue.add(json.loads(line), time.monotonic())
-                except ValueError:
-                    pass
+                for line in buf.splitlines():
+                    try:
+                        msg = json.loads(line)
+                    except ValueError:
+                        continue
+                    if not isinstance(msg, dict):
+                        continue
+                    if "menu" not in msg:
+                        queue.add(msg, time.monotonic())
+                    elif server is srv:   # the session's own socket only, not the shared one
+                        try:
+                            conn.sendall(json.dumps(menu.command(msg["menu"], in_game())).encode() + b"\n")
+                        except OSError:
+                            pass
         if xfd in ready:
             while d.pending_events():
                 d.next_event()   # also notices when gamescope has gone
+        if menu.open:
+            menu_drawn = draw_menu(menu_drawn)
+            d.flush()
+            continue
+        if menu_drawn is not None:   # just closed: take it down, redraw any toasts
+            clear((0, 0, sw, sh))
+            menu_drawn = drawn = last = None
         shown = queue.tick(time.monotonic())
         live = {id(t) for t, _, _ in shown}
         for cache in (colors, rendered, ys):

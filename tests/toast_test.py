@@ -216,6 +216,9 @@ class Controllers(unittest.TestCase):
             pads = t.connected_pads(root / "class")
             self.assertEqual(sorted(pads.values()), ["DualSense Wireless Controller", "Xbox Wireless Controller"])
             self.assertEqual(list(t.pad_batteries(root / "class").values()), [("Xbox Wireless Controller", 15)])
+            # The menu: each pad with its own battery, or None.
+            self.assertEqual(sorted(t.pad_status(root / "class")),
+                             [("DualSense Wireless Controller", None), ("Xbox Wireless Controller", 15)])
 
     def test_connected_and_disconnected(self):
         a = {"/d/1": "8BitDo Ultimate 2"}
@@ -233,6 +236,29 @@ class Controllers(unittest.TestCase):
         self.assertEqual(t.battery_changes(warned, {"x": ("Pad", 12)}), [])
         t.battery_changes(warned, {"x": ("Pad", 80)})
         self.assertEqual(len(t.battery_changes(warned, {"x": ("Pad", 19)})), 1)
+
+
+class GuideMenu(unittest.TestCase):
+    def test_in_a_game(self):
+        menu = t.Menu()
+        self.assertEqual(menu.command("down", True), {"open": False})   # nothing until it's open
+        self.assertEqual(menu.command("open", True), {"open": True})
+        self.assertEqual(menu.items, ["Resume", "Quit game"])
+        menu.command("up", True)
+        self.assertEqual(menu.sel, 0)
+        menu.command("down", True)
+        menu.command("down", True)
+        self.assertEqual(menu.sel, 1)
+        self.assertEqual(menu.command("select", True), {"open": False, "do": "quit"})
+
+    def test_resume_back_and_close(self):
+        menu = t.Menu()
+        menu.command("open", True)
+        self.assertEqual(menu.command("select", True), {"open": False})
+        for cmd in ("back", "close"):
+            menu.command("open", False)
+            self.assertEqual(menu.items, ["Close"])
+            self.assertEqual(menu.command(cmd, False), {"open": False})
 
 
 class Sockets(unittest.TestCase):
