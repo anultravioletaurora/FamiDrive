@@ -61,9 +61,10 @@ STALE_PROGRESS = 120.0
 DIM = (0, 0, 0, 165)   # over the game while the menu is up
 BLUR_RADIUS = 18       # gamescope's blur of the game behind the menu (its most is 19)
 BLUR_FADE_MS = 200
-# The panel springs in from the right: stiffness and damping per second,
-# a little under critical, so it overshoots a touch and settles.
-SPRING_K, SPRING_C = 260.0, 20.0
+# The panel slides in from the right over this long, easing out: quick
+# at first, settling gently, no bounce (a spring's overshoot was more
+# than wanted, first box 2026-10-13).
+SLIDE_SECONDS = 0.28
 
 MAX_SHOWN = 3          # toasts on screen at once, stacked from the corner
 URGENT = ("alert", "achievement")   # a progress toast nobody updates is let go
@@ -108,15 +109,11 @@ def opaque(color):
     return (*color[:3], min(255, int(color[3] * 1.5)))
 
 
-def spring(x, v, target, dt):
-    """One step of the panel's spring: (x, v) after dt seconds, in small
-    steps so a slow frame doesn't throw it off."""
-    steps = max(1, int(dt / 0.004))
-    h = dt / steps
-    for _ in range(steps):
-        v += (-SPRING_K * (x - target) - SPRING_C * v) * h
-        x += v * h
-    return x, v
+def ease_out(p):
+    """How far along a slide is (0..1) at fraction p of its time: a cubic
+    ease-out."""
+    p = max(0.0, min(1.0, p))
+    return 1 - (1 - p) ** 3
 
 
 def hex_color(value):
@@ -977,60 +974,38 @@ def daemon(spec_file, player):
         key = menu_key(pads)
         if key == before:
             return before
-        sheet["data"] = put(wide_panel(pads), (0, 0), sheet["pix"], prev=sheet["data"])
+        panel = render_menu(pads, theme_colors(theme, color_scheme(Path.home())))
+        sheet["data"] = put(panel, (0, 0), sheet["pix"], prev=sheet["data"])
         win.copy_area(gc, sheet["pix"], 0, 0, sheet["pw"], sh, sw - sheet["pw"], 0)
         return key
-
-    def wide_panel(pads):
-        """The panel, with its spare width to the right for the overshoot."""
-        colors = theme_colors(theme, color_scheme(Path.home()))
-        panel = render_menu(pads, colors)
-        pw, ext = panel.get_width(), int(80 * u)
-        wide = pygame.Surface((pw + ext, sh), pygame.SRCALPHA, 32)
-        wide.blit(panel, (0, 0))
-        wide.fill(opaque(colors["panel"]), (pw, 0, ext, sh))
-        return wide
 
     def open_menu():
         """Dim the screen and start the panel's slide in. The panel goes to
         the X server once, as a pixmap, and each frame of the slide is a
-        copy from it there. It's drawn wider than it is, in its own color,
-        so the overshoot never shows an edge. The dim and the panel's color
-        are filled by the X server; only the rows with something on them
-        are sent."""
+        copy from it there. The dim and the panel's color are filled by the
+        X server; only the rows with something on them are sent."""
         pads = pad_status()
-        wide = wide_panel(pads)
-        ext = int(80 * u)
-        pw = wide.get_width() - ext
+        colors = theme_colors(theme, color_scheme(Path.home()))
+        panel = render_menu(pads, colors)
+        pw = panel.get_width()
         fill_solid(win, DIM, (0, 0, sw, sh))
-        pix = win.create_pixmap(pw + ext, sh, 32)
-        color = opaque(theme_colors(theme, color_scheme(Path.home()))["panel"])
-        fill_solid(pix, color, (0, 0, pw + ext, sh))
-        data = put(wide, (0, 0), pix, skip=color)
-        strip = win.create_pixmap(ext, sh, 32)
-        fill_solid(strip, DIM, (0, 0, ext, sh))
-        return {"x": float(sw), "v": 0.0, "t": time.monotonic(), "at": sw, "pw": pw, "ext": ext,
-                "pix": pix, "strip": strip, "moving": True, "key": menu_key(pads), "data": data}
+        pix = win.create_pixmap(pw, sh, 32)
+        fill_solid(pix, opaque(colors["panel"]), (0, 0, pw, sh))
+        data = put(panel, (0, 0), pix, skip=opaque(colors["panel"]))
+        return {"t0": time.monotonic(), "pw": pw, "pix": pix, "moving": True,
+                "key": menu_key(pads), "data": data}
 
     def slide_step(sl):
-        """Move the panel one frame along its spring; True once it's settled."""
-        now = time.monotonic()
-        target = sw - sl["pw"]
-        sl["x"], sl["v"] = spring(sl["x"], sl["v"], target, min(0.05, now - sl["t"]))
-        sl["t"] = now
-        done = abs(sl["x"] - target) < 0.5 and abs(sl["v"]) < 5
-        x = target if done else max(target - sl["ext"], int(round(sl["x"])))
-        if x > sl["at"]:   # springing back right: put the dim back where it was
-            win.copy_area(gc, sl["strip"], 0, 0, x - sl["at"], sh, sl["at"], 0)
+        """Move the panel one frame along its slide; True once it's in."""
+        p = (time.monotonic() - sl["t0"]) / SLIDE_SECONDS
+        x = sw - int(round(sl["pw"] * ease_out(p)))
         if x < sw:
-            win.copy_area(gc, sl["pix"], 0, 0, min(sl["pw"] + sl["ext"], sw - x), sh, x, 0)
-        sl["at"] = x
-        return done
+            win.copy_area(gc, sl["pix"], 0, 0, sw - x, sh, x, 0)
+        return p >= 1
 
     def end_sheet(sl):
         if sl:
             sl["pix"].free()
-            sl["strip"].free()
 
     root = scr.root
     focus_atom, cardinal = d.intern_atom("STEAM_INPUT_FOCUS"), Xatom.CARDINAL

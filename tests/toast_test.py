@@ -296,14 +296,10 @@ class Look(unittest.TestCase):
         self.assertEqual(t.opaque((10, 20, 30, 100)), (10, 20, 30, 150))
         self.assertEqual(t.opaque((10, 20, 30, 238)), (10, 20, 30, 255))
 
-    def test_spring_overshoots_a_little_and_settles(self):
-        x, v, lowest = 1920.0, 0.0, 1920.0
-        for _ in range(120):   # two seconds at 60 frames a second
-            x, v = t.spring(x, v, 1280, 1 / 60)
-            lowest = min(lowest, x)
-        self.assertLess(lowest, 1280 - 10)     # a visible overshoot
-        self.assertGreater(lowest, 1280 - 80)  # within the panel's spare width
-        self.assertAlmostEqual(x, 1280, delta=0.5)
+    def test_slide_eases_out(self):
+        self.assertEqual((t.ease_out(0), t.ease_out(1), t.ease_out(2)), (0, 1, 1))
+        steps = [t.ease_out((k + 1) / 10) - t.ease_out(k / 10) for k in range(10)]
+        self.assertTrue(all(a > b > 0 for a, b in zip(steps, steps[1:])))   # slowing, never back
 
 
 class Sockets(unittest.TestCase):
