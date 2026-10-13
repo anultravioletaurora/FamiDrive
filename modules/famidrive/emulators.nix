@@ -6,6 +6,9 @@
 let
   inherit (lib) mkOption types;
   cfg = config.famidrive;
+  # Steam games the Guide menu freezes, by app id: FamiDrive's known
+  # offline ones and the host's.
+  offlineGames = lib.unique ((import ./lib/steam-games.nix { inherit lib; }).offline ++ cfg.steam.offlineGames);
   hasLane = l: lib.elem l cfg.lanes;
 
   # The stores Heroic brings: the Desktop entries' extension -> Heroic's
@@ -61,8 +64,32 @@ let
         default = "";
         description = "Shell run just after the command, outside it, even when the player quits with Select + Start.";
       };
+      guideMenu = mkOption {
+        type = types.enum [ "freeze" "block" ];
+        default = "block";
+        description = ''
+          What the Guide menu does with the game while it's open:
+          `freeze` stops it, so it's paused, whatever menu of its own was
+          open staying as it was (an emulator, an offline game); `block`
+          leaves it running and only takes the pads from it (a game that
+          may be online, where stopping it would drop it off its server).
+        '';
+      };
     };
   });
+
+  # What the Guide menu does with a Desktop or Ports entry's game (each
+  # entry's guideMenu), picked by its extension. The launch has already
+  # written the system's own; this replaces it.
+  menuByExtension = table:
+    let parts = lib.filterAttrs (_: p: p.guideMenu != "block") table;
+    in lib.optionalString (parts != { }) ''
+      case "$ROM" in
+      ${lib.concatStrings (lib.mapAttrsToList (ext: p: ''
+        *${ext}) echo ${p.guideMenu} > "''${XDG_RUNTIME_DIR:-/tmp/famidrive-$(id -u)}/famidrive-game.menu" ;;
+      '') parts)}
+      esac
+    '';
 
   # The Desktop or Ports system's command, before or after: each entry's,
   # picked by the entry's extension.
@@ -183,6 +210,17 @@ let
         type = types.bool;
         default = false;
         description = "Pull each game's save from RomM before it starts and push it back after.";
+      };
+      guideMenu = mkOption {
+        type = types.enum [ "freeze" "block" ];
+        default = "freeze";
+        description = ''
+          What the Guide menu does with the game while it's open:
+          `freeze` stops it, so it's paused, whatever menu of its own was
+          open staying as it was (an emulator, an offline game); `block`
+          leaves it running and only takes the pads from it (a game that
+          may be online, where stopping it would drop it off its server).
+        '';
       };
       # Per-emulator layout mapping is still an open question (roms.md
       # "Console saves: RomM sync API only").
@@ -628,6 +666,14 @@ in
           # -applaunch returns at once; gamescope-fg --steam waits for the game.
           command = ''${pkgs.gamescope-fg}/bin/gamescope-fg --steam "$(cat "$ROM")"'';
           theme = "steam";
+          # Many Steam games are online, and stopping one drops it off its
+          # server: only games known to be offline (offlineGames) freeze.
+          guideMenu = "block";
+          before = lib.optionalString (offlineGames != [ ]) ''
+            case "$(cat "$ROM")" in
+              ${lib.concatStringsSep "|" offlineGames}) echo freeze > "''${XDG_RUNTIME_DIR:-/tmp/famidrive-$(id -u)}/famidrive-game.menu" ;;
+            esac
+          '';
         };
       })
       (lib.mkIf (cfg.desktop != { }) {
@@ -636,7 +682,8 @@ in
           theme = "desktop";   # Art Book Next's desktop art
           extensions = lib.attrNames cfg.desktop;
           command = byExtension cfg.desktop "command";
-          before = byExtension cfg.desktop "before";
+          guideMenu = "block";
+          before = menuByExtension cfg.desktop + byExtension cfg.desktop "before";
           after = byExtension cfg.desktop "after";
         };
       })
@@ -646,7 +693,8 @@ in
           theme = "ports";   # Art Book Next's ports art
           extensions = lib.attrNames cfg.ports;
           command = byExtension cfg.ports "command";
-          before = byExtension cfg.ports "before";
+          guideMenu = "block";
+          before = menuByExtension cfg.ports + byExtension cfg.ports "before";
           after = byExtension cfg.ports "after";
         };
       })
@@ -656,11 +704,17 @@ in
     # 2026-10-06: as a system of their own they showed as a second Ports,
     # with the same art). Every instance starts fullscreen, whoever made
     # it (pkgs/famidrive-prism).
+    #
+    # SDL_JOYSTICK_HIDAPI=0: Controlify's SDL reads pads through the
+    # kernel's input devices, not their raw HID ones. FamiDrive's menu
+    # (Guide) takes the input devices from the game while it's open; it
+    # can't take the raw ones. Found on the first box 2026-10-13: with a
+    # DualShock 4, Minecraft kept moving under the menu.
     famidrive.desktop = lib.mkMerge [
       (lib.mkIf (hasLane "minecraft") {
         ".prism".command = ''
           ${pkgs.famidrive-prism}/bin/famidrive-prism fullscreen "$HOME/.local/share/PrismLauncher/instances/$(cat "$ROM")"
-          ${pkgs.prismlauncher}/bin/prismlauncher --launch "$(cat "$ROM")"
+          SDL_JOYSTICK_HIDAPI=0 ${pkgs.prismlauncher}/bin/prismlauncher --launch "$(cat "$ROM")"
         '';
       })
       # GOG, the Epic Games Store and Amazon Games, all through Heroic, as

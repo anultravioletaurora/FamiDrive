@@ -21,6 +21,8 @@ let
   # dropped, or both would reach the tool and the name's would win.
   steamSettings = own: lib.escapeShellArg (builtins.toJSON {
     inherit (cfg.steam) compatTools steamInput steamInputGames;
+    # Guide is FamiDrive's menu (pkgs/famidrive-quit), not Steam's.
+    guideFocusesSteam = false;
     launchOptions = lib.filterAttrs
       (game: _: !lib.any (appid: (steamGames.games.${appid}.name or null) == game) (lib.attrNames own))
       (knownLaunchOptions // cfg.steam.launchOptions) // own;
@@ -81,7 +83,7 @@ let
         ${pkgs.procps}/bin/pgrep -u "$(id -u)" -x steam > /dev/null || break
         sleep 0.5
       done
-      # Proton pins, Steam Input and launch options, written while Steam
+      # Proton pins, Steam Input, launch options and Guide, written while Steam
       # isn't running (pkgs/famidrive-steam-config). A player's own launch
       # options (their mods') go over the box's.
       case "$(id -un)" in
@@ -154,8 +156,9 @@ let
     fi
     # Nothing is running yet: clear what a crashed launch may have left.
     rm -f "''${XDG_RUNTIME_DIR:-/nonexistent}"/famidrive-game.*
-    # Hold Select + Start on any controller to quit the running game
-    # (pkgs/famidrive-quit). It exits on its own when the session ends.
+    # Hold Select + Start on any controller to quit the running game, and
+    # press Guide for the menu the toast daemon draws (pkgs/famidrive-quit).
+    # It exits on its own when the session ends.
     ${pkgs.famidrive-quit}/bin/famidrive-quit &
     # ES-DE through gamescope-fg, which labels its window and makes it what
     # gamescope shows (nothing does that without Steam; see gamescope-fg).
@@ -294,6 +297,19 @@ in
       Steam and ES-DE show it) or app id. For games whose own controller
       support is missing or worse, such as Valve's older games, which
       expect Steam Input.
+    '';
+  };
+
+  options.famidrive.steam.offlineGames = mkOption {
+    type = types.listOf types.str;
+    default = [ ];
+    example = [ "1091500" ];
+    description = ''
+      Steam games, by app id, with nothing online: the Guide menu freezes
+      them while it's open, so they're paused, as emulators are. Any other
+      Steam game keeps running under the menu, with the pads taken from
+      it, since stopping an online game drops it off its server. FamiDrive
+      knows some already (Cyberpunk 2077); these are added to them.
     '';
   };
 
@@ -506,6 +522,15 @@ in
           Install.WantedBy = [ "default.target" ];
           Service = {
             Environment = "PATH=/run/current-system/sw/bin:/run/wrappers/bin";
+            # The same Steam settings the session writes, before this Steam
+            # starts too. Found on the first box 2026-10-13: another
+            # player's background Steam still had "Guide Button Focuses
+            # Steam" on, heard Guide on the TV's pads (players are in the
+            # input group) and played its sounds under FamiDrive's menu.
+            ExecStartPre = toString (pkgs.writeShellScript "famidrive-steam-background-settings" ''
+              ${pkgs.famidrive-steam-config}/bin/famidrive-steam-config ${steamSettings (cfg.steam.playerLaunchOptions.${famidrivePlayer.user} or { })} \
+                || echo "famidrive-steam-background: couldn't apply Steam settings" >&2
+            '');
             ExecStart = "${pkgs.xvfb-run}/bin/xvfb-run -a steam -silent";
             # Asks Steam to quit, then waits for it: systemd sends SIGTERM
             # to whatever's left the moment ExecStop returns. By full path,

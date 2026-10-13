@@ -8,6 +8,8 @@
 #            collections, nexusmods.nix, or Thunderstore, thunderstore.nix):
 #            what loads the mods, such as a DLL override under Proton or
 #            the mod loader's own start script
+#   offline  true for a single-player game with nothing online to drop:
+#            the Guide menu freezes it (an online one keeps running)
 # Thunderstore's BepInExPacks stay in thunderstore.nix.
 { lib }:
 
@@ -22,6 +24,7 @@ let
       args = "--launcher-skip";
       # Cyber Engine Tweaks and RED4ext load through these (MODDING.md).
       modded = ''WINEDLLOVERRIDES="winmm,version=n,b"'';
+      offline = true;
     };
     "892970" = {
       name = "Valheim";
@@ -51,6 +54,9 @@ in
   modded = appid:
     let g = games.${appid} or { }; in
     if (g.modded or "") == "" then null else build g.modded (g.args or "");
+
+  # Games with nothing online, by app id: the Guide menu freezes them.
+  offline = lib.attrNames (lib.filterAttrs (_: g: g.offline or false) games);
 
   # Whether a host's launch options (by app id or name) already cover it.
   setIn = attrs: appid:

@@ -142,6 +142,14 @@ class Test(unittest.TestCase):
         self.run_settings({"launchOptions": {}})
         self.assertIn('"LaunchOptions"\t\t"old"', self.local.read_text())
 
+    def test_guide_button_off(self):
+        self.run_settings({"guideFocusesSteam": False})
+        text = self.local.read_text()
+        self.assertTrue(text.endswith('\t"Controller_CheckGuideButton"\t\t"0"\n}'))
+        self.local.write_text(text.replace('"Controller_CheckGuideButton"\t\t"0"', '"Controller_CheckGuideButton"\t\t"1"'))
+        self.run_settings({"guideFocusesSteam": False})
+        self.assertEqual(self.local.read_text(), text)   # set back, not added twice
+
     def test_unchanged_files_untouched(self):
         self.run_settings({"launchOptions": {"Not Installed": "x"}})
         self.assertEqual(self.local.read_text(), LOCALCONFIG)

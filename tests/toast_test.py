@@ -216,6 +216,9 @@ class Controllers(unittest.TestCase):
             pads = t.connected_pads(root / "class")
             self.assertEqual(sorted(pads.values()), ["DualSense Wireless Controller", "Xbox Wireless Controller"])
             self.assertEqual(list(t.pad_batteries(root / "class").values()), [("Xbox Wireless Controller", 15)])
+            # The menu: each pad with its own battery, or None.
+            self.assertEqual(sorted(t.pad_status(root / "class")),
+                             [("DualSense Wireless Controller", None), ("Xbox Wireless Controller", 15)])
 
     def test_connected_and_disconnected(self):
         a = {"/d/1": "8BitDo Ultimate 2"}
@@ -233,6 +236,73 @@ class Controllers(unittest.TestCase):
         self.assertEqual(t.battery_changes(warned, {"x": ("Pad", 12)}), [])
         t.battery_changes(warned, {"x": ("Pad", 80)})
         self.assertEqual(len(t.battery_changes(warned, {"x": ("Pad", 19)})), 1)
+
+
+class GuideMenu(unittest.TestCase):
+    def test_in_a_game(self):
+        menu = t.Menu()
+        self.assertEqual(menu.command("down", True), {"open": False})   # nothing until it's open
+        self.assertEqual(menu.command("open", True), {"open": True})
+        self.assertEqual(menu.items, ["Resume", "Quit game"])
+        menu.command("up", True)
+        self.assertEqual(menu.sel, 0)
+        for _ in range(3):
+            menu.command("down", True)
+        self.assertEqual(menu.sel, 1)
+
+    def test_quit_asks_first(self):
+        menu = t.Menu()
+        menu.command("open", True)
+        menu.command("down", True)
+        self.assertEqual(menu.command("select", True), {"open": True})
+        self.assertEqual((menu.view, menu.items, menu.sel), ("confirm", ["Cancel", "Quit"], 0))
+        menu.command("select", True)   # Cancel: back on Quit game
+        self.assertEqual((menu.view, menu.items[menu.sel]), ("main", "Quit game"))
+        menu.command("select", True)
+        menu.command("back", True)     # B backs out of the question, not the menu
+        self.assertEqual((menu.open, menu.view), (True, "main"))
+        menu.command("select", True)
+        menu.command("down", True)
+        # Quitting presses nothing for the game.
+        self.assertEqual(menu.command("select", True), {"open": False, "do": "quit"})
+
+    def test_modes(self):
+        menu = t.Menu()
+        # An emulator, an offline game: stopped while the menu is open.
+        menu.command("open", True, mode="freeze")
+        self.assertEqual(menu.note, "Game paused")
+        self.assertEqual(menu.command("select", True), {"open": False})
+        # An online game: left running, pads taken; nothing pressed for it.
+        menu.command("open", True, mode="block")
+        self.assertEqual(menu.note, "The game keeps running")
+        self.assertEqual(menu.command("back", True), {"open": False})
+        # Big Picture or the voice client: no note.
+        menu.command("open", True, pausable=False)
+        self.assertEqual(menu.note, "")
+        # Out of a game, nothing to say.
+        menu.command("open", False)
+        self.assertEqual((menu.items, menu.note), (["Close"], ""))
+
+    def test_back_and_close(self):
+        menu = t.Menu()
+        for cmd in ("back", "close", "select"):
+            menu.command("open", False)
+            self.assertEqual(menu.command(cmd, False), {"open": False})
+        menu.command("open", True)
+        menu.command("down", True)
+        menu.command("select", True)
+        self.assertEqual(menu.command("close", True), {"open": False})   # Guide closes from anywhere
+
+
+class Look(unittest.TestCase):
+    def test_opaque(self):
+        self.assertEqual(t.opaque((10, 20, 30, 100)), (10, 20, 30, 150))
+        self.assertEqual(t.opaque((10, 20, 30, 238)), (10, 20, 30, 255))
+
+    def test_slide_eases_out(self):
+        self.assertEqual((t.ease_out(0), t.ease_out(1), t.ease_out(2)), (0, 1, 1))
+        steps = [t.ease_out((k + 1) / 10) - t.ease_out(k / 10) for k in range(10)]
+        self.assertTrue(all(a > b > 0 for a, b in zip(steps, steps[1:])))   # slowing, never back
 
 
 class Sockets(unittest.TestCase):
