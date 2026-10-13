@@ -4,6 +4,9 @@
                                         Controllers entries for this box (session start)
     famidrive-bluetooth pair [SECONDS]  find a controller in pairing mode and pair it
     famidrive-bluetooth forget ADDRESS  forget a paired controller
+    famidrive-bluetooth disconnect ADDRESS
+                                        disconnect a controller, which switches
+                                        most off (famidrive-quit, for one left idle)
 
 No screens of its own: the entries are ES-DE games in the Controllers system,
 drawn by the player's theme like any other, and what happens while pairing
@@ -371,6 +374,22 @@ async def forget(address):
     return 0
 
 
+async def disconnect(address):
+    """Disconnect a connected controller. Xbox, PlayStation and Switch
+    pads switch themselves off when their host lets them go."""
+    bus = await system_bus()
+    objs = await managed_objects(bus)
+    adapter = first_adapter(objs)
+    match = [p for p, d in devices(objs, adapter)
+             if d.get("Address", "").upper() == address.upper() and d.get("Connected")]
+    if not match:
+        return 0
+    dev = await iface(bus, match[0], "org.bluez.Device1")
+    await dev.call_disconnect()
+    log(f"disconnected {address}")
+    return 0
+
+
 async def entries(folder, old=()):
     try:
         bus = await system_bus()
@@ -396,6 +415,8 @@ def main():
         return asyncio.run(pair(int(args[1]) if len(args) == 2 else 60))
     if args[:1] == ["forget"] and len(args) == 2:
         return asyncio.run(forget(args[1]))
+    if args[:1] == ["disconnect"] and len(args) == 2:
+        return asyncio.run(disconnect(args[1]))
     print(__doc__, file=sys.stderr)
     return 2
 

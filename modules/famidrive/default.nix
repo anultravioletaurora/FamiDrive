@@ -63,6 +63,18 @@ let
           say which one is real.
         '';
       };
+      controllerIdleMinutes = mkOption {
+        type = types.nullOr types.ints.positive;
+        default = 10;
+        example = 30;
+        description = ''
+          Minutes a Bluetooth controller can sit unused in this player's
+          session before FamiDrive switches it off, to save its battery. A
+          toast says so a minute before; pressing anything keeps it on.
+          `null`: never. Controllers on a 2.4 GHz dongle or USB can't be
+          switched off by the box, and keep their own sleep timer.
+        '';
+      };
       # Xenia's is derived from `owner`, never set by hand: if each box
       # invented its own, one owner's saves wouldn't line up across their
       # boxes (roms.md "Mapping saves to games").
@@ -102,6 +114,7 @@ let
     tokenFile = null;   # no RomM: the guest's saves stay on this box
     edenProfileId = null;
     xeniaXuid = "E000000000000000";
+    controllerIdleMinutes = 10;
     isGuest = true;
   } // { nickname = "Guest"; };
 in

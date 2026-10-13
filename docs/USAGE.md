@@ -141,6 +141,18 @@ anyone else gets their initial.
 - **Default:** `null`
 - **Example:** `./avatars/alice.png`
 
+### `famidrive.players.<name>.controllerIdleMinutes`
+
+Minutes a Bluetooth controller can sit unused in this player's
+session before FamiDrive switches it off, to save its battery. A
+toast says so a minute before; pressing anything keeps it on.
+`null`: never. Controllers on a 2.4 GHz dongle or USB can't be
+switched off by the box, and keep their own sleep timer.
+
+- **Type:** null or (positive integer, meaning >0)
+- **Default:** `10`
+- **Example:** `30`
+
 ### `famidrive.players.<name>.displayName`
 
 What the "Who's playing?" screen calls them.

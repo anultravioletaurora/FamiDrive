@@ -183,8 +183,15 @@ let
     rm -f "''${XDG_RUNTIME_DIR:-/nonexistent}"/famidrive-game.*
     # Hold Select + Start on any controller to quit the running game, and
     # press Guide for the menu the toast daemon draws (pkgs/famidrive-quit).
-    # It exits on its own when the session ends.
-    ${pkgs.famidrive-quit}/bin/famidrive-quit &
+    # It also switches off a Bluetooth controller the player left idle
+    # (their controllerIdleMinutes). It exits on its own when the session ends.
+    case "$(id -un)" in
+    ${lib.concatStrings (lib.mapAttrsToList (_: p: ''
+      ${p.user}) idle_minutes=${toString (p.controllerIdleMinutes or "")} ;;
+    '') cfg.allPlayers)}
+      *) idle_minutes="" ;;
+    esac
+    FAMIDRIVE_IDLE_MINUTES="$idle_minutes" ${pkgs.famidrive-quit}/bin/famidrive-quit &
     # ES-DE through gamescope-fg, which labels its window and makes it what
     # gamescope shows (nothing does that without Steam; see gamescope-fg).
     ${pkgs.gamescope-fg}/bin/gamescope-fg --frontend ${pkgs.es-de}/bin/es-de --no-splash || true
