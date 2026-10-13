@@ -93,7 +93,8 @@ cover every case this module needs:
   off).
 - **`defaultKeys`**: set keys only where the file has none yet — a
   starting value the player can then change from the TV and keep. Used
-  for a new theme's starting options in `es_settings.xml`.
+  for a new theme's starting options, and ES-DE's starting collections
+  and startup system, in `es_settings.xml`.
 
 Files only Nix ever writes (`es_systems.xml`, theme folders) are plain
 home-manager symlinks instead; there's no app on the other end to fight
