@@ -162,13 +162,14 @@ def generic_roles(keys, vendor, product, db, name=""):
 
 
 def menu_buttons(keys, vendor, product, driver, db, name=""):
-    """{"guide", "a", "b", "start": key code} on this device, as far as it has them.
+    """{"guide", "a", "b", "start", "back": key code} on this device, as far
+    as it has them. "back" is Select, in SDL's names.
     A pad with a driver of its own names them; a hid-generic one is looked
     up like its Select and Start."""
     if driver == "hid-generic":
         found = generic_roles(keys, vendor, product, db, name)
-        return {r: found[r] for r in ("guide", "a", "b", "start") if r in found}
-    named = {"guide": BTN_MODE, "a": BTN_SOUTH, "b": BTN_EAST, "start": e.BTN_START}
+        return {r: found[r] for r in ("guide", "a", "b", "start", "back") if r in found}
+    named = {"guide": BTN_MODE, "a": BTN_SOUTH, "b": BTN_EAST, "start": e.BTN_START, "back": e.BTN_SELECT}
     return {r: c for r, c in named.items() if c in keys}
 
 
@@ -181,7 +182,8 @@ class PadNav:
     PUSH, BACK = 0.6, 0.3
 
     def __init__(self, buttons, ranges):
-        self.keys = {c: {"guide": "close", "a": "select", "b": "back"}[r] for r, c in buttons.items() if r != "start"}
+        commands = {"guide": "close", "a": "select", "b": "back"}
+        self.keys = {c: commands[r] for r, c in buttons.items() if r in commands}
         self.ranges = ranges      # {abs code: (min, max)}
         self.pushed = {}          # stick axis -> the direction it's held in
 
@@ -309,21 +311,29 @@ def game_targets():
     return targets
 
 
+def parse_mode(text):
+    """famidrive-game.menu's "MODE [BUTTON]": (mode, the button that opens
+    the game's pause menu). "pause" and Start when it says nothing else."""
+    words = (text or "").split()
+    mode = words[0] if words and words[0] in ("freeze", "pause") else "pause"
+    button = words[1] if len(words) > 1 and words[1] in ("start", "select") else "start"
+    return mode, button
+
+
 def game_mode():
-    """What the menu does with the running game: its guideMenu ("freeze"
-    or "pause"), or "none" with no game, or for Steam's Big Picture and
-    the voice client, which leave a polite way to close them instead
-    (famidrive-game.close) and aren't games."""
+    """What the menu does with the running game: its guideMenu and pause
+    button (parse_mode), or ("none", None) with no game, or for Steam's
+    Big Picture and the voice client, which leave a polite way to close
+    them instead (famidrive-game.close) and aren't games."""
     try:
         if not game_targets() or CLOSE_FILE.read_text().strip():
-            return "none"
+            return "none", None
     except OSError:
         pass
     try:
-        mode = MENU_FILE.read_text().strip()
+        return parse_mode(MENU_FILE.read_text())
     except OSError:
-        return "pause"
-    return mode if mode in ("freeze", "pause") else "pause"
+        return parse_mode("")
 
 
 def freeze_game(on):
@@ -526,13 +536,15 @@ def main():
                         if ask_menu("open").get("open"):
                             menu = True
                             log("menu opened")
-                            mode = game_mode()
+                            mode, button = game_mode()
+                            # The pause button's role: Select is "back" in SDL's names.
+                            role = {"start": "start", "select": "back"}.get(button)
                             if mode == "freeze":
                                 freeze_game(True)
                                 frozen = True
-                            elif mode == "pause" and "start" in buttons_of[fd]:
+                            elif mode == "pause" and role in buttons_of[fd]:
                                 # Before the grab, which would keep it from the game.
-                                press(dev, buttons_of[fd]["start"], "Start")
+                                press(dev, buttons_of[fd][role], button.capitalize())
                             for fd2, dev2 in devices.items():
                                 grab(dev2, drivers[fd2])
             except OSError:

@@ -8,6 +8,8 @@
 #            collections, nexusmods.nix, or Thunderstore, thunderstore.nix):
 #            what loads the mods, such as a DLL override under Proton or
 #            the mod loader's own start script
+#   pause    the pad button that opens the game's pause menu, when it isn't
+#            Start ("select"): the Guide menu presses it as it opens
 # Thunderstore's BepInExPacks stay in thunderstore.nix.
 { lib }:
 
@@ -22,6 +24,9 @@ let
       args = "--launcher-skip";
       # Cyber Engine Tweaks and RED4ext load through these (MODDING.md).
       modded = ''WINEDLLOVERRIDES="winmm,version=n,b"'';
+      # Start opens its hub (inventory, map); Select (View) is its pause
+      # menu. Found on the first box 2026-10-13.
+      pause = "select";
     };
     "892970" = {
       name = "Valheim";
@@ -51,6 +56,9 @@ in
   modded = appid:
     let g = games.${appid} or { }; in
     if (g.modded or "") == "" then null else build g.modded (g.args or "");
+
+  # Each game's pause button, by app id, where it isn't Start.
+  pauseButtons = lib.mapAttrs (_: g: g.pause) (lib.filterAttrs (_: g: g ? pause) games);
 
   # Whether a host's launch options (by app id or name) already cover it.
   setIn = attrs: appid:

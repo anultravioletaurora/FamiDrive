@@ -1254,6 +1254,23 @@ every player, mods or not.
   }
   ```
 
+### `famidrive.steam.pauseButtons`
+
+The pad button that opens a Steam game's pause menu, by app id, for
+games where it isn't Start: the Guide menu presses it as it opens.
+FamiDrive knows some games' already (Cyberpunk 2077's is Select);
+these are added to them, and win.
+
+- **Type:** attribute set of (one of "start", "select")
+- **Default:** `{ }`
+- **Example:** 
+
+  ```nix
+  {
+    "1091500" = "select";
+  }
+  ```
+
 ### `famidrive.steam.steamInput`
 
 Whether Steam Input stands between controllers and Steam games.

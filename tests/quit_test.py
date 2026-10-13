@@ -85,10 +85,10 @@ class Combo(unittest.TestCase):
     def test_menu_buttons(self):
         xpad = [0x130, 0x131, 0x133, 0x134, 0x13a, 0x13b, 0x13c]
         self.assertEqual(m.menu_buttons(xpad, 0x2dc8, 0x310b, "xpad", self.db),
-                         {"guide": 0x13c, "a": 0x130, "b": 0x131, "start": 0x13b})
-        # The Raiju's entry has no guide: A, B and Start, by number.
+                         {"guide": 0x13c, "a": 0x130, "b": 0x131, "start": 0x13b, "back": 0x13a})
+        # The Raiju's entry has no guide: A, B, Start and Select, by number.
         self.assertEqual(m.menu_buttons(RAIJU, 0x1532, 0x1007, "hid-generic", self.db),
-                         {"a": 0x131, "b": 0x132, "start": 0x139})
+                         {"a": 0x131, "b": 0x132, "start": 0x139, "back": 0x138})
         self.assertEqual(m.menu_buttons(RAIJU, 0x1234, 0x5678, "hid-generic", self.db), {})
 
 
@@ -134,6 +134,19 @@ class LetGo(unittest.TestCase):
     def test_generic_pad_z_may_be_a_stick(self):
         self.assertEqual(m.let_go([], {m.ABS_Z: (200, 0, 255)}, "hid-generic"), [(m.EV_ABS, m.ABS_Z, 127)])
         self.assertEqual(m.let_go([], {m.ABS_Z: (127, 0, 255)}, "hid-generic"), [])
+
+
+class Mode(unittest.TestCase):
+    def test_parse(self):
+        self.assertEqual(m.parse_mode("freeze\n"), ("freeze", "start"))
+        self.assertEqual(m.parse_mode("pause select\n"), ("pause", "select"))
+        self.assertEqual(m.parse_mode(""), ("pause", "start"))
+        self.assertEqual(m.parse_mode("focus\n"), ("pause", "start"))   # unknown: the safe one
+
+    def test_select_isnt_a_menu_button(self):
+        nav = m.PadNav({"start": 0x13b, "back": 0x13a, "a": 0x130}, {})
+        self.assertIsNone(nav.feed(m.EV_KEY, 0x13a, 1))
+        self.assertEqual(nav.feed(m.EV_KEY, 0x130, 1), "select")
 
 
 class PressStart(unittest.TestCase):

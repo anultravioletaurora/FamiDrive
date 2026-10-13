@@ -489,10 +489,10 @@ def game_mode():
     guideMenu, written by the launch): "freeze" or "pause". "pause" when
     the launch said nothing."""
     try:
-        mode = (sock_path().parent / "famidrive-game.menu").read_text().strip()
+        words = (sock_path().parent / "famidrive-game.menu").read_text().split()
     except OSError:
         return "pause"
-    return mode if mode in ("freeze", "pause") else "pause"
+    return words[0] if words and words[0] in ("freeze", "pause") else "pause"
 
 
 def pausable():

@@ -300,6 +300,18 @@ in
     '';
   };
 
+  options.famidrive.steam.pauseButtons = mkOption {
+    type = types.attrsOf (types.enum [ "start" "select" ]);
+    default = { };
+    example = { "1091500" = "select"; };
+    description = ''
+      The pad button that opens a Steam game's pause menu, by app id, for
+      games where it isn't Start: the Guide menu presses it as it opens.
+      FamiDrive knows some games' already (Cyberpunk 2077's is Select);
+      these are added to them, and win.
+    '';
+  };
+
   options.famidrive.steam.playerLaunchOptions = mkOption {
     type = types.attrsOf (types.attrsOf types.str);
     default = { };
