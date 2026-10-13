@@ -21,6 +21,10 @@ and Steam Input sits in front of every controller whether a game wants it
 or not. FamiDrive keeps the good part, a box that boots into a console UI
 and never needs a desktop, and makes Steam just one entry on the menu.
 
+[![FamiDrive alpha footage, from a capture card on the first box](https://img.youtube.com/vi/Dm0pZZIZaVo/maxresdefault.jpg)](https://youtu.be/Dm0pZZIZaVo)
+
+*Alpha footage, straight from a capture card on the first box.*
+
 > **Status: early.** FamiDrive runs on two boxes: a gaming PC that boots
 > into ES-DE at 4K120 with HDR, and a small Intel office PC installed
 > fresh from this README. GameCube and Switch games launch, take focus and
