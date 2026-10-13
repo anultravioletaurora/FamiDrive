@@ -156,7 +156,8 @@ This is the house controller, and FamiDrive knows it by name
   Fighter 6 and Rocket League. In Rocket League, which pad is switched on
   first doesn't decide who's player 1.
   [Need for Speed Heat](COMPATIBILITY.md#need-for-speed-heat): the right
-  glyphs and strong rumble.
+  glyphs and strong rumble. [Peak](COMPATIBILITY.md#peak): perfect,
+  2026-10-12.
 - **Kodi:** ✅ with FamiDrive's button map, 2026-10-06. At first Kodi saw
   the pad but had no button map for it, so it ignored the pad and kept
   offering to set it up. FamiDrive now gives every player's Kodi a map for

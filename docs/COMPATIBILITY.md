@@ -615,11 +615,25 @@ on first launch, but not the Battle.net app.
 
 ### Peak
 
-**Steam: ❔ Untested.** Co-op climbing, for up to four players online.
+**Steam: 🟡 Playable: friends can't be invited from FamiDrive's
+session.** Co-op climbing, for up to four players online. Proton
+Experimental.
 
-- **To check:** controllers and rumble, joining friends through Steam,
-  and voice chat (proximity voice) through the TV's audio and a mic, if
-  there is one.
+- **2026-10-12, the first box, 8BitDo Ultimate 2 (2.4 GHz), Steam Input
+  off:** ✅ controls were perfect.
+- **2026-10-12, inviting a friend:** ❌ the game's invite menu doesn't
+  open when Peak is launched from ES-DE. It's Steam's own invite
+  dialog, which Steam draws in its overlay, and Steam's overlay doesn't
+  come up over games in FamiDrive's session yet (see Rocket League's
+  "Overlay Disabled"). Opening Steam Settings first and launching Peak
+  from Big Picture works: the invite dialog shows. Steam chat invites
+  from friends arrive in the same overlay, so they're missed too.
+- **2026-10-12, the first box:** green screen and a hard reboot
+  mid-game. The GPU was overclocked at the time (LACT, core and memory
+  clocks raised), the likeliest cause; not a Peak problem until it
+  happens at stock clocks.
+- **To check:** rumble, and voice chat (proximity voice) through the
+  TV's audio and a mic, if there is one.
 
 ### Risk of Rain 2
 
