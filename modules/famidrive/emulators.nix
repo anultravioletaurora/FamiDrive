@@ -6,9 +6,6 @@
 let
   inherit (lib) mkOption types;
   cfg = config.famidrive;
-  # Steam games' pause buttons (the Guide menu presses one as it opens):
-  # FamiDrive's known ones, the host's over them.
-  pauseButtons = (import ./lib/steam-games.nix { inherit lib; }).pauseButtons // cfg.steam.pauseButtons;
   hasLane = l: lib.elem l cfg.lanes;
 
   # The stores Heroic brings: the Desktop entries' extension -> Heroic's
@@ -70,9 +67,9 @@ let
         description = ''
           What the Guide menu does with the game while it's open:
           `freeze` stops it (an emulator: the menu is its pause); `pause`
-          presses Start as the menu opens, for the game's own pause menu,
-          and B as it closes, to back out of it (a PC game, which may be
-          online and can't be stopped).
+          presses Esc as the menu opens, for the game's own pause menu,
+          and again as it closes, to back out of it (a PC game, which may
+          be online and can't be stopped).
         '';
       };
     };
@@ -217,9 +214,9 @@ let
         description = ''
           What the Guide menu does with the game while it's open:
           `freeze` stops it (an emulator: the menu is its pause); `pause`
-          presses Start as the menu opens, for the game's own pause menu,
-          and B as it closes, to back out of it (a PC game, which may be
-          online and can't be stopped).
+          presses Esc as the menu opens, for the game's own pause menu,
+          and again as it closes, to back out of it (a PC game, which may
+          be online and can't be stopped).
         '';
       };
       # Per-emulator layout mapping is still an open question (roms.md
@@ -668,15 +665,6 @@ in
           theme = "steam";
           # Many Steam games are online, and can't be stopped.
           guideMenu = "pause";
-          # A game whose pause menu isn't on Start (pauseButtons): the
-          # launch has written "pause"; this adds its button.
-          before = lib.optionalString (pauseButtons != { }) ''
-            case "$(cat "$ROM")" in
-            ${lib.concatStrings (lib.mapAttrsToList (appid: button: ''
-              ${appid}) echo "pause ${button}" > "''${XDG_RUNTIME_DIR:-/tmp/famidrive-$(id -u)}/famidrive-game.menu" ;;
-            '') pauseButtons)}
-            esac
-          '';
         };
       })
       (lib.mkIf (cfg.desktop != { }) {

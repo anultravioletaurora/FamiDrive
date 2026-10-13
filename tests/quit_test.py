@@ -85,10 +85,10 @@ class Combo(unittest.TestCase):
     def test_menu_buttons(self):
         xpad = [0x130, 0x131, 0x133, 0x134, 0x13a, 0x13b, 0x13c]
         self.assertEqual(m.menu_buttons(xpad, 0x2dc8, 0x310b, "xpad", self.db),
-                         {"guide": 0x13c, "a": 0x130, "b": 0x131, "start": 0x13b, "back": 0x13a})
-        # The Raiju's entry has no guide: A, B, Start and Select, by number.
+                         {"guide": 0x13c, "a": 0x130, "b": 0x131})
+        # The Raiju's entry has no guide: only A and B, by number.
         self.assertEqual(m.menu_buttons(RAIJU, 0x1532, 0x1007, "hid-generic", self.db),
-                         {"a": 0x131, "b": 0x132, "start": 0x139, "back": 0x138})
+                         {"a": 0x131, "b": 0x132})
         self.assertEqual(m.menu_buttons(RAIJU, 0x1234, 0x5678, "hid-generic", self.db), {})
 
 
@@ -138,33 +138,35 @@ class LetGo(unittest.TestCase):
 
 class Mode(unittest.TestCase):
     def test_parse(self):
-        self.assertEqual(m.parse_mode("freeze\n"), ("freeze", "start"))
-        self.assertEqual(m.parse_mode("pause select\n"), ("pause", "select"))
-        self.assertEqual(m.parse_mode(""), ("pause", "start"))
-        self.assertEqual(m.parse_mode("focus\n"), ("pause", "start"))   # unknown: the safe one
-
-    def test_select_isnt_a_menu_button(self):
-        nav = m.PadNav({"start": 0x13b, "back": 0x13a, "a": 0x130}, {})
-        self.assertIsNone(nav.feed(m.EV_KEY, 0x13a, 1))
-        self.assertEqual(nav.feed(m.EV_KEY, 0x130, 1), "select")
+        self.assertEqual(m.parse_mode("freeze\n"), "freeze")
+        self.assertEqual(m.parse_mode("pause\n"), "pause")
+        self.assertEqual(m.parse_mode(""), "pause")
+        self.assertEqual(m.parse_mode("focus\n"), "pause")   # unknown: the safe one
 
 
-class PressStart(unittest.TestCase):
-    def test_presses_and_lets_go(self):
+class Esc(unittest.TestCase):
+    def keys(self, sent):
+        return type("Keys", (), {"write": lambda self, *ev: sent.append(ev), "syn": lambda self: sent.append("syn")})()
+
+    def wait_for(self, sent, n):
+        import time
+        for _ in range(50):
+            if len(sent) >= n:
+                return
+            time.sleep(0.02)
+
+    def test_tap(self):
         sent = []
-        held = [[0x131], [0x131], []]   # B held for two looks, then let go
-        dev = type("Pad", (), {"name": "Pad", "write": lambda self, *ev: sent.append(ev),
-                               "syn": lambda self: sent.append("syn"),
-                               "active_keys": lambda self: held.pop(0) if len(held) > 1 else held[0]})()
-        m.press(dev, 0x131, "B", hold=0)
-        self.assertEqual(sent, [(m.EV_KEY, 0x131, 1), "syn", (m.EV_KEY, 0x131, 0), "syn"])
-        self.assertEqual(held, [[]])   # it waited for the let-go
+        m.tap_esc(self.keys(sent))
+        self.wait_for(sent, 4)
+        self.assertEqual(sent, [(m.EV_KEY, m.KEY_ESC, 1), "syn", (m.EV_KEY, m.KEY_ESC, 0), "syn"])
 
-    def test_not_when_no_longer_wanted(self):
+    def test_not_when_no_longer_wanted_or_no_keyboard(self):
         sent = []
-        dev = type("Pad", (), {"name": "Pad", "write": lambda self, *ev: sent.append(ev),
-                               "syn": lambda self: sent.append("syn"), "active_keys": lambda self: []})()
-        m.press(dev, 0x131, "B", hold=0, still=lambda: False)
+        m.tap_esc(self.keys(sent), still=lambda: False)
+        m.tap_esc(None)
+        import time
+        time.sleep(0.2)
         self.assertEqual(sent, [])
 
 

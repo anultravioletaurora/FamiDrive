@@ -532,8 +532,6 @@ in
       (check "the Guide menu freezes emulators, and opens Steam's and Desktop games' own pause menus"
         (c.famidrive.systems.gc.guideMenu == "freeze" && c.famidrive.systems.steam.guideMenu == "pause"
           && c.famidrive.systems.desktop.guideMenu == "pause"))
-      (check "Cyberpunk 2077's pause menu is on Select: its launch says so for the Guide menu"
-        (lib.hasInfix ''1091500) echo "pause select"'' c.famidrive.systems.steam.before))
       (check "a host's own cleanup choice wins" (c.nix.gc.options == "--delete-older-than 30d"))
       (check "Thunderstore mods are each player's own: BepInEx loads only in their Steam, Valheim's and Risk of Rain 2's known"
         (lib.hasInfix "famidrive-thunderstore" c.home-manager.users.alice.home.activation.famidriveThunderstore.data

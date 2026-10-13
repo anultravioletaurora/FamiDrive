@@ -1254,23 +1254,6 @@ every player, mods or not.
   }
   ```
 
-### `famidrive.steam.pauseButtons`
-
-The pad button that opens a Steam game's pause menu, by app id, for
-games where it isn't Start: the Guide menu presses it as it opens.
-FamiDrive knows some games' already (Cyberpunk 2077's is Select);
-these are added to them, and win.
-
-- **Type:** attribute set of (one of "start", "select")
-- **Default:** `{ }`
-- **Example:** 
-
-  ```nix
-  {
-    "1091500" = "select";
-  }
-  ```
-
 ### `famidrive.steam.steamInput`
 
 Whether Steam Input stands between controllers and Steam games.
@@ -1859,9 +1842,9 @@ The system's name in ES-DE's menu.
 
 What the Guide menu does with the game while it's open:
 `freeze` stops it (an emulator: the menu is its pause); `pause`
-presses Start as the menu opens, for the game's own pause menu,
-and B as it closes, to back out of it (a PC game, which may be
-online and can't be stopped).
+presses Esc as the menu opens, for the game's own pause menu,
+and again as it closes, to back out of it (a PC game, which may
+be online and can't be stopped).
 
 - **Type:** one of "freeze", "pause"
 - **Default:** `"freeze"`

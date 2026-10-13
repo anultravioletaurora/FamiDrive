@@ -562,9 +562,9 @@ class Menu:
 
     In a game: Resume, and Quit game, which asks first, since anything not
     saved is lost. Out of one: Close. A "freeze" game (an emulator) is
-    stopped while the menu is open; a "pause" one (a PC game) has Start
-    pressed as it opens, for its own pause menu, and B as the menu closes
-    ("do": "resume"), unless it closed by quitting."""
+    stopped while the menu is open; a "pause" one (a PC game) has Esc
+    pressed as it opens, for its own pause menu, and again as the menu
+    closes ("do": "resume"), unless it closed by quitting."""
 
     def __init__(self):
         self.open = False

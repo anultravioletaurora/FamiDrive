@@ -82,8 +82,8 @@ TRIGGERS = (ABS_Z, ABS_RZ, ABS_GAS, ABS_BRAKE)
 # are the real pad's again, so they don't move the menu twice.
 STEAM_VIRTUAL = (0x28de, 0x11ff)
 TOAST_SOCK = RUN / "famidrive-toast.sock"
-HOLD_PRESS = 0.1    # seconds a button pressed for the game is held
-RELEASE_WAIT = 2.0  # seconds to wait for the player to let go of it first
+HOLD_PRESS = 0.1    # seconds Esc is held for the game, a few of its frames
+KEY_ESC = 1
 
 
 def log(msg):
@@ -163,14 +163,13 @@ def generic_roles(keys, vendor, product, db, name=""):
 
 
 def menu_buttons(keys, vendor, product, driver, db, name=""):
-    """{"guide", "a", "b", "start", "back": key code} on this device, as far
-    as it has them. "back" is Select, in SDL's names.
+    """{"guide", "a", "b": key code} on this device, as far as it has them.
     A pad with a driver of its own names them; a hid-generic one is looked
     up like its Select and Start."""
     if driver == "hid-generic":
         found = generic_roles(keys, vendor, product, db, name)
-        return {r: found[r] for r in ("guide", "a", "b", "start", "back") if r in found}
-    named = {"guide": BTN_MODE, "a": BTN_SOUTH, "b": BTN_EAST, "start": e.BTN_START, "back": e.BTN_SELECT}
+        return {r: found[r] for r in ("guide", "a", "b") if r in found}
+    named = {"guide": BTN_MODE, "a": BTN_SOUTH, "b": BTN_EAST}
     return {r: c for r, c in named.items() if c in keys}
 
 
@@ -183,8 +182,7 @@ class PadNav:
     PUSH, BACK = 0.6, 0.3
 
     def __init__(self, buttons, ranges):
-        commands = {"guide": "close", "a": "select", "b": "back"}
-        self.keys = {c: commands[r] for r, c in buttons.items() if r in commands}
+        self.keys = {c: {"guide": "close", "a": "select", "b": "back"}[r] for r, c in buttons.items()}
         self.ranges = ranges      # {abs code: (min, max)}
         self.pushed = {}          # stick axis -> the direction it's held in
 
@@ -235,7 +233,7 @@ def let_go(held, axes, driver):
 
 def ask_menu(command, path=None):
     """Hand the toast daemon a menu command; its reply ({"open": bool, and
-    "do": "quit", or "resume" to press B to back out of the game's own
+    "do": "quit", or "resume" to press Esc to back out of the game's own
     pause menu}), or {} without one."""
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
@@ -313,22 +311,20 @@ def game_targets():
 
 
 def parse_mode(text):
-    """famidrive-game.menu's "MODE [BUTTON]": (mode, the button that opens
-    the game's pause menu). "pause" and Start when it says nothing else."""
+    """famidrive-game.menu's guideMenu: "freeze" or "pause" ("pause" when
+    it says nothing else)."""
     words = (text or "").split()
-    mode = words[0] if words and words[0] in ("freeze", "pause") else "pause"
-    button = words[1] if len(words) > 1 and words[1] in ("start", "select") else "start"
-    return mode, button
+    return words[0] if words and words[0] in ("freeze", "pause") else "pause"
 
 
 def game_mode():
-    """What the menu does with the running game: its guideMenu and pause
-    button (parse_mode), or ("none", None) with no game, or for Steam's
-    Big Picture and the voice client, which leave a polite way to close
-    them instead (famidrive-game.close) and aren't games."""
+    """What the menu does with the running game: its guideMenu, or "none"
+    with no game, or for Steam's Big Picture and the voice client, which
+    leave a polite way to close them instead (famidrive-game.close) and
+    aren't games."""
     try:
         if not game_targets() or CLOSE_FILE.read_text().strip():
-            return "none", None
+            return "none"
     except OSError:
         pass
     try:
@@ -347,43 +343,40 @@ def freeze_game(on):
     signal_all(targets, signal.SIGSTOP if on else signal.SIGCONT)
 
 
-def press(dev, code, what, wait=0.0, hold=HOLD_PRESS, background=False, still=lambda: True):
-    """Press a button for the game, as if on the pad itself (a "pause"
-    game, a PC one): Start as the menu opens, so the game opens its own
-    pause menu, and B as it closes, to back out of it. Held for a few of
-    the game's frames: a game that reads the pad's state once a frame
-    misses a press and release between two. Freezing a PC game instead
-    stopped it, but showed no pause menu, and that wasn't what was wanted;
-    taking its focus, so it paused itself, left a fullscreen game
-    minimized (first box, 2026-10-13).
+def make_keys():
+    """A virtual keyboard with just Esc, made once, as the session starts,
+    so gamescope has it before it's needed. None without /dev/uinput."""
+    try:
+        return evdev.UInput({EV_KEY: [KEY_ESC]}, name="FamiDrive keys")
+    except Exception as err:   # no uinput access: PC games just aren't paused
+        log(f"no virtual keyboard, so no pausing PC games: {err}")
+        return None
 
-    Not while the player holds the same button: the kernel already has
-    it down, so a press of ours would be dropped, and the player letting
-    go would reach the game as a release with no press. Found on the
-    first box 2026-10-13: closing the menu with B left Cyberpunk's pause
-    menu open. And not once still() says it's no longer wanted (the menu
-    opened again meanwhile: it would get the press itself)."""
+
+def tap_esc(keys, wait=0.0, still=lambda: True):
+    """Esc for a "pause" game (a PC one), on FamiDrive's own keyboard: as
+    the menu opens, for the game's own pause menu, and as it closes, to
+    back out of it. Esc is a PC game's pause and back key, whatever pad it
+    uses (Cyberpunk 2077's pause is Select on a pad, but Esc too). Not a
+    button pressed on the pad itself: the pad's next report of its own
+    buttons undid it within a millisecond, before the game looked. Found
+    on the first box 2026-10-13. Held a few of the game's frames; dropped
+    once still() says it's no longer wanted (the menu opened again)."""
     def go():
         time.sleep(wait)
+        if not keys or not still():
+            return
         try:
-            deadline = time.monotonic() + RELEASE_WAIT
-            while code in dev.active_keys() and time.monotonic() < deadline:
-                time.sleep(0.02)
-            if not still():
-                return
-            dev.write(EV_KEY, code, 1)
-            dev.syn()
-            time.sleep(hold)
-            dev.write(EV_KEY, code, 0)
-            dev.syn()
-            log(f"pressed {what} on {dev.name} for the game")
+            keys.write(EV_KEY, KEY_ESC, 1)
+            keys.syn()
+            time.sleep(HOLD_PRESS)
+            keys.write(EV_KEY, KEY_ESC, 0)
+            keys.syn()
+            log("pressed Esc for the game")
         except OSError as err:
-            log(f"couldn't press {what} on {dev.name}: {err}")
+            log(f"couldn't press Esc: {err}")
 
-    if background:
-        threading.Thread(target=go, daemon=True).start()
-    else:
-        go()
+    threading.Thread(target=go, daemon=True).start()
 
 
 def quit_game():
@@ -451,12 +444,12 @@ def main():
     navs = {}           # fd -> PadNav, or None for a pad whose presses are another's
     drivers = {}        # fd -> its kernel driver
     guides = {}         # fd -> its Guide key code, if it has one
-    buttons_of = {}     # fd -> its menu buttons ({"start", "b", ...: key code})
     frozen = False      # whether the menu stopped the game
     menu = False        # whether the menu is open, and every pad grabbed
     guide_down = set()  # fds whose Guide went down while the menu was closed
     last_scan = 0.0
     db = load_paddb(PADDB)
+    keys = make_keys()
 
     def close_menu():
         nonlocal menu, frozen
@@ -496,7 +489,6 @@ def main():
                     drivers[fd] = driver
                     buttons = menu_buttons(keys, dev.info.vendor, dev.info.product, driver, db, dev.name)
                     guides[fd] = buttons.get("guide")
-                    buttons_of[fd] = buttons
                     ranges = {c: (i.min, i.max) for c, i in dev.capabilities().get(e.EV_ABS, [])}
                     navs[fd] = None if (dev.info.vendor, dev.info.product) == STEAM_VIRTUAL else PadNav(buttons, ranges)
                     names = "+".join(str(e.BTN.get(c) or e.KEY.get(c) or c) for c in sorted(combo))
@@ -530,10 +522,8 @@ def main():
                                 log("menu closed")
                                 if reply.get("do") == "quit":
                                     quit_game()
-                                elif reply.get("do") == "resume" and "b" in buttons_of[fd]:
-                                    # Once the button that closed the menu is let go.
-                                    press(dev, buttons_of[fd]["b"], "B", wait=0.05, background=True,
-                                          still=lambda: not menu)
+                                elif reply.get("do") == "resume":
+                                    tap_esc(keys, still=lambda: not menu)
                     elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 1:
                         guide_down.add(fd)
                     elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 0 and fd in guide_down:
@@ -548,21 +538,18 @@ def main():
                         if ask_menu("open").get("open"):
                             menu = True
                             log("menu opened")
-                            mode, button = game_mode()
-                            # The pause button's role: Select is "back" in SDL's names.
-                            role = {"start": "start", "select": "back"}.get(button)
+                            mode = game_mode()
                             if mode == "freeze":
                                 freeze_game(True)
                                 frozen = True
-                            elif mode == "pause" and role in buttons_of[fd]:
-                                # Before the grab, which would keep it from the game.
-                                press(dev, buttons_of[fd][role], button.capitalize())
+                            elif mode == "pause":
+                                tap_esc(keys)
                             for fd2, dev2 in devices.items():
                                 grab(dev2, drivers[fd2])
             except OSError:
                 # Unplugged, out of range or switched off.
                 log(f"lost {dev.name}")
-                for table in (devices, combos, held, since, navs, drivers, guides, buttons_of):
+                for table in (devices, combos, held, since, navs, drivers, guides):
                     del table[fd]
                 try:
                     dev.close()
