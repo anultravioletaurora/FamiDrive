@@ -82,8 +82,6 @@ TRIGGERS = (ABS_Z, ABS_RZ, ABS_GAS, ABS_BRAKE)
 # are the real pad's again, so they don't move the menu twice.
 STEAM_VIRTUAL = (0x28de, 0x11ff)
 TOAST_SOCK = RUN / "famidrive-toast.sock"
-HOLD_PRESS = 0.1    # seconds Esc is held for the game, a few of its frames
-KEY_ESC = 1
 
 
 def log(msg):
@@ -233,8 +231,7 @@ def let_go(held, axes, driver):
 
 def ask_menu(command, path=None):
     """Hand the toast daemon a menu command; its reply ({"open": bool, and
-    "do": "quit", or "resume" to press Esc to back out of the game's own
-    pause menu}), or {} without one."""
+    "do": "quit" when the player picked Quit game}), or {} without one."""
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
             s.settimeout(2)
@@ -311,10 +308,10 @@ def game_targets():
 
 
 def parse_mode(text):
-    """famidrive-game.menu's guideMenu: "freeze" or "pause" ("pause" when
-    it says nothing else)."""
+    """famidrive-game.menu's guideMenu: "freeze" or "block" ("block" when
+    it says nothing else: never freeze a game that may be online)."""
     words = (text or "").split()
-    return words[0] if words and words[0] in ("freeze", "pause") else "pause"
+    return words[0] if words and words[0] in ("freeze", "block") else "block"
 
 
 def game_mode():
@@ -335,48 +332,15 @@ def game_mode():
 
 def freeze_game(on):
     """Stop the game (SIGSTOP) while the menu is open, and let it go on
-    (SIGCONT) after: an emulator's pause. Found on the first box
-    2026-10-13: Dolphin kept reading a DualShock 4 under the menu, through
-    its hidraw device, which no grab covers; stopped, it reads nothing."""
+    (SIGCONT) after: a "freeze" game's pause (an emulator, an offline PC
+    game). Whatever the game had open, its own pause menu included, stays
+    as it was: FamiDrive can't see a game's menus, and pressing its pause
+    key (tried first, on the first box 2026-10-13) closed one already open.
+    Stopped, it reads no pad either: Dolphin had kept reading a DualShock 4
+    under the menu, through its hidraw device, which no grab covers."""
     targets = game_targets()
     log(("freezing" if on else "thawing") + f" the game ({len(targets)} targets)")
     signal_all(targets, signal.SIGSTOP if on else signal.SIGCONT)
-
-
-def make_keys():
-    """A virtual keyboard with just Esc, made once, as the session starts,
-    so gamescope has it before it's needed. None without /dev/uinput."""
-    try:
-        return evdev.UInput({EV_KEY: [KEY_ESC]}, name="FamiDrive keys")
-    except Exception as err:   # no uinput access: PC games just aren't paused
-        log(f"no virtual keyboard, so no pausing PC games: {err}")
-        return None
-
-
-def tap_esc(keys, wait=0.0, still=lambda: True):
-    """Esc for a "pause" game (a PC one), on FamiDrive's own keyboard: as
-    the menu opens, for the game's own pause menu, and as it closes, to
-    back out of it. Esc is a PC game's pause and back key, whatever pad it
-    uses (Cyberpunk 2077's pause is Select on a pad, but Esc too). Not a
-    button pressed on the pad itself: the pad's next report of its own
-    buttons undid it within a millisecond, before the game looked. Found
-    on the first box 2026-10-13. Held a few of the game's frames; dropped
-    once still() says it's no longer wanted (the menu opened again)."""
-    def go():
-        time.sleep(wait)
-        if not keys or not still():
-            return
-        try:
-            keys.write(EV_KEY, KEY_ESC, 1)
-            keys.syn()
-            time.sleep(HOLD_PRESS)
-            keys.write(EV_KEY, KEY_ESC, 0)
-            keys.syn()
-            log("pressed Esc for the game")
-        except OSError as err:
-            log(f"couldn't press Esc: {err}")
-
-    threading.Thread(target=go, daemon=True).start()
 
 
 def quit_game():
@@ -449,7 +413,6 @@ def main():
     guide_down = set()  # fds whose Guide went down while the menu was closed
     last_scan = 0.0
     db = load_paddb(PADDB)
-    esc_keys = make_keys()   # not "keys": the scan below names each pad's buttons that
 
     def close_menu():
         nonlocal menu, frozen
@@ -522,8 +485,6 @@ def main():
                                 log("menu closed")
                                 if reply.get("do") == "quit":
                                     quit_game()
-                                elif reply.get("do") == "resume":
-                                    tap_esc(esc_keys, still=lambda: not menu)
                     elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 1:
                         guide_down.add(fd)
                     elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 0 and fd in guide_down:
@@ -542,8 +503,6 @@ def main():
                             if mode == "freeze":
                                 freeze_game(True)
                                 frozen = True
-                            elif mode == "pause":
-                                tap_esc(esc_keys)
                             for fd2, dev2 in devices.items():
                                 grab(dev2, drivers[fd2])
             except OSError:

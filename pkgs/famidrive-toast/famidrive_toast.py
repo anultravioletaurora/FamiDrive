@@ -486,13 +486,13 @@ def in_game():
 
 def game_mode():
     """What the Guide menu does with the running game (a system's
-    guideMenu, written by the launch): "freeze" or "pause". "pause" when
+    guideMenu, written by the launch): "freeze" or "block". "block" when
     the launch said nothing."""
     try:
         words = (sock_path().parent / "famidrive-game.menu").read_text().split()
     except OSError:
-        return "pause"
-    return words[0] if words and words[0] in ("freeze", "pause") else "pause"
+        return "block"
+    return words[0] if words and words[0] in ("freeze", "block") else "block"
 
 
 def pausable():
@@ -562,9 +562,8 @@ class Menu:
 
     In a game: Resume, and Quit game, which asks first, since anything not
     saved is lost. Out of one: Close. A "freeze" game (an emulator) is
-    stopped while the menu is open; a "pause" one (a PC game) has Esc
-    pressed as it opens, for its own pause menu, and again as the menu
-    closes ("do": "resume"), unless it closed by quitting."""
+    stopped while the menu is open; a "block" one (an online game) keeps
+    running, with the pads taken from it."""
 
     def __init__(self):
         self.open = False
@@ -572,24 +571,18 @@ class Menu:
         self.items = []
         self.sel = 0
         self.playing = False
-        self.mode, self.note = "pause", ""
+        self.mode, self.note = "block", ""
 
     def _main(self):
         self.view = "main"
         self.items = ["Resume", "Quit game"] if self.playing else ["Close"]
 
-    def command(self, cmd, playing, pausable=True, mode="pause"):
-        reply = self._command(cmd, playing, pausable, mode)
-        if cmd != "open" and not reply["open"] and "do" not in reply and self.playing and self.mode == "pause":
-            reply["do"] = "resume"
-        return reply
-
-    def _command(self, cmd, playing, pausable, mode):
+    def command(self, cmd, playing, pausable=True, mode="block"):
         if cmd == "open":
             self.open, self.sel, self.playing = True, 0, playing
             # Big Picture and the voice client aren't games to pause.
             self.mode = mode if playing and pausable else "none"
-            self.note = "Game paused" if self.mode == "freeze" else ""
+            self.note = {"freeze": "Game paused", "block": "The game keeps running"}.get(self.mode, "")
             self._main()
             return self.state()
         if not self.open:

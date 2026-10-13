@@ -139,35 +139,9 @@ class LetGo(unittest.TestCase):
 class Mode(unittest.TestCase):
     def test_parse(self):
         self.assertEqual(m.parse_mode("freeze\n"), "freeze")
-        self.assertEqual(m.parse_mode("pause\n"), "pause")
-        self.assertEqual(m.parse_mode(""), "pause")
-        self.assertEqual(m.parse_mode("focus\n"), "pause")   # unknown: the safe one
-
-
-class Esc(unittest.TestCase):
-    def keys(self, sent):
-        return type("Keys", (), {"write": lambda self, *ev: sent.append(ev), "syn": lambda self: sent.append("syn")})()
-
-    def wait_for(self, sent, n):
-        import time
-        for _ in range(50):
-            if len(sent) >= n:
-                return
-            time.sleep(0.02)
-
-    def test_tap(self):
-        sent = []
-        m.tap_esc(self.keys(sent))
-        self.wait_for(sent, 4)
-        self.assertEqual(sent, [(m.EV_KEY, m.KEY_ESC, 1), "syn", (m.EV_KEY, m.KEY_ESC, 0), "syn"])
-
-    def test_not_when_no_longer_wanted_or_no_keyboard(self):
-        sent = []
-        m.tap_esc(self.keys(sent), still=lambda: False)
-        m.tap_esc(None)
-        import time
-        time.sleep(0.2)
-        self.assertEqual(sent, [])
+        self.assertEqual(m.parse_mode("block\n"), "block")
+        self.assertEqual(m.parse_mode(""), "block")
+        self.assertEqual(m.parse_mode("pause\n"), "block")   # unknown: the safe one, never frozen
 
 
 class AskMenu(unittest.TestCase):

@@ -1254,6 +1254,24 @@ every player, mods or not.
   }
   ```
 
+### `famidrive.steam.offlineGames`
+
+Steam games, by app id, with nothing online: the Guide menu freezes
+them while it's open, so they're paused, as emulators are. Any other
+Steam game keeps running under the menu, with the pads taken from
+it, since stopping an online game drops it off its server. FamiDrive
+knows some already (Cyberpunk 2077); these are added to them.
+
+- **Type:** list of string
+- **Default:** `[ ]`
+- **Example:** 
+
+  ```nix
+  [
+    "1091500"
+  ]
+  ```
+
 ### `famidrive.steam.steamInput`
 
 Whether Steam Input stands between controllers and Steam games.
@@ -1841,12 +1859,12 @@ The system's name in ES-DE's menu.
 ### `famidrive.systems.<name>.guideMenu`
 
 What the Guide menu does with the game while it's open:
-`freeze` stops it (an emulator: the menu is its pause); `pause`
-presses Esc as the menu opens, for the game's own pause menu,
-and again as it closes, to back out of it (a PC game, which may
-be online and can't be stopped).
+`freeze` stops it, so it's paused, whatever menu of its own was
+open staying as it was (an emulator, an offline game); `block`
+leaves it running and only takes the pads from it (a game that
+may be online, where stopping it would drop it off its server).
 
-- **Type:** one of "freeze", "pause"
+- **Type:** one of "freeze", "block"
 - **Default:** `"freeze"`
 
 ### `famidrive.systems.<name>.platform`

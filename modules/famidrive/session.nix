@@ -300,6 +300,19 @@ in
     '';
   };
 
+  options.famidrive.steam.offlineGames = mkOption {
+    type = types.listOf types.str;
+    default = [ ];
+    example = [ "1091500" ];
+    description = ''
+      Steam games, by app id, with nothing online: the Guide menu freezes
+      them while it's open, so they're paused, as emulators are. Any other
+      Steam game keeps running under the menu, with the pads taken from
+      it, since stopping an online game drops it off its server. FamiDrive
+      knows some already (Cyberpunk 2077); these are added to them.
+    '';
+  };
+
   options.famidrive.steam.playerLaunchOptions = mkOption {
     type = types.attrsOf (types.attrsOf types.str);
     default = { };

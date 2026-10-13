@@ -6,6 +6,9 @@
 let
   inherit (lib) mkOption types;
   cfg = config.famidrive;
+  # Steam games the Guide menu freezes, by app id: FamiDrive's known
+  # offline ones and the host's.
+  offlineGames = lib.unique ((import ./lib/steam-games.nix { inherit lib; }).offline ++ cfg.steam.offlineGames);
   hasLane = l: lib.elem l cfg.lanes;
 
   # The stores Heroic brings: the Desktop entries' extension -> Heroic's
@@ -62,14 +65,14 @@ let
         description = "Shell run just after the command, outside it, even when the player quits with Select + Start.";
       };
       guideMenu = mkOption {
-        type = types.enum [ "freeze" "pause" ];
-        default = "pause";
+        type = types.enum [ "freeze" "block" ];
+        default = "block";
         description = ''
           What the Guide menu does with the game while it's open:
-          `freeze` stops it (an emulator: the menu is its pause); `pause`
-          presses Esc as the menu opens, for the game's own pause menu,
-          and again as it closes, to back out of it (a PC game, which may
-          be online and can't be stopped).
+          `freeze` stops it, so it's paused, whatever menu of its own was
+          open staying as it was (an emulator, an offline game); `block`
+          leaves it running and only takes the pads from it (a game that
+          may be online, where stopping it would drop it off its server).
         '';
       };
     };
@@ -79,7 +82,7 @@ let
   # entry's guideMenu), picked by its extension. The launch has already
   # written the system's own; this replaces it.
   menuByExtension = table:
-    let parts = lib.filterAttrs (_: p: p.guideMenu != "pause") table;
+    let parts = lib.filterAttrs (_: p: p.guideMenu != "block") table;
     in lib.optionalString (parts != { }) ''
       case "$ROM" in
       ${lib.concatStrings (lib.mapAttrsToList (ext: p: ''
@@ -209,14 +212,14 @@ let
         description = "Pull each game's save from RomM before it starts and push it back after.";
       };
       guideMenu = mkOption {
-        type = types.enum [ "freeze" "pause" ];
+        type = types.enum [ "freeze" "block" ];
         default = "freeze";
         description = ''
           What the Guide menu does with the game while it's open:
-          `freeze` stops it (an emulator: the menu is its pause); `pause`
-          presses Esc as the menu opens, for the game's own pause menu,
-          and again as it closes, to back out of it (a PC game, which may
-          be online and can't be stopped).
+          `freeze` stops it, so it's paused, whatever menu of its own was
+          open staying as it was (an emulator, an offline game); `block`
+          leaves it running and only takes the pads from it (a game that
+          may be online, where stopping it would drop it off its server).
         '';
       };
       # Per-emulator layout mapping is still an open question (roms.md
@@ -663,8 +666,14 @@ in
           # -applaunch returns at once; gamescope-fg --steam waits for the game.
           command = ''${pkgs.gamescope-fg}/bin/gamescope-fg --steam "$(cat "$ROM")"'';
           theme = "steam";
-          # Many Steam games are online, and can't be stopped.
-          guideMenu = "pause";
+          # Many Steam games are online, and stopping one drops it off its
+          # server: only games known to be offline (offlineGames) freeze.
+          guideMenu = "block";
+          before = lib.optionalString (offlineGames != [ ]) ''
+            case "$(cat "$ROM")" in
+              ${lib.concatStringsSep "|" offlineGames}) echo freeze > "''${XDG_RUNTIME_DIR:-/tmp/famidrive-$(id -u)}/famidrive-game.menu" ;;
+            esac
+          '';
         };
       })
       (lib.mkIf (cfg.desktop != { }) {
@@ -673,7 +682,7 @@ in
           theme = "desktop";   # Art Book Next's desktop art
           extensions = lib.attrNames cfg.desktop;
           command = byExtension cfg.desktop "command";
-          guideMenu = "pause";
+          guideMenu = "block";
           before = menuByExtension cfg.desktop + byExtension cfg.desktop "before";
           after = byExtension cfg.desktop "after";
         };
@@ -684,7 +693,7 @@ in
           theme = "ports";   # Art Book Next's ports art
           extensions = lib.attrNames cfg.ports;
           command = byExtension cfg.ports "command";
-          guideMenu = "pause";
+          guideMenu = "block";
           before = menuByExtension cfg.ports + byExtension cfg.ports "before";
           after = byExtension cfg.ports "after";
         };

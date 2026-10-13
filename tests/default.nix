@@ -529,9 +529,10 @@ in
       (check "each player's background Steam gets FamiDrive's Steam settings (Guide isn't Steam's) before it starts"
         (lib.all (u: lib.hasInfix "famidrive-steam-background-settings"
           c.home-manager.users.${u}.systemd.user.services.famidrive-steam-background.Service.ExecStartPre) [ "alice" "bob" ]))
-      (check "the Guide menu freezes emulators, and opens Steam's and Desktop games' own pause menus"
-        (c.famidrive.systems.gc.guideMenu == "freeze" && c.famidrive.systems.steam.guideMenu == "pause"
-          && c.famidrive.systems.desktop.guideMenu == "pause"))
+      (check "the Guide menu freezes emulators and offline Steam games (Cyberpunk 2077), and only blocks the rest"
+        (c.famidrive.systems.gc.guideMenu == "freeze" && c.famidrive.systems.steam.guideMenu == "block"
+          && c.famidrive.systems.desktop.guideMenu == "block"
+          && lib.hasInfix "1091500) echo freeze > " c.famidrive.systems.steam.before))
       (check "a host's own cleanup choice wins" (c.nix.gc.options == "--delete-older-than 30d"))
       (check "Thunderstore mods are each player's own: BepInEx loads only in their Steam, Valheim's and Risk of Rain 2's known"
         (lib.hasInfix "famidrive-thunderstore" c.home-manager.users.alice.home.activation.famidriveThunderstore.data
