@@ -449,7 +449,7 @@ def main():
     guide_down = set()  # fds whose Guide went down while the menu was closed
     last_scan = 0.0
     db = load_paddb(PADDB)
-    keys = make_keys()
+    esc_keys = make_keys()   # not "keys": the scan below names each pad's buttons that
 
     def close_menu():
         nonlocal menu, frozen
@@ -523,7 +523,7 @@ def main():
                                 if reply.get("do") == "quit":
                                     quit_game()
                                 elif reply.get("do") == "resume":
-                                    tap_esc(keys, still=lambda: not menu)
+                                    tap_esc(esc_keys, still=lambda: not menu)
                     elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 1:
                         guide_down.add(fd)
                     elif ev.type == e.EV_KEY and ev.code == guides[fd] and ev.value == 0 and fd in guide_down:
@@ -543,7 +543,7 @@ def main():
                                 freeze_game(True)
                                 frozen = True
                             elif mode == "pause":
-                                tap_esc(keys)
+                                tap_esc(esc_keys)
                             for fd2, dev2 in devices.items():
                                 grab(dev2, drivers[fd2])
             except OSError:
