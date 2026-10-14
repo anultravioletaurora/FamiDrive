@@ -136,6 +136,51 @@ writeShellApplication {
       done
     }
 
+    # follow_modal ID: show a Wine app's modal dialog. The dialog is a
+    # top-level window of its own, not transient for its owner, and Wine
+    # disables the owner (WS_DISABLED in _WINE_HWND_STYLE) while it's up.
+    # gamescope shows one window per app id and still picked the disabled
+    # owner. Found on the first box 2026-10-14: Battle.net's install and
+    # game settings dialogs took the d-pad but never came on screen
+    # (#221). So while the window gamescope shows for ID is disabled, name
+    # an enabled one of ID's in GAMESCOPECTRL_BASELAYER_WINDOW, the way
+    # Steam picks a window, and take it off again once that window closes
+    # or something else (voice chat) is on top.
+    pinned=""
+    unpin() {
+      [ -n "$pinned" ] || return 0
+      xprop -root -remove GAMESCOPECTRL_BASELAYER_WINDOW 2>/dev/null || true
+      pinned=""
+    }
+    disabled() {
+      local style
+      style=$(xprop -id "$1" _WINE_HWND_STYLE 2>/dev/null | awk '/= / { print $3 }' || true)
+      [ -n "$style" ] && [ $(( style & 0x08000000 )) -ne 0 ]
+    }
+    follow_modal() {
+      local top focused wid info
+      top=$(xprop -root GAMESCOPECTRL_BASELAYER_APPID 2>/dev/null | awk '/= / { sub(",", "", $3); print $3 }' || true)
+      if [ "$top" != "$1" ]; then unpin; return 0; fi
+      if [ -n "$pinned" ] && ! xwininfo -id "$pinned" 2>/dev/null | grep -q IsViewable; then unpin; fi
+      focused=$(xprop -root GAMESCOPE_FOCUSED_WINDOW 2>/dev/null | awk '/= / { print $3 }' || true)
+      [ -n "$focused" ] && [ "$focused" != 0 ] || return 0
+      xprop -id "$focused" STEAM_GAME 2>/dev/null | grep -q "= $1$" || return 0
+      disabled "$focused" || return 0
+      for wid in $(windows); do
+        [ $(( wid )) -ne "$focused" ] || continue
+        xprop -id "$wid" STEAM_GAME 2>/dev/null | grep -q "= $1$" || continue
+        xprop -id "$wid" _WINE_HWND_STYLE 2>/dev/null | grep -q "= " || continue
+        disabled "$wid" && continue
+        info=$(xwininfo -id "$wid" 2>/dev/null || true)
+        grep -q IsViewable <<< "$info" || continue
+        grep -q "Override Redirect State: yes" <<< "$info" && continue
+        grep -qE "Width: 1$" <<< "$info" && continue
+        xprop -root -f GAMESCOPECTRL_BASELAYER_WINDOW 32c -set GAMESCOPECTRL_BASELAYER_WINDOW "$(( wid ))" 2>/dev/null || true
+        pinned="$wid"
+        return 0
+      done
+    }
+
     if [ "''${1:-}" = "--frontend" ]; then
       shift
       setsid "$@" &
@@ -559,8 +604,10 @@ writeShellApplication {
     # (Dolphin's render window comes after its main one).
     while kill -0 "$pid" 2>/dev/null; do
       tag_session "$GAME" "$pid"
+      follow_modal "$GAME"
       sleep 0.5
     done
+    unpin
     # The tree file too: a quit kills a Steam launch's script (in this
     # group) before it can clean up after itself.
     rm -f "$run/famidrive-game.pgid" "$run/famidrive-game.tree"
