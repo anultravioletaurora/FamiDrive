@@ -700,7 +700,13 @@ in
       (check "Lutris gets the GE-Proton Steam and Heroic have, pinned for umu, so a game's still in Sniper's container"
         (let a = c.home-manager.users.bob.home.activation.famidriveLutrisProton.data; in
           lib.hasInfix "GE-Proton-FamiDrive" a && lib.hasInfix "system.env.PROTONPATH" a
-            && lib.hasInfix "FAMIDRIVE_PROTON_GE" a))
+            && lib.hasInfix "FAMIDRIVE_PROTON_GE" a
+            # Wine's own "ge-proton" sentinel must give way to "custom" with
+            # umu-run itself as the path, or Lutris's wine runner resets
+            # PROTONPATH to its own "fetch latest" sentinel before the pin
+            # above is ever read.
+            && lib.hasInfix "wine.version = \"custom\"" a
+            && lib.hasInfix "umu-launcher" a && lib.hasInfix "bin/umu-run" a))
       (check "Heroic and Lutris are in Settings, for sign-in and installs"
         (lib.hasInfix "Heroic Games Launcher.setting" c.home-manager.users.alice.home.activation.famidriveSettings.data
           && lib.hasInfix "Lutris.setting" c.home-manager.users.alice.home.activation.famidriveSettings.data
