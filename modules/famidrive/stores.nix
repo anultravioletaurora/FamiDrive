@@ -38,20 +38,35 @@ let
 
   lutrisStores = cfg.launchers.lutris;
 
-  # umu-launcher's own bin/umu-run (umu-launcher = unstable.umu-launcher
-  # in flake.nix's overlay) shebangs nixpkgs-unstable's bash (5.3p15, as
-  # pinned 2026-10-14). That bash aborts with a stack-smashing failure
-  # during its own dynamic-linker startup (SIGABRT, lutris.log's exit
-  # 134) whenever it's run nested inside Lutris's own FHS/bwrap sandbox,
-  # which every custom_wine_path below runs inside - found on the first
-  # box 2026-10-14, installing Battle.net, with every other bash on the
-  # box (the release's, 5.3p9) running fine in that same nested sandbox
-  # throughout the same session. Running the very same umu-run script
-  # under the release's bash instead avoids it, with nothing else
-  # changed: the script's own logic (building and running its own
-  # nested bwrap for umu's Steam Runtime container) is untouched, only
-  # which bash parses and execs it is.
+  # umu-run is a bash script (nixpkgs-unstable's, as umu-launcher =
+  # unstable.umu-launcher pins it in flake.nix's overlay), and it
+  # crashes before running a single line of itself - bash aborts with a
+  # stack-smashing failure during its own dynamic-linker startup
+  # (SIGABRT, lutris.log's exit 134) - every time Lutris's wine runner
+  # (wine.py, get_env()) execs it, on both the installer's set_regedit
+  # step and the actual .exe launch. Lutris's own create_prefix never
+  # hits it: it skips get_env() and builds its environment from
+  # scratch. #211 found one contributing cause, on the first box
+  # 2026-10-13: get_env()'s LD_LIBRARY_PATH is built for the FHS
+  # sandbox's 32-bit/legacy compat libs, an older bundled glibc among
+  # them, ahead of the sandbox's own glibc in the search path - and
+  # LD_LIBRARY_PATH beats a binary's own DT_RUNPATH, so bash loads that
+  # older libc.so.6 instead of the one it's actually linked against.
+  # Dropping LD_LIBRARY_PATH before re-exec'ing didn't fully clear it,
+  # though: found on the first box 2026-10-14, still installing
+  # Battle.net, coredumpctl's backtrace named the exact bash binary
+  # that aborted - nixpkgs-unstable's (5.3p15, pinned alongside
+  # umu-launcher/Heroic/GE-Proton), never the release's own (5.3p9,
+  # running throughout that same nested bwrap sandbox all session with
+  # no issue). Running the very same umu-run script, byte for byte,
+  # under the release's bash instead (its own shebang ignored, the way
+  # "bash script args" always does) avoids it outright, on top of the
+  # LD_LIBRARY_PATH fix, which still matters for whatever umu-run execs
+  # after it starts (Proton, Wine). Named umu-run itself (not just a
+  # wrapper with its own name): is_umu_path() (proton.py) only matches
+  # a path whose last segment is literally "umu-run".
   umuRun = pkgs.writeShellScriptBin "umu-run" ''
+    unset LD_LIBRARY_PATH
     exec ${pkgs.bash}/bin/bash ${pkgs.umu-launcher}/bin/umu-run "$@"
   '';
 
@@ -67,30 +82,6 @@ let
     export GDK_SCALE=${toString gdkScale}
     export GDK_DPI_SCALE=${toString (scale / gdkScale)}
     exec ${pkgs.lutris}/bin/lutris "$@"
-  '';
-
-  # Lutris's wine runner (wine.py, get_env()) hands umu-run an
-  # LD_LIBRARY_PATH built for the FHS sandbox's 32-bit/legacy compat libs
-  # (its Lutris Runtime dirs, an older bundled glibc among them) - fine for
-  # a Windows exe loaded by Proton, but umu-run's own launcher is a bash
-  # script, and that glibc entry comes before the sandbox's real one in the
-  # search path. On the first box, 2026-10-13 (#205): that's enough for
-  # bash itself (linked against the sandbox's own, newer glibc) to load the
-  # wrong libc.so.6 and abort during its own startup (SIGABRT, exit 134),
-  # before umu-run runs a single line - on both the installer's set_regedit
-  # step and the actual Battle.net-Setup.exe launch, every time. Lutris's
-  # own create_prefix doesn't go through get_env() and builds its
-  # environment from scratch, which is why prefix creation alone always
-  # worked. Dropping LD_LIBRARY_PATH before re-exec'ing the real umu-run
-  # sidesteps it: umu-run and Proton set up whatever they need themselves
-  # once running, the same as they already do for create_prefix. Named
-  # umu-run itself (not just a wrapper with its own name): Lutris's
-  # is_umu_path() (proton.py) only matches a path whose last segment is
-  # literally "umu-run", and several of its umu/Proton code paths are
-  # gated on that check.
-  umuRun = pkgs.writeShellScriptBin "umu-run" ''
-    unset LD_LIBRARY_PATH
-    exec ${pkgs.umu-launcher}/bin/umu-run "$@"
   '';
 in
 {
