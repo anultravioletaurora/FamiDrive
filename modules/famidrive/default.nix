@@ -316,6 +316,11 @@ in
     # Steam, the Xbox controller driver and others are unfree.
     nixpkgs.config.allowUnfree = true;
 
+    # Every box, for troubleshooting and editing sops secrets from the
+    # console: an editor, fastfetch for a quick look at the hardware, and
+    # the tools famidrive's own packages are built on.
+    environment.systemPackages = with pkgs; [ python3 fastfetch sops curl wget nano vim git ];
+
     # Newest stable kernel (Decided 2026-10-05): display and GPU support
     # moves fast (HDMI 2.1 for AMD landed in 7.2), and the kernel is cheap to
     # roll back from the boot menu. A host can still pin its own.
