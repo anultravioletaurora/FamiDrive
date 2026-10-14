@@ -42,6 +42,20 @@ STATE = Path.home() / ".local/share/famidrive/steam-launch-options.json"
 STEAM_TOOLS = re.compile(r"^(Proton|Steam Linux Runtime|Steamworks Common Redistributables)\b")
 
 
+# CompatToolMapping's priorities, as Steam writes them: 250 for a tool
+# forced on one game, 75 for "all other titles" (app id "0"). Valve's own
+# mappings, like Steam Linux Runtime for a native game, are 90, so the
+# default has to stay under them, not just under a game's pin. Found on
+# the first box 2026-10-13: with "0" at 250, GE-Proton outranked them
+# all. Steam treated native games and its own Steam Linux Runtime 4.0 as
+# Windows apps, swapped their depots, and left the runtime with none,
+# deleting its files. Every Proton built on it (GE-Proton 11, Proton
+# Experimental) then failed to launch with AppError_51 (compat_log.txt:
+# "Steam Linux Runtime 4.0" unsupported version 0).
+GAME_PRIORITY = "250"
+DEFAULT_PRIORITY = "75"
+
+
 def log(msg):
     print(f"famidrive-steam-config: {msg}", file=sys.stderr)
 
@@ -137,7 +151,7 @@ def set_compat_tools(wanted):
         new += [f'{ind}"{appid}"', f"{ind}{{",
                 f'{ind}\t"name"\t\t"{tool}"',
                 f'{ind}\t"config"\t\t""',
-                f'{ind}\t"priority"\t\t"250"',
+                f'{ind}\t"priority"\t\t"{DEFAULT_PRIORITY if appid == "0" else GAME_PRIORITY}"',
                 f"{ind}}}"]
     vdf.lines[head + 2:head + 2] = new
     vdf.save()
