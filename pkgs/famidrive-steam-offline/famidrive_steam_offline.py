@@ -22,8 +22,7 @@ import struct
 import sys
 from pathlib import Path
 
-APPINFO = Path(os.environ.get("FAMIDRIVE_STEAM_APPINFO")
-               or Path.home() / ".local/share/Steam/appcache/appinfo.vdf")
+APPINFO = Path(os.environ.get("FAMIDRIVE_STEAM_APPINFO") or Path.home() / ".local/share/Steam/appcache/appinfo.vdf")
 
 V28, V29 = 0x07564428, 0x07564429
 
