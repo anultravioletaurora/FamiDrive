@@ -129,27 +129,34 @@ in
           }}
         '';
 
-        # Lutris's own default Wine for a game with nothing configured is
-        # its "ge-proton" sentinel, run through umu-run; Battle.net's
-        # installer (Call of Duty: Black Ops Cold War, #205) aborted under
-        # it (exit 134, lutris.log). The GE-Proton Steam and Heroic already
-        # get (proton-ge-bin, emulators.nix) is a real Wine build with no
-        # umu layer, so it's Lutris's default too, the same way
-        # famidriveHeroicProton does for Heroic: only where nothing already
-        # works, so a player's own choice of Wine build stands.
-        home.activation.famidriveLutrisWine = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-          wine_conf="$HOME/.local/share/lutris/runners/wine.yml"
+        # Lutris's own default Wine is its "ge-proton" sentinel (0.5.22+),
+        # which runs through umu-run inside Steam's Sniper runtime
+        # container (pressure-vessel) - the same sandbox BattlEye's and
+        # Easy Anti-Cheat's Linux support check for, so games that need
+        # them still work, same as through Steam or Heroic (a plain Wine
+        # build, with no container, wouldn't pass that check). With no
+        # PROTONPATH, umu fetches its own idea of "latest" GE-Proton over
+        # the network the first time a game runs; Battle.net's installer
+        # aborted under whatever it fetched (exit 134, lutris.log, #205).
+        # Pointing PROTONPATH at the GE-Proton Steam and Heroic already
+        # have instead keeps every launcher on the same pinned build, with
+        # no fetch: a stable symlink, refreshed every activation (so
+        # bumping the pin here reaches Lutris with no further edit), the
+        # same way famidriveHeroicProton does it for Heroic.
+        home.activation.famidriveLutrisProton = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+          lutris_dir="$HOME/.local/share/lutris"
           if [ -d "$HOME/.config/lutris" ]; then
-            wine_conf="$HOME/.config/lutris/runners/wine.yml"
+            lutris_dir="$HOME/.config/lutris"
           fi
-          mkdir -p "$(dirname "$wine_conf")"
-          touch "$wine_conf"
-          version=$(${pkgs.yq-go}/bin/yq '.wine.version' "$wine_conf" 2>/dev/null || echo "null")
-          custom_path=$(${pkgs.yq-go}/bin/yq '.wine.custom_wine_path' "$wine_conf" 2>/dev/null || echo "null")
-          if [ "$version" = "null" ] || [ "$version" = "ge-proton" ] \
-            || { [ "$version" = "custom" ] && { [ "$custom_path" = "null" ] || [ ! -e "$custom_path" ]; }; }; then
-            ${pkgs.yq-go}/bin/yq -i ${lib.escapeShellArg ''.wine.version = "custom" | .wine.custom_wine_path = "${pkgs.proton-ge-bin.steamcompattool}/files/bin/wine64"''} "$wine_conf" \
-              || echo "famidrive: couldn't set Lutris's default Wine" >&2
+          mkdir -p "$lutris_dir"
+          ln -sfn ${pkgs.proton-ge-bin.steamcompattool} "$lutris_dir/GE-Proton-FamiDrive"
+          sys_conf="$lutris_dir/system.yml"
+          touch "$sys_conf"
+          current=$(${pkgs.yq-go}/bin/yq '.system.env.PROTONPATH' "$sys_conf" 2>/dev/null || echo "null")
+          if [ "$current" = "null" ] || [ ! -e "$current" ]; then
+            export FAMIDRIVE_PROTON_GE="$lutris_dir/GE-Proton-FamiDrive"
+            ${pkgs.yq-go}/bin/yq -i '.system.env.PROTONPATH = strenv(FAMIDRIVE_PROTON_GE)' "$sys_conf" \
+              || echo "famidrive: couldn't set Lutris's default Proton" >&2
           fi
         '';
       };
