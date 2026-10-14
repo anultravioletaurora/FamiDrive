@@ -38,6 +38,23 @@ let
 
   lutrisStores = cfg.launchers.lutris;
 
+  # umu-launcher's own bin/umu-run (umu-launcher = unstable.umu-launcher
+  # in flake.nix's overlay) shebangs nixpkgs-unstable's bash (5.3p15, as
+  # pinned 2026-10-14). That bash aborts with a stack-smashing failure
+  # during its own dynamic-linker startup (SIGABRT, lutris.log's exit
+  # 134) whenever it's run nested inside Lutris's own FHS/bwrap sandbox,
+  # which every custom_wine_path below runs inside - found on the first
+  # box 2026-10-14, installing Battle.net, with every other bash on the
+  # box (the release's, 5.3p9) running fine in that same nested sandbox
+  # throughout the same session. Running the very same umu-run script
+  # under the release's bash instead avoids it, with nothing else
+  # changed: the script's own logic (building and running its own
+  # nested bwrap for umu's Steam Runtime container) is untouched, only
+  # which bash parses and execs it is.
+  umuRun = pkgs.writeShellScriptBin "umu-run" ''
+    exec ${pkgs.bash}/bin/bash ${pkgs.umu-launcher}/bin/umu-run "$@"
+  '';
+
   # Lutris is GTK 3, which only scales by whole numbers (GDK_SCALE): the
   # nearest one to display.scale, as Plymouth's, with text then sized
   # to display.scale exactly (GDK_DPI_SCALE). At 1.5: widgets and icons
@@ -154,7 +171,9 @@ in
         # Sniper container entirely) sidesteps that: Lutris still treats it
         # as an umu path (is_umu_path() matches on the filename alone) and
         # runs it the same way, but no longer overwrites PROTONPATH first,
-        # so the pin from system.yml below sticks.
+        # so the pin from system.yml below sticks. umuRun (above) is that
+        # same umu-run, run under a bash that doesn't crash nested in
+        # Lutris's sandbox.
         home.activation.famidriveLutrisProton = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           lutris_dir="$HOME/.local/share/lutris"
           if [ -d "$HOME/.config/lutris" ]; then
@@ -170,7 +189,7 @@ in
           custom_path=$(${pkgs.yq-go}/bin/yq '.wine.custom_wine_path' "$wine_conf" 2>/dev/null || echo "null")
           if [ "$version" = "null" ] || [ "$version" = "ge-proton" ] \
             || { [ "$version" = "custom" ] && { [ "$custom_path" = "null" ] || [ ! -e "$custom_path" ]; }; }; then
-            ${pkgs.yq-go}/bin/yq -i ${lib.escapeShellArg ''.wine.version = "custom" | .wine.custom_wine_path = "${pkgs.umu-launcher}/bin/umu-run"''} "$wine_conf" \
+            ${pkgs.yq-go}/bin/yq -i ${lib.escapeShellArg ''.wine.version = "custom" | .wine.custom_wine_path = "${umuRun}/bin/umu-run"''} "$wine_conf" \
               || echo "famidrive: couldn't set Lutris's default Wine" >&2
           fi
 
