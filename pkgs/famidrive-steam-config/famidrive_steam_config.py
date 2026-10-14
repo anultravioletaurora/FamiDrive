@@ -5,6 +5,9 @@ Writes FamiDrive's Steam settings into Steam's own config files:
 - compatTools: {game: tool}, the per-game Proton choice ("Force the use of
   a specific Steam Play compatibility tool"), into config.vdf's
   CompatToolMapping. A game is a name (as Steam shows it) or an app id.
+  App id "0" is Steam's own id for "Enable Steam Play for all other
+  titles" (famidrive.steam.protonDefault): every other entry is a pin for
+  one real game and wins over it.
 - steamInput: false turns Steam Input off for every installed game (the
   per-game "Disable Steam Input"), in each Steam user's localconfig.vdf,
   except the games in steamInputGames (names or app ids), which get it on.

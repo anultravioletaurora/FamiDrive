@@ -697,6 +697,10 @@ in
         (let a = c.home-manager.users.bob.home.activation.famidriveLutris.data; in
           lib.hasInfix "services gog True" a && lib.hasInfix "services battlenet True" a
             && lib.hasInfix "services egs False" a && lib.hasInfix "services steam False" a))
+      (check "Lutris gets the GE-Proton Steam and Heroic have, pinned for umu, so a game's still in Sniper's container"
+        (let a = c.home-manager.users.bob.home.activation.famidriveLutrisProton.data; in
+          lib.hasInfix "GE-Proton-FamiDrive" a && lib.hasInfix "system.env.PROTONPATH" a
+            && lib.hasInfix "FAMIDRIVE_PROTON_GE" a))
       (check "Heroic and Lutris are in Settings, for sign-in and installs"
         (lib.hasInfix "Heroic Games Launcher.setting" c.home-manager.users.alice.home.activation.famidriveSettings.data
           && lib.hasInfix "Lutris.setting" c.home-manager.users.alice.home.activation.famidriveSettings.data

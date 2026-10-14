@@ -1277,6 +1277,23 @@ knows some already (Cyberpunk 2077); these are added to them.
   ]
   ```
 
+### `famidrive.steam.protonDefault`
+
+Steam's "Enable Steam Play for all other titles" default
+compatibility tool (`compatTools`' app id `"0"`): every installed
+game without its own pin in `compatTools` runs under this one,
+instead of Steam's own per-title choice (often Proton Experimental,
+sometimes an older pinned Proton). The default is GloriousEggroll's
+GE-Proton, the same build Heroic gets.
+
+A game that needs Valve's own Proton specifically still gets it
+from its own pin (`compatTools.<game> = "proton_experimental";`),
+which wins over this default. `null` leaves Steam's own choice of
+compatibility tool alone for every game that has no pin.
+
+- **Type:** null or string
+- **Default:** `"GE-Proton"`
+
 ### `famidrive.steam.steamInput`
 
 Whether Steam Input stands between controllers and Steam games.

@@ -20,7 +20,12 @@ let
   # (by app id) over the box's. A box entry by the same game's name is
   # dropped, or both would reach the tool and the name's would win.
   steamSettings = own: lib.escapeShellArg (builtins.toJSON {
-    inherit (cfg.steam) compatTools steamInput steamInputGames;
+    inherit (cfg.steam) steamInput steamInputGames;
+    # "0" is Steam's own app id for "Enable Steam Play for all other
+    # titles"; a compatTools pin for a real game wins over it, same as
+    # in Steam's own UI.
+    compatTools = lib.optionalAttrs (cfg.steam.protonDefault != null) { "0" = cfg.steam.protonDefault; }
+      // cfg.steam.compatTools;
     # Guide is FamiDrive's menu (pkgs/famidrive-quit), not Steam's.
     guideFocusesSteam = false;
     launchOptions = lib.filterAttrs
@@ -272,6 +277,24 @@ in
       their pin at the start of each session, before Steam starts; other
       games keep whatever Steam was told. Names of games that aren't
       installed yet are skipped until they are.
+    '';
+  };
+
+  options.famidrive.steam.protonDefault = mkOption {
+    type = types.nullOr types.str;
+    default = "GE-Proton";
+    description = ''
+      Steam's "Enable Steam Play for all other titles" default
+      compatibility tool (`compatTools`' app id `"0"`): every installed
+      game without its own pin in `compatTools` runs under this one,
+      instead of Steam's own per-title choice (often Proton Experimental,
+      sometimes an older pinned Proton). The default is GloriousEggroll's
+      GE-Proton, the same build Heroic gets.
+
+      A game that needs Valve's own Proton specifically still gets it
+      from its own pin (`compatTools.<game> = "proton_experimental";`),
+      which wins over this default. `null` leaves Steam's own choice of
+      compatibility tool alone for every game that has no pin.
     '';
   };
 
