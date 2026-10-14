@@ -51,6 +51,30 @@ let
     export GDK_DPI_SCALE=${toString (scale / gdkScale)}
     exec ${pkgs.lutris}/bin/lutris "$@"
   '';
+
+  # Lutris's wine runner (wine.py, get_env()) hands umu-run an
+  # LD_LIBRARY_PATH built for the FHS sandbox's 32-bit/legacy compat libs
+  # (its Lutris Runtime dirs, an older bundled glibc among them) - fine for
+  # a Windows exe loaded by Proton, but umu-run's own launcher is a bash
+  # script, and that glibc entry comes before the sandbox's real one in the
+  # search path. On the first box, 2026-10-13 (#205): that's enough for
+  # bash itself (linked against the sandbox's own, newer glibc) to load the
+  # wrong libc.so.6 and abort during its own startup (SIGABRT, exit 134),
+  # before umu-run runs a single line - on both the installer's set_regedit
+  # step and the actual Battle.net-Setup.exe launch, every time. Lutris's
+  # own create_prefix doesn't go through get_env() and builds its
+  # environment from scratch, which is why prefix creation alone always
+  # worked. Dropping LD_LIBRARY_PATH before re-exec'ing the real umu-run
+  # sidesteps it: umu-run and Proton set up whatever they need themselves
+  # once running, the same as they already do for create_prefix. Named
+  # umu-run itself (not just a wrapper with its own name): Lutris's
+  # is_umu_path() (proton.py) only matches a path whose last segment is
+  # literally "umu-run", and several of its umu/Proton code paths are
+  # gated on that check.
+  umuRun = pkgs.writeShellScriptBin "umu-run" ''
+    unset LD_LIBRARY_PATH
+    exec ${pkgs.umu-launcher}/bin/umu-run "$@"
+  '';
 in
 {
   options.famidrive.stores = {
@@ -170,7 +194,7 @@ in
           custom_path=$(${pkgs.yq-go}/bin/yq '.wine.custom_wine_path' "$wine_conf" 2>/dev/null || echo "null")
           if [ "$version" = "null" ] || [ "$version" = "ge-proton" ] \
             || { [ "$version" = "custom" ] && { [ "$custom_path" = "null" ] || [ ! -e "$custom_path" ]; }; }; then
-            ${pkgs.yq-go}/bin/yq -i ${lib.escapeShellArg ''.wine.version = "custom" | .wine.custom_wine_path = "${pkgs.umu-launcher}/bin/umu-run"''} "$wine_conf" \
+            ${pkgs.yq-go}/bin/yq -i ${lib.escapeShellArg ''.wine.version = "custom" | .wine.custom_wine_path = "${umuRun}/bin/umu-run"''} "$wine_conf" \
               || echo "famidrive: couldn't set Lutris's default Wine" >&2
           fi
 
