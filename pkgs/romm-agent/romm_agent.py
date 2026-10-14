@@ -389,6 +389,15 @@ def fetch_rom(s, rom, system):
             # RomM's ROM list sends `files` empty; the ROM's own page has
             # them. Found on the first box 2026-10-06.
             files = get(s, EP_ROM.format(id=rom["id"])).json().get("files") or []
+        exts = {e.lower() for e in CFG["systems"][system].get("extensions", [])}
+        if not rom.get("fs_extension") and len(files) > 1 and exts \
+                and not any(Path(f.get("file_name") or "").suffix.lower() in exts for f in files):
+            # A folder with no game in it: a mod's files on their own. The
+            # whole folder came down as a zip under the game's name, which
+            # ES-DE can't list, and again every pull, since a zip's size is
+            # never RomM's. Found on the first box 2026-10-13: Animal
+            # Crossing: City Folk Deluxe, a Riivolution mod for the disc.
+            raise RuntimeError("RomM has no game file for it (no file ES-DE lists for this system)")
         main = main_file(rom, files) if not rom.get("fs_extension") else None
         params = None
         size = rom.get("fs_size_bytes")
