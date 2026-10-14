@@ -143,6 +143,18 @@ in
         # no fetch: a stable symlink, refreshed every activation (so
         # bumping the pin here reaches Lutris with no further edit), the
         # same way famidriveHeroicProton does it for Heroic.
+        #
+        # That alone isn't enough, though: as long as Wine's "version" is
+        # still the "ge-proton" sentinel, Lutris's own wine runner
+        # (wine.py, get_env()) sets PROTONPATH to the literal string
+        # "GE-Proton" - umu's own "fetch latest" sentinel - unconditionally,
+        # before our value is even considered, undoing the pin. Pointing
+        # "version" at "custom" with custom_wine_path set to umu-run itself
+        # (not a raw wine/wine64 binary, which would skip umu and the
+        # Sniper container entirely) sidesteps that: Lutris still treats it
+        # as an umu path (is_umu_path() matches on the filename alone) and
+        # runs it the same way, but no longer overwrites PROTONPATH first,
+        # so the pin from system.yml below sticks.
         home.activation.famidriveLutrisProton = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           lutris_dir="$HOME/.local/share/lutris"
           if [ -d "$HOME/.config/lutris" ]; then
@@ -150,6 +162,18 @@ in
           fi
           mkdir -p "$lutris_dir"
           ln -sfn ${pkgs.proton-ge-bin.steamcompattool} "$lutris_dir/GE-Proton-FamiDrive"
+
+          wine_conf="$lutris_dir/runners/wine.yml"
+          mkdir -p "$(dirname "$wine_conf")"
+          touch "$wine_conf"
+          version=$(${pkgs.yq-go}/bin/yq '.wine.version' "$wine_conf" 2>/dev/null || echo "null")
+          custom_path=$(${pkgs.yq-go}/bin/yq '.wine.custom_wine_path' "$wine_conf" 2>/dev/null || echo "null")
+          if [ "$version" = "null" ] || [ "$version" = "ge-proton" ] \
+            || { [ "$version" = "custom" ] && { [ "$custom_path" = "null" ] || [ ! -e "$custom_path" ]; }; }; then
+            ${pkgs.yq-go}/bin/yq -i ${lib.escapeShellArg ''.wine.version = "custom" | .wine.custom_wine_path = "${pkgs.umu-launcher}/bin/umu-run"''} "$wine_conf" \
+              || echo "famidrive: couldn't set Lutris's default Wine" >&2
+          fi
+
           sys_conf="$lutris_dir/system.yml"
           touch "$sys_conf"
           current=$(${pkgs.yq-go}/bin/yq '.system.env.PROTONPATH' "$sys_conf" 2>/dev/null || echo "null")
