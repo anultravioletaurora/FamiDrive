@@ -128,6 +128,30 @@ in
               // { steam = "False"; };
           }}
         '';
+
+        # Lutris's own default Wine for a game with nothing configured is
+        # its "ge-proton" sentinel, run through umu-run; Battle.net's
+        # installer (Call of Duty: Black Ops Cold War, #205) aborted under
+        # it (exit 134, lutris.log). The GE-Proton Steam and Heroic already
+        # get (proton-ge-bin, emulators.nix) is a real Wine build with no
+        # umu layer, so it's Lutris's default too, the same way
+        # famidriveHeroicProton does for Heroic: only where nothing already
+        # works, so a player's own choice of Wine build stands.
+        home.activation.famidriveLutrisWine = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+          wine_conf="$HOME/.local/share/lutris/runners/wine.yml"
+          if [ -d "$HOME/.config/lutris" ]; then
+            wine_conf="$HOME/.config/lutris/runners/wine.yml"
+          fi
+          mkdir -p "$(dirname "$wine_conf")"
+          touch "$wine_conf"
+          version=$(${pkgs.yq-go}/bin/yq '.wine.version' "$wine_conf" 2>/dev/null || echo "null")
+          custom_path=$(${pkgs.yq-go}/bin/yq '.wine.custom_wine_path' "$wine_conf" 2>/dev/null || echo "null")
+          if [ "$version" = "null" ] || [ "$version" = "ge-proton" ] \
+            || { [ "$version" = "custom" ] && { [ "$custom_path" = "null" ] || [ ! -e "$custom_path" ]; }; }; then
+            ${pkgs.yq-go}/bin/yq -i ${lib.escapeShellArg ''.wine.version = "custom" | .wine.custom_wine_path = "${pkgs.proton-ge-bin.steamcompattool}/files/bin/wine64"''} "$wine_conf" \
+              || echo "famidrive: couldn't set Lutris's default Wine" >&2
+          fi
+        '';
       };
     })
   ];

@@ -697,6 +697,10 @@ in
         (let a = c.home-manager.users.bob.home.activation.famidriveLutris.data; in
           lib.hasInfix "services gog True" a && lib.hasInfix "services battlenet True" a
             && lib.hasInfix "services egs False" a && lib.hasInfix "services steam False" a))
+      (check "Lutris gets the GE-Proton Steam and Heroic have, as its default Wine when it has none"
+        (let a = c.home-manager.users.bob.home.activation.famidriveLutrisWine.data; in
+          lib.hasInfix "proton-ge-bin" a && lib.hasInfix "files/bin/wine64" a
+            && lib.hasInfix ''version = "custom"'' a && lib.hasInfix ''version" = "ge-proton"'' a))
       (check "Heroic and Lutris are in Settings, for sign-in and installs"
         (lib.hasInfix "Heroic Games Launcher.setting" c.home-manager.users.alice.home.activation.famidriveSettings.data
           && lib.hasInfix "Lutris.setting" c.home-manager.users.alice.home.activation.famidriveSettings.data
