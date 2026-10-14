@@ -202,8 +202,13 @@ in
           touch "$wine_conf"
           version=$(${pkgs.yq-go}/bin/yq '.wine.version' "$wine_conf" 2>/dev/null || echo "null")
           custom_path=$(${pkgs.yq-go}/bin/yq '.wine.custom_wine_path' "$wine_conf" 2>/dev/null || echo "null")
+          # custom_path is content-addressed (umuRun), so a FamiDrive fix
+          # to it (#211, #215) is a new store path that always exists, not
+          # a missing one: re-point whenever it's still famidrive's own
+          # (named "umu-run"), not a player's real custom Wine.
           if [ "$version" = "null" ] || [ "$version" = "ge-proton" ] \
-            || { [ "$version" = "custom" ] && { [ "$custom_path" = "null" ] || [ ! -e "$custom_path" ]; }; }; then
+            || { [ "$version" = "custom" ] && { [ "$custom_path" = "null" ] || [ ! -e "$custom_path" ] \
+                 || [ "$(basename "$custom_path")" = "umu-run" ]; }; }; then
             ${pkgs.yq-go}/bin/yq -i ${lib.escapeShellArg ''.wine.version = "custom" | .wine.custom_wine_path = "${umuRun}/bin/umu-run"''} "$wine_conf" \
               || echo "famidrive: couldn't set Lutris's default Wine" >&2
           fi
