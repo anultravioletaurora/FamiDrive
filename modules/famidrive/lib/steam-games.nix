@@ -26,6 +26,12 @@ let
       modded = ''WINEDLLOVERRIDES="winmm,version=n,b"'';
       offline = true;
     };
+    "1172380" = {
+      name = "STAR WARS Jedi: Fallen Order™";
+      # Single-player only. Found on the first box 2026-10-14: the Guide
+      # menu let it run on underneath ("The game keeps running").
+      offline = true;
+    };
     "892970" = {
       name = "Valheim";
       # Its Linux build, through BepInExPack's own start script.

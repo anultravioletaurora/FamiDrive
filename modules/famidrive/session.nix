@@ -332,7 +332,8 @@ in
       them while it's open, so they're paused, as emulators are. Any other
       Steam game keeps running under the menu, with the pads taken from
       it, since stopping an online game drops it off its server. FamiDrive
-      knows some already (Cyberpunk 2077); these are added to them.
+      knows some already (Cyberpunk 2077, STAR WARS Jedi: Fallen Order™);
+      these are added to them.
     '';
   };
 
