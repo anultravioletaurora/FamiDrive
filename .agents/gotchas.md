@@ -312,6 +312,29 @@ See [CONTROLLERS.md](../docs/CONTROLLERS.md) for per-controller results.
   Add-ons from outside Kodi's repository ask to be enabled once on
   Kodi's first start.
 
+## Lutris
+
+- **Lutris itself is a `buildFHSEnv` package** (its own bubblewrap
+  sandbox, `lutris-<version>-fhsenv`), and so is nixpkgs'
+  `umu-launcher` (`umu-launcher-<version>-bwrap`, a separate, nested
+  sandbox). Found on the first box 2026-10-14, installing Battle.net
+  through Lutris: `custom_wine_path` pointed at `umu-launcher`'s own
+  `bin/umu-run`, whose shebang is nixpkgs-unstable's bash (pinned for
+  umu-launcher/Heroic/GE-Proton in flake.nix's overlay). That bash
+  aborted with a stack-smashing failure during its own dynamic-linker
+  startup (SIGABRT, lutris.log's exit 134) every time, nested inside
+  Lutris's sandbox - 100% reproducible through a real install, 0%
+  reproducible replaying the exact same env vars outside any sandbox.
+  The release's own bash (also present throughout the same nested
+  sandbox, used by everything else there) never crashed. The fix
+  (`stores.nix`'s `umuRun`) runs the very same `umu-run` script, byte
+  for byte, under the release's bash instead - `bash umu-run args`
+  ignores whatever shebang the script already has - with nothing else
+  about it changed.
+- **`is_umu_path()` (Lutris's wine runner) matches `custom_wine_path` by
+  filename alone** (`umu-run`), not by store path, so a FamiDrive-built
+  wrapper has to keep that exact name to still be treated as umu.
+
 ## The box
 
 - **A full system disk:** Steam's download queue filled the first box's

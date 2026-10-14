@@ -706,8 +706,9 @@ in
             # PROTONPATH to its own "fetch latest" sentinel before the pin
             # above is ever read. That path is famidrive's own wrapper
             # (named "umu-run" so Lutris's is_umu_path() still matches),
-            # which drops a stale LD_LIBRARY_PATH before re-exec'ing the
-            # real umu-run (#205).
+            # which drops a stale LD_LIBRARY_PATH and runs the real umu-run
+            # under a bash that doesn't crash nested in Lutris's sandbox
+            # (#211, #215).
             && lib.hasInfix "wine.version = \"custom\"" a
             && lib.hasInfix "custom_wine_path" a && lib.hasInfix "bin/umu-run" a))
       (check "Heroic and Lutris are in Settings, for sign-in and installs"
