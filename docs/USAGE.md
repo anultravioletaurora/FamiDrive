@@ -1261,11 +1261,14 @@ every player, mods or not.
 
 ### `famidrive.steam.offlineGames`
 
-Steam games, by app id, with nothing online: the Guide menu freezes
-them while it's open, so they're paused, as emulators are. Any other
-Steam game keeps running under the menu, with the pads taken from
-it, since stopping an online game drops it off its server. FamiDrive
-knows some already (Cyberpunk 2077); these are added to them.
+Steam games, by app id, that the Guide menu freezes while it's open,
+so they're paused, as emulators are. Without this, Steam's own
+labels decide: a game marked Single-player and none of the
+multiplayer kinds (Multi-player, Co-op, Online PvP, Shared/Split
+Screen…) is frozen, and any other keeps running under the menu,
+with the pads taken from it, since stopping an online game drops it
+off its server. For a game whose multiplayer is only on the couch,
+such as Cuphead, which Steam marks Multi-player.
 
 - **Type:** list of string
 - **Default:** `[ ]`
@@ -1273,9 +1276,18 @@ knows some already (Cyberpunk 2077); these are added to them.
 
   ```nix
   [
-    "1091500"
+    "268910"
   ]
   ```
+
+### `famidrive.steam.onlineGames`
+
+Steam games, by app id, that keep running under the Guide menu even
+though Steam marks them Single-player only, for one that's online
+anyway.
+
+- **Type:** list of string
+- **Default:** `[ ]`
 
 ### `famidrive.steam.protonDefault`
 

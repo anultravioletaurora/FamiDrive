@@ -82,6 +82,8 @@ let
     famidrive = {
       enable = true;
       lanes = [ "roms" "steam" "stores" "minecraft" ];
+      steam.offlineGames = [ "570" ];        # Dota 2, as if Steam's labels were wrong
+      steam.onlineGames = [ "1091500" "1172380" ];
       players = {
         alice.romm.tokenFile = "/run/secrets/alice-token";
         alice.thunderstore.games = {
@@ -171,6 +173,7 @@ in
     (pkgs.python3.withPackages (ps: [ ps.requests ps.cryptography ]));
   thunderstore = unit "thunderstore" ../pkgs/famidrive-thunderstore/famidrive_thunderstore.py pkgs.python3;
   steam-config = unit "steam_config" ../pkgs/famidrive-steam-config/famidrive_steam_config.py pkgs.python3;
+  steam-offline = unit "steam_offline" ../pkgs/famidrive-steam-offline/famidrive_steam_offline.py pkgs.python3;
   clonehero = unit "clonehero" ../pkgs/famidrive-clonehero/famidrive_clonehero.py pkgs.python3;
   kodi = unit "kodi" ../pkgs/famidrive-kodi/famidrive_kodi.py pkgs.python3;
   prism = unit "prism" ../pkgs/famidrive-prism/famidrive_prism.py pkgs.python3;
@@ -538,10 +541,13 @@ in
       (check "no background Steam for a player who's never signed in to it here (it would hear Guide)"
         (lib.all (u: lib.hasInfix "famidrive-steam-signed-in"
           c.home-manager.users.${u}.systemd.user.services.famidrive-steam-background.Service.ExecCondition) [ "alice" "bob" ]))
-      (check "the Guide menu freezes emulators and offline Steam games (Cyberpunk 2077), and only blocks the rest"
-        (c.famidrive.systems.gc.guideMenu == "freeze" && c.famidrive.systems.steam.guideMenu == "block"
+      (check "the Guide menu freezes emulators and Steam games Steam marks single-player only, a host's lists first, and only blocks the rest"
+        (let b = c.famidrive.systems.steam.before; in
+          c.famidrive.systems.gc.guideMenu == "freeze" && c.famidrive.systems.steam.guideMenu == "block"
           && c.famidrive.systems.desktop.guideMenu == "block"
-          && lib.hasInfix "1091500) echo freeze > " c.famidrive.systems.steam.before))
+          && lib.hasInfix "1091500|1172380) : ;;" b && lib.hasInfix "570) echo freeze > " b
+          && lib.hasInfix "*) if famidrive-steam-offline \"$steam_app\"; then echo freeze > " b
+          && lib.any (p: lib.getName p == "famidrive-steam-offline") c.environment.systemPackages))
       (check "a host's own cleanup choice wins" (c.nix.gc.options == "--delete-older-than 30d"))
       (check "Thunderstore mods are each player's own: BepInEx loads only in their Steam, Valheim's and Risk of Rain 2's known"
         (lib.hasInfix "famidrive-thunderstore" c.home-manager.users.alice.home.activation.famidriveThunderstore.data

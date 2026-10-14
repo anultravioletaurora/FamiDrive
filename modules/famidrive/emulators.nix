@@ -6,9 +6,6 @@
 let
   inherit (lib) mkOption types;
   cfg = config.famidrive;
-  # Steam games the Guide menu freezes, by app id: FamiDrive's known
-  # offline ones and the host's.
-  offlineGames = lib.unique ((import ./lib/steam-games.nix { inherit lib; }).offline ++ cfg.steam.offlineGames);
   hasLane = l: lib.elem l cfg.lanes;
 
   # The stores Heroic runs on this box (stores.nix): each one's entries'
@@ -700,13 +697,22 @@ in
           command = ''${pkgs.gamescope-fg}/bin/gamescope-fg --steam "$(cat "$ROM")"'';
           theme = "steam";
           # Many Steam games are online, and stopping one drops it off its
-          # server: only games known to be offline (offlineGames) freeze.
+          # server: only games Steam marks single-player only freeze
+          # (famidrive-steam-offline), and the host's offlineGames;
+          # onlineGames never do. By name, from PATH: a fix to the tool
+          # then doesn't restart the TV (box-testing.md).
           guideMenu = "block";
-          before = lib.optionalString (offlineGames != [ ]) ''
-            case "$(cat "$ROM")" in
-              ${lib.concatStringsSep "|" offlineGames}) echo freeze > "''${XDG_RUNTIME_DIR:-/tmp/famidrive-$(id -u)}/famidrive-game.menu" ;;
-            esac
-          '';
+          before =
+            let
+              freeze = ''echo freeze > "''${XDG_RUNTIME_DIR:-/tmp/famidrive-$(id -u)}/famidrive-game.menu"'';
+              listed = games: what: lib.optionalString (games != [ ])
+                "  ${lib.concatStringsSep "|" games}) ${what} ;;\n";
+            in ''
+              steam_app=$(cat "$ROM")
+              case "$steam_app" in
+              ${listed cfg.steam.onlineGames ":"}${listed cfg.steam.offlineGames freeze}  *) if famidrive-steam-offline "$steam_app"; then ${freeze}; fi ;;
+              esac
+            '';
         };
       })
       (lib.mkIf (heroicStores ? epic) {
@@ -767,6 +773,7 @@ in
 
     environment.systemPackages =
       lib.optionals heroic [ pkgs.heroic ]
+      ++ lib.optionals (hasLane "steam") [ pkgs.famidrive-steam-offline ]
       ++ lib.optionals (hasLane "minecraft") [ pkgs.prismlauncher ];
 
     # Desktop was Ports until 2026-10-10. Each module writes its own entry
