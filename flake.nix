@@ -63,8 +63,15 @@
         # Lutris runs Windows games through umu and GE-Proton, its default
         # ("ge-proton", which umu downloads), and finds umu only on PATH
         # (lutris/util/wine/proton.py, 0.5.23). nixpkgs' Lutris doesn't
-        # bring it.
-        lutris = prev.lutris.override { extraPkgs = _: [ final.umu-launcher ]; };
+        # bring it. The patch lets add-on installers (Black Ops Cold War
+        # on top of Battle.net) run with the "custom" Wine stores.nix
+        # sets; found on the first box 2026-10-14.
+        lutris = prev.lutris.override {
+          extraPkgs = _: [ final.umu-launcher ];
+          lutris-unwrapped = prev.lutris-unwrapped.overridePythonAttrs (old: {
+            patches = (old.patches or [ ]) ++ [ ./pkgs/lutris/custom-wine-addons.patch ];
+          });
+        };
 
         es-de = final.callPackage ./pkgs/es-de { };
         tcli = final.callPackage ./pkgs/tcli { };

@@ -1,0 +1,19 @@
+An add-on install script (one with "requires:", like Black Ops Cold War
+on top of Battle.net) takes its Wine version from the game it requires.
+FamiDrive sets that to "custom" (stores.nix), and get_wine_path() then
+asks for the "custom" path with no config to read it from:
+"Custom wine paths are only supported when a configuration is
+available." Let "custom" fall through to the runner-config branch
+below, which passes the config. Same code on Lutris master, 2026-10-14.
+
+--- a/lutris/installer/commands.py
++++ b/lutris/installer/commands.py
+@@ -35,7 +35,7 @@
+         None if the wine exe can't be located."""
+         runner = self.get_runner_class(self.installer.runner)()
+         version = runner.get_installer_runner_version(self.installer, use_runner_config=False)
+-        if version:
++        if version and version != "custom":
+             wine_path = get_wine_path_for_version(version)
+             return wine_path
+ 
