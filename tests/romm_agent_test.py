@@ -256,6 +256,20 @@ class Test(unittest.TestCase):
         self.assertEqual(got, [("/roms/186/content/Animal Crossing.ciso", "Animal Crossing.ciso", "ccc", 31,
                                 {"file_ids": 189})])
 
+    def test_a_folder_with_no_game_is_skipped(self):
+        # A mod's files on their own, with no disc image: nothing to fetch.
+        box = Box(self.base, "library", tokenFile=None)
+        a = box.agent()
+        got = []
+        a["fetch_rom"].__globals__["download"] = lambda s, path, dest, *rest, **kw: got.append(dest)
+        files = [{"id": 1, "file_name": "item.arc", "sha1_hash": "aaa", "file_size_bytes": 90},
+                 {"id": 2, "file_name": "deluxe.xml", "sha1_hash": "bbb", "file_size_bytes": 3}]
+        rom = {"id": 2892, "fs_name": "City Folk Deluxe", "fs_extension": "", "has_multiple_files": False,
+               "has_nested_single_file": False, "sha1_hash": "", "fs_size_bytes": 93, "files": files}
+        with self.assertRaisesRegex(RuntimeError, "no game file"):
+            a["fetch_rom"](None, rom, "gc")
+        self.assertEqual(got, [])
+
     def test_hex_id_kept_from_an_earlier_pull_is_fixed(self):
         a = Box(self.base, "alice").agent()
         a["title_id"].__globals__["derive_id"] = lambda system, path: "GP7E01"
