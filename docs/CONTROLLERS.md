@@ -22,6 +22,15 @@ yet is listed below as ❔ until someone does.
 - ❔ **Untested**.
 - — **Doesn't apply** (for example, Wii Remotes in Steam games).
 
+**Steam games and Steam Input:** FamiDrive lets each game read the pad
+itself, the way every emulator does, and keeps Steam Input off by default
+(`famidrive.steam.steamInput`). Steam Input is a tool for when it's
+needed, not for every game. It puts one more layer between the pad and
+the game, and most games' own controller support works fine without it.
+A game whose own support is missing or broken, such as Valve's older
+games, gets Steam Input on its own through `famidrive.steam.steamInputGames`.
+The Steam results below are with Steam Input off unless they say so.
+
 ## At a glance
 
 | Controller | Connection | ES-DE menus | RetroArch | Dolphin (GameCube) | Dolphin (Wii) | Eden (Switch) | Steam games | Rumble | Select + Start quits |

@@ -185,6 +185,14 @@ the exact commands.
   Clone Hero's settings.ini): use `lib/seed.nix`. `seed` writes a file
   only if it's missing. `lockKeys` resets just the keys FamiDrive owns
   and leaves everything else to the app.
+- **Steam Input is for when it's needed, not for every game.** A game's
+  own controller support comes first. Steam Input is one more layer
+  between the pad and the game, so it's off by default
+  (`famidrive.steam.steamInput`). A game gets it through
+  `steamInputGames` only when its own support is missing or broken,
+  such as Valve's older games. When a pad stops working in a Steam game,
+  find out why the game's own support fails before reaching for Steam
+  Input. Turning it on can hide the cause.
 - **Shared library disk:**
   - `dataDir` belongs to the `famidrive-library` user and the `famidrive`
     group.
