@@ -210,6 +210,18 @@ Found against RomM 5.3:
   (`steam -silent`) with the session's environment (copy it from the
   ES-DE wrapper's `/proc/<pid>/environ`), or games launched later miss
   gamescope's variables.
+- **`CompatToolMapping` priorities matter.** A game's own forced tool is
+  250, Valve's mappings (Steam Linux Runtime for a native game) are 90,
+  and "all other titles" (app id `"0"`) is 75. A `"0"` above 90 wins
+  over Valve's too. Steam then treats native games and its own runtimes
+  as Windows apps and swaps their depots. Steam Linux Runtime 4.0 has
+  only a Linux depot, so its files get deleted while its manifest still
+  says "Fully Installed". Every Proton built on it then fails with
+  `AppError_51`. `compat_log.txt` shows `"Steam Linux Runtime 4.0"
+  unsupported version 0`, and `content_log.txt` shows `removed depots`.
+  To fix it, remove `appmanifest_4183110.acf` and
+  `common/SteamLinuxRuntime_4` with Steam closed, and Steam reinstalls
+  it. Found on the first box 2026-10-13 (#209, #212).
 - **GTA V on Steam is two apps:** Legacy (271590) and Enhanced (3240220),
   each with its own install folder.
 

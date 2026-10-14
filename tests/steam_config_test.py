@@ -107,6 +107,15 @@ class Test(unittest.TestCase):
         self.assertNotIn("proton_9", text)
         self.assertTrue(self.config.with_name("config.vdf.famidrive-backup").exists())
 
+    def test_default_tool_ranks_below_a_games_pin(self):
+        self.run_settings({"compatTools": {"0": "GE-Proton", "Rocket League": "proton_experimental"}})
+        text = self.config.read_text()
+        default, game = self.block(text, "0"), self.block(text, "252950")
+        self.assertIn('"name"\t\t"GE-Proton"', default)
+        self.assertIn('"priority"\t\t"75"', default)
+        self.assertIn('"name"\t\t"proton_experimental"', game)
+        self.assertIn('"priority"\t\t"250"', game)
+
     def test_steam_input_off_except_listed(self):
         self.run_settings({"steamInput": False, "steamInputGames": ["Left 4 Dead 2"]})
         text = self.local.read_text()
