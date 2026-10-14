@@ -34,6 +34,16 @@ let
   });
   hasLane = l: lib.elem l cfg.lanes;
 
+  # True once this player has signed in to Steam on this box: Steam makes
+  # userdata/<account>/config/localconfig.vdf at the first sign-in, and
+  # that's where famidrive-steam-config turns Guide off.
+  steamSignedIn = pkgs.writeShellScript "famidrive-steam-signed-in" ''
+    for f in "$HOME"/.local/share/Steam/userdata/*/config/localconfig.vdf; do
+      [ -e "$f" ] && exit 0
+    done
+    exit 1
+  '';
+
   picker = lib.length (lib.attrNames cfg.allPlayers) > 1;
 
   # Players with MangoHud's performance overlay on (overlays.nix).
@@ -107,7 +117,17 @@ let
       # Start Steam hidden up front. Otherwise the first `steam -applaunch`
       # brings up Steam's own client windows, which then fight the game
       # for gamescope's single focused window.
-      SDL_GAMECONTROLLER_IGNORE_DEVICES="$FAMIDRIVE_STEAM_SDL_IGNORE" steam -silent &
+      #
+      # Only once this player has signed in to Steam, though: before that
+      # there's no localconfig.vdf to turn "Guide Button Focuses Steam"
+      # off in, and a Steam with nobody signed in still hears the pads.
+      # Found on the second box 2026-10-14: Guide opened FamiDrive's menu,
+      # then Big Picture came up over it. Signing in goes through Steam
+      # Settings (gamescope-fg starts Steam for it), and the next session
+      # has the file.
+      if ${steamSignedIn}; then
+        SDL_GAMECONTROLLER_IGNORE_DEVICES="$FAMIDRIVE_STEAM_SDL_IGNORE" steam -silent &
+      fi
     ''}
     ${lib.optionalString (config.famidrive.esde.theme != null) ''
       # The Steam launch status screen draws in the theme's fonts.
@@ -547,6 +567,11 @@ in
           Install.WantedBy = [ "default.target" ];
           Service = {
             Environment = "PATH=/run/current-system/sw/bin:/run/wrappers/bin";
+            # Not for a player who's never signed in to Steam here: it would
+            # only sit at the sign-in screen, and react to Guide on the TV's
+            # pads (see the session's own Steam, above). famidrive-end-session
+            # starts it again when the session they sign in from ends.
+            ExecCondition = toString steamSignedIn;
             # The same Steam settings the session writes, before this Steam
             # starts too. Found on the first box 2026-10-13: another
             # player's background Steam still had "Guide Button Focuses
