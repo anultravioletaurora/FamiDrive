@@ -704,9 +704,12 @@ in
             # Wine's own "ge-proton" sentinel must give way to "custom" with
             # umu-run itself as the path, or Lutris's wine runner resets
             # PROTONPATH to its own "fetch latest" sentinel before the pin
-            # above is ever read.
+            # above is ever read. That path is famidrive's own wrapper
+            # (named "umu-run" so Lutris's is_umu_path() still matches),
+            # which drops a stale LD_LIBRARY_PATH before re-exec'ing the
+            # real umu-run (#205).
             && lib.hasInfix "wine.version = \"custom\"" a
-            && lib.hasInfix "umu-launcher" a && lib.hasInfix "bin/umu-run" a))
+            && lib.hasInfix "custom_wine_path" a && lib.hasInfix "bin/umu-run" a))
       (check "Heroic and Lutris are in Settings, for sign-in and installs"
         (lib.hasInfix "Heroic Games Launcher.setting" c.home-manager.users.alice.home.activation.famidriveSettings.data
           && lib.hasInfix "Lutris.setting" c.home-manager.users.alice.home.activation.famidriveSettings.data
