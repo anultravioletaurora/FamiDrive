@@ -185,6 +185,15 @@ the exact commands.
   Clone Hero's settings.ini): use `lib/seed.nix`. `seed` writes a file
   only if it's missing. `lockKeys` resets just the keys FamiDrive owns
   and leaves everything else to the app.
+- **An app not made for a controller** (a launcher, a store, a dialog)
+  gets one in this order:
+  1. The app's own controller support, if it has any.
+  2. Directional navigation: the d-pad moves focus between the app's
+     controls (arrow keys, Tab), A presses the focused one and B goes
+     back. Battle.net works this way, and it's comfortable on the couch.
+  3. Only when there's no keyboard focus to move: a pointer, as
+     famidrive-padmouse gives Steam's prompts. The stick moves it and A
+     clicks.
 - **Steam Input is for when it's needed, not for every game.** A game's
   own controller support comes first. Steam Input is one more layer
   between the pad and the game, so it's off by default
