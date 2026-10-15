@@ -196,6 +196,19 @@ class Test(unittest.TestCase):
         self.assertEqual(self.lutris_games()["Overwatch 2"]["installed"], 1)
         self.assertEqual(len(self.lutris_games()), 4)
 
+    def test_installed_says_whether_lutris_has_battlenet(self):
+        def run():
+            return subprocess.run([sys.executable, str(SCRIPT), "installed", str(self.lutris)],
+                                  env={**os.environ, "HOME": str(self.root)}).returncode
+        self.assertEqual(run(), 0)
+        con = sqlite3.connect(self.lutris / "pga.db")
+        con.execute("UPDATE games SET installed = 0 WHERE id = 1")   # uninstalled in Lutris
+        con.commit()
+        con.close()
+        self.assertEqual(run(), 1)
+        (self.lutris / "pga.db").unlink()   # Lutris never opened
+        self.assertEqual(run(), 1)
+
     def test_nothing_before_battlenet_has_run(self):
         before = self.lutris_games()
         self.run_games()

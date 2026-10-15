@@ -1,0 +1,79 @@
+# Battle.net, for "Install Battle.net" in the Lutris system (lutris -i).
+# Lutris's own installer for it (lutris.net, battlenet-standard, revised
+# 2025-07-05), kept here so a change on lutris.net can't break it: the
+# first box installed Battle.net with it on 2026-10-14. Changed: no
+# DXVK_HUD (it shows shader compiles on the TV), and the wording.
+# Wine is FamiDrive's (stores.nix sets Lutris's default to umu).
+name: Battle.net
+game_slug: battlenet
+version: Standard
+slug: battlenet-standard
+runner: wine
+year: 1996
+script:
+  files:
+  - setup:
+      filename: Battle.net-Setup.exe
+      url: https://www.battle.net/download/getInstallerForGame?os=win&version=LIVE&gameProgram=BATTLENET_APP
+  game:
+    arch: win64
+    exe: drive_c/Program Files (x86)/Battle.net/Battle.net Launcher.exe
+    prefix: $GAMEDIR
+  installer:
+  - task:
+      arch: win64
+      description: Making a Windows folder for Battle.net
+      name: create_prefix
+      prefix: $GAMEDIR
+  - task:
+      arch: win64
+      key: backend
+      name: set_regedit
+      path: HKEY_CURRENT_USER\Software\Wine\DXVA2
+      prefix: $GAMEDIR
+      value: va
+  - write_json:
+      data:
+        Client:
+          GameLaunchWindowBehavior: '2'
+          GameSearch:
+            BackgroundSearch: 'true'
+          HardwareAcceleration: 'false'
+          Install:
+            DownloadLimitNextPatchInBps: '0'
+          Sound:
+            Enabled: 'false'
+          Streaming:
+            StreamingEnabled: 'false'
+        Games:
+          s2:
+            AdditionalLaunchArguments: -Displaymode 1
+      description: Battle.net's settings for a TV
+      file: $GAMEDIR/drive_c/users/$USER/AppData/Roaming/Battle.net/Battle.net.config
+  - task:
+      description: |-
+        Installing Battle.net
+
+        When Battle.net's sign-in window shows, close it without signing
+        in. You'll sign in the first time you start Battle.net from the
+        Lutris system.
+      executable: setup
+      name: wineexec
+      prefix: $GAMEDIR
+  - task:
+      name: winekill
+      prefix: $GAMEDIR
+  system:
+    env:
+      DXVK_STATE_CACHE_PATH: $GAMEDIR
+      STAGING_SHARED_MEMORY: 1
+      __GL_SHADER_DISK_CACHE: 1
+      __GL_SHADER_DISK_CACHE_PATH: $GAMEDIR
+      __GL_SHADER_DISK_CACHE_SKIP_CLEANUP: 1
+    exclude_processes: Agent.exe "Battle.net Helper.exe"
+  wine:
+    battleye: false
+    eac: false
+    fsr: false
+    overrides:
+      locationapi: d

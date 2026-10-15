@@ -1,5 +1,6 @@
 """famidrive-battlenet play LUTRIS_DATA_DIR GAME_ID
 famidrive-battlenet games LUTRIS_DATA_DIR
+famidrive-battlenet installed LUTRIS_DATA_DIR
 
 play runs beside a Lutris launch and puts the player in a Battle.net game
 instead of Battle.net's page for it.
@@ -37,6 +38,9 @@ An entry made here goes when Battle.net no longer lists its game, as an
 uninstalled game (Lutris keeps those, and FamiDrive doesn't show them).
 A game that already has an entry, from a Lutris installer, gets no
 second one.
+
+installed says (its exit status) whether Lutris has Battle.net: the
+Lutris system shows "Install Battle.net" until it does.
 """
 
 import json
@@ -262,15 +266,7 @@ def games(lutris_dir, clock=time.time):
         with con:
             rows = con.execute("SELECT id, slug, installer_slug, configpath, installed FROM games").fetchall()
             config = {r[0]: ((load_config(configs / f"{r[3]}.yml") or {}) if r[3] else {}) for r in rows}
-            # Battle.net itself, in each prefix it's installed in: an entry
-            # that starts Battle.net and no game.
-            apps = {}
-            for i, slug, installer, path, installed in rows:
-                game = config[i].get("game") or {}
-                exe = Path(str(game.get("exe") or "").replace("\\", "/")).name.lower()
-                if installed and game.get("prefix") and exe in ("battle.net.exe", "battle.net launcher.exe") \
-                        and not exec_code(str(game.get("args") or "")):
-                    apps.setdefault(Path(game["prefix"]).resolve(), (installer, config[i]))
+            apps = battlenet_apps(rows, config)
             for prefix, (app_installer, app_config) in apps.items():
                 found = installed_by_battlenet(prefix)
                 if found is None:
@@ -302,6 +298,38 @@ def games(lutris_dir, clock=time.time):
         con.close()
 
 
+def battlenet_apps(rows, config):
+    """{prefix: (installer_slug, config)}: Battle.net itself, in each prefix
+    it's installed in, an entry that starts Battle.net and no game."""
+    apps = {}
+    for i, slug, installer, path, installed in rows:
+        game = config[i].get("game") or {}
+        exe = Path(str(game.get("exe") or "").replace("\\", "/")).name.lower()
+        if installed and game.get("prefix") and exe in ("battle.net.exe", "battle.net launcher.exe") \
+                and not exec_code(str(game.get("args") or "")):
+            apps.setdefault(Path(game["prefix"]).resolve(), (installer, config[i]))
+    return apps
+
+
+def installed(lutris_dir):
+    """Whether Lutris has Battle.net installed (unknown counts as yes, so
+    the install entry doesn't come back while Lutris writes its database)."""
+    db = lutris_dir / "pga.db"
+    if not db.exists():
+        return False
+    configs = game_configs(lutris_dir)
+    try:
+        con = sqlite3.connect(f"{db.as_uri()}?mode=ro", uri=True, timeout=10)
+        try:
+            rows = con.execute("SELECT id, slug, installer_slug, configpath, installed FROM games").fetchall()
+        finally:
+            con.close()
+    except sqlite3.Error:
+        return True
+    config = {r[0]: ((load_config(configs / f"{r[3]}.yml") or {}) if r[3] else {}) for r in rows}
+    return bool(battlenet_apps(rows, config))
+
+
 def add(con, configs, prefix, code, name, app_installer, app_config, clock):
     """A Lutris entry like the one Lutris's installer for the game makes
     (Black Ops Cold War's, on the first box 2026-10-15): Battle.net's
@@ -331,11 +359,13 @@ def add(con, configs, prefix, code, name, app_installer, app_config, clock):
 
 
 def main():
-    usage = "usage: famidrive-battlenet play LUTRIS_DATA_DIR GAME_ID | games LUTRIS_DATA_DIR"
+    usage = "usage: famidrive-battlenet play LUTRIS_DATA_DIR GAME_ID | games|installed LUTRIS_DATA_DIR"
     if len(sys.argv) == 4 and sys.argv[1] == "play":
         play(Path(sys.argv[2]), sys.argv[3])
     elif len(sys.argv) == 3 and sys.argv[1] == "games":
         games(Path(sys.argv[2]))
+    elif len(sys.argv) == 3 and sys.argv[1] == "installed":
+        sys.exit(0 if installed(Path(sys.argv[2])) else 1)
     else:
         sys.exit(usage)
 

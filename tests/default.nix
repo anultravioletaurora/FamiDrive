@@ -694,6 +694,10 @@ in
           && lib.hasInfix "gamescope-fg --launcher \"$ROM\"" c.famidrive.systems.lutris.command
           && lib.hasInfix "lutris:rungameid/" c.famidrive.systems.lutris.command
           && lib.hasInfix "/bin/famidrive-battlenet play \"$HOME/.local/share/lutris\"" c.famidrive.systems.lutris.command))
+      (check "Install Battle.net is in the Lutris system until Lutris has Battle.net, and runs FamiDrive's installer"
+        (lib.hasInfix "famidrive-generate launcher \"$HOME/.local/share/famidrive/roms/lutris\" \"Install Battle.net\" battlenet-install" c.famidrive.sessionSetup
+          && lib.hasInfix "/bin/famidrive-battlenet installed \"$HOME/.local/share/lutris\"" c.famidrive.sessionSetup
+          && lib.hasInfix "-battlenet.yml" c.famidrive.systems.lutris.command))
       (check "a game installed from Battle.net gets a Lutris entry after Lutris closes"
         (lib.hasInfix "/bin/famidrive-battlenet games \"$HOME/.local/share/lutris\"" c.famidrive.systems.lutris.after))
       (check "Lutris is at the TV's scale (1.5: GTK's 2, its text at 0.75 of that)"
@@ -733,7 +737,7 @@ in
           && lib.all (n: lib.elem ".setting" sys.${n}.extensions) [ "steam" "epic" "lutris" ]
           && lib.hasInfix "*.setting) exec" sys.steam.command && lib.hasInfix "--steam bigpicture" sys.steam.command
           && lib.hasInfix "/bin/heroic --fullscreen" sys.epic.command
-          && lib.hasInfix "*.setting) /nix/store/" sys.lutris.command
+          && lib.hasInfix "*.setting)" sys.lutris.command && lib.hasInfix "/bin/lutris\n" sys.lutris.command
           && !(lib.hasInfix "heroic" sys.settings.command) && !(lib.hasInfix "bigpicture" sys.settings.command)
           && lib.any (p: lib.getName p == "famidrive-generate") c.environment.systemPackages))
       (check "Steam's art and details after each Steam menu update, not before the session"
