@@ -541,10 +541,11 @@ in
       (check "no background Steam for a player who's never signed in to it here (it would hear Guide)"
         (lib.all (u: lib.hasInfix "famidrive-steam-signed-in"
           c.home-manager.users.${u}.systemd.user.services.famidrive-steam-background.Service.ExecCondition) [ "alice" "bob" ]))
-      (check "the Guide menu freezes emulators and Steam games Steam marks single-player only, a host's lists first, and only blocks the rest"
+      (check "the Guide menu freezes emulators and Steam games Steam marks single-player only, a host's lists first, and only blocks the rest, Lutris's and Epic's too"
         (let b = c.famidrive.systems.steam.before; in
           c.famidrive.systems.gc.guideMenu == "freeze" && c.famidrive.systems.steam.guideMenu == "block"
           && c.famidrive.systems.desktop.guideMenu == "block"
+          && c.famidrive.systems.lutris.guideMenu == "block" && c.famidrive.systems.epic.guideMenu == "block"
           && lib.hasInfix "1091500|1172380) : ;;" b && lib.hasInfix "570) echo freeze > " b
           && lib.hasInfix "*) if famidrive-steam-offline \"$steam_app\"; then echo freeze > " b
           && lib.any (p: lib.getName p == "famidrive-steam-offline") c.environment.systemPackages))

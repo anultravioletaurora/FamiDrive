@@ -738,6 +738,9 @@ in
               *) ${(heroicEntry "epic").command} ;;
             esac
           '';
+          # Heroic doesn't say which games are online: left running under
+          # the Guide menu, as Lutris's are (stores.nix).
+          guideMenu = "block";
         };
       })
       (lib.mkIf (cfg.desktop != { }) {
