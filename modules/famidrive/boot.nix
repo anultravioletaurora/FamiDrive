@@ -68,10 +68,12 @@ in
     # through; a host with an initrd of its own can still say otherwise.
     boot.initrd.systemd.enable = lib.mkDefault true;
     # The graphics driver there too, so that start is at the TV's
-    # resolution (earlyGraphics). Nvidia's driver isn't loaded early here.
+    # resolution (earlyGraphics). Nvidia's driver isn't loaded early here,
+    # but Intel's is: on a laptop with an Nvidia card, the Intel card has
+    # the screen (hybrid graphics, gpu.nix).
     boot.initrd.kernelModules = lib.mkIf splash.earlyGraphics (
       lib.optionals (lib.elem cfg.gpu [ "auto" "amd" ]) [ "amdgpu" ]
-      ++ lib.optionals (lib.elem cfg.gpu [ "auto" "intel" ]) [ "i915" ]);
+      ++ lib.optionals (lib.elem cfg.gpu [ "auto" "intel" "nvidia" ]) [ "i915" ]);
     hardware.amdgpu.initrd.enable = lib.mkIf (splash.earlyGraphics && lib.elem cfg.gpu [ "auto" "amd" ]) true;
     # No text over the splash: the kernel's messages, systemd's status
     # lines and udev's. A failed boot still shows them, and Esc on the

@@ -29,7 +29,10 @@ NixOS, but isn't covered here.
 
 **You'll need:**
 - a 64-bit PC (x86_64) with an AMD or Intel graphics card. Nvidia should
-  work, but it's untested ([#77](https://github.com/anultravioletaurora/FamiDrive/issues/77)).
+  work, laptops with an Nvidia card next to Intel or AMD graphics too,
+  but it's untested ([#77](https://github.com/anultravioletaurora/FamiDrive/issues/77)).
+  With Nvidia, leave `boot.kernelPackages` out of your configuration:
+  FamiDrive picks the long-term kernel, which Nvidia's driver keeps up with.
 - a USB stick of 4 GB or more
 - a keyboard for the install (only for the install: the box is played
   with controllers after)
