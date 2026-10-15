@@ -174,6 +174,7 @@ in
   thunderstore = unit "thunderstore" ../pkgs/famidrive-thunderstore/famidrive_thunderstore.py pkgs.python3;
   steam-config = unit "steam_config" ../pkgs/famidrive-steam-config/famidrive_steam_config.py pkgs.python3;
   steam-offline = unit "steam_offline" ../pkgs/famidrive-steam-offline/famidrive_steam_offline.py pkgs.python3;
+  battlenet = unit "battlenet" ../pkgs/famidrive-battlenet/famidrive_battlenet.py (pkgs.python3.withPackages (p: [ p.pyyaml ]));
   clonehero = unit "clonehero" ../pkgs/famidrive-clonehero/famidrive_clonehero.py pkgs.python3;
   kodi = unit "kodi" ../pkgs/famidrive-kodi/famidrive_kodi.py pkgs.python3;
   prism = unit "prism" ../pkgs/famidrive-prism/famidrive_prism.py pkgs.python3;
@@ -691,7 +692,8 @@ in
           && c.famidrive.systems.lutris.theme == "lutris"
           && c.famidrive.systems.lutris.extensions == [ ".lutris" ".setting" ]
           && lib.hasInfix "gamescope-fg --launcher \"$ROM\"" c.famidrive.systems.lutris.command
-          && lib.hasInfix "lutris:rungameid/" c.famidrive.systems.lutris.command))
+          && lib.hasInfix "lutris:rungameid/" c.famidrive.systems.lutris.command
+          && lib.hasInfix "/bin/famidrive-battlenet play \"$HOME/.local/share/lutris\"" c.famidrive.systems.lutris.command))
       (check "Lutris is at the TV's scale (1.5: GTK's 2, its text at 0.75 of that)"
         (let w = c.famidrive.lutris.text;
              lutrisBin = builtins.unsafeDiscardStringContext "${c.famidrive.lutris}/bin/lutris";

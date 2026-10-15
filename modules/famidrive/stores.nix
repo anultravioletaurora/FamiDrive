@@ -127,8 +127,9 @@ in
       # wasn't already open (lutris/gui/application.py, 0.5.23), so the
       # command lasts as long as the game. Through gamescope-fg --launcher:
       # the status screen until a window is up, which for a Battle.net game
-      # is Battle.net's, where Play is pressed with the controller as a
-      # mouse.
+      # is Battle.net's. famidrive-battlenet then starts the game in it
+      # once it has signed in: Battle.net ignores the --exec it was
+      # started with (pkgs/famidrive-battlenet).
       famidrive.systems.lutris = {
         fullname = "Lutris";
         theme = "lutris";   # Art Book Next's Lutris art
@@ -137,10 +138,17 @@ in
         command = ''
           case "$ROM" in
             *.setting) ${lutris}/bin/lutris ;;
-            *) ${pkgs.gamescope-fg}/bin/gamescope-fg --launcher "$ROM" ${lutris}/bin/lutris "lutris:rungameid/$(cat "$ROM")" ;;
+            *)
+              ${pkgs.famidrive-battlenet}/bin/famidrive-battlenet play "$HOME/.local/share/lutris" "$(cat "$ROM")" &
+              battlenet=$!
+              rc=0
+              ${pkgs.gamescope-fg}/bin/gamescope-fg --launcher "$ROM" ${lutris}/bin/lutris "lutris:rungameid/$(cat "$ROM")" || rc=$?
+              kill "$battlenet" 2>/dev/null || true
+              exit "$rc"
+              ;;
           esac
         '';
-        
+
         # Lutris doesn't say which games are online, and most of its
         # stores' are (Battle.net's all are): the Guide menu leaves them
         # running. Found on the first box 2026-10-15: it froze Black Ops
