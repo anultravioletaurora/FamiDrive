@@ -148,7 +148,7 @@ in
               ;;
           esac
         '';
-        
+
         # Lutris doesn't say which games are online, and most of its
         # stores' are (Battle.net's all are): the Guide menu leaves them
         # running. Found on the first box 2026-10-15: it froze Black Ops
