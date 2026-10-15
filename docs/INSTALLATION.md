@@ -206,10 +206,12 @@ NixOS, but isn't covered here.
      list after joining, and the box remembers the network.
      Settings → Ethernet shows the wired port: cable, address, speed and
      hardware address. The lists are as they were when ES-DE started.
-   - **Steam:** sign in under Settings → Steam Settings.
+   - **Steam:** sign in under Steam → Steam Settings, the first entry
+     in the Steam system.
    - **The other PC stores**, if `lanes` has `"stores"`: Epic under
-     Settings → Heroic Games Launcher; GOG, Amazon, Battle.net, EA,
-     Ubisoft and Humble Bundle under Settings → Lutris
+     Epic Games Store → Heroic Games Launcher; GOG, Amazon, Battle.net,
+     EA, Ubisoft and Humble Bundle under Lutris → Lutris. Each launcher
+     is the first entry in its system, after any favorites
      (`famidrive.stores` says which launcher has each).
    - **Jellyfin:** sign in once in Media.
    - **RomM:** with a token, the library pull starts by itself (every

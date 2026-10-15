@@ -692,9 +692,15 @@ in
       (lib.mkIf (hasLane "steam") {
         steam = {
           fullname = "Steam";
-          extensions = [ ".steam" ];
+          # .setting: Steam Settings, Big Picture, at the top (settings.nix).
+          extensions = [ ".steam" ".setting" ];
           # -applaunch returns at once; gamescope-fg --steam waits for the game.
-          command = ''${pkgs.gamescope-fg}/bin/gamescope-fg --steam "$(cat "$ROM")"'';
+          command = ''
+            case "$ROM" in
+              *.setting) exec ${pkgs.gamescope-fg}/bin/gamescope-fg --steam bigpicture ;;
+              *) ${pkgs.gamescope-fg}/bin/gamescope-fg --steam "$(cat "$ROM")" ;;
+            esac
+          '';
           theme = "steam";
           # Many Steam games are online, and stopping one drops it off its
           # server: only games Steam marks single-player only freeze
@@ -708,9 +714,14 @@ in
               listed = games: what: lib.optionalString (games != [ ])
                 "  ${lib.concatStringsSep "|" games}) ${what} ;;\n";
             in ''
+              case "$ROM" in
+              *.setting) ;;
+              *)
               steam_app=$(cat "$ROM")
               case "$steam_app" in
               ${listed cfg.steam.onlineGames ":"}${listed cfg.steam.offlineGames freeze}  *) if famidrive-steam-offline "$steam_app"; then ${freeze}; fi ;;
+              esac
+              ;;
               esac
             '';
         };
@@ -719,10 +730,17 @@ in
         epic = heroicEntry "epic" // {
           fullname = "Epic Games Store";
           theme = "epic";   # Art Book Next's Epic art
+          # .setting: Heroic Games Launcher, at the top (settings.nix).
+          extensions = [ ".epic" ".setting" ];
+          command = ''
+            case "$ROM" in
+              *.setting) XDG_CURRENT_DESKTOP=FamiDrive ${pkgs.heroic}/bin/heroic --fullscreen --no-sandbox ;;
+              *) ${(heroicEntry "epic").command} ;;
+            esac
+          '';
           # Heroic doesn't say which games are online: left running under
           # the Guide menu, as Lutris's are (stores.nix).
           guideMenu = "block";
-          extensions = [ ".epic" ];
         };
       })
       (lib.mkIf (cfg.desktop != { }) {

@@ -323,7 +323,7 @@ surgery as that player at session start or home-manager activation.
 | [gpu.nix](../modules/famidrive/gpu.nix) | [famidrive-hardware](../pkgs/famidrive-hardware) | `famidrive.gpu` (`auto`/`amd`/`intel`/`nvidia`) picks drivers; a boot-time check warns when the setting doesn't match the hardware |
 | [boot.nix](../modules/famidrive/boot.nix) | — | Plymouth boot splash in place of console text |
 | [stores.nix](../modules/famidrive/stores.nix) | [famidrive-generators](../pkgs/famidrive-generators) | `famidrive.stores`: Lutris or Heroic (or neither) for each PC store other than Steam; the Lutris system, and the stores Lutris shows as its services |
-| [settings.nix](../modules/famidrive/settings.nix) | — | The Settings and Controllers ES-DE systems: Steam Settings, Heroic, Lutris, Jellyfin, Wi-Fi/Ethernet and Bluetooth pairing entries, each player's own, rewritten every session |
+| [settings.nix](../modules/famidrive/settings.nix) | — | The Settings and Controllers ES-DE systems: Jellyfin, Wi-Fi/Ethernet and Bluetooth pairing entries, each player's own, rewritten every session; and Steam Settings, Heroic and Lutris, each at the top of its store's system |
 | [endpoints.nix](../modules/famidrive/endpoints.nix) | — | Every server address (`romm`, `jellyfin`, `rpcn`, `edenRoomHost`, `xeniaWebServices`, ...) in one place, no defaults, so a host fails loudly at build time instead of silently pointing nowhere |
 
 Steam-specific config editing has its own tool,

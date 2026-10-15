@@ -3,6 +3,7 @@ famidrive-generate heroic HEROIC_CONFIG_DIR ROMS_DIR STORE...
 famidrive-generate lutris LUTRIS_DATA_DIR OUT_DIR
 famidrive-generate steam-media STEAMAPPS_DIR OUT_DIR
 famidrive-generate heroic-media HEROIC_CONFIG_DIR ROMS_DIR STORE...
+famidrive-generate launcher SYSTEM_DIR NAME ID
 
 Rewrite OUT_DIR so it holds exactly one placeholder per installed game in
 SOURCE_DIR. Each placeholder's *content* is the launch ID that famidrive-launch
@@ -27,6 +28,11 @@ developer, publisher, genres and release date from the Steam store.
 heroic-media does the same for Heroic's games, from Heroic's own store
 cache: the store's name for the game (a file name can't have a ":"), its
 description, developer and genres, and its cover and background images.
+
+launcher puts a launcher's own entry (NAME.setting, holding ID) in its
+store's system folder, at the top of the list: Lutris in Lutris, Steam
+Settings in Steam. Its sort name does that; ES-DE still lists a
+player's favorites first.
 """
 
 import json
@@ -491,6 +497,15 @@ def move_entries(old, new, ext):
                 f.rename(dest)
 
 
+def launcher(folder, name, launch_id):
+    entry = folder / f"{name}.setting"
+    folder.mkdir(parents=True, exist_ok=True)
+    if not entry.exists() or entry.read_text() != launch_id:
+        entry.write_text(launch_id)
+    gamelist = ESDE / "gamelists" / folder.name / "gamelist.xml"
+    write_gamelist(folder.name, merge_gamelist(gamelist, {entry.name: {"sortname": "0"}}, ("sortname",)))
+
+
 def main():
     if sys.argv[1] == "steam-media":
         started = time.monotonic()
@@ -501,6 +516,9 @@ def main():
         started = time.monotonic()
         heroic_media(Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4:])
         print(f"Heroic art and details: {time.monotonic() - started:.0f} s", file=sys.stderr)
+        return
+    if sys.argv[1] == "launcher":
+        launcher(Path(sys.argv[2]), sys.argv[3], sys.argv[4])
         return
     lane, src, out = sys.argv[1], Path(sys.argv[2]), Path(sys.argv[3])
     if lane == "heroic":

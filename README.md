@@ -361,15 +361,16 @@ famidrive = {
   settings, ES-DE's favorites and play counts, Steam, Prism, the Jellyfin
   login. Each player's saves go to RomM under their own RomM user, with
   their own token.
-- **Steam:** each player signs in to their own account once, in Settings →
+- **Steam:** each player signs in to their own account once, in Steam →
   Steam Settings. Games installed in one player's home show up only in
   their menu, so a game both play is downloaded twice. Steam Family lets
   a family share one copy of each *purchase* (each account still keeps
   its own download).
 - **The other PC stores:** each player signs in to their own stores
-  once and installs games there: Epic in Settings → Heroic Games
-  Launcher, the rest (GOG, Amazon, Battle.net, EA, Ubisoft, Humble
-  Bundle) in Settings → Lutris. Epic's games show up in the Epic system,
+  once and installs games there: Epic in Epic Games Store → Heroic
+  Games Launcher, the rest (GOG, Amazon, Battle.net, EA, Ubisoft, Humble
+  Bundle) in Lutris → Lutris. Each launcher is the first entry in its
+  system, after any favorites. Epic's games show up in the Epic system,
   with Epic's names, art and details; Lutris's in the Lutris system.
 - **The guest:** no RomM, so their saves stay on this box. They can sign
   in to their own Steam or play without it.

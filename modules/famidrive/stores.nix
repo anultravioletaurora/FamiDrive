@@ -132,13 +132,20 @@ in
       famidrive.systems.lutris = {
         fullname = "Lutris";
         theme = "lutris";   # Art Book Next's Lutris art
+        # .setting: Lutris itself, at the top (settings.nix).
+        extensions = [ ".lutris" ".setting" ];
+        command = ''
+          case "$ROM" in
+            *.setting) ${lutris}/bin/lutris ;;
+            *) ${pkgs.gamescope-fg}/bin/gamescope-fg --launcher "$ROM" ${lutris}/bin/lutris "lutris:rungameid/$(cat "$ROM")" ;;
+          esac
+        '';
+        
         # Lutris doesn't say which games are online, and most of its
         # stores' are (Battle.net's all are): the Guide menu leaves them
         # running. Found on the first box 2026-10-15: it froze Black Ops
         # Cold War in a multiplayer match.
         guideMenu = "block";
-        extensions = [ ".lutris" ];
-        command = ''${pkgs.gamescope-fg}/bin/gamescope-fg --launcher "$ROM" ${lutris}/bin/lutris "lutris:rungameid/$(cat "$ROM")"'';
       };
 
       environment.systemPackages = [ lutris ];

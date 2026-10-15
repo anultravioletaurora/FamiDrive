@@ -1,16 +1,29 @@
+# Each launcher's own entry sits at the top of its store's system, where
+# its games are: the system shows before anything's installed, and a
+# player's favorites still come first (ES-DE lists them first; the
+# entry's sort name puts it before every other game). Written each
+# session, before ES-DE reads its game lists (famidrive-generate
+# launcher). Each system starts its .setting entry itself.
+#
+#   Steam Settings          in Steam: Steam's Big Picture (Proton per
+#                           game, launch options, Steam Input, downloads);
+#                           steam lane
+#   Heroic Games Launcher   in Epic Games Store: sign in to the stores
+#                           Heroic runs, install and remove their games;
+#                           stores lane, with Epic Heroic's (stores.nix).
+#                           In Settings on a box whose Heroic runs only
+#                           GOG or Amazon (their games are in Desktop)
+#   Lutris                  in Lutris: sign in to the stores Lutris runs
+#                           (GOG, Amazon, Battle.net, EA, Ubisoft, Humble
+#                           Bundle, by default), install and remove their
+#                           games; stores lane
+#
+# All three were in Settings until 2026-10-15.
+#
 # A Settings system in ES-DE: one entry per feature this box has that's
 # configured from its own screens, so the game lists hold only games.
 # ES-DE's own settings menu can't take custom entries.
 #
-#   Steam Settings          Steam's Big Picture (Proton per game, launch
-#                           options, Steam Input, downloads); steam lane
-#   Heroic Games Launcher   sign in to the stores Heroic runs (Epic, by
-#                           default), install and remove their games;
-#                           stores lane (stores.nix)
-#   Lutris                  sign in to the stores Lutris runs (GOG,
-#                           Amazon, Battle.net, EA, Ubisoft, Humble
-#                           Bundle, by default), install and remove their
-#                           games; stores lane
 #   Jellyfin Media Player   the Jellyfin app, with its sign-in and its
 #                           own settings menu; media.jellyfin.enable
 #   Discord Voice Chat      the client's own window: sign in, pick a
@@ -48,21 +61,18 @@ let
   # player's folder gets these alike; Discord Voice Chat is only this
   # player's own (added in playerHome below, not here).
   entries =
-    lib.optionalAttrs steam { "Steam Settings" = "steam"; }
-    // lib.optionalAttrs heroic { "Heroic Games Launcher" = "heroic"; }
-    // lib.optionalAttrs lutris { "Lutris" = "lutris"; }
+    lib.optionalAttrs heroicInSettings { "Heroic Games Launcher" = "heroic"; }
     // lib.optionalAttrs jellyfin { "Jellyfin Media Player" = "jellyfin"; };
 
-  gamelist = pkgs.writeText "gamelist.xml" ''
-    <?xml version="1.0"?>
-    <gameList>
-      <game>
-        <path>./Steam Settings.setting</path>
-        <name>Steam Settings</name>
-        <sortname>0</sortname>
-      </game>
-    </gameList>
-  '';
+  # Heroic's own entry goes in the Epic system only when Heroic runs Epic.
+  heroicInSettings = heroic && !(lib.elem "epic" cfg.launchers.heroic);
+
+  # System folder -> the launcher's entry at its top: what ES-DE shows,
+  # and what's in the file.
+  launchers =
+    lib.optionalAttrs steam { steam = { name = "Steam Settings"; id = "steam"; }; }
+    // lib.optionalAttrs (heroic && !heroicInSettings) { epic = { name = "Heroic Games Launcher"; id = "heroic"; }; }
+    // lib.optionalAttrs lutris { lutris = { name = "Lutris"; id = "lutris"; }; };
 in
 {
   options.famidrive.controllers.bluetoothPairing = lib.mkOption {
@@ -88,7 +98,7 @@ in
     '';
   };
 
-  config = lib.mkIf (cfg.enable && (entries != { } || bluetooth || network || voice)) {
+  config = lib.mkIf (cfg.enable && (entries != { } || launchers != { } || bluetooth || network || voice)) {
     famidrive.systems.controllers = lib.mkIf bluetooth {
       fullname = "Controllers";
       # Art Book Next has no controller or Bluetooth art: its fallback,
@@ -111,9 +121,7 @@ in
       extensions = [ ".setting" ];
       command = ''
         case "$(cat "$ROM")" in
-          ${lib.optionalString steam ''steam) exec ${pkgs.gamescope-fg}/bin/gamescope-fg --steam bigpicture ;;''}
-          ${lib.optionalString heroic ''heroic) XDG_CURRENT_DESKTOP=FamiDrive ${pkgs.heroic}/bin/heroic --fullscreen --no-sandbox ;;''}
-          ${lib.optionalString lutris ''lutris) ${cfg.lutris}/bin/lutris ;;''}
+          ${lib.optionalString heroicInSettings ''heroic) XDG_CURRENT_DESKTOP=FamiDrive ${pkgs.heroic}/bin/heroic --fullscreen --no-sandbox ;;''}
           ${lib.optionalString jellyfin ''jellyfin) ${cfg.systems.media.command} ;;''}
           ${lib.optionalString network ''network-*) exec ${pkgs.famidrive-network}/bin/famidrive-network launch "$ROM" ;;''}
           ${lib.optionalString voice ''discord-voice) exec ${pkgs.gamescope-fg}/bin/gamescope-fg --voice-show ;;''}
@@ -124,7 +132,10 @@ in
     # Bluetooth's entries follow the hardware and what's paired, so
     # they're written as each session starts, not at switch. Ones left in
     # Settings, where they were before Controllers, are taken out there.
-    famidrive.sessionSetup = lib.optionalString bluetooth ''
+    famidrive.sessionSetup = lib.concatStrings (lib.mapAttrsToList (system: l: ''
+      famidrive-generate launcher "$HOME/.local/share/famidrive/roms/${system}" ${lib.escapeShellArgs [ l.name l.id ]} \
+        || echo "famidrive-session: couldn't add ${l.name} to its system" >&2
+    '') launchers) + lib.optionalString bluetooth ''
       ${pkgs.famidrive-bluetooth}/bin/famidrive-bluetooth entries "$HOME/.local/share/famidrive/roms/controllers" \
         "$HOME/.local/share/famidrive/roms/settings" \
         || echo "famidrive-session: couldn't list Bluetooth controllers" >&2
@@ -132,6 +143,10 @@ in
       ${pkgs.famidrive-network}/bin/famidrive-network entries "$HOME/.local/share/famidrive/roms/settings" \
         || echo "famidrive-session: couldn't list networks" >&2
     '';
+
+    # famidrive-generate by name, from PATH: a fix to it then doesn't
+    # restart the TV (box-testing.md).
+    environment.systemPackages = lib.mkIf (launchers != { }) [ pkgs.famidrive-generators ];
 
     # Players join and forget networks for the whole box, so Wi-Fi is up
     # before anyone picks a player. NetworkManager asks for an admin
@@ -162,16 +177,6 @@ in
           rm -f "$d/${name}.setting"
         '') (lib.filter (n: !(myEntries ? ${n}))
           [ "Steam Settings" "Heroic Games Launcher" "Lutris" "Jellyfin Media Player" "Discord Voice Chat" "Switch Player" ])}
-        ${lib.optionalString steam ''
-          # ES-DE sorts by name; Steam Settings goes first by its sort name.
-          # ES-DE rewrites gamelists itself (play counts), so this is only a
-          # first copy.
-          g="$HOME/ES-DE/gamelists/settings/gamelist.xml"
-          if [ ! -e "$g" ]; then
-            mkdir -p "$(dirname "$g")"
-            install -m 0644 ${gamelist} "$g"
-          fi
-        ''}
       '';
     };
   };
