@@ -258,7 +258,8 @@ planning doc for now and will move into this repo.
   `"stores"`): Epic through Heroic, in the Epic system, with its names,
   art and details from Heroic and the same status screen; GOG, Amazon,
   Battle.net, EA, Ubisoft and Humble Bundle through Lutris, in the
-  Lutris system (`famidrive.stores` picks per store). Results per game are in
+  Lutris system (`famidrive.stores` picks per store). A Battle.net game
+  starts straight into the game, not Battle.net's page for it. Results per game are in
   [COMPATIBILITY.md](docs/COMPATIBILITY.md).
 - Toasts over whatever's on the TV, in the player's theme, with an icon
   each: a save going up to RomM, or not. Toasts show bottom right by

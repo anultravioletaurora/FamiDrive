@@ -210,6 +210,9 @@ signs in and starts the game by itself (`famidrive-battlenet`, #225).
   gameplay worked great, with controller glyphs in the game's UI. The Guide
   menu said it would pause the game, even in multiplayer; Lutris and
   Epic games are now left running behind it (#223).
+- **2026-10-15, the first box, online:** ✅ multiplayer and Zombies
+  online both worked, with no anti-cheat refusal or kick, against what
+  was expected below. One night's play; see the ban risk note.
 
 - **Expected:** ProtonDB has reports of it running. Proton Experimental
   had Battle.net and Cold War fixes in December 2025, but Valve later
@@ -221,8 +224,8 @@ signs in and starts the game by itself (`famidrive-battlenet`, #225).
   or not at all. An anti-cheat that doesn't support Linux can flag a
   Proton player instead of just refusing them.
 - **To check:**
-  - the campaign and offline Zombies, start to finish with a controller
-  - what happens in multiplayer: a clear refusal, or something worse
+  - the campaign, start to finish with a controller
+  - whether online play keeps working (no ban or kick later)
   - rumble, and the game's windows counting as the game's
     (`gamescope-fg`)
 
