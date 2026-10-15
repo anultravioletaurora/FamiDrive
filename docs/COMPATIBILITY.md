@@ -183,10 +183,33 @@ layout for the game. No aim assist: aiming is a mouse on a stick.
 
 ### Call of Duty: Black Ops Cold War
 
-**Battle.net: ❔ Untested.** Never sold on Steam, so it needs the
+**Battle.net: ✅ Works.** Never sold on Steam, so it needs the
 Battle.net app: through Lutris, in the Lutris system (#205). Lutris's
 installer for it is a "script for existing install of Battle.net", so
-Battle.net goes in through Lutris first.
+Battle.net goes in through Lutris first. Launched from ES-DE, Battle.net
+signs in and starts the game by itself (`famidrive-battlenet`, #225).
+
+- **2026-10-15, the first box, installing:** Battle.net installed
+  through Lutris and showed up in the Lutris system. Lutris's Cold War
+  installer then failed: it couldn't use FamiDrive's "custom" Wine
+  (umu) to add to Battle.net's prefix. Fixed in #220, and the installer
+  finished. Cold War itself was installed from Battle.net's Install
+  button, with the controller.
+- **2026-10-15, the first box, Battle.net with the 8BitDo Ultimate 2:**
+  ✅ the d-pad moves between Battle.net's controls and A presses them.
+  Once, a dialog Battle.net opened (Install, then the game's settings)
+  took the controller but wasn't shown on the TV; the next time it was.
+  `gamescope-fg` now brings up a Wine app's dialog over the window it
+  belongs to (#221, #222).
+- **2026-10-15, the first box, launching:** ❌ then ✅. At first,
+  Battle.net opened on Cold War's page and waited for Play: it ignores
+  Lutris's `--exec="launch ZEUS"` when it starts cold. FamiDrive now
+  sends the launch again once Battle.net has signed in (#225), and the
+  game started by itself.
+- **2026-10-15, the first box, playing with the 8BitDo Ultimate 2:** ✅
+  gameplay worked great, with controller glyphs in the game's UI. The Guide
+  menu said it would pause the game, even in multiplayer; Lutris and
+  Epic games are now left running behind it (#223).
 
 - **Expected:** ProtonDB has reports of it running. Proton Experimental
   had Battle.net and Cold War fixes in December 2025, but Valve later
@@ -198,7 +221,6 @@ Battle.net goes in through Lutris first.
   or not at all. An anti-cheat that doesn't support Linux can flag a
   Proton player instead of just refusing them.
 - **To check:**
-  - the Battle.net app under Proton, and signing in with a controller
   - the campaign and offline Zombies, start to finish with a controller
   - what happens in multiplayer: a clear refusal, or something worse
   - rumble, and the game's windows counting as the game's

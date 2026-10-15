@@ -167,6 +167,12 @@ This is the house controller, and FamiDrive knows it by name
   [Need for Speed Heat](COMPATIBILITY.md#need-for-speed-heat): the right
   glyphs and strong rumble. [Peak](COMPATIBILITY.md#peak): perfect,
   2026-10-12.
+  [Call of Duty: Black Ops Cold War](COMPATIBILITY.md#call-of-duty-black-ops-cold-war)
+  (Battle.net, through Lutris): played great, with the controller's
+  glyphs in the game, 2026-10-15.
+- **Battle.net:** ✅ the d-pad moves focus between its controls and A
+  presses the focused one, so it's usable from the couch with no pointer,
+  2026-10-15.
 - **Kodi:** ✅ with FamiDrive's button map, 2026-10-06. At first Kodi saw
   the pad but had no button map for it, so it ignored the pad and kept
   offering to set it up. FamiDrive now gives every player's Kodi a map for
