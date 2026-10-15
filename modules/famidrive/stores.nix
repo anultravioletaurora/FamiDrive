@@ -154,6 +154,14 @@ in
         # running. Found on the first box 2026-10-15: it froze Black Ops
         # Cold War in a multiplayer match.
         guideMenu = "block";
+
+        # A game installed from Battle.net gets its own Lutris entry, so
+        # it's in this system the next time ES-DE starts
+        # (famidrive-battlenet games). Battle.net only runs from here, so
+        # after it closes is when there can be something new.
+        after = lib.optionalString (lib.elem "battlenet" lutrisStores) ''
+          ${pkgs.famidrive-battlenet}/bin/famidrive-battlenet games "$HOME/.local/share/lutris" || true
+        '';
       };
 
       environment.systemPackages = [ lutris ];

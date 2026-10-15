@@ -214,10 +214,8 @@ NixOS, but isn't covered here.
      is the first entry in its system, after any favorites
      (`famidrive.stores` says which launcher has each).
      Battle.net goes in through Lutris first (search Lutris for
-     "Battle.net"). Each Battle.net game then takes two steps: install
-     it from Battle.net, then run Lutris's installer for it, the one
-     for an existing Battle.net install, so it shows in the Lutris
-     system.
+     "Battle.net"). Then install games from Battle.net itself: each one
+     it installs is in the Lutris system the next time ES-DE starts.
    - **Jellyfin:** sign in once in Media.
    - **RomM:** with a token, the library pull starts by itself (every
      30 minutes). To start it now, over SSH:

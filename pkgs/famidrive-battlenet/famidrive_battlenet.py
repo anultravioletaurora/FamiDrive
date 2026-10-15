@@ -1,6 +1,7 @@
 """famidrive-battlenet play LUTRIS_DATA_DIR GAME_ID
+famidrive-battlenet games LUTRIS_DATA_DIR
 
-Runs beside a Lutris launch and puts the player in a Battle.net game
+play runs beside a Lutris launch and puts the player in a Battle.net game
 instead of Battle.net's page for it.
 
 A Battle.net game in Lutris is Battle.net.exe with --exec="launch <code>"
@@ -24,8 +25,21 @@ So: wait for this launch's Battle.net to sign in and show its window,
 then send the launch, and again if the game doesn't start, until it
 does. Nothing at all for a Lutris game that isn't a Battle.net one, or
 when Battle.net starts the game by itself.
+
+games gives each game Battle.net has installed a Lutris entry of its own,
+so it's in the Lutris system once it's installed from Battle.net, with no
+Lutris installer to run for it. Lutris's installers for Battle.net games
+("for an existing install of Battle.net") add nothing else: the same
+prefix, and Battle.net.exe with --exec="launch <code>". Battle.net lists
+what it has installed in ProgramData/Battle.net/Agent/aggregate.json, by
+its own ID (Black Ops Cold War's is "zeus", on the first box 2026-10-15).
+An entry made here goes when Battle.net no longer lists its game, as an
+uninstalled game (Lutris keeps those, and FamiDrive doesn't show them).
+A game that already has an entry, from a Lutris installer, gets no
+second one.
 """
 
+import json
 import os
 import re
 import sqlite3
@@ -54,6 +68,72 @@ LAUNCHED = "LaunchBinary"
 PROCESS_ONLY = ("WINESERVERSOCKET=", "WINELOADERNOEXEC=", "WINEPRELOADRESERVE=")
 
 
+# Battle.net's ID for a game (aggregate.json's product_id) -> the code
+# --exec="launch ..." takes, and the game's name with its punctuation (the
+# file has "Call of Duty Black Ops Cold War"). From Playnite's Battle.net
+# library (BattleNetGames.cs, MIT), 2026-10-15, where they're InternalId
+# and ProductId. A game that's not here: its ID in capitals, the way most
+# codes are, and Battle.net's name.
+GAMES = {
+    "wow": ("WoW", "World of Warcraft"),
+    "diablo3": ("D3", "Diablo III"),
+    "s2": ("S2", "StarCraft II"),
+    "s1": ("S1", "StarCraft"),
+    "hs_beta": ("WTCG", "Hearthstone"),
+    "heroes": ("Hero", "Heroes of the Storm"),
+    "prometheus": ("Pro", "Overwatch 2"),
+    "viper": ("VIPR", "Call of Duty: Black Ops 4"),
+    "odin": ("ODIN", "Call of Duty: Modern Warfare"),
+    "w3": ("W3", "Warcraft III: Reforged"),
+    "lazarus": ("LAZR", "Call of Duty: Modern Warfare 2 Campaign Remastered"),
+    "zeus": ("ZEUS", "Call of Duty: Black Ops Cold War"),
+    "wlby": ("WLBY", "Crash Bandicoot 4: It's About Time"),
+    "osi": ("OSI", "Diablo II: Resurrected"),
+    "rtro": ("RTRO", "Blizzard Arcade Collection"),
+    "fore": ("FORE", "Call of Duty: Vanguard"),
+    "anbs": ("ANBS", "Diablo Immortal"),
+    "auks": ("AUKS", None),   # Call of Duty's own app: Battle.net's name for it
+    "fen": ("Fen", "Diablo IV"),
+    "fenris": ("Fen", "Diablo IV"),
+    "d1": ("D1", "Diablo"),
+    "w1r": ("W1R", "Warcraft: Remastered"),
+    "w2r": ("W2R", "Warcraft II: Remastered"),
+    "w1": ("W1", "Warcraft: Orcs & Humans"),
+    "w2": ("W2", "Warcraft II: Battle.net Edition"),
+    "gryphon": ("GRY", "Warcraft Rumble"),
+    "aris": ("ARIS", "DOOM: The Dark Ages"),
+    "scorpio": ("SCOR", "Sea of Thieves"),
+    "arkansas": ("ARK", "The Outer Worlds 2"),
+    "libra": ("LBRA", "Tony Hawk's Pro Skater 3 + 4"),
+    "pinta": ("PNTA", "Call of Duty: Modern Warfare III"),
+    "aqua": ("AQUA", "Avowed"),
+}
+
+# The installer_slug of an entry made here, so it's told apart from one a
+# Lutris installer made.
+MADE_HERE = "famidrive-battlenet"
+BATTLENET_EXE = "drive_c/Program Files (x86)/Battle.net/Battle.net.exe"
+
+
+def game_configs(lutris_dir):
+    """Where Lutris keeps its game configs: beside the database, unless an
+    older Lutris left them in ~/.config/lutris (lutris/settings.py)."""
+    games = lutris_dir / "games"
+    return games if games.is_dir() else Path.home() / ".config/lutris/games"
+
+
+def load_config(path):
+    try:
+        return yaml.safe_load(path.read_text()) or {}
+    except (OSError, yaml.YAMLError):
+        return None
+
+
+def exec_code(args):
+    m = re.search(r'--exec=("[^"]*"|\S+)', args or "")
+    return m.group(1).strip('"') if m else None
+
+
 def battlenet_game(lutris_dir, game_id):
     """(prefix, the --exec argument) for a Battle.net game, or None."""
     try:
@@ -66,20 +146,12 @@ def battlenet_game(lutris_dir, game_id):
         return None
     if not row or not row[0]:
         return None
-    # Game configs are beside the database, unless an older Lutris left
-    # them in ~/.config/lutris (lutris/settings.py).
-    games = lutris_dir / "games"
-    if not games.is_dir():
-        games = Path.home() / ".config/lutris/games"
-    try:
-        game = (yaml.safe_load((games / f"{row[0]}.yml").read_text()) or {}).get("game") or {}
-    except (OSError, yaml.YAMLError):
+    game = ((load_config(game_configs(lutris_dir) / f"{row[0]}.yml") or {}).get("game")) or {}
+    exe, prefix = str(game.get("exe") or ""), game.get("prefix")
+    code = exec_code(str(game.get("args") or ""))
+    if not code or not prefix or Path(exe.replace("\\", "/")).name.lower() != "battle.net.exe":
         return None
-    exe, args, prefix = str(game.get("exe") or ""), str(game.get("args") or ""), game.get("prefix")
-    m = re.search(r'--exec=("[^"]*"|\S+)', args)
-    if not m or not prefix or Path(exe.replace("\\", "/")).name.lower() != "battle.net.exe":
-        return None
-    return Path(prefix), "--exec=" + m.group(1).strip('"')
+    return Path(prefix), "--exec=" + code
 
 
 def newest_log(prefix, since):
@@ -160,10 +232,112 @@ def play(lutris_dir, game_id, sleep=time.sleep, clock=time.time):
     print(f"famidrive-battlenet: Battle.net didn't start the game after {TRIES} tries", file=sys.stderr)
 
 
+def slugify(name):
+    return re.sub(r"[^a-z0-9]+", "-", name.lower().replace("'", "")).strip("-")
+
+
+def installed_by_battlenet(prefix):
+    """{Battle.net's ID: its name} for each game Battle.net has installed
+    in this prefix, or None when it can't say (not run yet, or writing)."""
+    try:
+        data = json.loads((prefix / "drive_c/ProgramData/Battle.net/Agent/aggregate.json").read_text())
+    except (OSError, ValueError):
+        return None
+    return {str(g["product_id"]).lower(): str(g.get("name") or g["product_id"])
+            for g in data.get("installed") or [] if isinstance(g, dict) and g.get("product_id")}
+
+
+def games(lutris_dir, clock=time.time):
+    """A Lutris entry for each game Battle.net has installed."""
+    db = lutris_dir / "pga.db"
+    if not db.exists():
+        return
+    configs = game_configs(lutris_dir)
+    try:
+        con = sqlite3.connect(db, timeout=10)
+    except sqlite3.Error as e:
+        print(f"famidrive-battlenet: can't open {db}: {e}", file=sys.stderr)
+        return
+    try:
+        with con:
+            rows = con.execute("SELECT id, slug, installer_slug, configpath, installed FROM games").fetchall()
+            config = {r[0]: ((load_config(configs / f"{r[3]}.yml") or {}) if r[3] else {}) for r in rows}
+            # Battle.net itself, in each prefix it's installed in: an entry
+            # that starts Battle.net and no game.
+            apps = {}
+            for i, slug, installer, path, installed in rows:
+                game = config[i].get("game") or {}
+                exe = Path(str(game.get("exe") or "").replace("\\", "/")).name.lower()
+                if installed and game.get("prefix") and exe in ("battle.net.exe", "battle.net launcher.exe") \
+                        and not exec_code(str(game.get("args") or "")):
+                    apps.setdefault(Path(game["prefix"]).resolve(), (installer, config[i]))
+            for prefix, (app_installer, app_config) in apps.items():
+                found = installed_by_battlenet(prefix)
+                if found is None:
+                    continue
+                # What already has an entry here: its code, any case.
+                have = {}
+                for i, slug, installer, path, installed in rows:
+                    game = config[i].get("game") or {}
+                    code = exec_code(str(game.get("args") or ""))
+                    if code and game.get("prefix") and Path(game["prefix"]).resolve() == prefix:
+                        have.setdefault(code.lower(), (i, installer, installed))
+                wanted = {}
+                for product, bnet_name in found.items():
+                    code, name = GAMES.get(product, (product.upper(), None))
+                    wanted["launch " + code.lower()] = (code, name or bnet_name)
+                for key, (code, name) in wanted.items():
+                    if key in have:
+                        i, installer, installed = have[key]
+                        if installer == MADE_HERE and not installed:
+                            con.execute("UPDATE games SET installed = 1 WHERE id = ?", (i,))
+                        continue
+                    add(con, configs, prefix, code, name, app_installer, app_config, clock)
+                for key, (i, installer, installed) in have.items():
+                    if installer == MADE_HERE and installed and key not in wanted:
+                        con.execute("UPDATE games SET installed = 0 WHERE id = ?", (i,))
+    except sqlite3.Error as e:
+        print(f"famidrive-battlenet: can't update {db}: {e}", file=sys.stderr)
+    finally:
+        con.close()
+
+
+def add(con, configs, prefix, code, name, app_installer, app_config, clock):
+    """A Lutris entry like the one Lutris's installer for the game makes
+    (Black Ops Cold War's, on the first box 2026-10-15): Battle.net's
+    prefix and its runner settings, and its Battle.net.exe with the code."""
+    slug = slugify(name)
+    now = int(clock())
+    path = f"{slug}-{MADE_HERE}-{now}"
+    entry = {
+        "game": {"arch": (app_config.get("game") or {}).get("arch", "win64"),
+                 "args": f'--exec="launch {code}"', "exe": BATTLENET_EXE, "prefix": str(prefix)},
+        "game_slug": slug,
+        "name": name,
+        "requires": app_installer,
+        "slug": f"{slug}-{MADE_HERE}",
+        "version": "Battle.net",
+    }
+    for runner in ("system", "wine"):
+        if app_config.get(runner):
+            entry[runner] = app_config[runner]
+    configs.mkdir(parents=True, exist_ok=True)
+    (configs / f"{path}.yml").write_text(yaml.safe_dump(entry, sort_keys=False))
+    con.execute("""INSERT INTO games (name, sortname, slug, installer_slug, parent_slug, platform,
+                       runner, directory, lastplayed, installed, installed_at, configpath,
+                       has_custom_banner, has_custom_icon, has_custom_coverart_big, playtime)
+                   VALUES (?, '', ?, ?, ?, 'Windows', 'wine', ?, 0, 1, ?, ?, 0, 0, 0, 0.0)""",
+                (name, slug, MADE_HERE, app_installer, str(prefix), now, path))
+
+
 def main():
-    if len(sys.argv) != 4 or sys.argv[1] != "play":
-        sys.exit("usage: famidrive-battlenet play LUTRIS_DATA_DIR GAME_ID")
-    play(Path(sys.argv[2]), sys.argv[3])
+    usage = "usage: famidrive-battlenet play LUTRIS_DATA_DIR GAME_ID | games LUTRIS_DATA_DIR"
+    if len(sys.argv) == 4 and sys.argv[1] == "play":
+        play(Path(sys.argv[2]), sys.argv[3])
+    elif len(sys.argv) == 3 and sys.argv[1] == "games":
+        games(Path(sys.argv[2]))
+    else:
+        sys.exit(usage)
 
 
 if __name__ == "__main__":
