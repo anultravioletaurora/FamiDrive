@@ -719,6 +719,9 @@ in
         epic = heroicEntry "epic" // {
           fullname = "Epic Games Store";
           theme = "epic";   # Art Book Next's Epic art
+          # Heroic doesn't say which games are online: left running under
+          # the Guide menu, as Lutris's are (stores.nix).
+          guideMenu = "block";
           extensions = [ ".epic" ];
         };
       })
