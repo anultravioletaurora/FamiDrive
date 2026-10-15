@@ -456,7 +456,7 @@ in
       (lib.hasInfix "XDG_CURRENT_DESKTOP=FamiDrive" c.famidrive.systems.desktop.command
         && lib.hasInfix "gamescope-fg --launcher \"$ROM\"" c.famidrive.systems.desktop.command
         && lib.hasInfix "XDG_CURRENT_DESKTOP=FamiDrive" c.famidrive.systems.epic.command
-        && lib.hasInfix "XDG_CURRENT_DESKTOP=FamiDrive" c.famidrive.systems.settings.command
+        && lib.hasInfix "/bin/heroic --fullscreen" c.famidrive.systems.epic.command
         && lib.hasInfix "*.gog)" c.famidrive.systems.desktop.before
         && lib.hasInfix "watch-comet" c.famidrive.systems.desktop.before
         && !(lib.hasInfix "*.amazon)" c.famidrive.systems.desktop.command)
@@ -470,7 +470,7 @@ in
         && c.famidrive.systems.controllers.theme == "_default"
         && lib.hasInfix "famidrive-bluetooth pair" c.famidrive.systems.controllers.command
         && lib.hasInfix "famidrive-bluetooth forget" c.famidrive.systems.controllers.command
-        && !(lib.hasInfix "famidrive-bluetooth" c.famidrive.systems.settings.command)))
+        && !(lib.hasInfix "famidrive-bluetooth" (c.famidrive.systems.settings.command or ""))))
     (check "RetroArch and Dolphin games have the unlock watcher; Eden's don't"
       (lib.hasInfix "famidrive-cheevos" c.famidrive.systems.psx.before
         && lib.hasInfix "--log-file" c.famidrive.systems.n64.command
@@ -677,7 +677,7 @@ in
       (check "by default Heroic runs only Epic, in the Epic system with Art Book Next's Epic art and Heroic's art and details"
         (c.famidrive.launchers.heroic == [ "epic" ]
           && c.famidrive.systems.epic.theme == "epic"
-          && c.famidrive.systems.epic.extensions == [ ".epic" ]
+          && c.famidrive.systems.epic.extensions == [ ".epic" ".setting" ]
           && lib.hasInfix "runner=legendary" c.famidrive.systems.epic.command
           && !(lib.any (s: c.famidrive.systems ? ${s} || lib.elem ".${s}" c.famidrive.systems.desktop.extensions) [ "gog" "amazon" ])
           && lib.hasSuffix "/home/bob/.local/share/famidrive/roms epic" c.systemd.services.famidrive-gen-heroic-bob.serviceConfig.ExecStart
@@ -688,7 +688,7 @@ in
       (check "every other store goes through Lutris, in the Lutris system with Art Book Next's Lutris art"
         (c.famidrive.launchers.lutris == [ "amazon" "battlenet" "ea" "gog" "humble" "ubisoft" ]
           && c.famidrive.systems.lutris.theme == "lutris"
-          && c.famidrive.systems.lutris.extensions == [ ".lutris" ]
+          && c.famidrive.systems.lutris.extensions == [ ".lutris" ".setting" ]
           && lib.hasInfix "gamescope-fg --launcher \"$ROM\"" c.famidrive.systems.lutris.command
           && lib.hasInfix "lutris:rungameid/" c.famidrive.systems.lutris.command))
       (check "Lutris is at the TV's scale (1.5: GTK's 2, its text at 0.75 of that)"
@@ -697,7 +697,7 @@ in
         in
           lib.hasInfix "GDK_SCALE=2" w && lib.hasInfix "GDK_DPI_SCALE=0.75" w
             && lib.hasInfix lutrisBin c.famidrive.systems.lutris.command
-            && lib.hasInfix lutrisBin c.famidrive.systems.settings.command))
+            && !(lib.hasInfix lutrisBin c.famidrive.systems.settings.command)))
       (check "Lutris's menu entries follow its database, per player"
         (lib.hasInfix "famidrive-generate lutris /home/bob/.local/share/lutris /home/bob/.local/share/famidrive/roms/lutris"
             c.systemd.services.famidrive-gen-lutris-bob.serviceConfig.ExecStart
@@ -720,10 +720,17 @@ in
             # (#211, #215).
             && lib.hasInfix "wine.version = \"custom\"" a
             && lib.hasInfix "custom_wine_path" a && lib.hasInfix "bin/umu-run" a))
-      (check "Heroic and Lutris are in Settings, for sign-in and installs"
-        (lib.hasInfix "Heroic Games Launcher.setting" c.home-manager.users.alice.home.activation.famidriveSettings.data
-          && lib.hasInfix "Lutris.setting" c.home-manager.users.alice.home.activation.famidriveSettings.data
-          && lib.hasInfix "/bin/lutris ;;" c.famidrive.systems.settings.command))
+      (check "Steam Settings, Heroic and Lutris top their stores' systems each session, and are out of Settings"
+        (let s = c.famidrive.sessionSetup; sys = c.famidrive.systems; in
+          lib.hasInfix "launcher \"$HOME/.local/share/famidrive/roms/steam\" 'Steam Settings' steam" s
+          && lib.hasInfix "launcher \"$HOME/.local/share/famidrive/roms/epic\" 'Heroic Games Launcher' heroic" s
+          && lib.hasInfix "launcher \"$HOME/.local/share/famidrive/roms/lutris\" Lutris lutris" s
+          && lib.all (n: lib.elem ".setting" sys.${n}.extensions) [ "steam" "epic" "lutris" ]
+          && lib.hasInfix "*.setting) exec" sys.steam.command && lib.hasInfix "--steam bigpicture" sys.steam.command
+          && lib.hasInfix "/bin/heroic --fullscreen" sys.epic.command
+          && lib.hasInfix "*.setting) /nix/store/" sys.lutris.command
+          && !(lib.hasInfix "heroic" sys.settings.command) && !(lib.hasInfix "bigpicture" sys.settings.command)
+          && lib.any (p: lib.getName p == "famidrive-generate") c.environment.systemPackages))
       (check "Steam's art and details after each Steam menu update, not before the session"
         (c.systemd.services.famidrive-gen-steam-alice.onSuccess == [ "famidrive-steam-media-alice.service" ]
           && !(lib.elem "display-manager.service" (c.systemd.services.famidrive-steam-media-alice.wantedBy or [ ]))))

@@ -132,8 +132,14 @@ in
       famidrive.systems.lutris = {
         fullname = "Lutris";
         theme = "lutris";   # Art Book Next's Lutris art
-        extensions = [ ".lutris" ];
-        command = ''${pkgs.gamescope-fg}/bin/gamescope-fg --launcher "$ROM" ${lutris}/bin/lutris "lutris:rungameid/$(cat "$ROM")"'';
+        # .setting: Lutris itself, at the top (settings.nix).
+        extensions = [ ".lutris" ".setting" ];
+        command = ''
+          case "$ROM" in
+            *.setting) ${lutris}/bin/lutris ;;
+            *) ${pkgs.gamescope-fg}/bin/gamescope-fg --launcher "$ROM" ${lutris}/bin/lutris "lutris:rungameid/$(cat "$ROM")" ;;
+          esac
+        '';
       };
 
       environment.systemPackages = [ lutris ];

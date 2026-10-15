@@ -259,6 +259,24 @@ class Test(unittest.TestCase):
         self.assertEqual((self.home / "ES-DE/downloaded_media/lutris/covers/Call of Duty_ Black Ops Cold War.jpg")
                          .read_bytes(), b"cover")
 
+    def test_a_launcher_tops_its_stores_system_after_favorites(self):
+        out = self.home / "roms/lutris"
+        out.mkdir(parents=True)
+        (out / "Diablo IV.lutris").write_text("2")
+        gamelist = self.home / "ES-DE/gamelists/lutris/gamelist.xml"
+        gamelist.parent.mkdir(parents=True)
+        gamelist.write_text('<?xml version="1.0"?>\n<gameList>\n\t<game>\n\t\t<path>./Diablo IV.lutris</path>\n'
+                            '\t\t<name>Diablo IV</name>\n\t\t<favorite>true</favorite>\n\t</game>\n</gameList>\n')
+        self.run_tool("launcher", str(out), "Lutris", "lutris")
+        self.run_tool("launcher", str(out), "Lutris", "lutris")
+        self.assertEqual((out / "Lutris.setting").read_text(), "lutris")
+        games = {g.findtext("path"): g for g in ET.parse(gamelist).getroot().iter("game")}
+        self.assertEqual(len(games), 2)
+        self.assertEqual(games["./Lutris.setting"].findtext("sortname"), "0")
+        # The player's favorite is left alone, and still listed first.
+        self.assertEqual(games["./Diablo IV.lutris"].findtext("favorite"), "true")
+        self.assertIsNone(games["./Diablo IV.lutris"].find("sortname"))
+
     def test_lutris_never_opened_gives_no_entries(self):
         out = self.home / "roms/lutris"
         self.run_tool("lutris", str(self.home / ".local/share/lutris"), str(out))
