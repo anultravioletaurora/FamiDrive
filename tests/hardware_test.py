@@ -75,6 +75,27 @@ class Test(unittest.TestCase):
         self.assertEqual((r.returncode, r.stdout), (1, ""))
         self.assertEqual(self.run_tool("offload").returncode, 1)
 
+    def test_the_first_and_second_box_change_nothing(self):
+        # One AMD card (the first box), one Intel card (the second): no
+        # card to prefer, so gamescope's command line stays as it was.
+        for slot, vendor in (("0000:03:00.0", "0x1002"), ("0000:00:02.0", "0x8086")):
+            with self.subTest(vendor=vendor):
+                self.tearDown()
+                self.setUp()
+                self.card(slot, vendor, outputs={"HDMI-A-1": "connected"})
+                self.assertEqual(self.run_tool("display").returncode, 1)
+                self.assertEqual(self.run_tool("offload").returncode, 1)
+
+    def test_a_desktop_with_amds_cpu_graphics_on_uses_the_tvs_card(self):
+        # A Ryzen's own graphics left on beside a Radeon card: the TV's card
+        # for gamescope, whichever Vulkan lists first, and no offload.
+        self.card("0000:03:00.0", "0x1002", device="0x744c", driver="amdgpu", n=0,
+                  outputs={"HDMI-A-1": "connected"})
+        self.card("0000:10:00.0", "0x1002", device="0x164e", driver="amdgpu", boot_vga=True, n=1,
+                  outputs={"HDMI-A-1": "disconnected"})
+        self.assertEqual(self.run_tool("display").stdout, "1002:744c\n")
+        self.assertEqual(self.run_tool("offload").returncode, 1)
+
     def test_a_laptop_renders_on_nvidia_and_shows_on_intel(self):
         self.laptop()
         self.assertEqual(self.run_tool("display").stdout, "8086:46a6\n")
