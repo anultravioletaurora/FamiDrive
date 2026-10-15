@@ -5,6 +5,12 @@
 # to be chosen. famidrive-hardware lists a box's cards, and a check at
 # boot says so in the journal when an Nvidia card has no driver.
 #
+# Hybrid graphics (most laptops with an Nvidia card): the Intel or AMD
+# card has every output, the TV's HDMI too, and the Nvidia card only
+# renders. A build can't tell the two apart either, so each session asks
+# famidrive-hardware: gamescope goes on the card the TV is on, and with
+# "nvidia", what it starts renders on the Nvidia card (session.nix).
+#
 # Tested: AMD (the first box, Radeon RX 7900 XTX). Intel should just
 # work (Mesa, the same as AMD). Nvidia is untested: help wanted.
 { config, lib, pkgs, ... }:
@@ -27,10 +33,14 @@ in
       - `"amd"`, `"intel"`: the same as `"auto"`, said outright.
         AMD is what FamiDrive is tested on; Intel should just work.
       - `"nvidia"`: Nvidia's own driver (its open kernel module, for RTX
-        20-series cards and newer), with kernel modesetting, which
-        gamescope needs, its video decoder, and the long-term kernel,
-        which Nvidia's driver keeps up with. Untested: results welcome
-        in docs/COMPATIBILITY.md.
+        20-series and GTX 16-series cards and newer), with kernel
+        modesetting, which gamescope needs, its video decoder, and the
+        long-term kernel, which Nvidia's driver keeps up with. On a
+        laptop, where the TV is on the Intel or AMD card and the Nvidia
+        card has no screen of its own (hybrid graphics), games render on
+        the Nvidia card and the other one shows them (PRIME render
+        offload); each session works that out from the hardware. Untested:
+        results welcome in docs/COMPATIBILITY.md.
     '';
   };
 

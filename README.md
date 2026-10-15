@@ -328,7 +328,8 @@ planning doc for now and will move into this repo.
 **Graphics cards:** AMD is tested (the first box's Radeon RX 7900 XTX),
 and so is Intel's integrated graphics (the second box's UHD 630, at
 1080p). Intel Arc should just work, the same as AMD. Nvidia is supported
-(`famidrive.gpu = "nvidia"`) but untested, and testers are wanted (#77).
+(`famidrive.gpu = "nvidia"`), laptops with hybrid graphics included, but
+untested, and testers are wanted (#77).
 [COMPATIBILITY.md](docs/COMPATIBILITY.md#graphics-cards) has the details.
 
 **Not in scope yet:** original Xbox, HDMI-CEC power-on (sketched behind

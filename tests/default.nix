@@ -181,7 +181,9 @@ in
   ryujinx = unit "ryujinx" ../pkgs/famidrive-ryujinx/famidrive_ryujinx.py pkgs.python3;
   hardware = unit "hardware" ../pkgs/famidrive-hardware/famidrive_hardware.py pkgs.python3;
 
-  # An Nvidia box: the proprietary driver, set up for gamescope.
+  # An Nvidia box: the proprietary driver, set up for gamescope. Whether
+  # games render on it while another card shows them (a laptop) is
+  # decided at session start (famidrive-hardware offload, unit-tested).
   box-nvidia = expect "nvidia" {
     famidrive = {
       enable = true;
@@ -197,8 +199,8 @@ in
       (c.boot.kernelPackages.kernel.version == pkgs.linuxPackages.kernel.version))
     (check "the boot check knows the box is set up for Nvidia"
       (lib.hasInfix "check nvidia" c.systemd.services.famidrive-hardware-check.serviceConfig.ExecStart))
-    (check "no AMD or Intel driver in its initrd"
-      (!(lib.elem "amdgpu" c.boot.initrd.kernelModules) && !(lib.elem "i915" c.boot.initrd.kernelModules)))
+    (check "Intel's driver in its initrd, for a laptop's screen (hybrid graphics), but not AMD's"
+      (!(lib.elem "amdgpu" c.boot.initrd.kernelModules) && lib.elem "i915" c.boot.initrd.kernelModules))
   ]);
   generators = unit "generators" ../pkgs/famidrive-generators/famidrive_generate.py pkgs.python3;
   picker = unit "picker" ../pkgs/famidrive-picker/famidrive_picker.py
