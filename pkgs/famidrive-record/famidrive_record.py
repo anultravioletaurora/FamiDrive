@@ -32,17 +32,29 @@ GST_LAUNCH = "@gstLaunch@"
 GST_INSPECT = "@gstInspect@"
 GST_PLUGINS = "@gstPlugins@"
 
-# H.264 encoders, best first, and their settings: the GPU's own encoder
-# (VA-API on AMD and Intel, NVENC on Nvidia), else x264 on the CPU. The
-# va plugin is the newer of the two VA-API ones; gst-vaapi is kept
-# as a fallback for older drivers.
+# H.264 encoders, best first: the GPU's own encoder (VA-API on AMD and
+# Intel, NVENC on Nvidia), else x264 on the CPU. The va plugin is the
+# newer of the two VA-API ones; gst-vaapi is kept as a fallback for older
+# drivers. Each with its settings, what scales the picture down for it,
+# and the caps it takes the picture in. The VA-API ones scale on the GPU.
+#
+# Recordings are 1080p, whatever the TV: gamescope's stream is the
+# output's own size (a smaller one can only be asked for through its own
+# pipewire property, which GStreamer can't set). Found on the first box
+# 2026-10-16: 4K recordings, converted on the CPU, came out choppy. They
+# had a steady 60 frames a second, but most likely few of their own:
+# gamescope skips a frame when the recorder hasn't handed its buffer
+# back yet ("out of buffers", pipewire.cpp), so many would be
+# videorate's repeats.
+SCALE_CPU = ["videoconvert", "!", "videoscale"]
 ENCODERS = (
-    ("vah264enc", ["rate-control=cbr", "bitrate=20000"]),
-    ("vaapih264enc", ["rate-control=cbr", "bitrate=20000"]),
-    ("nvh264enc", ["rc-mode=cbr", "bitrate=20000"]),
-    ("x264enc", ["speed-preset=veryfast", "tune=zerolatency", "bitrate=12000"]),
+    ("vah264enc", ["rate-control=cbr", "bitrate=12000"], ["vapostproc"], "video/x-raw(memory:VAMemory),format=NV12"),
+    ("vaapih264enc", ["rate-control=cbr", "bitrate=12000"], ["vaapipostproc"], "video/x-raw(memory:VASurface),format=NV12"),
+    ("nvh264enc", ["rc-mode=cbr", "bitrate=12000"], SCALE_CPU, "video/x-raw,format=NV12"),
+    ("x264enc", ["speed-preset=veryfast", "tune=zerolatency", "bitrate=8000"], SCALE_CPU, "video/x-raw,format=NV12"),
 )
 FPS = 60
+HEIGHT = 1080   # the width follows the TV's shape
 STARTUP_SECONDS = 2.0    # how long a pipeline gets to fail before start says it's running
 # How long it gets to finish the file after Ctrl-C, before it's ended
 # outright. The MP4 is fragmented, so a recording ended that way still
@@ -98,9 +110,9 @@ def file_name(now=None):
 
 def pick_encoder(exists):
     """The first of ENCODERS this box's GStreamer has: exists(name) says."""
-    for name, props in ENCODERS:
-        if exists(name):
-            return name, props
+    for encoder in ENCODERS:
+        if all(exists(e) for e in (encoder[0], *encoder[2][::2])):
+            return encoder
     return None
 
 
@@ -108,15 +120,21 @@ def pipeline(path, encoder):
     """gst-launch-1.0's arguments for a recording to path. pipewiresrc
     stamps frames as they come (gamescope sends one only when the picture
     changes) and keeps sending the last one through a still screen;
-    videorate makes that a steady FPS for the encoder and for players."""
-    name, props = encoder
+    videorate makes that a steady FPS for the encoder and for players.
+
+    NV12 from gamescope: it converts on the GPU, and it's half the size
+    of its other format. The queue after it drops frames rather than hold
+    the stream up when the encoder falls behind, so the recording keeps
+    to the clock."""
+    name, props, scale, caps = encoder
     return [
         "-e",   # Ctrl-C ends the stream properly, so the MP4 is finished
         "pipewiresrc", "target-object=gamescope", "do-timestamp=true", "keepalive-time=100",
-        "!", "queue",
-        "!", "videoconvert",
+        "!", "video/x-raw,format=NV12",
+        "!", "queue", "leaky=downstream", "max-size-buffers=4", "max-size-bytes=0", "max-size-time=0",
+        "!", *scale,
         "!", "videorate",
-        "!", f"video/x-raw,framerate={FPS}/1",
+        "!", f"{caps},height={HEIGHT},pixel-aspect-ratio=1/1,framerate={FPS}/1",
         "!", name, *props,
         "!", "h264parse",
         "!", "queue",

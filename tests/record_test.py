@@ -30,22 +30,39 @@ class Names(unittest.TestCase):
 class Encoder(unittest.TestCase):
     def test_the_gpus_encoder_first(self):
         self.assertEqual(r.pick_encoder(lambda n: True)[0], "vah264enc")
-        self.assertEqual(r.pick_encoder(lambda n: n in ("nvh264enc", "x264enc"))[0], "nvh264enc")
+        cpu = ("videoconvert", "videoscale")
+        self.assertEqual(r.pick_encoder(lambda n: n in ("nvh264enc", "x264enc", *cpu))[0], "nvh264enc")
+
+    def test_an_encoder_whose_scaler_is_missing_is_passed_over(self):
+        # The va encoder without the va scaler (an older plugin set).
+        self.assertEqual(r.pick_encoder(lambda n: n in ("vah264enc", "x264enc", "videoconvert", "videoscale"))[0], "x264enc")
 
     def test_the_cpu_when_there_is_no_other(self):
-        self.assertEqual(r.pick_encoder(lambda n: n == "x264enc")[0], "x264enc")
+        self.assertEqual(r.pick_encoder(lambda n: n in ("x264enc", "videoconvert", "videoscale"))[0], "x264enc")
         self.assertIsNone(r.pick_encoder(lambda n: False))
 
 
 class Pipeline(unittest.TestCase):
     def test_gamescopes_stream_and_the_sound_into_one_mp4(self):
-        args = r.pipeline(Path("/home/a/Recordings/x y.mp4"), ("vah264enc", ["bitrate=1"]))
+        args = r.pipeline(Path("/home/a/Recordings/x y.mp4"), r.ENCODERS[0])
         self.assertEqual(args[0], "-e")
         self.assertIn("target-object=gamescope", args)
         self.assertIn("device=@DEFAULT_MONITOR@", args)
         self.assertIn("location=/home/a/Recordings/x y.mp4", args)   # one argument, spaces and all
         self.assertIn("fragment-duration=1000", args)
-        self.assertEqual(args[args.index("vah264enc") + 1], "bitrate=1")
+        self.assertEqual(args[args.index("vah264enc") + 1], "rate-control=cbr")
+        self.assertIn("video/x-raw,format=NV12", args)   # gamescope's own conversion
+        # Scaled to 1080p on the GPU, at a steady 60, straight into the encoder.
+        scaled = args.index("vah264enc") - 2   # before its "!"
+        self.assertEqual(args[scaled], "video/x-raw(memory:VAMemory),format=NV12,height=1080,pixel-aspect-ratio=1/1,framerate=60/1")
+        self.assertLess(args.index("vapostproc"), args.index("videorate"))
+        # A slow encoder drops frames, it doesn't hold the stream up.
+        self.assertIn("leaky=downstream", args)
+
+    def test_the_cpu_scales_for_the_others(self):
+        args = r.pipeline(Path("/x.mp4"), r.pick_encoder(lambda n: n in ("x264enc", "videoconvert", "videoscale")))
+        self.assertLess(args.index("videoscale"), args.index("x264enc"))
+        self.assertIn("video/x-raw,format=NV12,height=1080,pixel-aspect-ratio=1/1,framerate=60/1", args)
         self.assertEqual(args[-1], "mux.")
 
 
