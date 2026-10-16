@@ -34,7 +34,7 @@ GST_PLUGINS = "@gstPlugins@"
 
 # H.264 encoders, best first, and their settings: the GPU's own encoder
 # (VA-API on AMD and Intel, NVENC on Nvidia), else x264 on the CPU. The
-# va plugin is the newer of the two VA-API ones; gstreamer-vaapi is kept
+# va plugin is the newer of the two VA-API ones; gst-vaapi is kept
 # as a fallback for older drivers.
 ENCODERS = (
     ("vah264enc", ["rate-control=cbr", "bitrate=20000"]),

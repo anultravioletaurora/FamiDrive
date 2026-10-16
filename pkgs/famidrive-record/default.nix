@@ -4,10 +4,10 @@ let
   # Every plugin the pipeline names: pipewiresrc (pipewire), videoconvert
   # and the rest (base), pulsesrc, mp4mux and aacparse (good), h264parse
   # and the va and nvcodec encoders (bad), x264enc (ugly), avenc_aac
-  # (libav), and gstreamer-vaapi.
+  # (libav), and gst-vaapi.
   plugins = with gst_all_1; [
     gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly
-    gst-libav gstreamer-vaapi pipewire
+    gst-libav gst-vaapi pipewire
   ];
 in
 writers.writePython3Bin "famidrive-record" {
