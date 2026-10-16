@@ -34,7 +34,7 @@ let
   # A GOG game's achievements unlock through Comet, which Heroic starts
   # beside it; famidrive-cheevos shows them as toasts.
   heroicEntry = store: {
-    command = ''${pkgs.gamescope-fg}/bin/gamescope-fg --launcher "$ROM" env XDG_CURRENT_DESKTOP=FamiDrive ${pkgs.heroic}/bin/heroic --no-gui --no-sandbox "heroic://launch?appName=$(cat "$ROM")&runner=${heroicStores.${store}}"'';
+    command = ''${pkgs.gamescope-fg}/bin/gamescope-fg --launcher "$ROM" env XDG_CURRENT_DESKTOP=FamiDrive ${cfg.heroic}/bin/heroic --no-gui --no-sandbox "heroic://launch?appName=$(cat "$ROM")&runner=${heroicStores.${store}}"'';
   } // lib.optionalAttrs (store == "gog") {
     before = ''
       ${pkgs.famidrive-cheevos}/bin/famidrive-cheevos watch-comet "$ROM" &
@@ -734,7 +734,7 @@ in
           extensions = [ ".epic" ".setting" ];
           command = ''
             case "$ROM" in
-              *.setting) XDG_CURRENT_DESKTOP=FamiDrive ${pkgs.heroic}/bin/heroic --fullscreen --no-sandbox ;;
+              *.setting) XDG_CURRENT_DESKTOP=FamiDrive ${cfg.heroic}/bin/heroic --fullscreen --no-sandbox ;;
               *) ${(heroicEntry "epic").command} ;;
             esac
           '';

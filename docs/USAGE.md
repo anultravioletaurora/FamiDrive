@@ -843,11 +843,12 @@ Refresh rate gamescope asks the TV for. null = the TV's preferred mode.
 
 ### `famidrive.display.scale`
 
-How much to enlarge things for this TV. Two couch problems, one
+How much to enlarge things for this TV. Several couch problems, one
 number:
   - Chromium's own UI scale (`--force-device-scale-factor`),
-    passed to Discord, Vesktop and Equibop (`voice.nix`): their
-    fonts and icons are a desktop app's, tiny from a couch.
+    passed to Discord, Vesktop and Equibop (`voice.nix`) and to
+    Heroic (`stores.nix`): their fonts and icons are a desktop
+    app's, tiny from a couch.
   - Lutris's window (`stores.nix`): GTK's scale, rounded to the
     nearest whole number, with its text at this scale exactly.
   - Plymouth's boot screen (`boot.nix`), rounded to the
