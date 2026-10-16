@@ -1,5 +1,6 @@
 """famidrive-nexusmods: each player's Nexus Mods collections, downloaded
-with their own premium API key and installed in their Steam games.
+with their own premium API key and installed in their Steam games and
+GOG games (Heroic's or Lutris's).
 
     famidrive-nexusmods sync SPEC.json
     famidrive-nexusmods fetch SPEC.json
@@ -12,9 +13,11 @@ that are no longer in it get their mods removed, and what those mods had
 replaced put back. For each game in it: fetch, plan, then install, once
 every file is here, if what's installed isn't already this. A changed
 spec (another collection, a new revision, other choices) means the old
-install comes out first. A game that's running is waited for; one that
-isn't installed in Steam is skipped until it is; one whose mods Vortex
-manages (vortex.deployment.json in its folder) is left alone.
+install comes out first, and so does one in a folder the game has
+since left (reinstalled, or moved from Heroic to Lutris). A game that's
+running is waited for; one that isn't installed is skipped until it is;
+one whose mods Vortex manages (vortex.deployment.json in its folder) is
+left alone.
 
 fetch: for each game in the spec, the pinned revision of its collection
 (the curator's list of mods and files, in the collection's own archive),
@@ -44,7 +47,9 @@ as it goes, so an install cut short comes out cleanly too.
 
 SPEC (JSON, from Nix):
   {"apiKeyFile": path or null, "cache": folder,
-   "games": {"<Steam app id>": {"collections": [{"slug": "...", "revision": N}, ...],
+   "gog": "heroic" or "lutris" or null (famidrive.stores.gog: whose copy
+          of a GOG game comes first, when both have it),
+   "games": {"<Steam app id>" or "gog:<GOG id>": {"collections": [{"slug": "...", "revision": N}, ...],
                                 "choices": {"<mod name>": ["<option>", ...]}}}}
 """
 
@@ -55,6 +60,7 @@ import posixpath
 import re
 import base64
 import shutil
+import sqlite3
 import struct
 import subprocess
 import sys
@@ -65,6 +71,7 @@ from pathlib import Path
 
 import requests
 import xxhash
+import yaml
 
 API = "https://api.nexusmods.com"
 GRAPHQL = API + "/v2/graphql"
@@ -912,13 +919,100 @@ def heroic_game(key, heroic=None):
     return next((g for g in installed if str(g.get("appName")) == key.split(":", 1)[1]), None)
 
 
-def game_dir(appid, steam=None, heroic=None):
+def heroic_gog(key, heroic=None):
+    """A GOG game Heroic installed: (its folder, its prefix or None), or
+    None. The prefix is the one Heroic's settings for the game name."""
+    g = heroic_game(key, heroic)
+    if not g or not g.get("install_path"):
+        return None
+    name = key.split(":", 1)[1]
+    try:
+        conf = json.loads((Path(heroic or HEROIC) / "GamesConfig" / f"{name}.json").read_text()).get(name, {})
+    except (OSError, ValueError):
+        conf = {}
+    return Path(g["install_path"]), wine_prefix(conf.get("winePrefix"))
+
+
+LUTRIS = Path.home() / ".local/share/lutris"
+
+
+def lutris_gog(key, lutris=None):
+    """A GOG game Lutris installed: (its folder, its prefix), or None.
+    Read from Lutris 0.5.22's source on 2026-10-15: its GOG installer
+    (services/gog.py, autosetup_gog_game) runs GOG's own setup in a
+    prefix of the game's own (pga.db's `directory`, and the `prefix` in
+    its game config), and records the GOG id as the game's service_id.
+    The setup puts the game in its default folder in that prefix's C:,
+    which is the one with GOG's goggame-<id>.info in it."""
+    lutris = Path(lutris or LUTRIS)
+    gog_id = key.split(":", 1)[1]
+    try:
+        con = sqlite3.connect(f"{(lutris / 'pga.db').as_uri()}?mode=ro", uri=True, timeout=10)
+        try:
+            row = con.execute("SELECT directory, configpath FROM games WHERE service = 'gog' AND service_id = ?"
+                              " AND installed = 1", (gog_id,)).fetchone()
+        finally:
+            con.close()
+    except sqlite3.Error:   # Lutris never opened, or writing it right now
+        return None
+    if not row:
+        return None
+    # In ~/.config/lutris when an older Lutris made that, otherwise
+    # beside the database (lutris/settings.py, CONFIG_DIR).
+    old = Path.home() / ".config/lutris"
+    configs = (old if old.is_dir() else lutris) / "games"
+    try:
+        game = (yaml.safe_load((configs / f"{row[1]}.yml").read_text()) or {}).get("game") or {}
+    except (OSError, yaml.YAMLError, AttributeError):
+        game = {}
+    prefix = wine_prefix(game.get("prefix") or row[0])
+    if prefix is None:
+        return None
+    marker = f"goggame-{gog_id}.info"
+    drive_c = prefix / "drive_c"
+    # GOG's setup goes in "GOG Games/<game>" by default; a few levels
+    # down covers "Program Files (x86)/GOG Galaxy/Games/<game>" too.
+    # Wine's own folders are big and never have it.
+    for folder, dirs, files in os.walk(drive_c):
+        if marker in files:
+            return Path(folder), prefix
+        depth = len(Path(folder).relative_to(drive_c).parts)
+        dirs[:] = [] if depth >= 4 else sorted(d for d in dirs if d.lower() not in ("windows", "users"))
+    return None
+
+
+# Whose copy of a GOG game comes first, when Heroic and Lutris both have
+# it: the spec's "gog" (famidrive.stores.gog) puts its own first.
+GOG_LAUNCHERS = ["heroic", "lutris"]
+
+
+def gog_game(key, heroic=None, lutris=None):
+    """A GOG game ("gog:<id>"): (its folder, its prefix or None), from the
+    first launcher in GOG_LAUNCHERS that has it installed, or None."""
+    for launcher in GOG_LAUNCHERS:
+        found = heroic_gog(key, heroic) if launcher == "heroic" else lutris_gog(key, lutris)
+        if found:
+            return found
+    return None
+
+
+def wine_prefix(p):
+    """The Wine prefix itself (drive_c's parent), or None: a Proton one
+    keeps it in pfx/."""
+    if not p:
+        return None
+    p = Path(p)
+    return p / "pfx" if (p / "pfx").is_dir() else p
+
+
+def game_dir(appid, steam=None, heroic=None, lutris=None):
     """The installed game's folder, or None. A Steam game (by app id): its
     appmanifest says where, and StateFlags 4 is fully installed (not
-    mid-download or update). A GOG game ("gog:<id>"): Heroic's record."""
+    mid-download or update). A GOG game ("gog:<id>"): Heroic's or
+    Lutris's record."""
     if str(appid).startswith("gog:"):
-        g = heroic_game(appid, heroic)
-        return Path(g["install_path"]) if g and g.get("install_path") else None
+        g = gog_game(appid, heroic, lutris)
+        return g[0] if g else None
     for lib in steam_libraries(steam):
         acf = lib / "steamapps" / f"appmanifest_{appid}.acf"
         try:
@@ -932,23 +1026,14 @@ def game_dir(appid, steam=None, heroic=None):
     return None
 
 
-def prefix_of(appid, root, steam=None, heroic=None):
+def prefix_of(appid, root, steam=None, heroic=None, lutris=None):
     """The game's Windows prefix (drive_c's parent), or None: Steam's
-    compatdata beside its library, or the one Heroic's settings name for
-    a GOG game (a Proton one keeps it in pfx/)."""
+    compatdata beside its library, or Heroic's or Lutris's for a GOG
+    game."""
     if str(appid).startswith("gog:"):
-        heroic = Path(heroic or HEROIC)
-        name = appid.split(":", 1)[1]
-        try:
-            conf = json.loads((heroic / "GamesConfig" / f"{name}.json").read_text()).get(name, {})
-        except (OSError, ValueError):
-            return None
-        p = Path(conf["winePrefix"]) if conf.get("winePrefix") else None
-    else:
-        p = Path(root).parents[1] / "compatdata" / str(appid)   # <library>/steamapps/compatdata/<id>
-    if p is None:
-        return None
-    return p / "pfx" if (p / "pfx").is_dir() else p
+        g = gog_game(appid, heroic, lutris)
+        return g[1] if g else None
+    return wine_prefix(Path(root).parents[1] / "compatdata" / str(appid))   # <library>/steamapps/compatdata/<id>
 
 
 def game_running(appid, root=None):
@@ -1137,14 +1222,17 @@ def uninstall(record):
         except FileNotFoundError:
             pass
         folders.add(p.parent)
-    for rel in record.get("replaced", []):
+    # A game that's been uninstalled (its folder, or its prefix, gone)
+    # gets nothing put back: that would make the folder again, with just
+    # the files the mods had replaced in it.
+    for rel in record.get("replaced", []) if root.is_dir() else []:
         bk = backup / "replaced" / rel if (backup / "replaced" / rel).exists() else backup / rel
         if bk.exists():
             (root / rel).parent.mkdir(parents=True, exist_ok=True)
             os.replace(bk, root / rel)
     for o in record.get("outside", []):   # files outside the game's folder (its prefix's INIs)
         Path(o["path"]).unlink(missing_ok=True)
-        if o.get("backup") and Path(o["backup"]).exists():
+        if o.get("backup") and Path(o["backup"]).exists() and Path(o["path"]).parent.is_dir():
             os.replace(o["backup"], o["path"])
     for folder in sorted(folders, key=lambda p: -len(p.parts)):
         while folder != root and root in folder.parents:
@@ -1385,7 +1473,13 @@ def sync_game(nx, cache, appid, game, wait=60, extras=None):
     want = want_of(game)
     have = read_installed(appid, cache)
     if have and have.get("want") == want and have.get("complete"):
-        return 0
+        # Unless the game's somewhere else now (reinstalled, or moved
+        # from Heroic to Lutris): then the old install comes out and the
+        # mods go in again, where the game is.
+        now = game_dir(appid)
+        if now is None or Path(have["root"]) == now:
+            return 0
+        log(f"{appid}: the game moved to {now}; installing its mods there")
     status = fetch_game(nx, cache, appid, game)
     if status:
         log(f"{appid}: not every file is here yet; installing once they are")
@@ -1402,7 +1496,7 @@ def sync_game(nx, cache, appid, game, wait=60, extras=None):
         return 1
     root = game_dir(appid)
     if root is None:
-        log(f"{appid}: the game isn't installed in Steam (or is updating); its mods wait for it")
+        log(f"{appid}: the game isn't installed (or Steam is updating it); its mods wait for it")
         return 0
     if (root / "vortex.deployment.json").exists():
         log(f"{appid}: Vortex manages this game's mods (vortex.deployment.json); left alone")
@@ -1517,6 +1611,8 @@ def main():
     if len(args) < 2 or args[0] not in ("sync", "fetch", "plan", "uninstall"):
         raise SystemExit(__doc__.split("\n\n")[1])
     spec = json.loads(Path(args[1]).read_text())
+    if spec.get("gog") in GOG_LAUNCHERS:
+        GOG_LAUNCHERS.sort(key=lambda launcher: launcher != spec["gog"])
     if args[0] == "sync":
         sys.exit(cmd_sync(spec))
     if args[0] == "fetch":

@@ -114,12 +114,6 @@ in
       famidrive.lutris = lutris;
       famidrive.launchers = lib.genAttrs [ "heroic" "lutris" ] (l:
         lib.optionals on (lib.filter (s: cfg.stores.${s} == l) (lib.attrNames cfg.stores)));
-
-      # famidrive-nexusmods finds a GOG game in Heroic's records only.
-      warnings = lib.optional (cfg.enable && cfg.stores.gog != "heroic" && lib.any (p:
-        lib.any (lib.hasPrefix "gog:") (lib.attrNames (p.nexusmods.games or { })))
-        (lib.attrValues cfg.players))
-        "famidrive.stores.gog isn't \"heroic\", but a player's nexusmods.games has a GOG game (\"gog:...\"), and its mods install only into Heroic's copy. Set famidrive.stores.gog = \"heroic\" to keep it.";
     }
 
     (lib.mkIf (cfg.enable && lutrisStores != [ ]) {

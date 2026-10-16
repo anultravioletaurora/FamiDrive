@@ -170,7 +170,7 @@ preferences, API Keys), for an account with premium.
 ### `famidrive.players.<name>.nexusmods.games`
 
 Nexus Mods collections for their games: a Steam game by its app
-id, a GOG game (installed through Heroic) as `gog:<GOG id>`. A
+id, a GOG game (in Heroic or Lutris) as `gog:<GOG id>`. A
 collection can be a Wabbajack list (New Vegas's NakeyJakey's,
 for one), built and installed the same way.
 Downloaded in the background into their cache

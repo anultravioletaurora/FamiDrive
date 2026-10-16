@@ -36,13 +36,13 @@ follow.
   marks adult (many large ones are, for a few of their mods). A key
   without it can't see them.
 - **The game installed** in the player's Steam library, or through
-  Heroic for a GOG game, and run once.
+  Heroic or Lutris for a GOG game, and run once.
 
 ### Setting it up
 
 Each game gets one or more collections, by the id at the end of the
 collection's address and a revision. A Steam game goes by its app id, a
-GOG game (installed through Heroic) as `gog:<GOG id>`:
+GOG game (installed through Heroic or Lutris) as `gog:<GOG id>`:
 
 ```nix
 famidrive.players.alice.nexusmods.games."1091500" = {   # Cyberpunk 2077
@@ -109,6 +109,13 @@ progress toast on the TV.
 - **The game running:** installing waits until it's closed.
 - **The game not installed** (or Steam updating it): its mods wait, and
   go in on a later run.
+- **The game somewhere else** (uninstalled and installed again, or moved
+  from Heroic to Lutris): the old install comes out and the mods go in
+  where the game is now, on the service's next run (at boot, once a day,
+  or `systemctl restart famidrive-nexusmods-<player>`). A game that's
+  been uninstalled gets nothing put back into its old folder.
+- **A GOG game in both Heroic and Lutris:** the mods go in the copy of
+  the launcher `famidrive.stores.gog` names.
 - **Vortex managing the game** (its `vortex.deployment.json` in the
   game's folder): left alone, with a toast. See [Moving from Vortex](#moving-from-vortex).
 - **A download failing** (a server down, a file pulled): tried again the
@@ -195,7 +202,7 @@ famidrive.players.alice.nexusmods.games."gog:1454587428".collections = [
   order the list's Mod Organizer profile gives them (a later mod wins a
   shared file), as hard links to the built folders, so they take no
   extra space. Mod Organizer itself isn't needed: the game starts from
-  Steam, Heroic or ES-DE as it always does.
+  Steam, Heroic, Lutris or ES-DE as it always does.
 - **Steps FamiDrive doesn't do yet** (building BSA archives, converting
   textures) are named in the service's log, and that list isn't
   installed.
@@ -227,7 +234,8 @@ that too, recorded and backed up like everything else:
   every INI: the TV's resolution, windowed (gamescope shows it full
   screen), no MSAA, and the controller turned on (lists often turn it
   off, for a mouse and keyboard).
-- **GOG's registry value** (`Installed Path`), when Heroic hasn't set it.
+- **GOG's registry value** (`Installed Path`), when the launcher hasn't
+  set it (Heroic hadn't).
 - **Archive invalidation:** the empty `Fallout - Invalidation.bsa` the
   profile's INI names, as Mod Organizer makes it.
 
@@ -238,9 +246,9 @@ its DLC on Steam.
 
 Its plugins need a current Proton: JohnnyGuitar NVSE needs
 `MSVCP140_ATOMIC_WAIT.dll`, which GE-Proton7-50's Wine doesn't have.
-FamiDrive makes its own GE-Proton Heroic's default; a game set up
-before that keeps the Proton it was given, so pick a newer one for it
-in Heroic.
+FamiDrive makes its own GE-Proton the default in Heroic and Lutris; a
+game set up in Heroic before that keeps the Proton it was given, so
+pick a newer one for it there.
 
 ### Not done yet
 
