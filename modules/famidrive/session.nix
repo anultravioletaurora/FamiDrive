@@ -81,18 +81,6 @@ let
 
   famidriveSession = pkgs.writeShellScript "famidrive-session" ''
     ${sdlXboxOff}
-    ${lib.optionalString (cfg.gpu == "nvidia") ''
-      # Hybrid graphics (gpu.nix): when the TV is on an Intel or AMD card
-      # and the Nvidia card has no screen, as on most laptops, everything
-      # this session starts renders on the Nvidia card and gamescope shows
-      # it (PRIME render offload). Here, not before gamescope: gamescope
-      # itself has to stay on the card the TV is on. Before Steam starts,
-      # since its games inherit its environment. By name, like romm-agent
-      # below, so a fix to the tool doesn't restart the TV.
-      if famidrive-hardware offload > /dev/null 2>&1; then
-        export __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only
-      fi
-    ''}
     ${lib.optionalString (perfUsers != [ ]) ''
       # MangoHud (gamescope --mangoapp, for players with the performance
       # overlay on). gamescope hands mangoapp a config that says
@@ -149,7 +137,15 @@ let
       # Settings (gamescope-fg starts Steam for it), and the next session
       # has the file.
       if ${steamSignedIn}; then
-        SDL_GAMECONTROLLER_IGNORE_DEVICES="$FAMIDRIVE_STEAM_SDL_IGNORE" steam -silent &
+        # On the Nvidia card on a hybrid laptop, as gamescope-fg starts
+        # it: its games inherit its environment.
+        (
+          if [ -n "''${FAMIDRIVE_OFFLOAD:-}" ]; then
+            unset VK_LOADER_DRIVERS_DISABLE
+            export __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only
+          fi
+          SDL_GAMECONTROLLER_IGNORE_DEVICES="$FAMIDRIVE_STEAM_SDL_IGNORE" exec steam -silent
+        ) &
       fi
     ''}
     ${lib.optionalString (config.famidrive.esde.theme != null) ''
@@ -252,11 +248,24 @@ let
   # that can be the Nvidia card, which has none: a black TV. So it's told
   # the card the TV is on (famidrive-hardware display). Nothing changes
   # on a box with one card. By name, from the system's PATH: see romm-agent.
+  #
+  # Hybrid graphics (gpu.nix): gamescope, ES-DE and the rest of the menu
+  # stay off the Nvidia card entirely, so it can power off while nobody
+  # is playing; only what's launched from ES-DE renders on it
+  # (FAMIDRIVE_OFFLOAD, read by gamescope-fg). Found on a hybrid laptop
+  # 2026-10-16: with the offload for the whole session, ES-DE rendered
+  # on the Nvidia card, and gamescope opened it too just by listing the
+  # cards through Vulkan, so the card sat at full clocks in the menu.
   preferDisplayCard = ''
     vk=()
     if card=$(famidrive-hardware display 2> /dev/null); then
       vk=(--prefer-vk-device "$card")
     fi
+    ${lib.optionalString (cfg.gpu == "nvidia") ''
+      if famidrive-hardware offload > /dev/null 2>&1; then
+        export VK_LOADER_DRIVERS_DISABLE='*nvidia*' FAMIDRIVE_OFFLOAD=1
+      fi
+    ''}
   '';
 
   gamescopeCmd = lib.concatStringsSep " " ([

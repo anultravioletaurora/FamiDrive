@@ -196,6 +196,18 @@ writeShellApplication {
       exit $?
     fi
 
+    # Hybrid graphics (gpu.nix): ES-DE and gamescope stay on the card the
+    # TV is on, and a game renders on the Nvidia card, which gamescope
+    # then shows (PRIME render offload). famidrive-session says when
+    # (FAMIDRIVE_OFFLOAD), and also starts Steam this way. Not voice
+    # chat: it runs the whole session, and would keep the Nvidia card on.
+    on_nvidia() {
+      if [ -n "''${FAMIDRIVE_OFFLOAD:-}" ]; then
+        unset VK_LOADER_DRIVERS_DISABLE
+        export __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only
+      fi
+    }
+
     # Everything else (a game, Steam, Big Picture, the Media app) covers
     # ES-DE until it's gone, so the menu's music waits too.
     music_paused true
@@ -232,6 +244,7 @@ writeShellApplication {
     focusable() { xprop -root GAMESCOPE_FOCUSABLE_APPS 2>/dev/null | grep -qE "[ ,]$1(,|$)"; }
 
     if [ "''${1:-}" = "--steam" ] && [ "''${2:-}" = "bigpicture" ]; then
+      on_nvidia   # in case this starts the Steam client
       echo "steam steam://close/bigpicture" > "$run/famidrive-game.close"
       SDL_GAMECONTROLLER_IGNORE_DEVICES="''${FAMIDRIVE_STEAM_SDL_IGNORE:-}" steam steam://open/bigpicture
       base "769,$FRONTEND"   # 769: the app id Steam gives its own windows
@@ -248,6 +261,7 @@ writeShellApplication {
     fi
 
     if [ "''${1:-}" = "--steam" ]; then
+      on_nvidia   # in case this starts the Steam client
       appid="$2"
       log="$HOME/.local/share/Steam/logs/console_log.txt"
       # Games in the default library only; others don't get the update retry.
@@ -493,6 +507,7 @@ writeShellApplication {
     if [ "''${1:-}" = "--launcher" ]; then
       rom="$2"
       shift 2
+      on_nvidia
       trap 'status_stop; music_paused false' EXIT
       status launching
       famidrive-status --rom "$rom" "$status_file" &
@@ -596,6 +611,7 @@ writeShellApplication {
     # setsid gives the game its own session and process group. A background
     # job of this (non-interactive) shell isn't a group leader, so setsid
     # execs in place and $! is the game's pid, session id and group id.
+    on_nvidia
     setsid "$@" &
     pid=$!
     echo "$pid" > "$run/famidrive-game.pgid"
