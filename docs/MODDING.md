@@ -240,6 +240,24 @@ that too, recorded and backed up like everything else:
 - **Archive invalidation:** the empty `Fallout - Invalidation.bsa` the
   profile's INI names, as Mod Organizer makes it.
 
+**Your own settings** go over the list's and FamiDrive's, from the
+player's config, so a reinstall keeps them. By INI file, section and key,
+with true and false written as 1 and 0:
+
+```nix
+famidrive.players.alice.nexusmods.games."gog:1454587428".ini = {
+  "FalloutPrefs.ini".Display = {
+    iShadowMapResolution = 4096;   # sharper shadows
+    iActorShadowCountExt = 10;     # more people casting shadows outside
+  };
+};
+```
+
+A rebuild that changes only these rewrites the INIs once the game is
+closed, without reinstalling the mods. Bethesda's launcher shouldn't be
+used for this: it writes its own `FalloutPrefs.ini` and overwrites
+`Fallout.ini` with the game's defaults, losing the list's settings.
+
 Lists for New Vegas usually need **every DLC** (Dead Money, Honest
 Hearts, Old World Blues, Lonesome Road, Gun Runners' Arsenal and the
 Courier's Stash): the Ultimate Edition on GOG, or the base game plus

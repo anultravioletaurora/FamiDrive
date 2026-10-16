@@ -50,7 +50,8 @@ SPEC (JSON, from Nix):
    "gog": "heroic" or "lutris" or null (famidrive.stores.gog: whose copy
           of a GOG game comes first, when both have it),
    "games": {"<Steam app id>" or "gog:<GOG id>": {"collections": [{"slug": "...", "revision": N}, ...],
-                                "choices": {"<mod name>": ["<option>", ...]}}}}
+                                "choices": {"<mod name>": ["<option>", ...]},
+                                "ini": {"<file>": {"<section>": {"<key>": value}}}}}}
 """
 
 import hashlib
@@ -1448,7 +1449,19 @@ NV_PATCHER = {"mod": 62552, "file": 1000080719, "name": "PyNVPatch.py",
               "sha256": "dbb841ba2ab5dd9979282b8029b87e703475b5264441b4ee18243c2e91b39849"}
 
 
-def newvegas(record, root, prefix, profile, extras, nx, cache):
+def nv_place_inis(record, root, prefix, profile, ini=None):
+    """New Vegas's INIs into My Games/FalloutNV, with the player's own
+    settings (`ini`) over them, recorded like the rest of the install."""
+    docs = windows_user(prefix) / "Documents/My Games/FalloutNV"
+    device = gpu_name()
+    if device is None:
+        log("newvegas: Vulkan named no graphics card; the game may start its launcher instead")
+    for name, text in apply_ini(nv_inis(root, profile, screen_size(), device), ini).items():
+        place_outside(record, docs / name, text.encode())
+    record["ini"] = ini or {}
+
+
+def newvegas(record, root, prefix, profile, extras, nx, cache, ini=None):
     """New Vegas beyond its mods: xNVSE, the 4GB patch, the launcher out
     of the way, the profile's INIs and plugins in the prefix, and the
     plugins' order (New Vegas orders them by file date)."""
@@ -1485,12 +1498,7 @@ def newvegas(record, root, prefix, profile, extras, nx, cache):
     if prefix is None:
         raise RuntimeError("no prefix for the game yet: start it once, then rebuild")
     user = windows_user(prefix)
-    docs = user / "Documents/My Games/FalloutNV"
-    device = gpu_name()
-    if device is None:
-        log("newvegas: Vulkan named no graphics card; the game may start its launcher instead")
-    for name, text in nv_inis(root, profile, screen_size(), device).items():
-        place_outside(record, docs / name, text.encode())
+    nv_place_inis(record, root, prefix, profile, ini)
     if nv_registry(prefix, root):
         log("newvegas: set the game's Installed Path in its prefix")
     plugins = (profile / "plugins.txt").read_bytes()
@@ -1506,6 +1514,54 @@ def newvegas(record, root, prefix, profile, extras, nx, cache):
 
 
 GAME_SETUP = {"newvegas": newvegas}
+# The games whose INIs FamiDrive writes, so a player's `ini` settings have
+# somewhere to go.
+GAME_INIS = {"newvegas": nv_place_inis}
+
+
+def ini_text(sections):
+    """{section: {key: value}} as INI text; true and false as 1 and 0, as
+    Bethesda's INIs have them."""
+    out = []
+    for section, keys in sections.items():
+        out.append(f"[{section}]")
+        out += [f"{k}={int(v) if isinstance(v, bool) else v}" for k, v in keys.items()]
+    return "\n".join(out) + "\n"
+
+
+def apply_ini(inis, overrides):
+    """{name: text} of a game's INIs with the player's settings ({file:
+    {section: {key: value}}}) over them. A file is matched in any case;
+    one FamiDrive doesn't write is made from the settings alone."""
+    out = dict(inis)
+    for name, sections in (overrides or {}).items():
+        name = next((n for n in out if n.lower() == name.lower()), name)
+        out[name] = ini_merge(out.get(name, ""), ini_text(sections))
+    return out
+
+
+def wabbajack_of(cache, game):
+    """The game's Wabbajack list ({slug, revision}) that's downloaded, or None."""
+    return next((c for c in collections_of(game) if wabbajack_file(cache, c["slug"], c["revision"]).exists()), None)
+
+
+def update_inis(cache, appid, game, have, root, wait=60):
+    """Only the player's INI settings changed: the game's INIs made again
+    with them, with no reinstall."""
+    wj = wabbajack_of(cache, game)
+    domain = WJ_GAMES.get(wj_modlist(cache, wj["slug"], wj["revision"]).get("GameType"), "") if wj else ""
+    place = GAME_INIS.get(domain)
+    if place is None:
+        log(f"{appid}: INI settings work only for New Vegas so far; left alone")
+        return 0
+    while game_running(appid, root):
+        log(f"{appid}: the game is running; changing its settings once it's closed")
+        time.sleep(wait)
+    place(have, root, prefix_of(appid, root), mo2_profile(wj_tree(cache, wj["slug"], wj["revision"])), game.get("ini"))
+    save_installed(appid, have)
+    log(f"{appid}: INI settings changed")
+    toast("--kind", "success", "--id", f"nexusmods-{appid}", "--done", "Game settings changed", "From the next start")
+    return 0
 
 
 def sync_game(nx, cache, appid, game, wait=60, extras=None):
@@ -1517,6 +1573,8 @@ def sync_game(nx, cache, appid, game, wait=60, extras=None):
         # mods go in again, where the game is.
         now = game_dir(appid)
         if now is None or Path(have["root"]) == now:
+            if now is not None and have.get("ini", {}) != (game.get("ini") or {}):
+                return update_inis(cache, appid, game, have, now, wait)
             return 0
         log(f"{appid}: the game moved to {now}; installing its mods there")
     status = fetch_game(nx, cache, appid, game)
@@ -1561,7 +1619,7 @@ def sync_game(nx, cache, appid, game, wait=60, extras=None):
         if setup:
             record["complete"] = False
             setup(record, root, prefix_of(appid, root), mo2_profile(wj_tree(cache, wj["slug"], wj["revision"])),
-                  extras or {}, nx, cache)
+                  extras or {}, nx, cache, ini=game.get("ini"))
             record["complete"] = True
         save_installed(appid, record)
     log(f"{appid}: installed {len(record['files'])} files from {names}; {len(record['replaced'])} replaced (backed up)")

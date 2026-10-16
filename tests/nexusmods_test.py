@@ -549,6 +549,38 @@ class NewVegas(unittest.TestCase):
         self.assertIsNone(m.gpu_name(gpu(0, "CPU", "llvmpipe (LLVM 21.1.8, 256 bits)")))
         self.assertIsNone(m.gpu_name(""))
 
+    def test_the_players_ini_settings_go_over_famidrives(self):
+        inis = {"FalloutPrefs.ini": "[Display]\niShadowMapResolution=1024\nbFull Screen=0\n"}
+        out = m.apply_ini(inis, {"falloutprefs.ini": {"Display": {"iShadowMapResolution": 4096, "bDrawShadows": True}},
+                                 "Fallout.ini": {"General": {"fDefaultFOV": 85.5}}})
+        prefs = out["FalloutPrefs.ini"].splitlines()   # matched in any case, kept as FamiDrive names it
+        self.assertIn("iShadowMapResolution=4096", prefs)
+        self.assertNotIn("iShadowMapResolution=1024", prefs)
+        self.assertIn("bDrawShadows=1", prefs)
+        self.assertIn("bFull Screen=0", prefs)
+        self.assertEqual(out["Fallout.ini"].splitlines(), ["[General]", "fDefaultFOV=85.5"])
+        self.assertEqual(m.apply_ini(inis, None), inis)
+
+    def test_only_the_ini_settings_changed_means_no_reinstall(self):
+        with tempfile.TemporaryDirectory() as d:
+            m.STATE = Path(d) / "state"
+            root, game = Path(d) / "game", {"collections": [{"slug": "ezlocx", "revision": 1}]}
+            m.save_installed("gog:1", {"appid": "gog:1", "root": str(root), "want": m.want_of(game), "files": [],
+                                       "replaced": [], "backup": str(Path(d) / "bk"), "complete": True})
+            calls = []
+            real = (m.game_dir, m.update_inis, m.fetch_game)
+            m.game_dir = lambda appid: root
+            m.update_inis = lambda cache, appid, game, have, root, wait=60: calls.append(game.get("ini")) or 0
+            m.fetch_game = lambda *a: self.fail("reinstalling")
+            try:
+                self.assertEqual(m.sync_game(None, Path(d), "gog:1", game), 0)   # an install from before ini
+                self.assertEqual(calls, [])
+                ini = {"FalloutPrefs.ini": {"Display": {"iShadowMapResolution": 4096}}}
+                self.assertEqual(m.sync_game(None, Path(d), "gog:1", dict(game, ini=ini)), 0)
+                self.assertEqual(calls, [ini])
+            finally:
+                m.game_dir, m.update_inis, m.fetch_game = real
+
     def test_installed_path_once(self):
         with tempfile.TemporaryDirectory() as d:
             prefix = Path(d)

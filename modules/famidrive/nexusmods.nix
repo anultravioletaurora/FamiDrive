@@ -43,7 +43,7 @@ let
     extras = lib.mapAttrs (_: toString) extras;
     games = lib.mapAttrs (_: g: {
       collections = lib.optional (g.collection != null) g.collection ++ g.collections;
-      inherit (g) choices;
+      inherit (g) choices ini;
     }) (p.nexusmods.games or { });
   });
 
@@ -108,6 +108,22 @@ let
           collection leaves to the player, by mod name: the names of the
           options, as the installer shows them. Unset, each installer's
           own default (its first option, when one must be picked).
+        '';
+      };
+      ini = mkOption {
+        type = types.attrsOf (types.attrsOf (types.attrsOf (types.oneOf [ types.bool types.int types.float types.str ])));
+        default = { };
+        example = {
+          "FalloutPrefs.ini".Display = { iShadowMapResolution = 4096; fShadowLODStartFade = 2000.0; };
+          "Fallout.ini".Display.bDrawShadows = true;
+        };
+        description = ''
+          The player's own settings in the game's INIs, by file, section
+          and key, over the collection's and FamiDrive's. true and false
+          are written as 1 and 0. Changing only these rewrites the INIs,
+          once the game is closed, without reinstalling the mods. Only for
+          the games whose INIs FamiDrive writes: Fallout: New Vegas (its
+          Fallout.ini, FalloutPrefs.ini and FalloutCustom.ini, in My Games).
         '';
       };
       launchOptions = mkOption {

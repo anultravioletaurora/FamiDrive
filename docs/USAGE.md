@@ -308,6 +308,35 @@ The collection's id, the last part of its address on nexusmods.com.
 - **Default:** none; required when used
 - **Example:** `"iszwwe"`
 
+### `famidrive.players.<name>.nexusmods.games.<name>.ini`
+
+The player's own settings in the game's INIs, by file, section
+and key, over the collection's and FamiDrive's. true and false
+are written as 1 and 0. Changing only these rewrites the INIs,
+once the game is closed, without reinstalling the mods. Only for
+the games whose INIs FamiDrive writes: Fallout: New Vegas (its
+Fallout.ini, FalloutPrefs.ini and FalloutCustom.ini, in My Games).
+
+- **Type:** attribute set of attribute set of attribute set of (boolean or signed integer or floating point number or string)
+- **Default:** `{ }`
+- **Example:** 
+
+  ```nix
+  {
+    "Fallout.ini" = {
+      Display = {
+        bDrawShadows = true;
+      };
+    };
+    "FalloutPrefs.ini" = {
+      Display = {
+        fShadowLODStartFade = 2000.0;
+        iShadowMapResolution = 4096;
+      };
+    };
+  }
+  ```
+
 ### `famidrive.players.<name>.nexusmods.games.<name>.launchOptions`
 
 The game's launch options in Steam while it's modded, for this

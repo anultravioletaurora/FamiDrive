@@ -233,6 +233,7 @@ in
         collection = { slug = "iszwwe"; revision = 481; };
         collections = [ { slug = "g0tcm4"; revision = 42; } ];
         choices."WTNC Config" = [ "Cyberpunk THING" ];
+        ini."FalloutPrefs.ini".Display = { iShadowMapResolution = 4096; bDrawShadows = true; };
       };
       players.bob = { };
     };
@@ -263,6 +264,10 @@ in
             c.systemd.services.famidrive-nexusmods-alice.serviceConfig.ExecStart)))); in
         map (x: x.slug) spec.games."1091500".collections == [ "iszwwe" "g0tcm4" ]
           && spec.games."1091500".choices."WTNC Config" == [ "Cyberpunk THING" ]))
+    (check "the player's INI settings reach the service, as plain data"
+      (let spec = builtins.fromJSON (builtins.unsafeDiscardStringContext (builtins.readFile (lib.last (lib.splitString " "
+            c.systemd.services.famidrive-nexusmods-alice.serviceConfig.ExecStart)))); in
+        spec.games."1091500".ini."FalloutPrefs.ini".Display == { iShadowMapResolution = 4096; bDrawShadows = true; }))
     (check "a known game's mods load for the player who mods it, launcher skipped; the other player keeps the box's"
       (c.famidrive.steam.playerLaunchOptions.alice."1091500"
           == ''WINEDLLOVERRIDES="winmm,version=n,b" %command% --launcher-skip''
