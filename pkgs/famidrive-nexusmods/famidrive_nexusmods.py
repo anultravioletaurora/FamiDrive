@@ -79,6 +79,7 @@ BSDTAR = os.environ.get("FAMIDRIVE_BSDTAR", "@bsdtar@")
 # The Unarchiver, for what libarchive can't unpack: solid RAR archives.
 # Found on the first box 2026-10-10, in NakeyJakey's New Vegas.
 UNAR = os.environ.get("FAMIDRIVE_UNAR", "@unar@")
+VULKANINFO = os.environ.get("FAMIDRIVE_VULKANINFO", "@vulkaninfo@")
 TOAST = "@toast@"
 STATE = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share") / "famidrive/nexusmods"
 STEAM = Path.home() / ".local/share/Steam"
@@ -1340,7 +1341,36 @@ def screen_size():
     return 1920, 1080
 
 
-def nv_inis(root, profile, screen):
+# DXVK lists Vulkan's devices discrete first, then integrated, then
+# virtual (queryAdapters, dxvk_instance.cpp), and the game's iAdapter=0
+# is the first. A CPU renderer (llvmpipe) is never the TV's card.
+GPU_ORDER = ("PHYSICAL_DEVICE_TYPE_DISCRETE_GPU", "PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU",
+             "PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU")
+
+
+def gpu_name(summary=None):
+    """The graphics card's name as DXVK gives it to a Direct3D 9 game: the
+    Vulkan device name of the first device DXVK lists, from `vulkaninfo
+    --summary`. None when Vulkan has no GPU to name. A player's service
+    sees it at boot too: NixOS leaves the render node open to everyone."""
+    if summary is None:
+        try:
+            summary = subprocess.run([VULKANINFO, "--summary"], capture_output=True, text=True, timeout=60).stdout
+        except (OSError, subprocess.SubprocessError):
+            return None
+    devices = []
+    for line in summary.splitlines():
+        if re.match(r"GPU\d+:", line.strip()):
+            devices.append({})
+        elif devices and "=" in line:
+            k, v = line.split("=", 1)
+            devices[-1][k.strip()] = v.strip()
+    gpus = [d for d in devices if d.get("deviceType") in GPU_ORDER and d.get("deviceName")]
+    gpus.sort(key=lambda d: GPU_ORDER.index(d["deviceType"]))   # stable: Vulkan's order within a type
+    return gpus[0]["deviceName"] if gpus else None
+
+
+def nv_inis(root, profile, screen, device=None):
     """{name: text} of New Vegas's INIs (My Games/FalloutNV): the profile's,
     with what the game needs to start on a TV through gamescope.
 
@@ -1353,6 +1383,10 @@ def nv_inis(root, profile, screen):
     launcher swapped for the game, over and over) when its
     uVideoDeviceIdentifierPart keys don't match the graphics card's
     identifier. DXVK's is all zeros, which the launcher recorded.
+    Found on the first box 2026-10-15, with the game installed through
+    Lutris: the same loop, with the identifier right, until sD3DDevice
+    had the card's name (`device`, as the launcher writes it: "AMD Radeon
+    RX 7900 XTX (RADV NAVI31)").
 
     Over every INI: windowed at the screen's size (gamescope shows it full
     screen), no MSAA (New Vegas Reloaded wants it off), and the controller
@@ -1373,6 +1407,8 @@ def nv_inis(root, profile, screen):
     if (profile / "falloutprefs.ini").exists():
         prefs = ini_merge(prefs, (profile / "falloutprefs.ini").read_text(errors="replace"))
     ids = "".join(f"uVideoDeviceIdentifierPart{i}=0\n" for i in range(1, 5))
+    if device:
+        ids += f'sD3DDevice="{device}"\n'
     ours = f"{display}{ids}iSize W={w}\niSize H={h}\n[Interface]\nbDisable360Controller=0\n"
     out["FalloutPrefs.ini"] = ini_merge(prefs, ours)
     return out
@@ -1450,7 +1486,10 @@ def newvegas(record, root, prefix, profile, extras, nx, cache):
         raise RuntimeError("no prefix for the game yet: start it once, then rebuild")
     user = windows_user(prefix)
     docs = user / "Documents/My Games/FalloutNV"
-    for name, text in nv_inis(root, profile, screen_size()).items():
+    device = gpu_name()
+    if device is None:
+        log("newvegas: Vulkan named no graphics card; the game may start its launcher instead")
+    for name, text in nv_inis(root, profile, screen_size(), device).items():
         place_outside(record, docs / name, text.encode())
     if nv_registry(prefix, root):
         log("newvegas: set the game's Installed Path in its prefix")

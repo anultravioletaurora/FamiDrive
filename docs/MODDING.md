@@ -229,7 +229,8 @@ that too, recorded and backed up like everything else:
 - **What the launcher would have set:** with the launcher swapped out,
   FamiDrive makes `FalloutPrefs.ini` the way it does on its first run
   (the game's defaults and its Very High preset, under the list's own
-  settings), with the graphics card's identifier as DXVK reports it.
+  settings), with the graphics card's identifier and name as DXVK
+  reports them (the name from Vulkan, `vulkaninfo`).
   Without that, New Vegas hands back to the launcher at startup. Over
   every INI: the TV's resolution, windowed (gamescope shows it full
   screen), no MSAA, and the controller turned on (lists often turn it

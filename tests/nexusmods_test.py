@@ -531,6 +531,24 @@ class NewVegas(unittest.TestCase):
                 self.assertIn("bFull Screen=0", inis[name].splitlines())
                 self.assertNotIn("bFull Screen=1", inis[name])
 
+    def test_the_cards_name_as_dxvk_gives_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            root, profile = self.nv_game(Path(d))
+            prefs = m.nv_inis(root, profile, (3840, 2160), "AMD Radeon RX 7900 XTX (RADV NAVI31)")["FalloutPrefs.ini"]
+            self.assertIn('sD3DDevice="AMD Radeon RX 7900 XTX (RADV NAVI31)"', prefs.splitlines())
+            self.assertNotIn("sD3DDevice", m.nv_inis(root, profile, (3840, 2160))["FalloutPrefs.ini"])
+
+    def test_gpu_name_is_the_one_dxvk_lists_first(self):
+        def gpu(n, kind, name):
+            return f"GPU{n}:\n\tapiVersion         = 1.4.354\n\tdeviceType         = PHYSICAL_DEVICE_TYPE_{kind}\n\tdeviceName         = {name}\n"
+        first_box = "Devices:\n========\n" + gpu(0, "DISCRETE_GPU", "AMD Radeon RX 7900 XTX (RADV NAVI31)") \
+            + gpu(1, "CPU", "llvmpipe (LLVM 21.1.8, 256 bits)")   # vulkaninfo --summary, the first box, 2026-10-15
+        self.assertEqual(m.gpu_name(first_box), "AMD Radeon RX 7900 XTX (RADV NAVI31)")
+        laptop = gpu(0, "INTEGRATED_GPU", "Intel(R) Iris(R) Xe Graphics (TGL GT2)") + gpu(1, "DISCRETE_GPU", "NVIDIA T600 Laptop GPU")
+        self.assertEqual(m.gpu_name(laptop), "NVIDIA T600 Laptop GPU")
+        self.assertIsNone(m.gpu_name(gpu(0, "CPU", "llvmpipe (LLVM 21.1.8, 256 bits)")))
+        self.assertIsNone(m.gpu_name(""))
+
     def test_installed_path_once(self):
         with tempfile.TemporaryDirectory() as d:
             prefix = Path(d)
