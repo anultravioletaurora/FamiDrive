@@ -77,6 +77,39 @@ class State(unittest.TestCase):
         self.assertIsNone(r.current())
         self.assertFalse(r.state_file().exists())
 
+    def test_a_recorder_that_ignores_ctrl_c_is_ended_anyway(self):
+        p = subprocess.Popen([sys.executable, "-c",
+                              "import signal, time\n"
+                              "signal.signal(signal.SIGINT, signal.SIG_IGN)\n"
+                              "time.sleep(30)\n"])
+        threading.Thread(target=p.wait, daemon=True).start()
+        time.sleep(0.3)
+        r.state_file().write_text(json.dumps({"pid": p.pid, "path": str(self.dir / "a.mp4")}))
+        old, r.STOP_SECONDS = r.STOP_SECONDS, 0.5
+        try:
+            self.assertEqual(r.stop(), 0)
+        finally:
+            r.STOP_SECONDS = old
+        time.sleep(0.2)
+        self.assertIsNotNone(p.returncode)
+
+    def test_stop_is_claimed_at_once(self):
+        # While one stop waits for the file, the menu sees no recording and
+        # a second stop does nothing.
+        p = subprocess.Popen([sys.executable, "-c",
+                              "import signal, time\n"
+                              "signal.signal(signal.SIGINT, lambda *_: time.sleep(1) or exit(0))\n"
+                              "time.sleep(30)\n"])
+        threading.Thread(target=p.wait, daemon=True).start()
+        time.sleep(0.3)
+        r.state_file().write_text(json.dumps({"pid": p.pid, "path": str(self.dir / "a.mp4")}))
+        first = threading.Thread(target=r.stop)
+        first.start()
+        time.sleep(0.3)
+        self.assertIsNone(r.current())
+        self.assertEqual(r.stop(), 0)
+        first.join()
+
     def test_stop_ends_the_recorder_with_ctrl_c(self):
         # A stand-in for gst-launch: exits cleanly on SIGINT, as -e does.
         p = subprocess.Popen([sys.executable, "-c",

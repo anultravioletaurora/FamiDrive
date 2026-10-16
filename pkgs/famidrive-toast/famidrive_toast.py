@@ -1189,8 +1189,14 @@ def daemon(spec_file, player):
             return
         rec["shown"] = show
         if not show:
+            # Destroyed, not unmapped: gamescope forgets an external
+            # overlay only when its window is gone (destroy_win), and kept
+            # showing an unmapped dot (first box, 2026-10-16). Cleared
+            # first, in case it's still drawn once more.
             if rec["win"]:
-                rec["win"].unmap()
+                fill_solid(rec["win"], (0, 0, 0, 0), (0, 0, sw, sh))
+                rec["win"].destroy()
+                rec["win"] = None
             d.flush()
             return
         if not rec["win"]:

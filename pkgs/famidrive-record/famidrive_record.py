@@ -44,7 +44,12 @@ ENCODERS = (
 )
 FPS = 60
 STARTUP_SECONDS = 2.0    # how long a pipeline gets to fail before start says it's running
-STOP_SECONDS = 15.0      # how long it gets to finish the file after Ctrl-C
+# How long it gets to finish the file after Ctrl-C, before it's ended
+# outright. The MP4 is fragmented, so a recording ended that way still
+# plays up to its last second. Found on the first box 2026-10-16: a stop
+# took more than one press of Stop, and each press made its own toast.
+STOP_SECONDS = 5.0
+TOAST_ID = "famidrive-record"   # one toast per stop: "Saving recording", then the result in its place
 
 
 def runtime_dir():
@@ -189,24 +194,35 @@ def stop():
     state = current()
     if not state:
         return 0
+    # Claimed first: from here on it isn't recording, for the Guide menu
+    # (which offers Record again) and for a second stop (which does
+    # nothing), while this one waits for the file to be finished.
+    state_file().unlink(missing_ok=True)
     pid, path = int(state["pid"]), Path(state["path"])
+    toast("--kind", "progress", "--id", TOAST_ID, "Saving recording")
     # SIGINT is gst-launch's Ctrl-C: with -e it sends end-of-stream and
     # exits once the MP4 is finished.
-    try:
-        os.kill(pid, signal.SIGINT)
-    except ProcessLookupError:
-        pass
-    deadline = time.monotonic() + STOP_SECONDS
-    while alive(pid) and time.monotonic() < deadline:
-        time.sleep(0.1)
-    if alive(pid):
-        log("GStreamer didn't finish in time; stopping it")
-        os.kill(pid, signal.SIGTERM)
-    state_file().unlink(missing_ok=True)
+    for sig, wait in ((signal.SIGINT, STOP_SECONDS), (signal.SIGTERM, 2.0), (signal.SIGKILL, 1.0)):
+        if not alive(pid):
+            break
+        if sig != signal.SIGINT:
+            log(f"GStreamer didn't finish in time; sending {sig.name}")
+        try:
+            os.kill(pid, sig)
+        except ProcessLookupError:
+            break
+        deadline = time.monotonic() + wait
+        while alive(pid) and time.monotonic() < deadline:
+            time.sleep(0.1)
     if path.exists() and path.stat().st_size > 0:
-        toast("--kind", "success", "Recording saved", f"In Recordings, as {path.stem}")
+        # ES-DE reads its game lists once, at start, and nothing outside it
+        # can make it read them again: its own Utilities menu can (2.1.2+).
+        # Found on the first box 2026-10-16: a new recording wasn't in
+        # Recordings.
+        toast("--kind", "success", "--id", TOAST_ID, "Recording saved",
+              "To see it in Recordings, pick Rescan ROM directory in the menu's Utilities.")
     else:
-        toast("--kind", "alert", "Recording not saved", "Nothing was captured.")
+        toast("--kind", "alert", "--id", TOAST_ID, "Recording not saved", "Nothing was captured.")
     return 0
 
 
