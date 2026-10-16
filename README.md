@@ -193,7 +193,7 @@ pkgs/
   famidrive-picker/          "Who's playing?", greetd's greeter on a box with more than one player
   romm-agent/                Python: pull, firmware, save-pull/push, reconcile
   famidrive-generators/      Python: install manifests -> ES-DE menu entries
-  famidrive-battlenet/       Python: starts a Battle.net game once Battle.net has signed in
+  famidrive-battlenet/       Python: starts a Battle.net game once Battle.net has signed in; a Lutris entry per game Battle.net installs
   lutris/                    a patch to nixpkgs' Lutris, for add-on installers under FamiDrive's Wine
   tcli/                      Thunderstore's CLI (unfinished)
   xenia-netplay/             placeholder until the Xenia fork is picked

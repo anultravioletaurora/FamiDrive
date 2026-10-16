@@ -694,6 +694,8 @@ in
           && lib.hasInfix "gamescope-fg --launcher \"$ROM\"" c.famidrive.systems.lutris.command
           && lib.hasInfix "lutris:rungameid/" c.famidrive.systems.lutris.command
           && lib.hasInfix "/bin/famidrive-battlenet play \"$HOME/.local/share/lutris\"" c.famidrive.systems.lutris.command))
+      (check "a game installed from Battle.net gets a Lutris entry after Lutris closes"
+        (lib.hasInfix "/bin/famidrive-battlenet games \"$HOME/.local/share/lutris\"" c.famidrive.systems.lutris.after))
       (check "Lutris is at the TV's scale (1.5: GTK's 2, its text at 0.75 of that)"
         (let w = c.famidrive.lutris.text;
              lutrisBin = builtins.unsafeDiscardStringContext "${c.famidrive.lutris}/bin/lutris";

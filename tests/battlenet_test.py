@@ -1,12 +1,15 @@
-"""famidrive-battlenet: a Battle.net game launched for the player.
+"""famidrive-battlenet: a Battle.net game launched for the player, and
+an entry in Lutris for each game Battle.net has installed.
 
     python3 battlenet_test.py path/to/famidrive_battlenet.py
 
-Each test runs the tool against a made-up Lutris database, Battle.net
-log and /proc, with a made-up nsenter that records what it was asked to
+Each test runs the tool against a made-up Lutris database (Lutris
+0.5.22's games table, from the first box), Battle.net log, list of
+installed games and /proc, with a made-up nsenter that records what it was asked to
 run and, like Battle.net, starts the game.
 """
 
+import json
 import os
 import sqlite3
 import subprocess
@@ -16,11 +19,19 @@ import time
 import unittest
 from pathlib import Path
 
+import yaml
+
 SCRIPT = Path(sys.argv.pop(1)).resolve()
 
 READY = ("I [GSAccountProvider] {Main} Login triggered. entityId=1\n"
          "I [Frontend] {Main} Attempting to show main window.\n")
 LAUNCH = "I [GameLaunchController] {Main} LaunchBinary: uid=zeus\n"
+GAMES = """CREATE TABLE games (id INTEGER PRIMARY KEY, name TEXT, sortname TEXT, slug TEXT,
+    installer_slug TEXT, parent_slug TEXT, platform TEXT, runner TEXT, executable TEXT,
+    directory TEXT, updated DATETIME, lastplayed INTEGER, installed INTEGER,
+    installed_at INTEGER, year INTEGER, configpath TEXT, has_custom_banner INTEGER,
+    has_custom_icon INTEGER, has_custom_coverart_big INTEGER, playtime REAL, service TEXT,
+    service_id TEXT, discord_id TEXT)"""
 
 
 class Test(unittest.TestCase):
@@ -36,16 +47,19 @@ class Test(unittest.TestCase):
         self.proc.mkdir()
         self.sent = self.root / "sent"
         con = sqlite3.connect(self.lutris / "pga.db")
-        con.execute("CREATE TABLE games (id INTEGER, slug TEXT, configpath TEXT)")
-        con.executemany("INSERT INTO games VALUES (?, ?, ?)", [
-            (1, "battlenet", "battlenet-standard-1"),
-            (2, "call-of-duty-black-ops-cold-war", "cold-war-2"),
-            (3, "hollow-knight", "hollow-knight-3"),
+        con.execute(GAMES)
+        con.executemany("INSERT INTO games (id, name, slug, installer_slug, runner, installed, configpath)"
+                        " VALUES (?, ?, ?, ?, ?, 1, ?)", [
+            (1, "Battle.net", "battlenet", "battlenet-standard", "wine", "battlenet-standard-1"),
+            (2, "Call of Duty: Black Ops Cold War", "call-of-duty-black-ops-cold-war",
+             "call-of-duty-black-ops-cold-w-battlenet", "wine", "cold-war-2"),
+            (3, "Hollow Knight", "hollow-knight", "hollow-knight-gog", "linux", "hollow-knight-3"),
         ])
         con.commit()
         con.close()
         exe = "drive_c/Program Files (x86)/Battle.net/Battle.net.exe"
-        self.config("battlenet-standard-1", f"game:\n  exe: drive_c/Program Files (x86)/Battle.net/Battle.net Launcher.exe\n  prefix: {self.prefix}\n")
+        self.config("battlenet-standard-1", f"game:\n  arch: win64\n  exe: drive_c/Program Files (x86)/Battle.net/Battle.net Launcher.exe\n"
+                    f"  prefix: {self.prefix}\nsystem:\n  exclude_processes: Agent.exe\nwine:\n  overrides:\n    locationapi: d\n")
         self.config("cold-war-2", f"game:\n  args: --exec=\"launch ZEUS\"\n  exe: {exe}\n  prefix: {self.prefix}\n")
         self.config("hollow-knight-3", "game:\n  exe: hollow_knight.x86_64\n")
         # The running Battle.net, and one of its Chromium helpers.
@@ -73,6 +87,27 @@ class Test(unittest.TestCase):
     def log(self, text):
         (self.logs / "battle.net-20261015T064419.log").write_text(
             "I [Main] {Main} Command line arguments: {[0]=--exec=launch ZEUS}\n" + text)
+
+    def installed(self, *games):
+        """Battle.net's list of what it has installed: (ID, name) each."""
+        agent = self.prefix / "drive_c/ProgramData/Battle.net/Agent"
+        agent.mkdir(parents=True, exist_ok=True)
+        (agent / "aggregate.json").write_text(json.dumps({"installed": [
+            {"product_id": i, "name": n, "launch_uri": f"battlenet://game/{i}"} for i, n in games]}))
+
+    def lutris_games(self):
+        con = sqlite3.connect(self.lutris / "pga.db")
+        con.row_factory = sqlite3.Row
+        try:
+            return {r["name"]: dict(r) for r in con.execute("SELECT * FROM games")}
+        finally:
+            con.close()
+
+    def run_games(self):
+        r = subprocess.run([sys.executable, str(SCRIPT), "games", str(self.lutris)],
+                           env={**os.environ, "HOME": str(self.root)}, capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r
 
     def run_tool(self, game_id):
         env = {**os.environ, "FAMIDRIVE_NSENTER": str(self.nsenter), "FAMIDRIVE_PROC": str(self.proc)}
@@ -125,6 +160,46 @@ class Test(unittest.TestCase):
             d.rmdir()
         self.run_tool(2)
         self.assertEqual(self.sends(), [])
+
+    def test_a_game_installed_from_battlenet_gets_a_lutris_entry(self):
+        self.installed(("zeus", "Call of Duty Black Ops Cold War"), ("prometheus", "Overwatch"),
+                       ("newgame", "Some New Game"))
+        self.run_games()
+        games = self.lutris_games()
+        # Cold War has one from Lutris's installer already: no second.
+        self.assertEqual(len([g for g in games.values() if g["slug"] == "call-of-duty-black-ops-cold-war"]), 1)
+        ow = games["Overwatch 2"]
+        self.assertEqual((ow["slug"], ow["installer_slug"], ow["parent_slug"], ow["runner"], ow["installed"]),
+                         ("overwatch-2", "famidrive-battlenet", "battlenet-standard", "wine", 1))
+        config = yaml.safe_load((self.lutris / "games" / f"{ow['configpath']}.yml").read_text())
+        self.assertEqual(config["game"], {"arch": "win64", "args": '--exec="launch Pro"',
+                                          "exe": "drive_c/Program Files (x86)/Battle.net/Battle.net.exe",
+                                          "prefix": str(self.prefix)})
+        self.assertEqual(config["wine"], {"overrides": {"locationapi": "d"}})   # Battle.net's own
+        self.assertEqual(config["requires"], "battlenet-standard")
+        # A game FamiDrive doesn't know: its ID in capitals, Battle.net's name.
+        new = yaml.safe_load((self.lutris / "games" / f"{games['Some New Game']['configpath']}.yml").read_text())
+        self.assertEqual(new["game"]["args"], '--exec="launch NEWGAME"')
+
+    def test_an_entry_is_made_once_and_follows_battlenet(self):
+        self.installed(("prometheus", "Overwatch"))
+        self.run_games()
+        self.run_games()
+        self.assertEqual(len(self.lutris_games()), 4)
+        self.installed()   # uninstalled from Battle.net
+        self.run_games()
+        games = self.lutris_games()
+        self.assertEqual(games["Overwatch 2"]["installed"], 0)
+        self.assertEqual(games["Call of Duty: Black Ops Cold War"]["installed"], 1)   # a Lutris installer's: left alone
+        self.installed(("prometheus", "Overwatch"))
+        self.run_games()
+        self.assertEqual(self.lutris_games()["Overwatch 2"]["installed"], 1)
+        self.assertEqual(len(self.lutris_games()), 4)
+
+    def test_nothing_before_battlenet_has_run(self):
+        before = self.lutris_games()
+        self.run_games()
+        self.assertEqual(self.lutris_games(), before)
 
 
 if __name__ == "__main__":
