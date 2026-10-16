@@ -378,6 +378,32 @@ it (`famidrive.steam.steamInputGames`).
 **Steam: ✅ Works.** Proton Experimental (Steam's choice), unmodded. The
 copy on the first box is the base game only, without the DLC.
 
+**GOG, through Lutris, with NakeyJakey's New Vegas: 🟡 Starts, after a
+fix by hand.** The same Ultimate Edition, moved from Heroic to Lutris
+(GOG's games are Lutris's by default).
+
+- **2026-10-15, the first box, installing:** Lutris downloaded GOG's
+  installer (7.9 GB in three parts) and made the prefix, then GOG's
+  setup quit within 3 seconds (`Command exited with code 256`), before
+  it wrote its own log. The same setup, with the same Proton, started
+  fine run by hand, in and out of Lutris's sandbox. Installing again
+  from Lutris, with the prefix already there, worked.
+- **2026-10-15, the first box, mods:** FamiDrive found the game in
+  Lutris (#231) and moved the list over from the Heroic copy: 58,770
+  files, the 4 GB patch and xNVSE in 1 minute 20 seconds, from the
+  downloads and build it already had.
+- **2026-10-15, the first box, first launch:** ❌ a restart loop. The
+  game loaded xNVSE and all 43 plugins, then started its launcher,
+  which is the patched game: it started again about once a second.
+  FamiDrive's `FalloutPrefs.ini` had no `sD3DDevice`. Bethesda's
+  launcher, run once on a virtual display in the same prefix, wrote
+  `sD3DDevice="AMD Radeon RX 7900 XTX (RADV NAVI31)"` and all zeros for
+  the card's identifier, which FamiDrive already had. With that one
+  line added by hand, the game started and stayed up. #232 has
+  FamiDrive write it, from Vulkan's name for the card. Running
+  Bethesda's launcher also replaced `Fallout.ini` with the game's
+  defaults, so it was put back from the list.
+
 **GOG, through Heroic, with NakeyJakey's New Vegas: 🟡 Plays.**
 2026-10-10, on the first box: the Ultimate Edition (GOG id
 `1454587428`, version 1.4.0.525) with every DLC and the list's 336

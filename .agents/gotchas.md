@@ -334,6 +334,33 @@ See [CONTROLLERS.md](../docs/CONTROLLERS.md) for per-controller results.
 - **`is_umu_path()` (Lutris's wine runner) matches `custom_wine_path` by
   filename alone** (`umu-run`), not by store path, so a FamiDrive-built
   wrapper has to keep that exact name to still be treated as umu.
+- **A failed install's output is gone once its window closes.** Lutris
+  0.5.22 keeps a command's output only in the install window (or with
+  `lutris -d`), not in `~/.cache/lutris/lutris.log`. Found on the first
+  box 2026-10-15: New Vegas's GOG setup quit with "Command exited with
+  code 256" within 3 seconds of Lutris making its prefix, with no Inno
+  Setup log in the prefix's Temp (so before the setup itself ran). Run
+  by hand, with the same Proton, in and out of Lutris's sandbox, the
+  setup started every time. Installing again from Lutris, with the
+  prefix already made, worked. Photograph the window before closing it.
+- **Testing a Proton prefix by hand:** umu's container has its own
+  `/tmp`, so a test prefix there never shows up outside it. Use a folder
+  in the home directory, and `xvfb-run` to keep windows off the TV.
+
+## New Vegas
+
+- **Bethesda's launcher overwrites `My Games/FalloutNV/Fallout.ini`**
+  with the game's `Fallout_default.ini` (read-only) when it finds no
+  `FalloutPrefs.ini`, which throws away a mod list's settings. Found on
+  the first box 2026-10-15, running it to see what it records for the
+  graphics card. Set `Fallout.ini` aside first, or rebuild it with
+  `nv_inis` (famidrive-nexusmods) afterwards.
+- **A game that keeps restarting is starting its launcher**, which is
+  the patched game once FamiDrive swaps it in. New Vegas does that when
+  `FalloutPrefs.ini` doesn't match the card: the identifier
+  (`uVideoDeviceIdentifierPart1`–`4`, all zeros through DXVK) and the
+  name (`sD3DDevice`, Vulkan's device name). `nvse.log`'s time changes
+  with every start.
 
 ## The box
 
