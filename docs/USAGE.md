@@ -751,8 +751,9 @@ the box lists its cards and the setting to use.
   laptop, where the TV is on the Intel or AMD card and the Nvidia
   card has no screen of its own (hybrid graphics), games render on
   the Nvidia card and the other one shows them (PRIME render
-  offload); each session works that out from the hardware. Untested:
-  results welcome in docs/COMPATIBILITY.md.
+  offload), while ES-DE stays on the other card and the Nvidia one
+  powers off; each session works that out from the hardware.
+  Untested: results welcome in docs/COMPATIBILITY.md.
 
 - **Type:** one of "auto", "amd", "intel", "nvidia"
 - **Default:** `"auto"`

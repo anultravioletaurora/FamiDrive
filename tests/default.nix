@@ -201,6 +201,9 @@ in
       (lib.hasInfix "check nvidia" c.systemd.services.famidrive-hardware-check.serviceConfig.ExecStart))
     (check "Intel's driver in its initrd, for a laptop's screen (hybrid graphics), but not AMD's"
       (!(lib.elem "amdgpu" c.boot.initrd.kernelModules) && lib.elem "i915" c.boot.initrd.kernelModules))
+    (check "the Nvidia card can power off while nothing renders on it, Turing cards too"
+      (lib.hasInfix "NVreg_DynamicPowerManagement=0x02" c.boot.extraModprobeConfig
+        && lib.hasInfix ''ATTR{power/control}="auto"'' c.services.udev.extraRules))
   ]);
   # AMD and Intel said outright (the first box is AMD, the second Intel):
   # Mesa only, as with "auto", and nothing of Nvidia's or of hybrid
