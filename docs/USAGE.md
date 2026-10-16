@@ -2130,3 +2130,16 @@ player's own mute and deafen state).
     "speaking"
   ]
   ```
+
+### `famidrive.recordings`
+
+Screen recording from the Guide menu: "Start recording" counts
+down from 3, then records what's on the TV, with its sound, until
+"Stop recording". Each recording goes in the player's own
+`~/Recordings` as an MP4 named by when it started, and the
+Recordings system in ES-DE lists them to watch. Off: no menu entry
+and no Recordings system; recordings already made stay in
+`~/Recordings`.
+
+- **Type:** boolean
+- **Default:** `true`

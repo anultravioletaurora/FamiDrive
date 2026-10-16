@@ -16,7 +16,7 @@ let
 
   # Systems whose entries differ per player. Every other system is the
   # shared library's.
-  perPlayer = [ "steam" "epic" "lutris" "minecraft" "settings" "controllers" "media" "desktop" "ports" ];
+  perPlayer = [ "steam" "epic" "lutris" "minecraft" "settings" "controllers" "media" "desktop" "ports" "recordings" ];
   shared = lib.filter (n: !(lib.elem n perPlayer)) (lib.attrNames cfg.systems);
   # Shared systems whose games (and so art) come from RomM.
   rommShared = lib.optionals cfg.romm.enable

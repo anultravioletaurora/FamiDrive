@@ -16,6 +16,10 @@ writeShellApplication {
   name = "famidrive-end-session";
   runtimeInputs = [ procps systemd coreutils ];
   text = ''
+    # A recording is finished first, so its MP4 is whole (pkgs/famidrive-record).
+    if command -v famidrive-record > /dev/null; then
+      famidrive-record stop || true
+    fi
     if pgrep -u "$(id -u)" -x steam > /dev/null; then
       steam -shutdown > /dev/null 2>&1 || true
       for _ in $(seq 1 20); do

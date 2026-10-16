@@ -185,12 +185,14 @@ modules/famidrive/
   online.nix                 famidrive.online.enable fills in each emulator's netplay settings
   media.nix                  famidrive.media.kodi / .jellyfin: "Media" entries for Kodi and Jellyfin
   controllers.nix            GameCube ports per box, the quit combo, RetroArch's menu combo
+  recordings.nix             famidrive.recordings: screen recording from the Guide menu; the Recordings system
   lib/seed.nix               seed / lockKeys helpers for configs the app also writes
 pkgs/
   es-de/                     ES-DE 3.5.0 AppImage (ES-DE left nixpkgs on 2025-10-23)
   gamescope-fg/              sets STEAM_GAME on the game's window so gamescope focuses it
   famidrive-quit/            hold Select + Start on any controller to quit the game; Guide opens the menu
   famidrive-picker/          "Who's playing?", greetd's greeter on a box with more than one player
+  famidrive-record/          Python: records gamescope's PipeWire stream and the sound into ~/Recordings
   romm-agent/                Python: pull, firmware, save-pull/push, reconcile
   famidrive-generators/      Python: install manifests -> ES-DE menu entries
   famidrive-battlenet/       Python: starts a Battle.net game once Battle.net has signed in; a Lutris entry per game Battle.net installs

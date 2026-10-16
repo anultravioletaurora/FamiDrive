@@ -1,0 +1,229 @@
+"""famidrive-record: record what's on the TV into the player's Recordings.
+
+    famidrive-record start     start recording, unless already
+    famidrive-record stop      stop, and toast where the recording went
+    famidrive-record status    exit 0 and print the file while recording
+
+The Guide menu's "Start recording" runs `start` after its countdown, and
+"Stop recording" runs `stop`; the session's end runs `stop` too, so a
+recording is never left half written.
+
+The picture is gamescope's own PipeWire stream (a Video/Source node named
+"gamescope", src/pipewire.cpp): the focused window with the Steam overlay
+layer over it (toasts, the Guide menu), in SDR, tone-mapped the way
+gamescope's screenshots are. The sound is the default output's monitor.
+Both go through GStreamer into an MP4 in ~/Recordings, named by the time
+it started, which the Recordings system in ES-DE lists.
+
+The MP4 is fragmented (a fragment a second), so a recording cut short (the
+session killed, the box losing power) still plays up to its last second.
+"""
+
+import json
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+GST_LAUNCH = "@gstLaunch@"
+GST_INSPECT = "@gstInspect@"
+GST_PLUGINS = "@gstPlugins@"
+
+# H.264 encoders, best first, and their settings: the GPU's own encoder
+# (VA-API on AMD and Intel, NVENC on Nvidia), else x264 on the CPU. The
+# va plugin is the newer of the two VA-API ones; gstreamer-vaapi is kept
+# as a fallback for older drivers.
+ENCODERS = (
+    ("vah264enc", ["rate-control=cbr", "bitrate=20000"]),
+    ("vaapih264enc", ["rate-control=cbr", "bitrate=20000"]),
+    ("nvh264enc", ["rc-mode=cbr", "bitrate=20000"]),
+    ("x264enc", ["speed-preset=veryfast", "tune=zerolatency", "bitrate=12000"]),
+)
+FPS = 60
+STARTUP_SECONDS = 2.0    # how long a pipeline gets to fail before start says it's running
+STOP_SECONDS = 15.0      # how long it gets to finish the file after Ctrl-C
+
+
+def runtime_dir():
+    return Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
+
+
+def state_file():
+    return runtime_dir() / "famidrive-record.json"
+
+
+def recordings_dir():
+    """Where recordings go: FAMIDRIVE_RECORDINGS (for tests), else ~/Recordings."""
+    return Path(os.environ.get("FAMIDRIVE_RECORDINGS") or Path.home() / "Recordings")
+
+
+def alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def current():
+    """{"pid", "path"} of the recording under way, or None. A state file
+    left by a recorder that's gone (a crash) is removed."""
+    try:
+        state = json.loads(state_file().read_text())
+        pid = int(state["pid"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if not alive(pid):
+        state_file().unlink(missing_ok=True)
+        return None
+    return state
+
+
+def file_name(now=None):
+    """A recording's name: the time it started, as 2026-10-16 21.04.33.mp4,
+    which ES-DE then lists oldest first. Dots, not colons: a colon is out
+    of place in a file name a player may copy to another computer."""
+    return time.strftime("%Y-%m-%d %H.%M.%S", time.localtime(now)) + ".mp4"
+
+
+def pick_encoder(exists):
+    """The first of ENCODERS this box's GStreamer has: exists(name) says."""
+    for name, props in ENCODERS:
+        if exists(name):
+            return name, props
+    return None
+
+
+def pipeline(path, encoder):
+    """gst-launch-1.0's arguments for a recording to path. pipewiresrc
+    stamps frames as they come (gamescope sends one only when the picture
+    changes) and keeps sending the last one through a still screen;
+    videorate makes that a steady FPS for the encoder and for players."""
+    name, props = encoder
+    return [
+        "-e",   # Ctrl-C ends the stream properly, so the MP4 is finished
+        "pipewiresrc", "target-object=gamescope", "do-timestamp=true", "keepalive-time=100",
+        "!", "queue",
+        "!", "videoconvert",
+        "!", "videorate",
+        "!", f"video/x-raw,framerate={FPS}/1",
+        "!", name, *props,
+        "!", "h264parse",
+        "!", "queue",
+        "!", "mp4mux", "name=mux", "fragment-duration=1000",
+        "!", "filesink", f"location={path}",
+        "pulsesrc", "device=@DEFAULT_MONITOR@",
+        "!", "queue",
+        "!", "audioconvert",
+        "!", "audioresample",
+        "!", "avenc_aac", "bitrate=192000",
+        "!", "aacparse",
+        "!", "queue",
+        "!", "mux.",
+    ]
+
+
+def gst_env():
+    env = dict(os.environ)
+    if not GST_PLUGINS.startswith("@"):
+        env["GST_PLUGIN_SYSTEM_PATH_1_0"] = GST_PLUGINS
+    return env
+
+
+def gst_exists(name):
+    return subprocess.run([GST_INSPECT, "--exists", name], env=gst_env(),
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+
+
+def toast(*args):
+    """A toast through famidrive-toast, by name (it's on the session's
+    PATH); never worth failing over."""
+    exe = shutil.which("famidrive-toast")
+    if exe:
+        subprocess.run([exe, *args], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def log(msg):
+    print(f"famidrive-record: {msg}", file=sys.stderr, flush=True)
+
+
+def start():
+    if current():
+        log("already recording")
+        return 0
+    encoder = pick_encoder(gst_exists)
+    if not encoder:
+        log("no H.264 encoder in GStreamer")
+        toast("--kind", "alert", "Couldn't start recording", "No video encoder was found.")
+        return 1
+    folder = recordings_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / file_name()
+    logfile = runtime_dir() / "famidrive-record.log"
+    with open(logfile, "w") as out:
+        proc = subprocess.Popen([GST_LAUNCH, *pipeline(path, encoder)], env=gst_env(),
+                                stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT,
+                                start_new_session=True)
+    state_file().write_text(json.dumps({"pid": proc.pid, "path": str(path)}))
+    log(f"recording to {path} with {encoder[0]} (pid {proc.pid})")
+    deadline = time.monotonic() + STARTUP_SECONDS
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            state_file().unlink(missing_ok=True)
+            log(f"GStreamer quit at once ({proc.returncode}); see {logfile}")
+            if path.exists() and path.stat().st_size == 0:
+                path.unlink()
+            toast("--kind", "alert", "Couldn't start recording",
+                  "The screen couldn't be captured.")
+            return 1
+        time.sleep(0.1)
+    return 0
+
+
+def stop():
+    state = current()
+    if not state:
+        return 0
+    pid, path = int(state["pid"]), Path(state["path"])
+    # SIGINT is gst-launch's Ctrl-C: with -e it sends end-of-stream and
+    # exits once the MP4 is finished.
+    try:
+        os.kill(pid, signal.SIGINT)
+    except ProcessLookupError:
+        pass
+    deadline = time.monotonic() + STOP_SECONDS
+    while alive(pid) and time.monotonic() < deadline:
+        time.sleep(0.1)
+    if alive(pid):
+        log("GStreamer didn't finish in time; stopping it")
+        os.kill(pid, signal.SIGTERM)
+    state_file().unlink(missing_ok=True)
+    if path.exists() and path.stat().st_size > 0:
+        toast("--kind", "success", "Recording saved", f"In Recordings, as {path.stem}")
+    else:
+        toast("--kind", "alert", "Recording not saved", "Nothing was captured.")
+    return 0
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    if cmd == "start":
+        sys.exit(start())
+    if cmd == "stop":
+        sys.exit(stop())
+    if cmd == "status":
+        state = current()
+        if state:
+            print(state["path"])
+        sys.exit(0 if state else 1)
+    print("usage: famidrive-record start|stop|status", file=sys.stderr)
+    sys.exit(64)
+
+
+if __name__ == "__main__":
+    main()

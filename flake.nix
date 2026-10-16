@@ -95,6 +95,7 @@
         famidrive-ryujinx = final.callPackage ./pkgs/famidrive-ryujinx { };
         famidrive-hardware = final.callPackage ./pkgs/famidrive-hardware { };
         famidrive-toast = final.callPackage ./pkgs/famidrive-toast { };
+        famidrive-record = final.callPackage ./pkgs/famidrive-record { };
         famidrive-cheevos = final.callPackage ./pkgs/famidrive-cheevos { };
         famidrive-pads = final.callPackage ./pkgs/famidrive-pads { };
         famidrive-bluetooth = final.callPackage ./pkgs/famidrive-bluetooth { };
@@ -152,7 +153,7 @@
       };
 
       packages.${system} = {
-        inherit (pkgs) es-de tcli xenia-netplay supertuxparty supertux-advance gamescope-fg romm-agent famidrive-generators famidrive-quit famidrive-steam-config famidrive-steam-offline famidrive-battlenet famidrive-prism famidrive-status famidrive-thunderstore famidrive-picker famidrive-end-session famidrive-clonehero famidrive-kodi famidrive-ryujinx famidrive-hardware famidrive-toast famidrive-cheevos famidrive-pads famidrive-padmouse famidrive-bluetooth famidrive-network famidrive-nexusmods
+        inherit (pkgs) es-de tcli xenia-netplay supertuxparty supertux-advance gamescope-fg romm-agent famidrive-generators famidrive-quit famidrive-steam-config famidrive-steam-offline famidrive-battlenet famidrive-prism famidrive-status famidrive-thunderstore famidrive-picker famidrive-end-session famidrive-clonehero famidrive-kodi famidrive-ryujinx famidrive-hardware famidrive-toast famidrive-record famidrive-cheevos famidrive-pads famidrive-padmouse famidrive-bluetooth famidrive-network famidrive-nexusmods
           mpv-gamepad jellyfin-mpv-shim;
       };
 

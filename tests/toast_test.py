@@ -293,6 +293,47 @@ class GuideMenu(unittest.TestCase):
         menu.command("select", True)
         self.assertEqual(menu.command("close", True), {"open": False})   # Guide closes from anywhere
 
+    def test_recording(self):
+        menu = t.Menu(recordings=True)
+        menu.command("open", True)
+        self.assertEqual(menu.items, ["Resume", "Start recording", "Quit game"])
+        menu.command("down", True)
+        self.assertEqual(menu.command("select", True), {"open": False, "do": "record"})
+        # While one's under way, the same place stops it.
+        menu.command("open", True, recording=True)
+        self.assertEqual(menu.items, ["Resume", "Stop recording", "Quit game"])
+        menu.command("down", True)
+        self.assertEqual(menu.command("select", True), {"open": False, "do": "stop-recording"})
+        # Out of a game too (the menu, Kodi): after Close.
+        menu.command("open", False)
+        self.assertEqual(menu.items, ["Close", "Start recording"])
+        # Quit game's question still comes back to Quit game.
+        menu.command("open", True)
+        menu.command("down", True)
+        menu.command("down", True)
+        menu.command("select", True)
+        menu.command("back", True)
+        self.assertEqual(menu.items[menu.sel], "Quit game")
+
+    def test_no_recording_without_recordings(self):
+        menu = t.Menu()
+        menu.command("open", True, recording=True)
+        self.assertNotIn("Stop recording", menu.items)
+
+    def test_recording_is_the_recorders_state_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            env = dict(os.environ)
+            os.environ["XDG_RUNTIME_DIR"] = d
+            try:
+                self.assertFalse(t.recording())
+                (Path(d) / "famidrive-record.json").write_text('{"pid": %d, "path": "/x.mp4"}' % os.getpid())
+                self.assertTrue(t.recording())
+                (Path(d) / "famidrive-record.json").write_text('{"pid": 999999999}')
+                self.assertFalse(t.recording())
+            finally:
+                os.environ.clear()
+                os.environ.update(env)
+
 
 class Look(unittest.TestCase):
     def test_opaque(self):

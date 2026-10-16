@@ -31,7 +31,7 @@ fontRegular and fontLight, like the status screen) and the colors of the
 color scheme the player picked in ES-DE (colors.xml's statusBackgroundColor,
 statusColor, helpTextColor), with ES-DE's dark look where a theme has none.
 
-SPEC (JSON, from Nix): {"theme": theme folder or null, "players":
+SPEC (JSON, from Nix): {"theme": theme folder or null, "recordings": bool, "players":
 {user: {"position": "bottom-right", "hide": [kinds]}}, "default": {...}}.
 """
 
@@ -66,6 +66,7 @@ BLUR_FADE_MS = 200
 # than wanted, first box 2026-10-13).
 SLIDE_SECONDS = 0.28
 SWAP_SECONDS = 0.22    # the buttons sliding over to the quit question and back
+COUNTDOWN = 3          # seconds counted down before a recording starts
 
 MAX_SHOWN = 3          # toasts on screen at once, stacked from the corner
 URGENT = ("alert", "achievement")   # a progress toast nobody updates is let go
@@ -495,6 +496,32 @@ def game_mode():
     return words[0] if words and words[0] in ("freeze", "block") else "block"
 
 
+def recording():
+    """Whether famidrive-record is recording in this session: its state
+    file, with a recorder that's still there."""
+    try:
+        pid = int(json.loads((sock_path().parent / "famidrive-record.json").read_text())["pid"])
+        os.kill(pid, 0)
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+    return True
+
+
+def record(cmd):
+    """famidrive-record start or stop, by name from PATH (a fix to it then
+    doesn't restart the TV), in the background: stopping waits for the
+    file to be finished, and the daemon has the screen to draw meanwhile."""
+    import subprocess
+    import threading
+
+    def run():
+        try:
+            subprocess.run(["famidrive-record", cmd], stdin=subprocess.DEVNULL)
+        except OSError as e:
+            print(f"famidrive-toast: couldn't run famidrive-record ({e})", file=sys.stderr)
+    threading.Thread(target=run, daemon=True).start()
+
+
 def pausable():
     """Whether the running thing is a game, to pause: not Steam's Big
     Picture or the voice client, which leave a polite way to close them
@@ -555,6 +582,11 @@ def watch_controllers(interval=1.5):
 # sends each one here as a command: {"menu": "open" | "up" | "down" |
 # "left" | "right" | "select" | "back" | "close"}. The reply says whether
 # the menu is still open, and what famidrive-quit should do ("quit").
+#
+# With recordings on (famidrive.recordings), the menu also starts and
+# stops a recording of the screen (famidrive-record). "Start recording"
+# closes the menu and counts down from 3 in the middle of the screen
+# first, so the menu and the countdown aren't in the recording.
 
 class Menu:
     """The menu's state. Pure: whether a game is running, whether it's one
@@ -563,9 +595,13 @@ class Menu:
     In a game: Resume, and Quit game, which asks first, since anything not
     saved is lost. Out of one: Close. A "freeze" game (an emulator) is
     stopped while the menu is open; a "block" one (an online game) keeps
-    running, with the pads taken from it."""
+    running, with the pads taken from it. With recordings on, Start
+    recording (or Stop recording, while one is under way) comes after
+    Resume or Close."""
 
-    def __init__(self):
+    def __init__(self, recordings=False):
+        self.recordings = recordings
+        self.recording = False
         self.open = False
         self.view = "main"   # or "confirm": Quit game's "are you sure?"
         self.items = []
@@ -575,11 +611,12 @@ class Menu:
 
     def _main(self):
         self.view = "main"
-        self.items = ["Resume", "Quit game"] if self.playing else ["Close"]
+        record = ["Stop recording" if self.recording else "Start recording"] if self.recordings else []
+        self.items = ["Resume", *record, "Quit game"] if self.playing else ["Close", *record]
 
-    def command(self, cmd, playing, pausable=True, mode="block"):
+    def command(self, cmd, playing, pausable=True, mode="block", recording=False):
         if cmd == "open":
-            self.open, self.sel, self.playing = True, 0, playing
+            self.open, self.sel, self.playing, self.recording = True, 0, playing, recording
             # Big Picture and the voice client aren't games to pause.
             self.mode = mode if playing and pausable else "none"
             self.note = {"freeze": "Game paused", "block": "The game keeps running"}.get(self.mode, "")
@@ -602,6 +639,10 @@ class Menu:
         elif cmd == "select" and item == "Quit":
             self.open = False
             return {"open": False, "do": "quit"}
+        elif cmd == "select" and item in ("Start recording", "Stop recording"):
+            # Done by the daemon itself; famidrive-quit only acts on "quit".
+            self.open = False
+            return {"open": False, "do": "record" if item == "Start recording" else "stop-recording"}
         elif cmd == "select":   # Resume, Close
             self.open = False
         return self.state()
@@ -662,7 +703,8 @@ def daemon(spec_file, player):
     me = player_spec(spec, player)
     theme = spec.get("theme")
     queue = Queue(me["hide"])
-    menu = Menu()
+    # Not on "Who's playing?": nobody's session to record into yet.
+    menu = Menu(recordings=bool(spec.get("recordings")) and player != "greeter")
 
     pygame.font.init()
     d = xdisplay.Display()
@@ -701,6 +743,7 @@ def daemon(spec_file, player):
     # bold on top of its regular one looked blocky.
     m_title, m_body, m_small = fnt(regular, int(34 * u)), fnt(regular, int(28 * u)), fnt(regular, int(22 * u))
     m_label = m_body
+    count_f = fnt(regular, int(150 * u))
     pad, gap, radius = int(22 * u), int(18 * u), int(14 * u)
     width = int(600 * u)
     margin = int(40 * u)
@@ -988,6 +1031,16 @@ def daemon(spec_file, player):
             x += g + int(10 * u) + label.get_width() + int(32 * u)
         return surf, (top, gy - int(24 * u))
 
+    def render_count(n, colors):
+        """The countdown before a recording: the number in a round panel,
+        in the middle of the screen."""
+        size = int(240 * u)
+        surf = pygame.Surface((size, size), pygame.SRCALPHA, 32)
+        pygame.draw.circle(surf, opaque(colors["panel"]), (size // 2, size // 2), size // 2)
+        digit = count_f.render(str(n), True, colors["text"])
+        surf.blit(digit, ((size - digit.get_width()) // 2, (size - digit.get_height()) // 2))
+        return surf
+
     def menu_key(pads):
         return (menu.view, menu.sel, menu.note, tuple(menu.items), tuple(pads), time.strftime("%-I:%M"))
 
@@ -1127,6 +1180,8 @@ def daemon(spec_file, player):
     sheet = None        # the menu's panel on the X server, and its slide in
     last = None    # what was drawn, to skip redrawing a still stack
     colors, rendered, ys = {}, {}, {}   # per toast: its scheme, its last render, its animated y
+    countdown = None   # when a recording starts, while the countdown is up
+    count_drawn = None   # (number, rect) of the countdown on screen now
     gap = int(16 * u)
     while True:
         now = time.monotonic()
@@ -1137,7 +1192,7 @@ def daemon(spec_file, player):
         # While the menu is up, toasts wait (the queue isn't ticked) and
         # show once it's closed; the menu redraws for the clock and
         # batteries every second.
-        busy = menu.open or sheet is not None or bool(queue.tick(now)) or drawn is not None
+        busy = menu.open or sheet is not None or countdown is not None or bool(queue.tick(now)) or drawn is not None
         moving = sheet and (sheet["phase"] != "still" or sheet["swap"])
         wait = 1 / 60 if moving else 1.0 if menu.open else 1 / 30 if busy else None
         ready, _, _ = select.select([*servers, xfd], [], [], wait)
@@ -1164,8 +1219,16 @@ def daemon(spec_file, player):
                         if not (menu.open and msg.get("icon") == "controller"):
                             queue.add(msg, time.monotonic())
                     elif server is srv:   # the session's own socket only, not the shared one
+                        if msg["menu"] == "open":
+                            countdown = None   # the menu opened over it: the recording isn't started
+                        reply = menu.command(msg["menu"], in_game(), pausable(), game_mode(), recording())
+                        if reply.get("do") == "record":
+                            # Once the menu has slid away and the blur faded.
+                            countdown = time.monotonic() + SLIDE_SECONDS + COUNTDOWN
+                        elif reply.get("do") == "stop-recording":
+                            record("stop")
                         try:
-                            conn.sendall(json.dumps(menu.command(msg["menu"], in_game(), pausable(), game_mode())).encode() + b"\n")
+                            conn.sendall(json.dumps(reply).encode() + b"\n")
                         except OSError:
                             pass
         if xfd in ready:
@@ -1203,6 +1266,30 @@ def daemon(spec_file, player):
             sheet = None
             clear((0, 0, sw, sh))
             menu_drawn = drawn = last = None
+        if count_drawn and countdown is None:   # cancelled: the menu was opened over it
+            clear(count_drawn[1])
+            count_drawn = None
+        if countdown is not None:
+            # Toasts wait under the countdown, as they do under the menu.
+            left = countdown - time.monotonic()
+            if left > 0:
+                n = min(COUNTDOWN, int(left) + 1)
+                if not count_drawn or count_drawn[0] != n:
+                    clear(drawn)
+                    drawn = last = None
+                    surf = render_count(n, theme_colors(theme, color_scheme(Path.home())))
+                    pos = ((sw - surf.get_width()) // 2, (sh - surf.get_height()) // 2)
+                    put(surf, pos)
+                    count_drawn = (n, (*pos, *surf.get_size()))
+                d.flush()
+                continue
+            # Cleared and on the TV before the first frame is captured.
+            if count_drawn:
+                clear(count_drawn[1])
+            d.flush()
+            d.sync()
+            countdown = count_drawn = None
+            record("start")
         shown = queue.tick(time.monotonic())
         live = {id(t) for t, _, _ in shown}
         for cache in (colors, rendered, ys):
