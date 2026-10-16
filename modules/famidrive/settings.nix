@@ -121,7 +121,7 @@ in
       extensions = [ ".setting" ];
       command = ''
         case "$(cat "$ROM")" in
-          ${lib.optionalString heroicInSettings ''heroic) XDG_CURRENT_DESKTOP=FamiDrive ${pkgs.heroic}/bin/heroic --fullscreen --no-sandbox ;;''}
+          ${lib.optionalString heroicInSettings ''heroic) XDG_CURRENT_DESKTOP=FamiDrive ${cfg.heroic}/bin/heroic --fullscreen --no-sandbox ;;''}
           ${lib.optionalString jellyfin ''jellyfin) ${cfg.systems.media.command} ;;''}
           ${lib.optionalString network ''network-*) exec ${pkgs.famidrive-network}/bin/famidrive-network launch "$ROM" ;;''}
           ${lib.optionalString voice ''discord-voice) exec ${pkgs.gamescope-fg}/bin/gamescope-fg --voice-show ;;''}

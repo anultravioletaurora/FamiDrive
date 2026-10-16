@@ -707,6 +707,11 @@ in
           lib.hasInfix "GDK_SCALE=2" w && lib.hasInfix "GDK_DPI_SCALE=0.75" w
             && lib.hasInfix lutrisBin c.famidrive.systems.lutris.command
             && !(lib.hasInfix lutrisBin c.famidrive.systems.settings.command)))
+      (check "Heroic is at the TV's scale, wherever it's started"
+        (let heroicBin = builtins.unsafeDiscardStringContext "${c.famidrive.heroic}/bin/heroic";
+        in
+          lib.hasInfix "--force-device-scale-factor=1.5" c.famidrive.heroic.text
+            && lib.hasInfix heroicBin c.famidrive.systems.epic.command))
       (check "Lutris's menu entries follow its database, per player"
         (lib.hasInfix "famidrive-generate lutris /home/bob/.local/share/lutris /home/bob/.local/share/famidrive/roms/lutris"
             c.systemd.services.famidrive-gen-lutris-bob.serviceConfig.ExecStart

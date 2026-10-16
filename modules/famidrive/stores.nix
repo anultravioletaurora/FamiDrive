@@ -83,6 +83,14 @@ let
     export GDK_DPI_SCALE=${toString (scale / gdkScale)}
     exec ${pkgs.lutris}/bin/lutris "$@"
   '';
+
+  # Heroic is Electron: Chromium's own UI scale, as Discord's
+  # (voice.nix). Found on the first box 2026-10-15: like Lutris, its
+  # window was at desktop size on the 4K TV, unreadable from the couch.
+  # Heroic keeps one instance, so the scale is the first start's.
+  heroic = pkgs.writeShellScriptBin "heroic" ''
+    exec ${pkgs.heroic}/bin/heroic --force-device-scale-factor=${toString cfg.display.scale} "$@"
+  '';
 in
 {
   options.famidrive.stores = {
@@ -102,6 +110,13 @@ in
     description = "Lutris, at the TV's scale (`display.scale`).";
   };
 
+  options.famidrive.heroic = mkOption {
+    type = types.package;
+    internal = true;
+    readOnly = true;
+    description = "Heroic Games Launcher, at the TV's scale (`display.scale`).";
+  };
+
   options.famidrive.launchers = mkOption {
     type = types.attrsOf (types.listOf types.str);
     internal = true;
@@ -112,6 +127,7 @@ in
   config = lib.mkMerge [
     {
       famidrive.lutris = lutris;
+      famidrive.heroic = heroic;
       famidrive.launchers = lib.genAttrs [ "heroic" "lutris" ] (l:
         lib.optionals on (lib.filter (s: cfg.stores.${s} == l) (lib.attrNames cfg.stores)));
 
