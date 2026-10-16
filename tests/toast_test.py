@@ -296,21 +296,23 @@ class GuideMenu(unittest.TestCase):
     def test_recording(self):
         menu = t.Menu(recordings=True)
         menu.command("open", True)
-        self.assertEqual(menu.items, ["Resume", "Start recording", "Quit game"])
-        menu.command("down", True)
+        # Record first, as a button of its own; the menu opens on Resume.
+        self.assertEqual(menu.items, ["Start recording", "Resume", "Quit game"])
+        self.assertEqual(menu.items[menu.sel], "Resume")
+        menu.command("up", True)
         self.assertEqual(menu.command("select", True), {"open": False, "do": "record"})
         # While one's under way, the same place stops it.
         menu.command("open", True, recording=True)
-        self.assertEqual(menu.items, ["Resume", "Stop recording", "Quit game"])
-        menu.command("down", True)
+        self.assertEqual(menu.items, ["Stop recording", "Resume", "Quit game"])
+        menu.command("up", True)
         self.assertEqual(menu.command("select", True), {"open": False, "do": "stop-recording"})
-        # Out of a game too (the menu, Kodi): after Close.
+        # Out of a game too (the menu, Kodi), opening on Close.
         menu.command("open", False)
-        self.assertEqual(menu.items, ["Close", "Start recording"])
-        # Quit game's question still comes back to Quit game.
+        self.assertEqual((menu.items, menu.items[menu.sel]), (["Start recording", "Close"], "Close"))
+        # Quit game is still one down from Resume, and its question comes back to it.
         menu.command("open", True)
         menu.command("down", True)
-        menu.command("down", True)
+        self.assertEqual(menu.items[menu.sel], "Quit game")
         menu.command("select", True)
         menu.command("back", True)
         self.assertEqual(menu.items[menu.sel], "Quit game")

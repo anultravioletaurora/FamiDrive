@@ -113,6 +113,14 @@ let
   '';
 
   theme = cfg.esde.theme;
+
+  # The theme as ES-DE gets it: its own files, with FamiDrive's additions
+  # for systems it has no art for (esde.themeExtras) laid over them. The
+  # theme's files are links into it, not copies.
+  themeSrc = if cfg.esde.themeExtras == [ ] then theme.src else pkgs.runCommand theme.name { } ''
+    cp -rs --no-preserve=mode ${theme.src} $out
+    ${lib.concatMapStrings (x: "cp -r --no-preserve=mode --remove-destination ${x}/. $out/\n") cfg.esde.themeExtras}
+  '';
 in
 {
   options.famidrive.esde.theme = lib.mkOption {
@@ -158,6 +166,17 @@ in
     defaultText = lib.literalMD "[Art Book Next](https://github.com/anthonycaccese/art-book-next-es-de), pinned";
     example = lib.literalExpression ''{ name = "my-theme"; src = ./themes/my-theme; }'';
     description = "ES-DE theme, symlinked in and selected. null = ES-DE's bundled default.";
+  };
+
+  options.famidrive.esde.themeExtras = lib.mkOption {
+    type = lib.types.listOf lib.types.path;
+    default = [ ];
+    internal = true;
+    description = ''
+      Folders laid over the theme's own files, in its layout: art, logos
+      and metadata for systems FamiDrive adds that the theme has none for
+      (the Recordings system's, recordings.nix).
+    '';
   };
 
   options.famidrive.esde.musicVolume = lib.mkOption {
@@ -219,7 +238,7 @@ in
         "ES-DE/custom_systems/es_systems.xml".source = esSystemsXml;
         "ES-DE/custom_systems/es_systems_sorting.xml".source = esSystemsSortingXml;
       } // lib.optionalAttrs (theme != null) {
-        "ES-DE/themes/${theme.name}".source = theme.src;
+        "ES-DE/themes/${theme.name}".source = themeSrc;
       };
 
       # This player's ROM folder: a link to each shared system. Links to

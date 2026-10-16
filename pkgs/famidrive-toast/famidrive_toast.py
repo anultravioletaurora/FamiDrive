@@ -67,6 +67,8 @@ BLUR_FADE_MS = 200
 SLIDE_SECONDS = 0.28
 SWAP_SECONDS = 0.22    # the buttons sliding over to the quit question and back
 COUNTDOWN = 3          # seconds counted down before a recording starts
+RECORD_ITEMS = {"Start recording": "Record", "Stop recording": "Stop"}   # the menu item, and its button's label
+RED = (226, 60, 60, 255)   # the record button's dot and the live dot
 
 MAX_SHOWN = 3          # toasts on screen at once, stacked from the corner
 URGENT = ("alert", "achievement")   # a progress toast nobody updates is let go
@@ -586,7 +588,9 @@ def watch_controllers(interval=1.5):
 # With recordings on (famidrive.recordings), the menu also starts and
 # stops a recording of the screen (famidrive-record). "Start recording"
 # closes the menu and counts down from 3 in the middle of the screen
-# first, so the menu and the countdown aren't in the recording.
+# first, so the menu and the countdown aren't in the recording. While it
+# records, a red dot shows in the top right corner, on a layer gamescope
+# leaves out of the recording.
 
 class Menu:
     """The menu's state. Pure: whether a game is running, whether it's one
@@ -596,7 +600,8 @@ class Menu:
     saved is lost. Out of one: Close. A "freeze" game (an emulator) is
     stopped while the menu is open; a "block" one (an online game) keeps
     running, with the pads taken from it. With recordings on, Start
-    recording (or Stop recording, while one is under way) comes after
+    recording (or Stop recording, while one is under way) is a half-width
+    button above them, drawn as Record (or Stop); the menu still opens on
     Resume or Close."""
 
     def __init__(self, recordings=False):
@@ -612,7 +617,7 @@ class Menu:
     def _main(self):
         self.view = "main"
         record = ["Stop recording" if self.recording else "Start recording"] if self.recordings else []
-        self.items = ["Resume", *record, "Quit game"] if self.playing else ["Close", *record]
+        self.items = [*record, "Resume", "Quit game"] if self.playing else [*record, "Close"]
 
     def command(self, cmd, playing, pausable=True, mode="block", recording=False):
         if cmd == "open":
@@ -621,6 +626,7 @@ class Menu:
             self.mode = mode if playing and pausable else "none"
             self.note = {"freeze": "Game paused", "block": "The game keeps running"}.get(self.mode, "")
             self._main()
+            self.sel = self.items.index("Resume" if playing else "Close")
             return self.state()
         if not self.open:
             return self.state()
@@ -822,6 +828,11 @@ def daemon(spec_file, player):
                 pygame.draw.ellipse(c, color, (n * (x - .19), n * .66, n * .22, n * .17))
                 pygame.draw.rect(c, color, (n * (x - .02), n * .20, n * .05, n * .56))
             pygame.draw.polygon(c, color, [(n * .28, n * .20), (n * .79, n * .10), (n * .79, n * .22), (n * .28, n * .32)])
+        elif name == "record":   # a ring around a dot
+            pygame.draw.circle(c, color, (n * .5, n * .5), n * .44, lw)
+            pygame.draw.circle(c, RED, (n * .5, n * .5), n * .26)
+        elif name == "stop":   # a rounded square
+            pygame.draw.rect(c, color, (n * .2, n * .2, n * .6, n * .6), border_radius=n // 10)
         elif name == "download":   # an arrow down into a tray
             pygame.draw.rect(c, color, (n * .43, n * .08, n * .14, n * .42))
             pygame.draw.polygon(c, color, [(n * .25, n * .46), (n * .75, n * .46), (n * .5, n * .70)])
@@ -1015,9 +1026,22 @@ def daemon(spec_file, player):
         bh = int(68 * u)
         for i, item in enumerate(menu.items):
             on = i == menu.sel
-            fill(surf, text if on else faint, (m, y, pw - 2 * m, bh), int(10 * u))
-            label = m_label.render(item, True, on_text(text) if on else text)
-            surf.blit(label, (m + int(24 * u), y + (bh - label.get_height()) // 2))
+            ink = on_text(text) if on else text
+            if item in RECORD_ITEMS:
+                # Half the width, an icon and a word: a quick action, not
+                # one of the menu's choices about the game.
+                tw = (pw - 2 * m - int(14 * u)) // 2
+                fill(surf, text if on else faint, (m, y, tw, bh), int(10 * u))
+                isz = int(36 * u)
+                icon = drawn_icon("record" if item == "Start recording" else "stop", isz, ink)
+                label = m_label.render(RECORD_ITEMS[item], True, ink)
+                x = m + (tw - isz - int(14 * u) - label.get_width()) // 2
+                surf.blit(icon, (x, y + (bh - isz) // 2))
+                surf.blit(label, (x + isz + int(14 * u), y + (bh - label.get_height()) // 2))
+            else:
+                fill(surf, text if on else faint, (m, y, pw - 2 * m, bh), int(10 * u))
+                label = m_label.render(item, True, ink)
+                surf.blit(label, (m + int(24 * u), y + (bh - label.get_height()) // 2))
             y += bh + int(12 * u)
 
         g = int(40 * u)
@@ -1151,6 +1175,39 @@ def daemon(spec_file, player):
 
     over_game(False)   # a daemon that died with the menu up left them on
 
+    # The live dot, while recording: a window of its own on gamescope's
+    # external overlay layer, which its PipeWire stream leaves out (only
+    # the Steam overlay layer, where everything else here draws, goes into
+    # it; paint_pipewire in steamcompmgr.cpp), so the dot is on the TV and
+    # not in the recording. That layer is MangoHud's, and gamescope shows
+    # one window on it: a player with the performance overlay on may lose
+    # it while recording. VERIFY on the first box.
+    rec = {"win": None, "shown": False, "watch": 0.0, "next": 0.0}
+
+    def rec_dot(show):
+        if show == rec["shown"]:
+            return
+        rec["shown"] = show
+        if not show:
+            if rec["win"]:
+                rec["win"].unmap()
+            d.flush()
+            return
+        if not rec["win"]:
+            w = scr.root.create_window(0, 0, sw, sh, 0, 32, X.InputOutput, visual,
+                                       background_pixel=0, border_pixel=0, colormap=cmap,
+                                       override_redirect=True)
+            w.set_wm_name("famidrive-record-dot")
+            w.change_property(d.intern_atom("GAMESCOPE_EXTERNAL_OVERLAY"), Xatom.CARDINAL, 32, [1])
+            rec["win"] = w
+        rec["win"].map()
+        size, r, halo = int(64 * u), int(14 * u), int(22 * u)
+        dot = pygame.Surface((size, size), pygame.SRCALPHA, 32)
+        pygame.draw.circle(dot, (0, 0, 0, 110), (size // 2, size // 2), halo)   # stands off a light game
+        pygame.draw.circle(dot, RED, (size // 2, size // 2), r)
+        put(dot, (sw - margin - size, margin), rec["win"])
+        d.flush()
+
     path = sock_path()
     srv = listen(path, 0o600)
     if srv is None:
@@ -1195,6 +1252,8 @@ def daemon(spec_file, player):
         busy = menu.open or sheet is not None or countdown is not None or bool(queue.tick(now)) or drawn is not None
         moving = sheet and (sheet["phase"] != "still" or sheet["swap"])
         wait = 1 / 60 if moving else 1.0 if menu.open else 1 / 30 if busy else None
+        if rec["shown"] or now < rec["watch"]:   # whether it's still recording, each second
+            wait = 1.0 if wait is None else min(wait, 1.0)
         ready, _, _ = select.select([*servers, xfd], [], [], wait)
         for server in (x for x in servers if x in ready):
             conn, _ = server.accept()
@@ -1226,6 +1285,7 @@ def daemon(spec_file, player):
                             # Once the menu has slid away and the blur faded.
                             countdown = time.monotonic() + SLIDE_SECONDS + COUNTDOWN
                         elif reply.get("do") == "stop-recording":
+                            rec_dot(False)
                             record("stop")
                         try:
                             conn.sendall(json.dumps(reply).encode() + b"\n")
@@ -1234,6 +1294,9 @@ def daemon(spec_file, player):
         if xfd in ready:
             while d.pending_events():
                 d.next_event()   # also notices when gamescope has gone
+        if (rec["shown"] or now < rec["watch"]) and now >= rec["next"]:
+            rec["next"] = now + 1.0
+            rec_dot(recording())
         if menu.open and sheet and sheet["phase"] == "out":   # opened again while leaving
             end_sheet(sheet)
             sheet = None
@@ -1290,6 +1353,7 @@ def daemon(spec_file, player):
             d.sync()
             countdown = count_drawn = None
             record("start")
+            rec["watch"] = time.monotonic() + 10   # long enough for it to start, or fail
         shown = queue.tick(time.monotonic())
         live = {id(t) for t, _, _ in shown}
         for cache in (colors, rendered, ys):

@@ -4,8 +4,10 @@
 # the same place ends it. A Recordings system in ES-DE lists them, and
 # plays one in mpv.
 #
-# Art Book Next has no art for recordings (or for any video system): its
-# fallback, as for Controllers.
+# Art Book Next (ES-DE edition) has no art for recordings, and its
+# fallback is Controllers' too, so the two looked alike (first box,
+# 2026-10-16): FamiDrive adds a logo, light red art and colors to it
+# (pkgs/art-book-next-recordings).
 { config, lib, pkgs, ... }:
 
 let
@@ -31,15 +33,22 @@ in
     # a fix to it doesn't restart the TV (box-testing.md).
     environment.systemPackages = [ pkgs.famidrive-record ];
 
+    # Only for Art Book Next: another theme has its own art, or its own
+    # fallback.
+    famidrive.esde.themeExtras = lib.mkIf (cfg.esde.theme != null && cfg.esde.theme.name == "art-book-next-es-de")
+      [ (pkgs.callPackage ../../pkgs/art-book-next-recordings { theme = cfg.esde.theme.src; }) ];
+
     famidrive.systems.recordings = {
       fullname = "Recordings";
-      theme = "_default";
+      theme = "recordings";
       sortName = "zzzx";   # with Controllers and Settings, after every game system
       extensions = [ ".mp4" ];
       # mpv-gamepad: mpv with SDL's gamepad input, as the Jellyfin shim
       # uses (flake.nix), so A pauses and the d-pad seeks. Select + Start
-      # leaves it, as it does a game.
-      command = ''${pkgs.mpv-gamepad}/bin/mpv --fs --input-gamepad=yes --keep-open=no "$ROM"'';
+      # leaves it, as it does a game. Decoded on the GPU (mpv's default is
+      # the CPU): playback was choppy on the first box 2026-10-16, and a 4K
+      # video decoded on the CPU is one likely cause.
+      command = ''${pkgs.mpv-gamepad}/bin/mpv --fs --hwdec=auto-safe --input-gamepad=yes --keep-open=no "$ROM"'';
     };
 
     # The Recordings system is a link to ~/Recordings, so it's the folder

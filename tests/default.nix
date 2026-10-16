@@ -530,6 +530,10 @@ in
         && lib.hasInfix "/home/alice/.local/share/famidrive/roms/recordings"
           c.home-manager.users.alice.home.activation.famidriveRecordings.data
         && lib.elem "famidriveRoms" c.home-manager.users.alice.home.activation.famidriveRecordings.after))
+    (check "Art Book Next gets the Recordings system's logo and art, which it has none of"
+      (c.famidrive.systems.recordings.theme == "recordings"
+        && lib.length c.famidrive.esde.themeExtras == 1
+        && lib.hasInfix "art-book-next-recordings" (toString (lib.head c.famidrive.esde.themeExtras))))
   ]);
 
   # famidrive.recordings = false: no recorder and no Recordings system.
@@ -544,6 +548,7 @@ in
     (check "no Recordings system" (!(c.famidrive.systems ? recordings)))
     (check "no recorder" (!(lib.any (p: lib.getName p == "famidrive-record") c.environment.systemPackages)))
     (check "no link to ~/Recordings" (!(c.home-manager.users.alice.home.activation ? famidriveRecordings)))
+    (check "Art Book Next as it comes" (c.famidrive.esde.themeExtras == [ ]))
   ]);
 
   box-family = expect "family" familyHost (c:
