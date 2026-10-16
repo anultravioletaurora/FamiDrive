@@ -215,7 +215,7 @@ in
   cheevos = unit "cheevos" ../pkgs/famidrive-cheevos/famidrive_cheevos.py
     (pkgs.python3.withPackages (ps: [ ps.requests ]));
   nexusmods = pkgs.runCommand "test-nexusmods" {
-    nativeBuildInputs = [ (pkgs.python3.withPackages (ps: [ ps.requests ps.xxhash ])) pkgs.libarchive ];
+    nativeBuildInputs = [ (pkgs.python3.withPackages (ps: [ ps.requests ps.xxhash ps.pyyaml ])) pkgs.libarchive ];
   } ''
     export HOME=$TMPDIR
     python3 ${./nexusmods_test.py} ${../pkgs/famidrive-nexusmods/famidrive_nexusmods.py}
@@ -254,6 +254,10 @@ in
       (let spec = builtins.fromJSON (builtins.unsafeDiscardStringContext (builtins.readFile (lib.last (lib.splitString " "
             c.systemd.services.famidrive-nexusmods-alice.serviceConfig.ExecStart)))); in
         lib.hasSuffix "nvse_6_4_9.7z" spec.extras.xnvse))
+    (check "a GOG game's mods go in Lutris's copy first, as GOG's games are Lutris's by default"
+      (let spec = builtins.fromJSON (builtins.unsafeDiscardStringContext (builtins.readFile (lib.last (lib.splitString " "
+            c.systemd.services.famidrive-nexusmods-alice.serviceConfig.ExecStart)))); in
+        spec.gog == "lutris"))
     (check "one collection and a list both work, the single one first"
       (let spec = builtins.fromJSON (builtins.unsafeDiscardStringContext (builtins.readFile (lib.last (lib.splitString " "
             c.systemd.services.famidrive-nexusmods-alice.serviceConfig.ExecStart)))); in

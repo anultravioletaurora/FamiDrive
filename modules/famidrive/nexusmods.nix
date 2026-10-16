@@ -1,5 +1,5 @@
 # Nexus Mods, per player: the collections (modpacks) they want for their
-# Steam games, downloaded in the background with their own API key and
+# Steam and GOG games, downloaded in the background with their own API key and
 # installed in the game's folder. A rebuild that changes a player's mods
 # starts their service again: a run still downloading is stopped (so its
 # downloads are cancelled), and the new one installs what's listed now and
@@ -37,6 +37,9 @@ let
   spec = name: p: pkgs.writeText "famidrive-nexusmods-${name}.json" (builtins.toJSON {
     apiKeyFile = if withMods ? ${name} then toString (keyFile name p) else null;
     cache = "~/.cache/famidrive/nexusmods";
+    # Whose copy of a GOG game gets its mods first, if Heroic and Lutris
+    # both have it.
+    gog = cfg.stores.gog;
     extras = lib.mapAttrs (_: toString) extras;
     games = lib.mapAttrs (_: g: {
       collections = lib.optional (g.collection != null) g.collection ++ g.collections;
@@ -148,7 +151,7 @@ in
           '';
           description = ''
             Nexus Mods collections for their games: a Steam game by its app
-            id, a GOG game (installed through Heroic) as `gog:<GOG id>`. A
+            id, a GOG game (in Heroic or Lutris) as `gog:<GOG id>`. A
             collection can be a Wabbajack list (New Vegas's NakeyJakey's,
             for one), built and installed the same way.
             Downloaded in the background into their cache

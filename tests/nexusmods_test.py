@@ -11,6 +11,7 @@ import importlib.util
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -300,6 +301,38 @@ class Install(unittest.TestCase):
         self.assertEqual(m.cmd_sync({"cache": str(self.base / "cache"), "apiKeyFile": None, "games": {}}), 0)
         self.assertFalse((root / "mod.archive").exists())
 
+    def test_a_game_uninstalled_first_isnt_made_again(self):
+        root, prefix_ini = self.base / "gone/game", self.base / "gone/prefix/Fallout.ini"
+        (self.base / "bk").mkdir()
+        (self.base / "bk/FalloutNV.exe").write_text("the game's own")
+        (self.base / "bk-ini").write_text("the player's")
+        m.save_installed("gog:1", {"appid": "gog:1", "root": str(root), "want": {}, "files": ["nvse_1_4.dll"],
+                                   "replaced": ["FalloutNV.exe"], "backup": str(self.base / "bk"), "complete": True,
+                                   "outside": [{"path": str(prefix_ini), "backup": str(self.base / "bk-ini")}]})
+        m.uninstall(m.read_installed("gog:1"))
+        self.assertFalse((self.base / "gone").exists())
+        self.assertIsNone(m.read_installed("gog:1"))
+
+    def test_mods_follow_a_game_that_moved(self):
+        cache, game = self.base / "cache", {"collections": [{"slug": "ezlocx", "revision": 1}]}
+        old, new = self.base / "Heroic/Fallout New Vegas", self.base / "Lutris/Fallout New Vegas"
+        m.save_installed("gog:1", {"appid": "gog:1", "root": str(old), "want": m.want_of(game), "files": [],
+                                   "replaced": [], "backup": str(self.base / "bk"), "complete": True})
+        fetched = []
+        real_dir, real_fetch = m.game_dir, m.fetch_game
+        m.fetch_game = lambda nx, cache, appid, game: fetched.append(appid) or 1   # stops there: files missing
+        try:
+            m.game_dir = lambda appid: old
+            self.assertEqual(m.sync_game(None, cache, "gog:1", game), 0)
+            m.game_dir = lambda appid: None   # uninstalled: the record stays until it's somewhere
+            self.assertEqual(m.sync_game(None, cache, "gog:1", game), 0)
+            self.assertEqual(fetched, [])
+            m.game_dir = lambda appid: new
+            m.sync_game(None, cache, "gog:1", game)
+            self.assertEqual(fetched, ["gog:1"])
+        finally:
+            m.game_dir, m.fetch_game = real_dir, real_fetch
+
 
 def octodelta(commands):
     """An OctoDiff delta, as Wabbajack's patches are."""
@@ -420,6 +453,53 @@ class Heroic(unittest.TestCase):
     def test_steam_prefix_beside_its_library(self):
         root = Path("/lib/steamapps/common/Fallout New Vegas")
         self.assertEqual(m.prefix_of("22380", root), Path("/lib/steamapps/compatdata/22380"))
+
+
+class Lutris(unittest.TestCase):
+    """Lutris 0.5.22's records for a GOG game it installed: a row in
+    pga.db with service "gog" and the GOG id, its config's prefix, and
+    the game wherever GOG's setup put it in that prefix."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self.lutris = self.base / "lutris"
+        (self.lutris / "games").mkdir(parents=True)
+        self.prefix = self.base / "Games/fallout-new-vegas"
+        self.game = self.prefix / "drive_c/GOG Games/Fallout New Vegas"
+        self.game.mkdir(parents=True)
+        (self.game / "goggame-1454587428.info").write_text("{}")
+        (self.prefix / "drive_c/windows/system32").mkdir(parents=True)
+        con = sqlite3.connect(self.lutris / "pga.db")
+        con.execute("CREATE TABLE games (id INTEGER PRIMARY KEY, name TEXT, directory TEXT, installed INTEGER,"
+                    " configpath TEXT, service TEXT, service_id TEXT)")
+        con.execute("INSERT INTO games VALUES (1, 'Fallout: New Vegas', ?, 1, 'fallout-new-vegas-1', 'gog', '1454587428')",
+                    (str(self.prefix),))
+        con.execute("INSERT INTO games VALUES (2, 'Gone', ?, 0, 'gone-2', 'gog', '2')", (str(self.prefix),))
+        con.commit()
+        con.close()
+        (self.lutris / "games/fallout-new-vegas-1.yml").write_text(
+            f"game:\n  exe: {self.game}/FalloutNVLauncher.exe\n  prefix: {self.prefix}\nwine:\n  version: ge-proton\n")
+
+    def tearDown(self):
+        m.GOG_LAUNCHERS[:] = ["heroic", "lutris"]
+        self.tmp.cleanup()
+
+    def test_gog_game_and_prefix(self):
+        self.assertEqual(m.game_dir("gog:1454587428", lutris=self.lutris, heroic=self.base / "no-heroic"), self.game)
+        self.assertEqual(m.prefix_of("gog:1454587428", self.game, lutris=self.lutris, heroic=self.base / "no-heroic"),
+                         self.prefix)
+        self.assertIsNone(m.game_dir("gog:2", lutris=self.lutris, heroic=self.base / "no-heroic"))   # uninstalled
+        self.assertIsNone(m.game_dir("gog:1454587428", lutris=self.base / "no-lutris", heroic=self.base / "no-heroic"))
+
+    def test_the_launcher_stores_gog_names_comes_first(self):
+        heroic, heroic_game = self.base / "heroic", self.base / "Heroic/Fallout New Vegas"
+        (heroic / "gog_store").mkdir(parents=True)
+        (heroic / "gog_store/installed.json").write_text(json.dumps(
+            {"installed": [{"appName": "1454587428", "install_path": str(heroic_game)}]}))
+        self.assertEqual(m.game_dir("gog:1454587428", heroic=heroic, lutris=self.lutris), heroic_game)
+        m.GOG_LAUNCHERS.sort(key=lambda launcher: launcher != "lutris")
+        self.assertEqual(m.game_dir("gog:1454587428", heroic=heroic, lutris=self.lutris), self.game)
 
 
 class NewVegas(unittest.TestCase):
