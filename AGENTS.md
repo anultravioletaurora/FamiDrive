@@ -107,9 +107,11 @@ What this means for changes now:
 ## Workflow
 
 1. Make a branch per change, then open a pull request with `gh`.
-2. The **Check** workflow runs `nix flake check`
-   ([tests/default.nix](tests/default.nix)). It takes about 25–30 minutes
-   on GitHub's runners, so run it locally first when you can. On a Mac
+2. The **Check** workflow runs each check in `nix flake check`
+   ([tests/default.nix](tests/default.nix)) as its own job, grouped as
+   Unit tests, Boxes and Packages, so a failure shows by name, and
+   "All checks" is green only when every one is. It takes a while on
+   GitHub's runners, so run `nix flake check` locally first when you can. On a Mac
    without Nix, run the Python unit tests directly
    (`python3 tests/<name>_test.py pkgs/<name>/<file>.py`) and let CI do
    the rest. A box can build checks too (see

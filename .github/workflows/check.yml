@@ -1,5 +1,11 @@
-# nix flake check on every pull request, and on main after a merge:
-# unit tests, example boxes evaluated, every package built (tests/).
+# Every check in `nix flake check` (tests/default.nix), each as its own
+# job, on every pull request and on main after a merge, so a failure
+# shows by name: "Unit tests (hardware)", "Boxes (box-nvidia)",
+# "Packages (pkg-es-de)". Locally, `nix flake check` still runs them all.
+#
+# The jobs share no Nix store: each fetches what it needs from
+# cache.nixos.org, and a package another one depends on is built by
+# both. FamiDrive has no binary cache of its own yet.
 name: Check
 
 on:
@@ -15,13 +21,81 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  list:
+    name: List checks
     runs-on: ubuntu-latest
+    outputs:
+      units: ${{ steps.list.outputs.units }}
+      boxes: ${{ steps.list.outputs.boxes }}
+      packages: ${{ steps.list.outputs.packages }}
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: |
             accept-flake-config = false
-      - name: nix flake check
-        run: nix flake check --print-build-logs --keep-going
+      # Also catches a flake that doesn't evaluate at all, before any
+      # job starts. By name: box-* are example boxes, pkg-* packages,
+      # everything else a unit test.
+      - id: list
+        run: |
+          names=$(nix eval --json .#checks.x86_64-linux --apply builtins.attrNames)
+          echo "$names"
+          for group in units boxes packages; do
+            case $group in
+              units) filter='map(select(startswith("box-") or startswith("pkg-") | not))' ;;
+              boxes) filter='map(select(startswith("box-")))' ;;
+              packages) filter='map(select(startswith("pkg-")))' ;;
+            esac
+            echo "$group=$(jq -c "$filter" <<< "$names")" >> "$GITHUB_OUTPUT"
+          done
+
+  units:
+    name: Unit tests
+    needs: list
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check: ${{ fromJSON(needs.list.outputs.units) }}
+    steps: &build
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            accept-flake-config = false
+      - name: ${{ matrix.check }}
+        run: nix build --no-link --print-build-logs .#checks.x86_64-linux.${{ matrix.check }}
+
+  boxes:
+    name: Boxes
+    needs: list
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check: ${{ fromJSON(needs.list.outputs.boxes) }}
+    steps: *build
+
+  packages:
+    name: Packages
+    needs: list
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check: ${{ fromJSON(needs.list.outputs.packages) }}
+    steps: *build
+
+  # One result to wait on, for a merge rule or the Update workflow:
+  # green only when every check above is.
+  all:
+    name: All checks
+    needs: [units, boxes, packages]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for r in ${{ needs.units.result }} ${{ needs.boxes.result }} ${{ needs.packages.result }}; do
+            [ "$r" = success ] || { echo "A check failed: see the jobs above."; exit 1; }
+          done
