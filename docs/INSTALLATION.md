@@ -213,9 +213,11 @@ NixOS, but isn't covered here.
      EA, Ubisoft and Humble Bundle under Lutris → Lutris. Each launcher
      is the first entry in its system, after any favorites
      (`famidrive.stores` says which launcher has each).
-     Battle.net goes in through Lutris first (search Lutris for
-     "Battle.net"). Then install games from Battle.net itself: each one
-     it installs is in the Lutris system the next time ES-DE starts.
+     For Battle.net, launch Lutris → Install Battle.net, and close
+     Battle.net's sign-in window when the installer gets there; sign
+     in the first time you start Battle.net. Then install games from
+     Battle.net itself: each one it installs is in the Lutris system
+     the next time ES-DE starts.
    - **Jellyfin:** sign in once in Media.
    - **RomM:** with a token, the library pull starts by itself (every
      30 minutes). To start it now, over SSH:

@@ -133,11 +133,20 @@ in
       famidrive.systems.lutris = {
         fullname = "Lutris";
         theme = "lutris";   # Art Book Next's Lutris art
-        # .setting: Lutris itself, at the top (settings.nix).
+        # .setting: Lutris itself, at the top (settings.nix), and Install
+        # Battle.net beside it until Lutris has Battle.net (below). One
+        # picked again before ES-DE restarts opens Lutris instead.
         extensions = [ ".lutris" ".setting" ];
         command = ''
           case "$ROM" in
-            *.setting) ${lutris}/bin/lutris ;;
+            *.setting)
+              if [ "$(cat "$ROM")" = battlenet-install ] \
+                  && ! ${pkgs.famidrive-battlenet}/bin/famidrive-battlenet installed "$HOME/.local/share/lutris"; then
+                ${lutris}/bin/lutris -i ${../../pkgs/famidrive-battlenet/battlenet.yml}
+              else
+                ${lutris}/bin/lutris
+              fi
+              ;;
             *)
               ${pkgs.famidrive-battlenet}/bin/famidrive-battlenet play "$HOME/.local/share/lutris" "$(cat "$ROM")" &
               battlenet=$!
@@ -165,6 +174,19 @@ in
       };
 
       environment.systemPackages = [ lutris ];
+
+      # "Install Battle.net" at the top of the Lutris system, beside Lutris,
+      # until Lutris has it: FamiDrive's copy of Lutris's installer
+      # (battlenet.yml), so a player needn't find it in Lutris. Battle.net's
+      # games then come in by themselves (famidrive-battlenet games).
+      famidrive.sessionSetup = lib.mkIf (lib.elem "battlenet" lutrisStores) ''
+        if ${pkgs.famidrive-battlenet}/bin/famidrive-battlenet installed "$HOME/.local/share/lutris"; then
+          rm -f "$HOME/.local/share/famidrive/roms/lutris/Install Battle.net.setting"
+        else
+          famidrive-generate launcher "$HOME/.local/share/famidrive/roms/lutris" "Install Battle.net" battlenet-install \
+            || echo "famidrive-session: couldn't add Install Battle.net to Lutris" >&2
+        fi
+      '';
 
       # The stores this box runs through Lutris are its services (its
       # sidebar, where a player signs in and installs); the others are
