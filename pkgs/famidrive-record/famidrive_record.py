@@ -31,6 +31,7 @@ from pathlib import Path
 GST_LAUNCH = "@gstLaunch@"
 GST_INSPECT = "@gstInspect@"
 GST_PLUGINS = "@gstPlugins@"
+PW_DUMP = "@pwDump@"
 
 # H.264 encoders, best first: the GPU's own encoder (VA-API on AMD and
 # Intel, NVENC on Nvidia), else x264 on the CPU. The va plugin is the
@@ -121,27 +122,76 @@ def pick_encoder(exists):
     return None
 
 
-def pipeline(path, encoder):
-    """gst-launch-1.0's arguments for a recording to path. pipewiresrc
-    stamps frames as they come (gamescope sends one only when the picture
-    changes) and keeps sending the last one through a still screen;
-    videorate makes that a steady FPS for the encoder and for players.
+def gamescope_stream():
+    """gamescope's PipeWire stream, as (node name, (width, height)), from
+    pw-dump; None when it can't be found. The node is named for
+    gamescope's binary, which isn't always "gamescope": under the
+    capSysNice wrapper it's ".gamescope-wrapped" (first box,
+    2026-10-17)."""
+    try:
+        out = subprocess.run([PW_DUMP], capture_output=True, text=True, timeout=5).stdout
+        objects = json.loads(out)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+    return find_stream(objects)
 
-    NV12 from gamescope: it converts on the GPU, and it's half the size
-    of its other format. The queue after it drops frames rather than hold
-    the stream up when the encoder falls behind, so the recording keeps
-    to the clock.
+
+def find_stream(objects):
+    for o in objects:
+        info = o.get("info") or {}
+        props = info.get("props") or {}
+        name = props.get("node.name") or ""
+        if props.get("media.class") != "Video/Source" or "gamescope" not in name:
+            continue
+        for fmt in (info.get("params") or {}).get("EnumFormat") or []:
+            size = fmt.get("size") or {}
+            if isinstance(size.get("width"), int) and isinstance(size.get("height"), int):
+                return name, (size["width"], size["height"])
+        return name, None
+    return None
+
+
+def fit(size):
+    """The largest even size within WIDTH x HEIGHT with size's shape (the
+    TV's); the scaler after it adds the borders."""
+    if not size or not size[0] or not size[1]:
+        return WIDTH, HEIGHT
+    w, h = size
+    scale = min(WIDTH / w, HEIGHT / h, 1.0)
+    return max(2, int(w * scale) // 2 * 2), max(2, int(h * scale) // 2 * 2)
+
+
+def pipeline(path, encoder, stream=None):
+    """gst-launch-1.0's arguments for a recording to path, from stream
+    (gamescope_stream()). pipewiresrc stamps frames as they come
+    (gamescope sends one only when the picture changes) and keeps sending
+    the last one through a still screen; videorate makes that a steady
+    FPS for the encoder and for players.
+
+    The picture comes in GPU memory (a DMABuf) and OpenGL scales it to
+    1080p before it's copied out. Found on the first box 2026-10-17: in
+    ordinary memory, gamescope copies each 4K frame on the CPU, and the
+    TV dropped from 120 frames a second to 60 while recording. No caps
+    after pipewiresrc: glupload asks for the DMABuf itself, and with them
+    gst-launch can't link the GL elements. OpenGL needs an exact size (it
+    picked a width of 1 when left to keep the shape itself), hence fit().
+    The queue after pipewiresrc drops frames rather than hold the stream
+    up when the encoder falls behind, so the recording keeps to the
+    clock.
 
     The queue before the encoder lets it work while the next frame is
     scaled. Found on the first box 2026-10-17: without it, each frame
     waited for both in turn, and the box's GPU encoder kept up with only
     about 41 frames a second, against 60 with it."""
     name, props, scale, caps = encoder
+    node, size = stream or ("gamescope", None)
+    w, h = fit(size)
     return [
         "-e",   # Ctrl-C ends the stream properly, so the MP4 is finished
-        "pipewiresrc", "target-object=gamescope", "do-timestamp=true", "keepalive-time=100",
-        "!", "video/x-raw,format=NV12",
+        "pipewiresrc", f"target-object={node}", "do-timestamp=true", "keepalive-time=100",
         "!", "queue", "leaky=downstream", "max-size-buffers=4", "max-size-bytes=0", "max-size-time=0",
+        "!", "glupload", "!", "glcolorconvert", "!", "glcolorscale", "!", "glcolorconvert", "!", "gldownload",
+        "!", f"video/x-raw,format=NV12,width={w},height={h}",
         "!", *scale,
         "!", "videorate",
         "!", f"{caps},width={WIDTH},height={HEIGHT},pixel-aspect-ratio=1/1,framerate={FPS}/1",
@@ -166,6 +216,9 @@ def gst_env():
     env = dict(os.environ)
     if not GST_PLUGINS.startswith("@"):
         env["GST_PLUGIN_SYSTEM_PATH_1_0"] = GST_PLUGINS
+    # OpenGL without a window: the recorder draws nothing.
+    env["GST_GL_PLATFORM"] = "egl"
+    env["GST_GL_WINDOW"] = "surfaceless"
     return env
 
 
@@ -200,7 +253,7 @@ def start():
     path = folder / file_name()
     logfile = runtime_dir() / "famidrive-record.log"
     with open(logfile, "w") as out:
-        proc = subprocess.Popen([GST_LAUNCH, *pipeline(path, encoder)], env=gst_env(),
+        proc = subprocess.Popen([GST_LAUNCH, *pipeline(path, encoder, gamescope_stream())], env=gst_env(),
                                 stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT,
                                 start_new_session=True)
     # When it started, for the time so far in the Guide menu.

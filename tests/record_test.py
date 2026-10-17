@@ -51,7 +51,12 @@ class Pipeline(unittest.TestCase):
         self.assertIn("location=/home/a/Recordings/x y.mp4", args)   # one argument, spaces and all
         self.assertIn("fragment-duration=1000", args)
         self.assertEqual(args[args.index("vah264enc") + 1], "rate-control=cbr")
-        self.assertIn("video/x-raw,format=NV12", args)   # gamescope's own conversion
+        # GPU memory from gamescope, scaled by OpenGL: no caps right after
+        # pipewiresrc, so glupload can ask for a DMABuf.
+        self.assertEqual(args[args.index("pipewiresrc") + 5], "queue")
+        self.assertLess(args.index("glupload"), args.index("glcolorscale"))
+        self.assertLess(args.index("gldownload"), args.index("vapostproc"))
+        self.assertIn("video/x-raw,format=NV12,width=1920,height=1080", args)
         # Scaled to 1080p on the GPU, at a steady 60, then queued for the
         # encoder, so scaling and encoding run side by side.
         self.assertEqual(args[args.index("vah264enc") - 2], "queue")
@@ -62,6 +67,33 @@ class Pipeline(unittest.TestCase):
         self.assertEqual(args[args.index("vapostproc") + 1], "add-borders=true")
         # A slow encoder drops frames, it doesn't hold the stream up.
         self.assertIn("leaky=downstream", args)
+
+    def test_gamescopes_node_whatever_its_name(self):
+        args = r.pipeline(Path("/x.mp4"), r.ENCODERS[0], (".gamescope-wrapped", (3840, 2160)))
+        self.assertIn("target-object=.gamescope-wrapped", args)
+        self.assertIn("target-object=gamescope", r.pipeline(Path("/x.mp4"), r.ENCODERS[0]))
+
+    def test_opengl_keeps_the_tvs_shape_and_the_scaler_adds_borders(self):
+        self.assertEqual(r.fit((3840, 2160)), (1920, 1080))
+        self.assertEqual(r.fit((3440, 1440)), (1920, 802))   # ultrawide: borders above and below
+        self.assertEqual(r.fit((1280, 800)), (1280, 800))     # never scaled up
+        self.assertEqual(r.fit(None), (1920, 1080))
+        args = r.pipeline(Path("/x.mp4"), r.ENCODERS[0], ("gamescope", (3440, 1440)))
+        self.assertIn("video/x-raw,format=NV12,width=1920,height=802", args)
+
+    def test_the_stream_found_in_pw_dump(self):
+        dump = [
+            {"type": "PipeWire:Interface:Node", "info": {"props": {"node.name": "alsa_output", "media.class": "Audio/Sink"}}},
+            {"type": "PipeWire:Interface:Node", "info": {
+                "props": {"node.name": ".gamescope-wrapped", "media.class": "Video/Source"},
+                "params": {"EnumFormat": [{"format": "BGRx", "size": {"width": 3840, "height": 2160}}]}}},
+        ]
+        self.assertEqual(r.find_stream(dump), (".gamescope-wrapped", (3840, 2160)))
+        self.assertIsNone(r.find_stream(dump[:1]))
+
+    def test_opengl_without_a_window(self):
+        env = r.gst_env()
+        self.assertEqual((env["GST_GL_PLATFORM"], env["GST_GL_WINDOW"]), ("egl", "surfaceless"))
 
     def test_the_cpu_scales_for_the_others(self):
         args = r.pipeline(Path("/x.mp4"), r.pick_encoder(lambda n: n in ("x264enc", "videoconvert", "videoscale")))
