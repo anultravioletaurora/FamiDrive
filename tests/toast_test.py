@@ -293,6 +293,69 @@ class GuideMenu(unittest.TestCase):
         menu.command("select", True)
         self.assertEqual(menu.command("close", True), {"open": False})   # Guide closes from anywhere
 
+    def test_recording(self):
+        menu = t.Menu(recordings=True)
+        menu.command("open", True)
+        # Record first, as a button of its own; the menu opens on Resume.
+        self.assertEqual(menu.items, ["Start recording", "Resume", "Quit game"])
+        self.assertEqual(menu.items[menu.sel], "Resume")
+        menu.command("up", True)
+        self.assertEqual(menu.command("select", True), {"open": False, "do": "record"})
+        # While one's under way, the same place stops it.
+        menu.command("open", True, recording=True)
+        self.assertEqual(menu.items, ["Stop recording", "Resume", "Quit game"])
+        menu.command("up", True)
+        self.assertEqual(menu.command("select", True), {"open": False, "do": "stop-recording"})
+        # Out of a game too (the menu, Kodi), opening on Close.
+        menu.command("open", False)
+        self.assertEqual((menu.items, menu.items[menu.sel]), (["Start recording", "Close"], "Close"))
+        # Quit game is still one down from Resume, and its question comes back to it.
+        menu.command("open", True)
+        menu.command("down", True)
+        self.assertEqual(menu.items[menu.sel], "Quit game")
+        menu.command("select", True)
+        menu.command("back", True)
+        self.assertEqual(menu.items[menu.sel], "Quit game")
+
+    def test_no_recording_without_recordings(self):
+        menu = t.Menu()
+        menu.command("open", True, recording=True)
+        self.assertNotIn("Stop recording", menu.items)
+
+    def test_recording_is_the_recorders_state_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            env = dict(os.environ)
+            os.environ["XDG_RUNTIME_DIR"] = d
+            try:
+                self.assertFalse(t.recording())
+                (Path(d) / "famidrive-record.json").write_text('{"pid": %d, "path": "/x.mp4"}' % os.getpid())
+                self.assertTrue(t.recording())
+                (Path(d) / "famidrive-record.json").write_text('{"pid": 999999999}')
+                self.assertFalse(t.recording())
+            finally:
+                os.environ.clear()
+                os.environ.update(env)
+
+    def test_how_long_its_been_recording(self):
+        with tempfile.TemporaryDirectory() as d:
+            env = dict(os.environ)
+            os.environ["XDG_RUNTIME_DIR"] = d
+            try:
+                self.assertIsNone(t.recording_since())
+                state = Path(d) / "famidrive-record.json"
+                state.write_text('{"pid": %d, "path": "/x.mp4", "started": 1000.5}' % os.getpid())
+                self.assertEqual(t.recording_since(), 1000.5)
+                state.write_text('{"pid": %d, "path": "/x.mp4"}' % os.getpid())   # from before it said
+                self.assertEqual(t.recording_since(), state.stat().st_mtime)
+            finally:
+                os.environ.clear()
+                os.environ.update(env)
+        self.assertEqual([t.elapsed(x) for x in (0, 42.9, 62, 3723, -1)], ["0:00", "0:42", "1:02", "1:02:03", "0:00"])
+
+    def test_the_dot_beside_stop_pulses_once_a_second(self):
+        self.assertEqual([t.pulse(x) for x in (0, 0.4, 0.5, 0.9, 1.0, 1.7)], [1.0, 1.0, 0.35, 0.35, 1.0, 0.35])
+        self.assertIn("record", t.ICONS)   # for the toast as it starts
+
 
 class Look(unittest.TestCase):
     def test_opaque(self):

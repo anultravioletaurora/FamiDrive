@@ -118,6 +118,7 @@ let
 
   toastSpec = pkgs.writeText "famidrive-toast.json" (builtins.toJSON {
     theme = if cfg.esde.theme != null then "${cfg.esde.theme.src}" else null;
+    inherit (cfg) recordings;
     default = { inherit (cfg.overlays.toasts) position hide; };
     players = lib.mapAttrs' (_: p: lib.nameValuePair p.user (resolve p).toasts) cfg.allPlayers;
   });

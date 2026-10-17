@@ -205,6 +205,7 @@ in
     (pkgs.python3.withPackages (ps: [ ps.pygame-ce ]));
 
   toast = unit "toast" ../pkgs/famidrive-toast/famidrive_toast.py pkgs.python3;
+  record = unit "record" ../pkgs/famidrive-record/famidrive_record.py pkgs.python3;
   status = unit "status" ../pkgs/famidrive-status/famidrive_status.py
     (pkgs.python3.withPackages (ps: [ ps.pygame-ce ]));
   pads = unit "pads" ../pkgs/famidrive-pads/famidrive_pads.py pkgs.python3;
@@ -522,6 +523,32 @@ in
     (check "old builds are cleaned up weekly, two weeks kept"
       (c.nix.gc.automatic && c.nix.gc.options == "--delete-older-than 14d"
         && c.boot.loader.systemd-boot.configurationLimit == 10))
+    (check "recordings are on by default: the recorder, and a Recordings system linked to ~/Recordings"
+      (c.famidrive.systems ? recordings
+        && c.famidrive.systems.recordings.extensions == [ ".mp4" ]
+        && lib.any (p: lib.getName p == "famidrive-record") c.environment.systemPackages
+        && lib.hasInfix "/home/alice/.local/share/famidrive/roms/recordings"
+          c.home-manager.users.alice.home.activation.famidriveRecordings.data
+        && lib.elem "famidriveRoms" c.home-manager.users.alice.home.activation.famidriveRecordings.after))
+    (check "Art Book Next gets the Recordings system's logo and art, which it has none of"
+      (c.famidrive.systems.recordings.theme == "recordings"
+        && lib.length c.famidrive.esde.themeExtras == 1
+        && lib.hasInfix "art-book-next-recordings" (toString (lib.head c.famidrive.esde.themeExtras))))
+  ]);
+
+  # famidrive.recordings = false: no recorder and no Recordings system.
+  box-no-recordings = expect "no-recordings" {
+    famidrive = {
+      enable = true;
+      players.alice = { };
+      romm.enable = false;
+      recordings = false;
+    };
+  } (c: [
+    (check "no Recordings system" (!(c.famidrive.systems ? recordings)))
+    (check "no recorder" (!(lib.any (p: lib.getName p == "famidrive-record") c.environment.systemPackages)))
+    (check "no link to ~/Recordings" (!(c.home-manager.users.alice.home.activation ? famidriveRecordings)))
+    (check "Art Book Next as it comes" (c.famidrive.esde.themeExtras == [ ]))
   ]);
 
   box-family = expect "family" familyHost (c:

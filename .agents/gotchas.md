@@ -151,6 +151,13 @@ Found against RomM 5.3:
   drawn over the focused app without focusing it. famidrive-toast's
   window is full-screen and 32-bit; it writes premultiplied BGRA with
   `put_image`, in chunks under the X server's request limit.
+- **gamescope needs CAP_SYS_NICE, and its children mustn't have it.**
+  Without it ("No CAP_SYS_NICE, falling back to regular-priority
+  compute" in session.log), its compositing waits behind the game's GPU
+  work. That shows while recording: each frame of the PipeWire stream
+  is a composite that gamescope waits for. bubblewrap won't run with
+  capabilities, so the session drops them (`setpriv`, session.nix). To
+  check, `grep Cap /proc/<pid>/status` of gamescope and of ES-DE.
 - **gamescope's `--mangoapp` starts MangoHud hidden.** It gives mangoapp
   a temporary config (`$MANGOHUD_CONFIGFILE`) that says `no_display`, for
   Steam's quick-access menu to fill in. The session copies the player's
