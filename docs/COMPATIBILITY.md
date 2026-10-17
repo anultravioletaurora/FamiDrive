@@ -210,6 +210,11 @@ signs in and starts the game by itself (`famidrive-battlenet`, #225).
   gameplay worked great, with controller glyphs in the game's UI. The Guide
   menu said it would pause the game, even in multiplayer; Lutris and
   Epic games are now left running behind it (#223).
+- **2026-10-17, the first box, other controllers:** ✅ the Xbox
+  Wireless Controller plays as well as the 8BitDo. ❌ the game doesn't
+  see the DualShock 4 at all. It runs in Wine (Lutris), not through
+  Steam, so Steam Input can't turn the DualShock into an Xbox pad for
+  it, and Call of Duty may only look for Xbox pads.
 - **2026-10-15, the first box, online:** ✅ multiplayer and Zombies
   online both worked, with no anti-cheat refusal or kick, against what
   was expected below. One night's play; see the ban risk note.
@@ -228,6 +233,7 @@ signs in and starts the game by itself (`famidrive-battlenet`, #225).
   - whether online play keeps working (no ban or kick later)
   - rumble, and the game's windows counting as the game's
     (`gamescope-fg`)
+  - a way for it to see a DualShock 4 or DualSense
 
 ### Call of Duty: Black Ops III
 
