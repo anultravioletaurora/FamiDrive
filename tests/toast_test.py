@@ -336,6 +336,26 @@ class GuideMenu(unittest.TestCase):
                 os.environ.clear()
                 os.environ.update(env)
 
+    def test_how_long_its_been_recording(self):
+        with tempfile.TemporaryDirectory() as d:
+            env = dict(os.environ)
+            os.environ["XDG_RUNTIME_DIR"] = d
+            try:
+                self.assertIsNone(t.recording_since())
+                state = Path(d) / "famidrive-record.json"
+                state.write_text('{"pid": %d, "path": "/x.mp4", "started": 1000.5}' % os.getpid())
+                self.assertEqual(t.recording_since(), 1000.5)
+                state.write_text('{"pid": %d, "path": "/x.mp4"}' % os.getpid())   # from before it said
+                self.assertEqual(t.recording_since(), state.stat().st_mtime)
+            finally:
+                os.environ.clear()
+                os.environ.update(env)
+        self.assertEqual([t.elapsed(x) for x in (0, 42.9, 62, 3723, -1)], ["0:00", "0:42", "1:02", "1:02:03", "0:00"])
+
+    def test_the_dot_beside_stop_pulses_a_second_at_a_time(self):
+        self.assertEqual([t.pulse(x) for x in (0, 0.9, 1.0, 1.5, 2.0)], [1.0, 1.0, 0.35, 0.35, 1.0])
+        self.assertIn("record", t.ICONS)   # for the toast as it starts
+
 
 class Look(unittest.TestCase):
     def test_opaque(self):

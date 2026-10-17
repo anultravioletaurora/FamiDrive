@@ -50,7 +50,7 @@ POSITIONS = ("top-left", "top-center", "top-right", "middle-left", "middle-right
 # theme's text color), or gives an image (a game's logo). Without one, or
 # when the image can't be read, the kind's own. A success is always the
 # checkmark.
-ICONS = ("save", "warning", "trophy", "download", "info", "controller", "check", "music")
+ICONS = ("save", "warning", "trophy", "download", "info", "controller", "check", "music", "record")
 KIND_ICON = {"notice": "info", "alert": "warning", "progress": "download", "achievement": "trophy",
              "success": "check"}
 ALERT = (230, 160, 40, 255)
@@ -68,7 +68,7 @@ SLIDE_SECONDS = 0.28
 SWAP_SECONDS = 0.22    # the buttons sliding over to the quit question and back
 COUNTDOWN = 3          # seconds counted down before a recording starts
 RECORD_ITEMS = {"Start recording": "Record", "Stop recording": "Stop"}   # the menu item, and its button's label
-RED = (226, 60, 60, 255)   # the record button's dot and the live dot
+RED = (226, 60, 60, 255)   # the record button's dot, and the one beside Stop while recording
 
 MAX_SHOWN = 3          # toasts on screen at once, stacked from the corner
 URGENT = ("alert", "achievement")   # a progress toast nobody updates is let go
@@ -498,15 +498,35 @@ def game_mode():
     return words[0] if words and words[0] in ("freeze", "block") else "block"
 
 
-def recording():
-    """Whether famidrive-record is recording in this session: its state
-    file, with a recorder that's still there."""
+def recording_since():
+    """When famidrive-record's recording in this session started (as
+    time.time()), or None if it isn't recording: its state file, with a
+    recorder that's still there. A state file from before it said when is
+    taken as written at the start."""
+    path = sock_path().parent / "famidrive-record.json"
     try:
-        pid = int(json.loads((sock_path().parent / "famidrive-record.json").read_text())["pid"])
-        os.kill(pid, 0)
-    except (OSError, ValueError, KeyError, TypeError):
-        return False
-    return True
+        state = json.loads(path.read_text())
+        os.kill(int(state["pid"]), 0)
+        return float(state.get("started") or path.stat().st_mtime)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return None
+
+
+def recording():
+    return recording_since() is not None
+
+
+def elapsed(seconds):
+    """A recording's length so far, as 0:42 or 1:02:03."""
+    m, s = divmod(max(0, int(seconds)), 60)
+    h, m = divmod(m, 60)
+    return f"{h}:{m:02}:{s:02}" if h else f"{m}:{s:02}"
+
+
+def pulse(seconds):
+    """How bright the dot beside Stop is: full and dull by turns, a second
+    each."""
+    return 1.0 if int(max(0, seconds)) % 2 == 0 else 0.35
 
 
 def record(cmd):
@@ -589,8 +609,15 @@ def watch_controllers(interval=1.5):
 # stops a recording of the screen (famidrive-record). "Start recording"
 # closes the menu and counts down from 3 in the middle of the screen
 # first, so the menu and the countdown aren't in the recording. While it
-# records, a red dot shows in the top right corner, on a layer gamescope
-# leaves out of the recording.
+# records, the menu has Stop in its place, with a red dot pulsing beside
+# it and the time so far; nothing shows over the game, but a "Recording"
+# toast as it starts (famidrive-record). Found on the first box
+# 2026-10-16: a dot over the game, in a window on gamescope's external
+# overlay layer (left out of the recording), made the game itself look
+# worse and run slower while recording. That layer is one more for
+# gamescope to show, and it then drew the whole picture itself, every
+# frame, instead of handing the game to the TV as it was. The Steam
+# overlay layer, where the toasts are, is in the recording.
 
 class Menu:
     """The menu's state. Pure: whether a game is running, whether it's one
@@ -1038,6 +1065,17 @@ def daemon(spec_file, player):
                 x = m + (tw - isz - int(14 * u) - label.get_width()) // 2
                 surf.blit(icon, (x, y + (bh - isz) // 2))
                 surf.blit(label, (x + isz + int(14 * u), y + (bh - label.get_height()) // 2))
+                since = recording_since() if item == "Stop recording" else None
+                if since is not None:
+                    # Beside it, the other half: that it's live, and for how long.
+                    t = time.time() - since
+                    r = int(11 * u)
+                    dot = pygame.Surface((2 * r, 2 * r), pygame.SRCALPHA, 32)
+                    pygame.draw.circle(dot, (*RED[:3], int(255 * pulse(t))), (r, r), r)
+                    clock = m_label.render(elapsed(t), True, text)
+                    x = m + tw + int(14 * u) + int(24 * u)
+                    surf.blit(dot, (x, y + bh // 2 - r))
+                    surf.blit(clock, (x + 2 * r + int(14 * u), y + (bh - clock.get_height()) // 2))
             else:
                 fill(surf, text if on else faint, (m, y, pw - 2 * m, bh), int(10 * u))
                 label = m_label.render(item, True, ink)
@@ -1066,7 +1104,9 @@ def daemon(spec_file, player):
         return surf
 
     def menu_key(pads):
-        return (menu.view, menu.sel, menu.note, tuple(menu.items), tuple(pads), time.strftime("%-I:%M"))
+        since = recording_since() if "Stop recording" in menu.items else None
+        live = None if since is None else int(time.time() - since)   # the dot's pulse and the time so far
+        return (menu.view, menu.sel, menu.note, tuple(menu.items), tuple(pads), time.strftime("%-I:%M"), live)
 
     def dim_at(k):
         """The dim at k of its full strength (it fades in and out with the
@@ -1175,45 +1215,6 @@ def daemon(spec_file, player):
 
     over_game(False)   # a daemon that died with the menu up left them on
 
-    # The live dot, while recording: a window of its own on gamescope's
-    # external overlay layer, which its PipeWire stream leaves out (only
-    # the Steam overlay layer, where everything else here draws, goes into
-    # it; paint_pipewire in steamcompmgr.cpp), so the dot is on the TV and
-    # not in the recording. That layer is MangoHud's, and gamescope shows
-    # one window on it: a player with the performance overlay on may lose
-    # it while recording. VERIFY on the first box.
-    rec = {"win": None, "shown": False, "watch": 0.0, "next": 0.0}
-
-    def rec_dot(show):
-        if show == rec["shown"]:
-            return
-        rec["shown"] = show
-        if not show:
-            # Destroyed, not unmapped: gamescope forgets an external
-            # overlay only when its window is gone (destroy_win), and kept
-            # showing an unmapped dot (first box, 2026-10-16). Cleared
-            # first, in case it's still drawn once more.
-            if rec["win"]:
-                fill_solid(rec["win"], (0, 0, 0, 0), (0, 0, sw, sh))
-                rec["win"].destroy()
-                rec["win"] = None
-            d.flush()
-            return
-        if not rec["win"]:
-            w = scr.root.create_window(0, 0, sw, sh, 0, 32, X.InputOutput, visual,
-                                       background_pixel=0, border_pixel=0, colormap=cmap,
-                                       override_redirect=True)
-            w.set_wm_name("famidrive-record-dot")
-            w.change_property(d.intern_atom("GAMESCOPE_EXTERNAL_OVERLAY"), Xatom.CARDINAL, 32, [1])
-            rec["win"] = w
-        rec["win"].map()
-        size, r, halo = int(64 * u), int(14 * u), int(22 * u)
-        dot = pygame.Surface((size, size), pygame.SRCALPHA, 32)
-        pygame.draw.circle(dot, (0, 0, 0, 110), (size // 2, size // 2), halo)   # stands off a light game
-        pygame.draw.circle(dot, RED, (size // 2, size // 2), r)
-        put(dot, (sw - margin - size, margin), rec["win"])
-        d.flush()
-
     path = sock_path()
     srv = listen(path, 0o600)
     if srv is None:
@@ -1258,8 +1259,11 @@ def daemon(spec_file, player):
         busy = menu.open or sheet is not None or countdown is not None or bool(queue.tick(now)) or drawn is not None
         moving = sheet and (sheet["phase"] != "still" or sheet["swap"])
         wait = 1 / 60 if moving else 1.0 if menu.open else 1 / 30 if busy else None
-        if rec["shown"] or now < rec["watch"]:   # whether it's still recording, each second
-            wait = 1.0 if wait is None else min(wait, 1.0)
+        if menu.open and wait == 1.0 and "Stop recording" in menu.items:
+            # On the second, so the dot beside Stop pulses evenly.
+            since = recording_since()
+            if since is not None:
+                wait = 1.0 - (time.time() - since) % 1.0 + 0.01
         ready, _, _ = select.select([*servers, xfd], [], [], wait)
         for server in (x for x in servers if x in ready):
             conn, _ = server.accept()
@@ -1291,7 +1295,6 @@ def daemon(spec_file, player):
                             # Once the menu has slid away and the blur faded.
                             countdown = time.monotonic() + SLIDE_SECONDS + COUNTDOWN
                         elif reply.get("do") == "stop-recording":
-                            rec_dot(False)
                             record("stop")
                         try:
                             conn.sendall(json.dumps(reply).encode() + b"\n")
@@ -1300,9 +1303,6 @@ def daemon(spec_file, player):
         if xfd in ready:
             while d.pending_events():
                 d.next_event()   # also notices when gamescope has gone
-        if (rec["shown"] or now < rec["watch"]) and now >= rec["next"]:
-            rec["next"] = now + 1.0
-            rec_dot(recording())
         if menu.open and sheet and sheet["phase"] == "out":   # opened again while leaving
             end_sheet(sheet)
             sheet = None
@@ -1359,7 +1359,6 @@ def daemon(spec_file, player):
             d.sync()
             countdown = count_drawn = None
             record("start")
-            rec["watch"] = time.monotonic() + 10   # long enough for it to start, or fail
         shown = queue.tick(time.monotonic())
         live = {id(t) for t, _, _ in shown}
         for cache in (colors, rendered, ys):

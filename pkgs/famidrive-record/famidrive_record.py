@@ -197,7 +197,8 @@ def start():
         proc = subprocess.Popen([GST_LAUNCH, *pipeline(path, encoder)], env=gst_env(),
                                 stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT,
                                 start_new_session=True)
-    state_file().write_text(json.dumps({"pid": proc.pid, "path": str(path)}))
+    # When it started, for the time so far in the Guide menu.
+    state_file().write_text(json.dumps({"pid": proc.pid, "path": str(path), "started": time.time()}))
     log(f"recording to {path} with {encoder[0]} (pid {proc.pid})")
     deadline = time.monotonic() + STARTUP_SECONDS
     while time.monotonic() < deadline:
@@ -210,6 +211,9 @@ def start():
                   "The screen couldn't be captured.")
             return 1
         time.sleep(0.1)
+    # The only sign of it over the game (the Guide menu has the rest), so
+    # it's in the recording's first seconds.
+    toast("--icon", "record", "Recording", "Stop it from the Guide menu.")
     return 0
 
 
