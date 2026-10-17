@@ -130,7 +130,12 @@ def pipeline(path, encoder):
     NV12 from gamescope: it converts on the GPU, and it's half the size
     of its other format. The queue after it drops frames rather than hold
     the stream up when the encoder falls behind, so the recording keeps
-    to the clock."""
+    to the clock.
+
+    The queue before the encoder lets it work while the next frame is
+    scaled. Found on the first box 2026-10-17: without it, each frame
+    waited for both in turn, and the box's GPU encoder kept up with only
+    about 41 frames a second, against 60 with it."""
     name, props, scale, caps = encoder
     return [
         "-e",   # Ctrl-C ends the stream properly, so the MP4 is finished
@@ -140,6 +145,7 @@ def pipeline(path, encoder):
         "!", *scale,
         "!", "videorate",
         "!", f"{caps},width={WIDTH},height={HEIGHT},pixel-aspect-ratio=1/1,framerate={FPS}/1",
+        "!", "queue",
         "!", name, *props,
         "!", "h264parse",
         "!", "queue",

@@ -52,8 +52,10 @@ class Pipeline(unittest.TestCase):
         self.assertIn("fragment-duration=1000", args)
         self.assertEqual(args[args.index("vah264enc") + 1], "rate-control=cbr")
         self.assertIn("video/x-raw,format=NV12", args)   # gamescope's own conversion
-        # Scaled to 1080p on the GPU, at a steady 60, straight into the encoder.
-        scaled = args.index("vah264enc") - 2   # before its "!"
+        # Scaled to 1080p on the GPU, at a steady 60, then queued for the
+        # encoder, so scaling and encoding run side by side.
+        self.assertEqual(args[args.index("vah264enc") - 2], "queue")
+        scaled = args.index("vah264enc") - 4   # before the queue
         self.assertEqual(args[scaled], "video/x-raw(memory:VAMemory),format=NV12,width=1920,height=1080,pixel-aspect-ratio=1/1,framerate=60/1")
         self.assertLess(args.index("vapostproc"), args.index("videorate"))
         # The TV's shape kept: borders, never a squashed picture.
