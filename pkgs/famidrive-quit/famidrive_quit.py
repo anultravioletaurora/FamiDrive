@@ -38,12 +38,21 @@ pressed doesn't keep walking under the menu. A grab only covers evdev:
 a game that reads a pad's hidraw device itself (SDL's own drivers for
 PlayStation and Switch pads, Steam Input) still sees it.
 
+A Bluetooth pad left idle for FAMIDRIVE_IDLE_MINUTES (the player's
+controllerIdleMinutes; unset or empty: never) is disconnected, which
+switches it off, after a toast a minute before that says so: pressing
+anything keeps it. Only Bluetooth: a 2.4 GHz dongle's or a USB pad can't
+be switched off from here, and keeps its own sleep timer. Idle means no
+button and no real stick movement: a held pad reports its sticks' jitter
+all the time.
+
 Runs for the life of the session: started by famidrive-session, and exits
 when that goes away.
 """
 
 import json
 import os
+import re
 import select
 import shlex
 import signal
@@ -82,6 +91,9 @@ TRIGGERS = (ABS_Z, ABS_RZ, ABS_GAS, ABS_BRAKE)
 # are the real pad's again, so they don't move the menu twice.
 STEAM_VIRTUAL = (0x28de, 0x11ff)
 TOAST_SOCK = RUN / "famidrive-toast.sock"
+BLUETOOTH = os.environ.get("FAMIDRIVE_QUIT_BLUETOOTH", "@famidrivebluetooth@")
+BUS_BLUETOOTH = 0x05
+WARN_BEFORE = 60.0  # seconds: the "going to sleep" toast, before an idle pad is let go
 
 
 def log(msg):
@@ -227,6 +239,72 @@ def let_go(held, axes, driver):
         if value != rest:
             out.append((EV_ABS, code, rest))
     return out
+
+
+class Activity:
+    """Whether a pad's events are someone using it. Every button counts,
+    and a hat; a stick or trigger only when it has moved a real distance
+    since it last counted. Found on the first box 2026-10-13: a held
+    8BitDo Ultimate 2 reported its sticks' jitter many times a second."""
+
+    MOVE = 0.15   # of the axis's range
+
+    def __init__(self, ranges):
+        self.ranges = ranges   # {abs code: (min, max)}
+        self.at = {}           # abs code -> where it was when it last counted
+
+    def feed(self, etype, code, value):
+        if etype == EV_KEY:
+            return True
+        if etype != EV_ABS or code not in self.ranges:
+            return False
+        if code in HATS:
+            return value != 0
+        lo, hi = self.ranges[code]
+        last = self.at.setdefault(code, at_rest(code, lo, hi, ""))
+        if abs(value - last) >= self.MOVE * max(1, hi - lo):
+            self.at[code] = value
+            return True
+        return False
+
+
+def idle_minutes(text):
+    """FAMIDRIVE_IDLE_MINUTES as seconds, or None for never."""
+    try:
+        minutes = float(text)
+    except (TypeError, ValueError):
+        return None
+    return minutes * 60 if minutes > 0 else None
+
+
+def idle_step(idle, timeout, warned):
+    """What to do about a pad idle for `idle` seconds: "warn", "off" or
+    None. timeout None: never."""
+    if timeout is None:
+        return None
+    if idle >= timeout:
+        return "off"
+    if idle >= timeout - WARN_BEFORE and not warned:
+        return "warn"
+    return None
+
+
+def bluetooth_address(dev):
+    """A Bluetooth pad's address (its evdev "uniq"), or None."""
+    uniq = (dev.uniq or "").strip()
+    if dev.info.bustype == BUS_BLUETOOTH and re.fullmatch(r"([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}", uniq):
+        return uniq
+    return None
+
+
+def send_toast(toast, path=None):
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.settimeout(2)
+            s.connect(str(path or TOAST_SOCK))
+            s.sendall(json.dumps(toast).encode() + b"\n")
+    except OSError:
+        pass
 
 
 def ask_menu(command, path=None):
@@ -411,6 +489,11 @@ def main():
     frozen = False      # whether the menu stopped the game
     menu = False        # whether the menu is open, and every pad grabbed
     guide_down = set()  # fds whose Guide went down while the menu was closed
+    activity = {}       # fd -> Activity
+    used = {}           # fd -> when someone last used it
+    warned = {}         # fd -> whether the "going to sleep" toast is out
+    addresses = {}      # fd -> its Bluetooth address, for a Bluetooth pad
+    idle_after = idle_minutes(os.environ.get("FAMIDRIVE_IDLE_MINUTES"))
     last_scan = 0.0
     db = load_paddb(PADDB)
 
@@ -454,6 +537,8 @@ def main():
                     guides[fd] = buttons.get("guide")
                     ranges = {c: (i.min, i.max) for c, i in dev.capabilities().get(e.EV_ABS, [])}
                     navs[fd] = None if (dev.info.vendor, dev.info.product) == STEAM_VIRTUAL else PadNav(buttons, ranges)
+                    activity[fd], used[fd], warned[fd] = Activity(ranges), now, False
+                    addresses[fd] = bluetooth_address(dev)
                     names = "+".join(str(e.BTN.get(c) or e.KEY.get(c) or c) for c in sorted(combo))
                     menu_on = "" if guides[fd] is None else ", menu on Guide"
                     log(f"watching {dev.name} ({path}), quitting on {names}{menu_on}")
@@ -468,6 +553,8 @@ def main():
             dev = devices[fd]
             try:
                 for ev in dev.read():
+                    if activity[fd].feed(ev.type, ev.code, ev.value):
+                        used[fd], warned[fd] = time.monotonic(), False
                     if ev.type == e.EV_KEY and ev.code in combos[fd]:
                         if ev.value:
                             held[fd].add(ev.code)
@@ -508,7 +595,7 @@ def main():
             except OSError:
                 # Unplugged, out of range or switched off.
                 log(f"lost {dev.name}")
-                for table in (devices, combos, held, since, navs, drivers, guides):
+                for table in (devices, combos, held, since, navs, drivers, guides, activity, used, warned, addresses):
                     del table[fd]
                 try:
                     dev.close()
@@ -516,6 +603,17 @@ def main():
                     pass
 
         now = time.monotonic()
+        for fd, address in addresses.items():
+            step = address and idle_step(now - used[fd], idle_after, warned[fd])
+            if step == "warn":
+                warned[fd] = True
+                send_toast({"kind": "alert", "icon": "controller", "id": f"idle-{address}",
+                            "title": "Controller going to sleep", "detail": "Press any button to keep it on"})
+            elif step == "off":
+                used[fd] = now   # once; it goes away when it's off
+                log(f"{devices[fd].name} idle for {idle_after / 60:g} min, switching it off")
+                subprocess.Popen([BLUETOOTH, "disconnect", address], start_new_session=True)
+
         for fd, t in since.items():
             if t is not None and now - t >= HOLD:
                 since[fd] = None   # once per hold; let go to fire again

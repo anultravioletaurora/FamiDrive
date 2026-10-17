@@ -144,6 +144,38 @@ class Mode(unittest.TestCase):
         self.assertEqual(m.parse_mode("pause\n"), "block")   # unknown: the safe one, never frozen
 
 
+class Idle(unittest.TestCase):
+    def test_jitter_isnt_use(self):
+        a = m.Activity({m.ABS_X: (-32768, 32767), m.ABS_Z: (0, 255), m.ABS_HAT0X: (-1, 1)})
+        self.assertFalse(a.feed(m.EV_ABS, m.ABS_X, -3))       # where it rests
+        self.assertFalse(a.feed(m.EV_ABS, m.ABS_X, 900))      # a held pad's jitter
+        self.assertTrue(a.feed(m.EV_ABS, m.ABS_X, 20000))     # pushed
+        self.assertFalse(a.feed(m.EV_ABS, m.ABS_X, 20500))    # still there
+        self.assertTrue(a.feed(m.EV_ABS, m.ABS_Z, 200))       # a trigger pulled
+        self.assertTrue(a.feed(m.EV_ABS, m.ABS_HAT0X, 1))     # the d-pad
+        self.assertFalse(a.feed(m.EV_ABS, m.ABS_HAT0X, 0))
+        self.assertTrue(a.feed(m.EV_KEY, 0x130, 1))           # any button
+        self.assertFalse(a.feed(0x04, 4, 9))                  # EV_MSC and the like
+
+    def test_minutes(self):
+        self.assertEqual(m.idle_minutes("10"), 600)
+        for none in (None, "", "0", "off"):
+            self.assertIsNone(m.idle_minutes(none))
+
+    def test_warn_then_off(self):
+        self.assertIsNone(m.idle_step(500, 600, False))
+        self.assertEqual(m.idle_step(545, 600, False), "warn")
+        self.assertIsNone(m.idle_step(560, 600, True))        # once
+        self.assertEqual(m.idle_step(600, 600, True), "off")
+        self.assertIsNone(m.idle_step(10 ** 6, None, False))  # never
+
+    def test_only_bluetooth(self):
+        pad = lambda bus, uniq: types.SimpleNamespace(uniq=uniq, info=types.SimpleNamespace(bustype=bus))
+        self.assertEqual(m.bluetooth_address(pad(0x05, "a0:5a:5c:12:34:56")), "a0:5a:5c:12:34:56")
+        self.assertIsNone(m.bluetooth_address(pad(0x03, "a0:5a:5c:12:34:56")))   # USB
+        self.assertIsNone(m.bluetooth_address(pad(0x05, "")))
+
+
 class AskMenu(unittest.TestCase):
     def test_reply_and_no_daemon(self):
         import socket

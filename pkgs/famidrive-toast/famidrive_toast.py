@@ -554,19 +554,21 @@ def pausable():
         return True
 
 
-def pad_changes(before, after, playing):
-    """The toasts for pads that came and went between two scans."""
+def pad_changes(before, after):
+    """The toasts for pads that came and went between two scans: short and
+    plain, in a game too. Before 2026-10-13 a pad lost in a game was an
+    alert that said to quit with Select + Start to play on with another;
+    a pad that went to sleep is far more likely, and the player picks it
+    up again and carries on."""
     toasts = []
     for dev, name in sorted(after.items()):
         if dev not in before:
-            toasts.append({"kind": "notice", "icon": "controller", "title": "Controller connected", "detail": name})
+            toasts.append({"kind": "notice", "icon": "controller", "title": "Controller connected",
+                           "detail": f"{name} has connected"})
     for dev, name in sorted(before.items()):
         if dev not in after:
-            detail = name
-            if playing:
-                detail += ". To play on with another controller, quit with Select + Start and start the game again."
-            toasts.append({"kind": "alert" if playing else "notice", "icon": "controller",
-                           "title": "Controller disconnected", "detail": detail})
+            toasts.append({"kind": "notice", "icon": "controller", "title": "Controller disconnected",
+                           "detail": f"{name} has disconnected"})
     return toasts
 
 
@@ -590,7 +592,7 @@ def watch_controllers(interval=1.5):
     while True:
         time.sleep(interval)
         after = connected_pads()
-        for t in pad_changes(before, after, in_game()) + battery_changes(warned, pad_batteries()):
+        for t in pad_changes(before, after) + battery_changes(warned, pad_batteries()):
             send(t)
         before = after
 

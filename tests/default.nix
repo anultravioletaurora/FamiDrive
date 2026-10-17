@@ -592,6 +592,8 @@ in
           && lib.hasInfix "famidrive-network launch" c.famidrive.systems.settings.command
           && lib.hasInfix "org.freedesktop.NetworkManager." c.security.polkit.extraConfig))
       (check "a switch restarts the session when it changed" c.systemd.services.greetd.restartIfChanged)
+      (check "an idle Bluetooth controller is switched off after 10 minutes by default, the guest's too"
+        (c.famidrive.allPlayers.alice.controllerIdleMinutes == 10 && c.famidrive.allPlayers.guest.controllerIdleMinutes == 10))
       (check "each player's background Steam gets FamiDrive's Steam settings (Guide isn't Steam's) before it starts"
         (lib.all (u: lib.hasInfix "famidrive-steam-background-settings"
           c.home-manager.users.${u}.systemd.user.services.famidrive-steam-background.Service.ExecStartPre) [ "alice" "bob" ]))

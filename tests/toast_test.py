@@ -4,6 +4,7 @@
 """
 
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -223,12 +224,9 @@ class Controllers(unittest.TestCase):
     def test_connected_and_disconnected(self):
         a = {"/d/1": "8BitDo Ultimate 2"}
         b = {"/d/2": "Xbox Wireless Controller"}
-        toasts = t.pad_changes(a, b, playing=False)
-        self.assertEqual([(x["title"], x["detail"]) for x in toasts],
-                         [("Controller connected", "Xbox Wireless Controller"), ("Controller disconnected", "8BitDo Ultimate 2")])
-        gone = t.pad_changes(b, {}, playing=True)[0]
-        self.assertEqual(gone["kind"], "alert")
-        self.assertIn("Select + Start", gone["detail"])
+        self.assertEqual([(x["kind"], x["title"], x["detail"]) for x in t.pad_changes(a, b)],
+                         [("notice", "Controller connected", "Xbox Wireless Controller has connected"),
+                          ("notice", "Controller disconnected", "8BitDo Ultimate 2 has disconnected")])
 
     def test_low_battery_once_until_charged(self):
         warned = set()
