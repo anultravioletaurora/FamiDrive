@@ -38,6 +38,14 @@ let
       system="$1"
       ROM="$2"
       export ROM
+      # ES-DE runs with SDL's raw HID drivers off, so the Guide menu can
+      # take the pads from it (session.nix). Games get what the session
+      # had: SDL's PlayStation and Switch drivers (gyro, Joy-Cons as one).
+      if [ -n "''${FAMIDRIVE_SDL_JOYSTICK_HIDAPI+x}" ]; then
+        export SDL_JOYSTICK_HIDAPI="$FAMIDRIVE_SDL_JOYSTICK_HIDAPI"
+      else
+        unset SDL_JOYSTICK_HIDAPI
+      fi
       ${lib.optionalString cfg.romm.enable ''
         # Save sync is for players with a RomM agent config of their own.
         sync=""
