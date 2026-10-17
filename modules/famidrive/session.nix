@@ -187,7 +187,16 @@ let
     ${pkgs.famidrive-quit}/bin/famidrive-quit &
     # ES-DE through gamescope-fg, which labels its window and makes it what
     # gamescope shows (nothing does that without Steam; see gamescope-fg).
-    ${pkgs.gamescope-fg}/bin/gamescope-fg --frontend ${pkgs.es-de}/bin/es-de --no-splash || true
+    #
+    # SDL_JOYSTICK_HIDAPI=0: ES-DE reads the pads through the kernel's
+    # input devices, which the Guide menu grabs while it's open, not
+    # their raw HID ones, which it can't. Found on the first box
+    # 2026-10-17: with a DualShock 4 (ES-DE had its hidraw device open),
+    # the d-pad moved between systems under the menu. famidrive-launch
+    # puts the player's own setting back for the game, from
+    # FAMIDRIVE_SDL_JOYSTICK_HIDAPI.
+    if [ -n "''${SDL_JOYSTICK_HIDAPI+x}" ]; then export FAMIDRIVE_SDL_JOYSTICK_HIDAPI="$SDL_JOYSTICK_HIDAPI"; fi
+    SDL_JOYSTICK_HIDAPI=0 ${pkgs.gamescope-fg}/bin/gamescope-fg --frontend ${pkgs.es-de}/bin/es-de --no-splash || true
     # ES-DE closed: Quit ES-DE in its Quit menu (or Power off / Reboot,
     # which it has already asked for, or a crash). End the session cleanly:
     # "Who's playing?" comes back, or on a one-player box, ES-DE.
