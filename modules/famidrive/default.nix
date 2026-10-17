@@ -317,9 +317,10 @@ in
     nixpkgs.config.allowUnfree = true;
 
     # Every box, for troubleshooting and editing sops secrets from the
-    # console: an editor, fastfetch for a quick look at the hardware, and
+    # console: an editor, fastfetch for a quick look at the hardware, lspci
+    # (pciutils) for what the GPU and other cards are, and
     # the tools famidrive's own packages are built on.
-    environment.systemPackages = with pkgs; [ python3 fastfetch sops curl wget nano vim git ];
+    environment.systemPackages = with pkgs; [ python3 fastfetch pciutils sops curl wget nano vim git ];
 
     # Newest stable kernel (Decided 2026-10-05): display and GPU support
     # moves fast (HDMI 2.1 for AMD landed in 7.2), and the kernel is cheap to
