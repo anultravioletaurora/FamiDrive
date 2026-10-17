@@ -186,6 +186,7 @@ modules/famidrive/
   media.nix                  famidrive.media.kodi / .jellyfin: "Media" entries for Kodi and Jellyfin
   controllers.nix            GameCube ports per box, the quit combo, RetroArch's menu combo
   recordings.nix             famidrive.recordings: screen recording from the Guide menu; the Recordings system
+  smb.nix                    famidrive.smb: each player's home over SMB, in Finder and Windows' Network
   lib/seed.nix               seed / lockKeys helpers for configs the app also writes
 pkgs/
   es-de/                     ES-DE 3.5.0 AppImage (ES-DE left nixpkgs on 2025-10-23)

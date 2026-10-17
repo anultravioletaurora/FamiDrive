@@ -439,6 +439,8 @@ bob:
 - `nexusmods`: their Nexus Mods personal API key, for players with
   `nexusmods.games` set. Downloading needs a premium Nexus Mods account
   ([MODDING.md](MODDING.md)).
+- `smb`: their password for file sharing, for players whose
+  `smb.passwordFile` points at it ([File sharing](#file-sharing)).
 
 Before 2026-10-10 these were top-level keys (`romm-token-alice`,
 `retroachievements-alice`, `rpcn-password-alice`). Move each under its
@@ -446,6 +448,33 @@ player, with the new name, before rebuilding with a newer FamiDrive.
 
 A box with `famidrive.romm.enable = false` needs no secrets and no sops
 setup at all.
+
+## File sharing
+
+Each player's home folder is on the network over SMB, unless the box
+sets `famidrive.smb.enable = false`. It's how to change the menu's music
+(`ES-DE/music`, played from the player's next session on) or copy
+recordings off (`Recordings`) from another computer. On a Mac the box
+is under Network in Finder's sidebar, by its hostname; on Windows it's
+under Network.
+
+Sign in as the player's Linux account. Samba can't check a Linux
+password, so each player needs an SMB password as well. Set it once on
+the box:
+
+```sh
+sudo smbpasswd -a alice
+```
+
+Or keep it with the player's secrets, as `smb` under their name, and
+point their `smb.passwordFile` at it; it's set at each boot:
+
+```nix
+sops.secrets."alice/smb" = { };
+famidrive.players.alice.smb.passwordFile = config.sops.secrets."alice/smb".path;
+```
+
+The guest can't sign in.
 
 ## RomM entries to add by hand
 

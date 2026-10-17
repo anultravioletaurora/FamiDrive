@@ -34,6 +34,7 @@ is on; every other option is optional.
 - [Minecraft](#minecraft)
 - [PC saves](#pc-saves)
 - [Online play](#online-play)
+- [File sharing](#file-sharing)
 - [Systems](#systems)
 - [Everything else](#everything-else)
 
@@ -463,6 +464,17 @@ an account made in RPCS3 under another name goes here.
 - **Type:** string
 - **Default:** `owner`
 - **Example:** `"alice-ps3"`
+
+### `famidrive.players.<name>.smb.passwordFile`
+
+A file with their SMB password, readable by root, set as
+their password at each boot. Unset, they set one once on the
+box with `sudo smbpasswd -a <user>`. Samba keeps its own
+passwords: it can't check their Linux one.
+
+- **Type:** null or absolute path
+- **Default:** `null`
+- **Example:** `"/run/secrets/alice/smb"`
 
 ### `famidrive.players.<name>.thunderstore.games`
 
@@ -1865,6 +1877,24 @@ Network, on its own: each player signed in to their RPCN account
 
 - **Type:** boolean
 - **Default:** `config.famidrive.online.enable`
+
+## File sharing
+
+Each player's home folder on the network (SMB), for changing the menu's music or copying recordings off from another computer.
+
+### `famidrive.smb.enable`
+
+Each player's home folder on the network over SMB, to change
+the files in it from another computer: the menu's music in
+`ES-DE/music` (played from the next session on), or recordings
+in `Recordings`. The box shows up by its hostname under Network
+in a Mac's Finder and in Windows' Network. A player signs in as
+their Linux account, with their SMB password
+(`players.<name>.smb.passwordFile`, or `sudo smbpasswd -a <user>`
+on the box once). The guest can't sign in. Off: no file sharing.
+
+- **Type:** boolean
+- **Default:** `true`
 
 ## Systems
 
