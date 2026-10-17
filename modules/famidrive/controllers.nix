@@ -114,6 +114,20 @@ in
     ) cfg.controllers.instruments;
   };
 
+  options.famidrive.controllers.idleMinutes = mkOption {
+    type = types.nullOr types.ints.positive;
+    default = 10;
+    example = 30;
+    description = ''
+      Minutes a Bluetooth controller can sit unused before FamiDrive
+      switches it off, to save its battery. A toast says so a minute
+      before; pressing anything keeps it on. `null`: never. A player can
+      set their own with `players.<name>.controllerIdleMinutes`; the guest
+      gets this one. Controllers on a 2.4 GHz dongle or USB can't be
+      switched off by the box, and keep their own sleep timer.
+    '';
+  };
+
   options.famidrive.controllers.faceButtons = mkOption {
     type = types.enum [ "labels" "positions" ];
     default = "labels";
