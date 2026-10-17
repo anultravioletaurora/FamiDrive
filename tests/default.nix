@@ -91,6 +91,7 @@ let
           "632360" = { };   # Risk of Rain 2: BepInEx alone
         };
         bob.owner = "bobby";
+        bob.smb.passwordFile = "/run/secrets/bob-smb";
       };
       primaryPlayer = "alice";
       guest.enable = true;
@@ -534,6 +535,30 @@ in
       (c.famidrive.systems.recordings.theme == "recordings"
         && lib.length c.famidrive.esde.themeExtras == 1
         && lib.hasInfix "art-book-next-recordings" (toString (lib.head c.famidrive.esde.themeExtras))))
+    (check "file sharing is on by default: each home over SMB, only to its owner, in Finder and Windows' Network"
+      (c.services.samba.enable && c.services.samba.openFirewall
+        && c.services.samba.settings.homes."valid users" == "%S"
+        && c.services.samba.settings.homes."read only" == "no"
+        && c.services.samba.settings.global."map to guest" == "never"
+        && lib.hasInfix "fruit" c.services.samba.settings.global."vfs objects"
+        && lib.hasInfix "_smb._tcp" c.services.avahi.extraServiceFiles.smb
+        && c.services.avahi.publish.enable && c.services.samba-wsdd.enable))
+    (check "no SMB passwords to set without a passwordFile"
+      (!(c.systemd.services ? famidrive-smb-passwords)))
+  ]);
+
+  # famidrive.smb.enable = false: no file sharing at all.
+  box-no-smb = expect "no-smb" {
+    famidrive = {
+      enable = true;
+      players.alice = { };
+      romm.enable = false;
+      smb.enable = false;
+    };
+  } (c: [
+    (check "no Samba" (!c.services.samba.enable))
+    (check "no wsdd" (!c.services.samba-wsdd.enable))
+    (check "no SMB in Bonjour" (!(c.services.avahi.extraServiceFiles ? smb)))
   ]);
 
   # famidrive.recordings = false: no recorder and no Recordings system.
@@ -784,5 +809,9 @@ in
           && lib.hasInfix "isInGroup(\"famidrive\")" c.security.polkit.extraConfig))
       (check "the shared library is read-only to players"
         (lib.elem "d /var/lib/famidrive/roms 0755 famidrive-library famidrive -" c.systemd.tmpfiles.rules))
+      (check "bob's SMB password from his passwordFile; alice's and the guest's aren't set"
+        (let s = c.systemd.services.famidrive-smb-passwords.script; in
+          lib.hasInfix "/run/secrets/bob-smb" s && lib.hasInfix "-s -a bob" s
+            && !(lib.hasInfix "-a alice" s) && !(lib.hasInfix "-a guest" s)))
     ]);
 }

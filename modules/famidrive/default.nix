@@ -135,6 +135,7 @@ in
     ./settings.nix
     ./stores.nix
     ./recordings.nix
+    ./smb.nix
     (lib.mkRemovedOptionModule [ "famidrive" "user" ] "Each player is listed in famidrive.players instead: famidrive.players.<name>.user is their Linux account.")
     (lib.mkRemovedOptionModule [ "famidrive" "owner" ] "Each player is listed in famidrive.players instead: famidrive.players.<name>.owner is their RomM username.")
     (lib.mkRemovedOptionModule [ "famidrive" "romm" "tokenFile" ] "Each player has their own: famidrive.players.<name>.romm.tokenFile.")
