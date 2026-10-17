@@ -54,15 +54,17 @@ class Pipeline(unittest.TestCase):
         self.assertIn("video/x-raw,format=NV12", args)   # gamescope's own conversion
         # Scaled to 1080p on the GPU, at a steady 60, straight into the encoder.
         scaled = args.index("vah264enc") - 2   # before its "!"
-        self.assertEqual(args[scaled], "video/x-raw(memory:VAMemory),format=NV12,height=1080,pixel-aspect-ratio=1/1,framerate=60/1")
+        self.assertEqual(args[scaled], "video/x-raw(memory:VAMemory),format=NV12,width=1920,height=1080,pixel-aspect-ratio=1/1,framerate=60/1")
         self.assertLess(args.index("vapostproc"), args.index("videorate"))
+        # The TV's shape kept: borders, never a squashed picture.
+        self.assertEqual(args[args.index("vapostproc") + 1], "add-borders=true")
         # A slow encoder drops frames, it doesn't hold the stream up.
         self.assertIn("leaky=downstream", args)
 
     def test_the_cpu_scales_for_the_others(self):
         args = r.pipeline(Path("/x.mp4"), r.pick_encoder(lambda n: n in ("x264enc", "videoconvert", "videoscale")))
         self.assertLess(args.index("videoscale"), args.index("x264enc"))
-        self.assertIn("video/x-raw,format=NV12,height=1080,pixel-aspect-ratio=1/1,framerate=60/1", args)
+        self.assertIn("video/x-raw,format=NV12,width=1920,height=1080,pixel-aspect-ratio=1/1,framerate=60/1", args)
         self.assertEqual(args[-1], "mux.")
 
 

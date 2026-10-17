@@ -46,15 +46,19 @@ GST_PLUGINS = "@gstPlugins@"
 # gamescope skips a frame when the recorder hasn't handed its buffer
 # back yet ("out of buffers", pipewire.cpp), so many would be
 # videorate's repeats.
-SCALE_CPU = ["videoconvert", "!", "videoscale"]
+#
+# 1920x1080 exactly, with black borders when the TV isn't 16:9. Found on
+# the first box 2026-10-16: with only the height set, vapostproc kept a
+# width of its own, and the picture came out squashed.
+SCALE_CPU = ["videoconvert", "!", "videoscale", "add-borders=true"]
 ENCODERS = (
-    ("vah264enc", ["rate-control=cbr", "bitrate=12000"], ["vapostproc"], "video/x-raw(memory:VAMemory),format=NV12"),
-    ("vaapih264enc", ["rate-control=cbr", "bitrate=12000"], ["vaapipostproc"], "video/x-raw(memory:VASurface),format=NV12"),
+    ("vah264enc", ["rate-control=cbr", "bitrate=12000"], ["vapostproc", "add-borders=true"], "video/x-raw(memory:VAMemory),format=NV12"),
+    ("vaapih264enc", ["rate-control=cbr", "bitrate=12000"], ["vaapipostproc", "force-aspect-ratio=true"], "video/x-raw(memory:VASurface),format=NV12"),
     ("nvh264enc", ["rc-mode=cbr", "bitrate=12000"], SCALE_CPU, "video/x-raw,format=NV12"),
     ("x264enc", ["speed-preset=veryfast", "tune=zerolatency", "bitrate=8000"], SCALE_CPU, "video/x-raw,format=NV12"),
 )
 FPS = 60
-HEIGHT = 1080   # the width follows the TV's shape
+WIDTH, HEIGHT = 1920, 1080
 STARTUP_SECONDS = 2.0    # how long a pipeline gets to fail before start says it's running
 # How long it gets to finish the file after Ctrl-C, before it's ended
 # outright. The MP4 is fragmented, so a recording ended that way still
@@ -111,7 +115,8 @@ def file_name(now=None):
 def pick_encoder(exists):
     """The first of ENCODERS this box's GStreamer has: exists(name) says."""
     for encoder in ENCODERS:
-        if all(exists(e) for e in (encoder[0], *encoder[2][::2])):
+        elements = [e for e in encoder[2] if e != "!" and "=" not in e]
+        if all(exists(e) for e in (encoder[0], *elements)):
             return encoder
     return None
 
@@ -134,7 +139,7 @@ def pipeline(path, encoder):
         "!", "queue", "leaky=downstream", "max-size-buffers=4", "max-size-bytes=0", "max-size-time=0",
         "!", *scale,
         "!", "videorate",
-        "!", f"{caps},height={HEIGHT},pixel-aspect-ratio=1/1,framerate={FPS}/1",
+        "!", f"{caps},width={WIDTH},height={HEIGHT},pixel-aspect-ratio=1/1,framerate={FPS}/1",
         "!", name, *props,
         "!", "h264parse",
         "!", "queue",
