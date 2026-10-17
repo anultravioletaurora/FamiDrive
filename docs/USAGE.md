@@ -144,14 +144,12 @@ anyone else gets their initial.
 
 ### `famidrive.players.<name>.controllerIdleMinutes`
 
-Minutes a Bluetooth controller can sit unused in this player's
-session before FamiDrive switches it off, to save its battery. A
-toast says so a minute before; pressing anything keeps it on.
-`null`: never. Controllers on a 2.4 GHz dongle or USB can't be
-switched off by the box, and keep their own sleep timer.
+This player's own `famidrive.controllers.idleMinutes`: minutes a
+Bluetooth controller can sit unused in their session before
+FamiDrive switches it off. `null`: never.
 
 - **Type:** null or (positive integer, meaning >0)
-- **Default:** `10`
+- **Default:** `config.famidrive.controllers.idleMinutes`
 - **Example:** `30`
 
 ### `famidrive.players.<name>.displayName`
@@ -1114,6 +1112,19 @@ controller screens don't last, on purpose.
     "adapter"
   ]
   ```
+
+### `famidrive.controllers.idleMinutes`
+
+Minutes a Bluetooth controller can sit unused before FamiDrive
+switches it off, to save its battery. A toast says so a minute
+before; pressing anything keeps it on. `null`: never. A player can
+set their own with `players.<name>.controllerIdleMinutes`; the guest
+gets this one. Controllers on a 2.4 GHz dongle or USB can't be
+switched off by the box, and keep their own sleep timer.
+
+- **Type:** null or (positive integer, meaning >0)
+- **Default:** `10`
+- **Example:** `30`
 
 ### `famidrive.controllers.instruments`
 

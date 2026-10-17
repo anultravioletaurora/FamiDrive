@@ -412,6 +412,23 @@ in
       (c.famidrive.controllers.sdlIgnoreDevices == "0x289b/0x0080,0x12ba/0x0100"))
   ]);
 
+  # The idle timeout for the whole box, and a player who sets their own.
+  box-controller-idle = expect "controller-idle" {
+    famidrive = {
+      enable = true;
+      romm.enable = false;
+      guest.enable = true;
+      controllers.idleMinutes = 2;
+      players.alice = { };
+      players.bob.controllerIdleMinutes = null;
+    };
+  } (c: [
+    (check "players and the guest get the box's timeout, unless they set their own"
+      (c.famidrive.allPlayers.alice.controllerIdleMinutes == 2
+        && c.famidrive.allPlayers.guest.controllerIdleMinutes == 2
+        && c.famidrive.allPlayers.bob.controllerIdleMinutes == null))
+  ]);
+
   # The boot screen at the TV's resolution from the start: the graphics
   # driver in the initrd, by famidrive.gpu.
   box-early-graphics = expect "early-graphics" {

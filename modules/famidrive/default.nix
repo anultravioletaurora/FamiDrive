@@ -65,14 +65,13 @@ let
       };
       controllerIdleMinutes = mkOption {
         type = types.nullOr types.ints.positive;
-        default = 10;
+        default = cfg.controllers.idleMinutes;
+        defaultText = lib.literalExpression "config.famidrive.controllers.idleMinutes";
         example = 30;
         description = ''
-          Minutes a Bluetooth controller can sit unused in this player's
-          session before FamiDrive switches it off, to save its battery. A
-          toast says so a minute before; pressing anything keeps it on.
-          `null`: never. Controllers on a 2.4 GHz dongle or USB can't be
-          switched off by the box, and keep their own sleep timer.
+          This player's own `famidrive.controllers.idleMinutes`: minutes a
+          Bluetooth controller can sit unused in their session before
+          FamiDrive switches it off. `null`: never.
         '';
       };
       # Xenia's is derived from `owner`, never set by hand: if each box
@@ -114,7 +113,7 @@ let
     tokenFile = null;   # no RomM: the guest's saves stay on this box
     edenProfileId = null;
     xeniaXuid = "E000000000000000";
-    controllerIdleMinutes = 10;
+    controllerIdleMinutes = cfg.controllers.idleMinutes;
     isGuest = true;
   } // { nickname = "Guest"; };
 in
