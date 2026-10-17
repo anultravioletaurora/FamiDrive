@@ -206,18 +206,24 @@ let
   ];
 
   gamescopeCmd = lib.concatStringsSep " " ([
-    # Plain gamescope, not the programs.gamescope.capSysNice wrapper.
-    # Found on the first box 2026-10-05: the wrapper's CAP_SYS_NICE is inherited
-    # by everything gamescope starts, and bubblewrap (ES-DE's AppImage
-    # sandbox, Steam's FHS sandbox) refuses to run with capabilities:
-    # "bwrap: Unexpected capabilities but not setuid". The cost is
-    # gamescope's realtime scheduling boost.
-    "${pkgs.gamescope}/bin/gamescope"
+    # The programs.gamescope.capSysNice wrapper: with CAP_SYS_NICE,
+    # gamescope composites on the GPU's high-priority queue, ahead of the
+    # game. Without it, found on the first box 2026-10-16: while
+    # recording, gamescope copies every frame for the recording and waits
+    # for the copy, and with Rocket League keeping the GPU busy that wait
+    # behind the game cost frames on the TV and in the recording.
+    "/run/wrappers/bin/gamescope"
     "-f"                  # fullscreen
     "-e"                  # Steam-integration mode, needed for STEAM_GAME focus atoms
     "\"\${overlay[@]}\""   # the player's performance overlay (famidrive-start)
   ] ++ gamescopeFlags ++ [
     "--"
+    # The wrapper's CAP_SYS_NICE is inherited by everything gamescope
+    # starts, and bubblewrap (ES-DE's AppImage sandbox, Steam's FHS
+    # sandbox) refuses to run with capabilities: "bwrap: Unexpected
+    # capabilities but not setuid" (first box, 2026-10-05). So the session
+    # starts without it.
+    "${pkgs.util-linux}/bin/setpriv" "--inh-caps=-all" "--ambient-caps=-all" "--"
     "${famidriveSession}"
   ]);
 
@@ -490,7 +496,7 @@ in
   config = lib.mkIf cfg.enable {
     programs.gamescope = {
       enable = true;
-      capSysNice = false;   # see gamescopeCmd
+      capSysNice = true;   # see gamescopeCmd
     };
 
     # A switch restarts the session only when the session itself changed

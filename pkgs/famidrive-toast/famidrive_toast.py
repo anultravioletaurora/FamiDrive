@@ -524,9 +524,9 @@ def elapsed(seconds):
 
 
 def pulse(seconds):
-    """How bright the dot beside Stop is: full and dull by turns, a second
-    each."""
-    return 1.0 if int(max(0, seconds)) % 2 == 0 else 0.35
+    """How bright the dot beside Stop is: full and dull by turns, half a
+    second each, so a whole pulse a second."""
+    return 1.0 if int(max(0, seconds) * 2) % 2 == 0 else 0.35
 
 
 def record(cmd):
@@ -1105,7 +1105,7 @@ def daemon(spec_file, player):
 
     def menu_key(pads):
         since = recording_since() if "Stop recording" in menu.items else None
-        live = None if since is None else int(time.time() - since)   # the dot's pulse and the time so far
+        live = None if since is None else int((time.time() - since) * 2)   # the dot's pulse and the time so far
         return (menu.view, menu.sel, menu.note, tuple(menu.items), tuple(pads), time.strftime("%-I:%M"), live)
 
     def dim_at(k):
@@ -1260,10 +1260,10 @@ def daemon(spec_file, player):
         moving = sheet and (sheet["phase"] != "still" or sheet["swap"])
         wait = 1 / 60 if moving else 1.0 if menu.open else 1 / 30 if busy else None
         if menu.open and wait == 1.0 and "Stop recording" in menu.items:
-            # On the second, so the dot beside Stop pulses evenly.
+            # On the half second, so the dot beside Stop pulses evenly.
             since = recording_since()
             if since is not None:
-                wait = 1.0 - (time.time() - since) % 1.0 + 0.01
+                wait = 0.5 - (time.time() - since) % 0.5 + 0.01
         ready, _, _ = select.select([*servers, xfd], [], [], wait)
         for server in (x for x in servers if x in ready):
             conn, _ = server.accept()

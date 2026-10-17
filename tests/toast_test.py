@@ -352,8 +352,8 @@ class GuideMenu(unittest.TestCase):
                 os.environ.update(env)
         self.assertEqual([t.elapsed(x) for x in (0, 42.9, 62, 3723, -1)], ["0:00", "0:42", "1:02", "1:02:03", "0:00"])
 
-    def test_the_dot_beside_stop_pulses_a_second_at_a_time(self):
-        self.assertEqual([t.pulse(x) for x in (0, 0.9, 1.0, 1.5, 2.0)], [1.0, 1.0, 0.35, 0.35, 1.0])
+    def test_the_dot_beside_stop_pulses_once_a_second(self):
+        self.assertEqual([t.pulse(x) for x in (0, 0.4, 0.5, 0.9, 1.0, 1.7)], [1.0, 1.0, 0.35, 0.35, 1.0, 0.35])
         self.assertIn("record", t.ICONS)   # for the toast as it starts
 
 
