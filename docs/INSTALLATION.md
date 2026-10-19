@@ -479,6 +479,37 @@ famidrive.players.alice.smb.passwordFile = config.sops.secrets."alice/smb".path;
 
 The guest can't sign in.
 
+Besides their home, a player who signs in sees two more shares:
+
+- **`Library`:** the shared library, read-only: games, art and firmware
+  to copy off. Only the RomM pull changes it.
+- **`Drop`:** a folder per console, named as in the library (`gc`,
+  `wii`, `switch`, `psx` …), that any player can copy games into. Every
+  player's menu lists them from their next session on. If RomM later
+  has a game by the same file name, RomM's is used and the copy stays
+  in `Drop`. Saves for a dropped game stay on the box. A console from
+  `localRoms` has no folder here: copy into its own folder instead.
+
+To keep file sharing off a VPN or a public network, name the home
+network's interface (`ip link` lists them):
+
+```nix
+famidrive.smb.interfaces = [ "enp3s0" ];
+```
+
+Linux computers can also read the library over NFS, read-only. NFS has
+no sign-in, so it's off unless the box lists the networks it may serve:
+
+```nix
+famidrive.nfs = {
+  enable = true;
+  allowedNetworks = [ "192.168.1.0/24" ];
+};
+```
+
+Then, on the other computer: `sudo mount -t nfs4 <box>:/var/lib/famidrive /mnt`
+(the box's `dataDir`, if it sets one).
+
 ## RomM entries to add by hand
 
 RomM keeps saves only for games in its library, and some apps on the box

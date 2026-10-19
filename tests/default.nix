@@ -594,6 +594,49 @@ in
         && c.services.avahi.publish.enable && c.services.samba-wsdd.enable))
     (check "no SMB passwords to set without a passwordFile"
       (!(c.systemd.services ? famidrive-smb-passwords)))
+    (check "the Library share: the shared library, read-only, for every player"
+      (let l = c.services.samba.settings.Library; in
+        l.path == "/var/lib/famidrive" && l."read only" == "yes" && l."valid users" == "@famidrive"))
+    (check "the Drop share: a folder per console, writable by every player, linked into the library on each change"
+      (let d = c.services.samba.settings.Drop; in
+        d.path == "/var/lib/famidrive/drop" && d."read only" == "no" && d."force group" == "famidrive"
+          && lib.elem "d /var/lib/famidrive/drop/gc 2775 famidrive-library famidrive -" c.systemd.tmpfiles.rules
+          && lib.elem "/var/lib/famidrive/drop/gc" c.systemd.paths.famidrive-drop.pathConfig.PathChanged
+          && !(lib.elem "/var/lib/famidrive/drop/steam" c.systemd.paths.famidrive-drop.pathConfig.PathChanged)
+          && c.systemd.services.famidrive-drop.serviceConfig.User == "famidrive-library"))
+    (check "file sharing on every interface by default, and no NFS"
+      (c.services.avahi.openFirewall && c.services.samba-wsdd.openFirewall
+        && c.networking.firewall.interfaces == { } && !c.services.nfs.server.enable))
+  ]);
+
+  # File sharing on the home network's interface only, with NFS.
+  box-smb-home-network = expect "smb-home-network" {
+    famidrive = {
+      enable = true;
+      players.alice = { };
+      romm.enable = false;
+      localRoms.gc = "/srv/roms/gamecube";
+      smb.interfaces = [ "enp3s0" ];
+      nfs = { enable = true; allowedNetworks = [ "192.168.1.0/24" ]; };
+    };
+  } (c: [
+    (check "SMB, wsdd and Bonjour open on enp3s0 only"
+      (!c.services.samba.openFirewall && !c.services.avahi.openFirewall && !c.services.samba-wsdd.openFirewall
+        && c.services.samba.settings.global.interfaces == "lo enp3s0"
+        && c.services.samba.settings.global."bind interfaces only" == "yes"
+        && c.services.avahi.allowInterfaces == [ "enp3s0" ]
+        && lib.elem "enp3s0" c.services.samba-wsdd.extraOptions
+        && lib.elem 445 c.networking.firewall.interfaces.enp3s0.allowedTCPPorts
+        && lib.elem 5353 c.networking.firewall.interfaces.enp3s0.allowedUDPPorts
+        && !(lib.elem 445 c.networking.firewall.allowedTCPPorts)))
+    (check "NFS: the library, read-only, to the home network, on enp3s0 only"
+      (c.services.nfs.server.enable
+        && lib.hasInfix "/var/lib/famidrive 192.168.1.0/24(ro," c.services.nfs.server.exports
+        && lib.elem 2049 c.networking.firewall.interfaces.enp3s0.allowedTCPPorts
+        && !(lib.elem 2049 c.networking.firewall.allowedTCPPorts)))
+    (check "no Drop folder for a system from localRoms"
+      (!(lib.elem "/var/lib/famidrive/drop/gc" c.systemd.paths.famidrive-drop.pathConfig.PathChanged)
+        && lib.elem "/var/lib/famidrive/drop/wii" c.systemd.paths.famidrive-drop.pathConfig.PathChanged))
   ]);
 
   # famidrive.smb.enable = false: no file sharing at all.
@@ -608,6 +651,7 @@ in
     (check "no Samba" (!c.services.samba.enable))
     (check "no wsdd" (!c.services.samba-wsdd.enable))
     (check "no SMB in Bonjour" (!(c.services.avahi.extraServiceFiles ? smb)))
+    (check "no Drop" (!(c.systemd.services ? famidrive-drop) && !(c.systemd.paths ? famidrive-drop)))
   ]);
 
   # famidrive.recordings = false: no recorder and no Recordings system.
@@ -870,7 +914,10 @@ in
           && lib.hasInfix "isInGroup(\"famidrive\")" c.security.polkit.extraConfig))
       (check "the shared library is read-only to players"
         (lib.elem "d /var/lib/famidrive/roms 0755 famidrive-library famidrive -" c.systemd.tmpfiles.rules))
-      (check "bob's SMB password from his passwordFile; alice's and the guest's aren't set"
+      (check "the guest can't open the Library or Drop shares"
+        (c.services.samba.settings.Library."invalid users" == "guest"
+          && c.services.samba.settings.Drop."invalid users" == "guest"))
+      (check "bob's SMB password from their passwordFile; alice's and the guest's aren't set"
         (let s = c.systemd.services.famidrive-smb-passwords.script; in
           lib.hasInfix "/run/secrets/bob-smb" s && lib.hasInfix "-s -a bob" s
             && !(lib.hasInfix "-a alice" s) && !(lib.hasInfix "-a guest" s)))

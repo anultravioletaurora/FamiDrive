@@ -1918,7 +1918,44 @@ Network, on its own: each player signed in to their RPCN account
 
 ## File sharing
 
-Each player's home folder on the network (SMB), for changing the menu's music or copying recordings off from another computer.
+The box on the home network (SMB, and NFS for Linux): each player's home folder, the library to copy off, and a Drop folder to copy games in from another computer.
+
+### `famidrive.nfs.allowedNetworks`
+
+The networks (addresses or subnets) NFS serves. `nfs.enable` needs at least one.
+
+- **Type:** list of string
+- **Default:** `[ ]`
+- **Example:** 
+
+  ```nix
+  [
+    "192.168.1.0/24"
+  ]
+  ```
+
+### `famidrive.nfs.enable`
+
+The shared library (`dataDir`) over NFS (version 4), read-only,
+for Linux computers. NFS has no sign-in: anyone on
+`nfs.allowedNetworks` can read it, so only the library is
+offered, and firmware stays unreadable to them.
+
+- **Type:** boolean
+- **Default:** `false`
+
+### `famidrive.smb.drop.enable`
+
+A `Drop` share any player can copy games into, with a folder per
+console named as in the library (`gc`, `switch`, `psx` …). ES-DE
+lists what's copied in from the next session on, for every
+player. A game RomM brings later under the same name is used
+instead; the copy stays in `Drop`. Dropped games' saves stay on
+the box. Systems from `localRoms` have no folder: copy into
+their own folder instead.
+
+- **Type:** boolean
+- **Default:** `true`
 
 ### `famidrive.smb.enable`
 
@@ -1929,7 +1966,34 @@ in `Recordings`. The box shows up by its hostname under Network
 in a Mac's Finder and in Windows' Network. A player signs in as
 their Linux account, with their SMB password
 (`players.<name>.smb.passwordFile`, or `sudo smbpasswd -a <user>`
-on the box once). The guest can't sign in. Off: no file sharing.
+on the box once). The guest can't sign in. The `Library` and
+`Drop` shares come with it. Off: no file sharing.
+
+- **Type:** boolean
+- **Default:** `true`
+
+### `famidrive.smb.interfaces`
+
+The network interfaces file sharing is reachable on: the home
+network's, never a VPN's or a public one's. Empty, every
+interface. Covers SMB, finding the box in Finder and Windows'
+Network, and NFS (`nfs.enable`).
+
+- **Type:** list of string
+- **Default:** `[ ]`
+- **Example:** 
+
+  ```nix
+  [
+    "enp3s0"
+  ]
+  ```
+
+### `famidrive.smb.library.enable`
+
+A `Library` share: the shared library (`dataDir`), read-only, for
+any player to copy games, art or firmware off. Systems from
+`localRoms` aren't in it: they're folders elsewhere on the box.
 
 - **Type:** boolean
 - **Default:** `true`
