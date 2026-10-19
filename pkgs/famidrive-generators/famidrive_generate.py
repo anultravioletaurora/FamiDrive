@@ -3,6 +3,7 @@ famidrive-generate heroic HEROIC_CONFIG_DIR ROMS_DIR STORE...
 famidrive-generate lutris LUTRIS_DATA_DIR OUT_DIR
 famidrive-generate steam-media STEAMAPPS_DIR OUT_DIR
 famidrive-generate heroic-media HEROIC_CONFIG_DIR ROMS_DIR STORE...
+famidrive-generate lutris-media LUTRIS_DATA_DIR OUT_DIR
 famidrive-generate launcher SYSTEM_DIR NAME ID
 
 Rewrite OUT_DIR so it holds exactly one placeholder per installed game in
@@ -29,6 +30,10 @@ heroic-media does the same for Heroic's games, from Heroic's own store
 cache: the store's name for the game (a file name can't have a ":"), its
 description, developer and genres, and its cover and background images.
 
+lutris-media does the same for Lutris's games, from lutris.net's page
+for each one (its description, genres and year), and from the Steam
+store, as steam-media does, for a game lutris.net says is on Steam.
+
 launcher puts a launcher's own entry (NAME.setting, holding ID) in its
 store's system folder, at the top of the list: Lutris in Lutris, Steam
 Settings in Steam. Its sort name does that; ES-DE still lists a
@@ -39,6 +44,7 @@ import json
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -155,6 +161,108 @@ def lutris(src, out):
                 and not any((ESDE / "downloaded_media/lutris/covers").glob(glob_escape(stem) + ".*")):
             put_media("covers", stem, cover.read_bytes(), ".jpg", "lutris")
     write_gamelist("lutris", merge_gamelist(ESDE / "gamelists/lutris/gamelist.xml", fields, ("name",)))
+
+
+# ---------------------------------------------------------------- Lutris's details
+
+# lutris.net's page for a game, by its slug (what Lutris's own client
+# reads, lutris/api.py, 0.5.23): description, genres, year, cover, and
+# the game's Steam app ID when it's on Steam. Seen 2026-10-18: Black Ops
+# Cold War's has steamid 1985810, Battle.net's and Fallout: New Vegas
+# Ultimate Edition's (GOG's) have none.
+LUTRIS_API = "https://lutris.net/api/games/{slug}"
+LUTRIS_CACHE = Path.home() / ".cache/famidrive/lutris"   # one JSON per slug
+# Steam's fields: a game on Steam gets them all from there.
+FROM_LUTRIS = ("name", "desc", "developer", "publisher", "genre", "releasedate", "rating")
+
+
+def lutris_details(slug, budget):
+    """lutris.net's details for a game, cached for good like Steam's. None
+    when lutris.net has no page for it or can't be reached."""
+    cached = LUTRIS_CACHE / f"{slug}.json"
+    if cached.exists():
+        return read_json(cached) or None
+    if budget[0] <= 0:
+        return None
+    budget[0] -= 1
+    try:
+        data = json.loads(fetch(LUTRIS_API.format(slug=slug)))
+    except urllib.error.HTTPError as e:
+        data = {} if e.code == 404 else None
+    except (OSError, ValueError):
+        data = None
+    if data is None:
+        return None   # try again next run
+    LUTRIS_CACHE.mkdir(parents=True, exist_ok=True)
+    cached.write_text(json.dumps(data))
+    return data or None
+
+
+def lutris_fields(details, name):
+    fields = {"name": name,
+              "desc": cut_description(details.get("description") or ""),
+              "genre": ", ".join(g["name"] for g in details.get("genres") or []
+                                 if isinstance(g, dict) and g.get("name"))}
+    if details.get("year"):
+        fields["releasedate"] = f"{details['year']}0101T000000"
+    return {k: v.strip() for k, v in fields.items() if v and v.strip()}
+
+
+def lutris_media(src, out):
+    """Details and art for every Lutris entry in out: lutris.net's, and
+    Steam's on top for a game that's on Steam (its description, credits
+    and art are better: a logo, a hero image, a screenshot)."""
+    games = lutris_games(src)
+    if not games:
+        return
+    by_id = {str(i): (name, slug) for i, name, slug in games}
+    steamapps = Path.home() / ".local/share/Steam/steamapps"   # its library cache, when it has the game
+    budget = [STORE_BUDGET]
+    fields = {}
+    for entry in sorted(out.glob("*.lutris")):
+        name, slug = by_id.get(entry.read_text().strip(), (None, None))
+        if not slug:
+            continue
+        details = lutris_details(slug, budget) or {}
+        f = lutris_fields(details, name or entry.stem)
+        steam = store_details(details["steamid"], budget) if details.get("steamid") else None
+        if steam:
+            year = f.get("releasedate")
+            f.update(steam_fields(steam, f["name"]))
+            # Steam's date is when it came to Steam: Black Ops Cold War's
+            # is 2023, three years after the game.
+            if year and not f["releasedate"].startswith(year[:4]):
+                f["releasedate"] = year
+        if len(f) > 1:
+            fields[entry.name] = f
+
+        def missing(kind):
+            return not any((ESDE / "downloaded_media/lutris" / kind).glob(glob_escape(entry.stem) + ".*"))
+
+        art = {}
+        if steam:
+            art = {kind: lambda files=files: library_image(steamapps, str(details["steamid"]), files)
+                   for kind, files in ART.items()}
+            shots = steam.get("screenshots") or []
+            if shots and shots[0].get("path_full"):
+                art["screenshots"] = lambda url=shots[0]["path_full"]: try_fetch(url)
+        if details.get("coverart") and "covers" not in art:
+            art["covers"] = lambda url=details["coverart"]: try_fetch(url)
+        for kind, get in art.items():
+            # Lutris's own cover (lutris, above) stays: it's what the
+            # player sees in Lutris.
+            if missing(kind):
+                data = get()
+                if data:
+                    put_media(kind, entry.stem, data, ".png" if data[:4] == b"\x89PNG" else ".jpg", "lutris")
+    write_gamelist("lutris", merge_gamelist(ESDE / "gamelists/lutris/gamelist.xml", fields, FROM_LUTRIS))
+
+
+def try_fetch(url):
+    try:
+        return fetch(url)
+    except OSError:
+        return None   # next run
 
 
 def minecraft(src):
@@ -516,6 +624,11 @@ def main():
         started = time.monotonic()
         heroic_media(Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4:])
         print(f"Heroic art and details: {time.monotonic() - started:.0f} s", file=sys.stderr)
+        return
+    if sys.argv[1] == "lutris-media":
+        started = time.monotonic()
+        lutris_media(Path(sys.argv[2]), Path(sys.argv[3]))
+        print(f"Lutris art and details: {time.monotonic() - started:.0f} s", file=sys.stderr)
         return
     if sys.argv[1] == "launcher":
         launcher(Path(sys.argv[2]), sys.argv[3], sys.argv[4])

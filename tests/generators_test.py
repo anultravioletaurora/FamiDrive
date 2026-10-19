@@ -259,6 +259,60 @@ class Test(unittest.TestCase):
         self.assertEqual((self.home / "ES-DE/downloaded_media/lutris/covers/Call of Duty_ Black Ops Cold War.jpg")
                          .read_bytes(), b"cover")
 
+    def lutris_page(self, slug, data):
+        cache = self.home / ".cache/famidrive/lutris"
+        cache.mkdir(parents=True, exist_ok=True)
+        (cache / f"{slug}.json").write_text(json.dumps(data))
+
+    def test_lutris_games_get_lutris_nets_details_and_steams_when_on_steam(self):
+        data = self.lutris_db([
+            (1, "Call of Duty: Black Ops Cold War", "call-of-duty-black-ops-cold-war", "wine", 1, None),
+            (2, "Fallout: New Vegas Ultimate Edition", "fallout-new-vegas-ultimate-edition", "wine", 1, "gog"),
+            (3, "Not on lutris.net", "not-on-lutris-net", "wine", 1, None),
+        ])
+        cover = self.home / "cover.jpg"
+        cover.write_bytes(b"lutris.net cover")
+        self.lutris_page("call-of-duty-black-ops-cold-war", {
+            "description": "The iconic Black Ops series is back.", "genres": [{"name": "FPS"}],
+            "year": 2020, "steamid": 1985810, "coverart": cover.as_uri()})
+        self.lutris_page("fallout-new-vegas-ultimate-edition", {
+            "description": "Welcome to Vegas.\r\nNew Vegas.", "year": 2010, "steamid": None,
+            "genres": [{"name": "RPG"}, {"name": "Open World"}], "coverart": cover.as_uri()})
+        self.lutris_page("not-on-lutris-net", {})
+        self.store(1985810, {"short_description": "Black Ops Cold War drops fans into the Cold War.",
+                             "developers": ["Treyarch", "Raven Software"], "publishers": ["Activision"],
+                             "genres": [{"description": "Action"}], "release_date": {"date": "Mar 8, 2023"}})
+        cache = self.steamapps.parent / "appcache/librarycache/1985810"
+        cache.mkdir(parents=True)
+        (cache / "logo.png").write_bytes(b"\x89PNG logo")
+        (cache / "library_hero.jpg").write_bytes(b"hero")
+        (cache / "library_600x900.jpg").write_bytes(b"steam cover")
+        (data / "coverart").mkdir()
+        (data / "coverart/call-of-duty-black-ops-cold-war.jpg").write_bytes(b"lutris cover")
+        out = self.home / "roms/lutris"
+        self.run_tool("lutris", str(data), str(out))
+        self.run_tool("lutris-media", str(data), str(out))
+        games = {g.findtext("path"): g for g in
+                 ET.parse(self.home / "ES-DE/gamelists/lutris/gamelist.xml").getroot().iter("game")}
+        cw = games["./Call of Duty_ Black Ops Cold War.lutris"]
+        self.assertEqual(cw.findtext("name"), "Call of Duty: Black Ops Cold War")
+        self.assertEqual(cw.findtext("desc"), "Black Ops Cold War drops fans into the Cold War.")
+        self.assertEqual(cw.findtext("developer"), "Treyarch, Raven Software")
+        self.assertEqual(cw.findtext("genre"), "Action")
+        # The game's year, not when it came to Steam.
+        self.assertEqual(cw.findtext("releasedate"), "20200101T000000")
+        fnv = games["./Fallout_ New Vegas Ultimate Edition.lutris"]
+        self.assertEqual(fnv.findtext("desc"), "Welcome to Vegas. New Vegas.")
+        self.assertEqual(fnv.findtext("genre"), "RPG, Open World")
+        self.assertEqual(fnv.findtext("releasedate"), "20100101T000000")
+        self.assertIsNone(games["./Not on lutris.net.lutris"].find("desc"))
+        media = self.home / "ES-DE/downloaded_media/lutris"
+        # Lutris's own cover stays; Steam's logo and hero come with it.
+        self.assertEqual((media / "covers/Call of Duty_ Black Ops Cold War.jpg").read_bytes(), b"lutris cover")
+        self.assertEqual((media / "marquees/Call of Duty_ Black Ops Cold War.png").read_bytes(), b"\x89PNG logo")
+        self.assertEqual((media / "fanart/Call of Duty_ Black Ops Cold War.jpg").read_bytes(), b"hero")
+        self.assertEqual((media / "covers/Fallout_ New Vegas Ultimate Edition.jpg").read_bytes(), b"lutris.net cover")
+
     def test_a_launcher_tops_its_stores_system_after_favorites(self):
         out = self.home / "roms/lutris"
         out.mkdir(parents=True)

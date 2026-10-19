@@ -59,11 +59,12 @@ let
           # so it gets the whole folder.
           ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate ${lane} ${(source p).${lane}} ${p.roms}${folder lane}${args.${lane} or ""}";
         };
-        # Steam's (and Heroic's) art and details for new games, once the
+        # Steam's (and Heroic's, and Lutris's) art and details for new games, once the
         # menu entries are in place, without holding up the session: a
         # first run can take a minute or two (a store lookup per game).
         onSuccess = lib.optional (lane == "steam") "famidrive-steam-media-${p.name}.service"
-          ++ lib.optional (lane == "heroic" && heroicStores != [ ]) "famidrive-heroic-media-${p.name}.service";
+          ++ lib.optional (lane == "heroic" && heroicStores != [ ]) "famidrive-heroic-media-${p.name}.service"
+          ++ lib.optional (lane == "lutris") "famidrive-lutris-media-${p.name}.service";
       };
     } // lib.optionalAttrs (lane == "steam") {
       "famidrive-steam-media-${p.name}" = {
@@ -87,6 +88,19 @@ let
           Type = "oneshot";
           User = p.user;
           ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate heroic-media ${(source p).heroic} ${p.roms}${args.heroic}";
+        };
+      };
+    } // lib.optionalAttrs (lane == "lutris") {
+      # lutris.net's details for each game, and the Steam store's for one
+      # that's on Steam.
+      "famidrive-lutris-media-${p.name}" = {
+        description = "Lutris's art and details for ${p.displayName}'s Lutris games in ES-DE";
+        wants = [ "network-online.target" ];
+        after = [ "network-online.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          User = p.user;
+          ExecStart = "${pkgs.famidrive-generators}/bin/famidrive-generate lutris-media ${(source p).lutris} ${p.roms}/lutris";
         };
       };
     };
