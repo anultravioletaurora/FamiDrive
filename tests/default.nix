@@ -791,6 +791,10 @@ in
         (lib.hasInfix "famidrive-generate lutris /home/bob/.local/share/lutris /home/bob/.local/share/famidrive/roms/lutris"
             c.systemd.services.famidrive-gen-lutris-bob.serviceConfig.ExecStart
           && toString c.systemd.paths.famidrive-gen-lutris-bob.pathConfig.PathChanged == "/home/bob/.local/share/lutris/pga.db"))
+      (check "Lutris's art and details after each Lutris menu update"
+        (c.systemd.services.famidrive-gen-lutris-bob.onSuccess == [ "famidrive-lutris-media-bob.service" ]
+          && lib.hasSuffix "famidrive-generate lutris-media /home/bob/.local/share/lutris /home/bob/.local/share/famidrive/roms/lutris"
+            c.systemd.services.famidrive-lutris-media-bob.serviceConfig.ExecStart))
       (check "Lutris's services are the stores it runs, Steam's off"
         (let a = c.home-manager.users.bob.home.activation.famidriveLutris.data; in
           lib.hasInfix "services gog True" a && lib.hasInfix "services battlenet True" a
