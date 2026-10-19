@@ -3,6 +3,7 @@
     famidrive-record start     start recording, unless already
     famidrive-record stop      stop, and toast where the recording went
     famidrive-record status    exit 0 and print the file while recording
+    famidrive-record media     art in ES-DE for every recording, none for deleted ones
 
 The Guide menu's "Start recording" runs `start` after its countdown, and
 "Stop recording" runs `stop`; the session's end runs `stop` too, so a
@@ -17,6 +18,14 @@ it started, which the Recordings system in ES-DE lists.
 
 The MP4 is fragmented (a fragment a second), so a recording cut short (the
 session killed, the box losing power) still plays up to its last second.
+
+Each saved recording gets its art in ES-DE's Recordings list: a still from
+it, as its screenshot and cover, and the recording itself as its video,
+which Art Book Next plays in place of the still after a few seconds on it.
+ES-DE finds a game's art by file name in downloaded_media/<system>/<kind>/,
+never in the game list, so these go there. The session's start runs
+`media` for recordings made before this, and to clear art left by ones the
+player deleted.
 """
 
 import json
@@ -52,6 +61,7 @@ GST_LAUNCH = "@gstLaunch@"
 GST_INSPECT = "@gstInspect@"
 GST_PLUGINS = "@gstPlugins@"
 PW_DUMP = "@pwDump@"
+FFMPEG = "@ffmpeg@"
 
 # H.264 encoders, best first: the GPU's own encoder (VA-API on AMD and
 # Intel, NVENC on Nvidia), else x264 on the CPU. The va plugin is the
@@ -87,6 +97,15 @@ STARTUP_SECONDS = 2.0    # how long a pipeline gets to fail before start says it
 # took more than one press of Stop, and each press made its own toast.
 STOP_SECONDS = 5.0
 TOAST_ID = "famidrive-record"   # one toast per stop: "Saving recording", then the result in its place
+# The still: this far in, past the "Recording" toast's slide in, or the
+# first frame when a recording is shorter. 540 lines tall is plenty for
+# the list's art, at a tenth of a 1080p frame's size.
+STILL_AT = 3
+STILL_HEIGHT = 540
+# The kinds of art each recording gets. Screenshot is what FamiDrive's
+# default layout (gamelist-list-metadata-screenshot-marquee) shows; cover
+# is for the cover and grid layouts.
+STILL_KINDS = ("screenshots", "covers")
 
 
 def runtime_dir() -> Path:
@@ -100,6 +119,13 @@ def state_file() -> Path:
 def recordings_dir() -> Path:
     """Where recordings go: FAMIDRIVE_RECORDINGS (for tests), else ~/Recordings."""
     return Path(os.environ.get("FAMIDRIVE_RECORDINGS") or Path.home() / "Recordings")
+
+
+def media_dir() -> Path:
+    """ES-DE's art for the Recordings system: FAMIDRIVE_RECORDINGS_MEDIA
+    (for tests), else ~/ES-DE/downloaded_media/recordings."""
+    return Path(os.environ.get("FAMIDRIVE_RECORDINGS_MEDIA")
+                or Path.home() / "ES-DE/downloaded_media/recordings")
 
 
 def alive(pid: int) -> bool:
@@ -270,6 +296,77 @@ def log(msg: str) -> None:
     print(f"famidrive-record: {msg}", file=sys.stderr, flush=True)
 
 
+def still(video: Path, out: Path) -> bool:
+    """A frame of the recording as a JPEG, STILL_AT seconds in, or its
+    first when it's shorter than that (ffmpeg writes nothing past the
+    end). Written beside and moved in, so ES-DE never reads half a file."""
+    tmp = out.with_name(out.name + ".part")
+    error = ""
+    for at in (STILL_AT, 0):
+        try:
+            r = subprocess.run([FFMPEG, "-nostdin", "-loglevel", "error", "-y", "-ss", str(at), "-i", str(video),
+                                "-frames:v", "1", "-vf", f"scale=-2:{STILL_HEIGHT}", "-f", "image2", "-c:v", "mjpeg",
+                                str(tmp)], stdin=subprocess.DEVNULL, capture_output=True, text=True)
+        except OSError as e:
+            error = str(e)
+            break
+        if r.returncode == 0 and tmp.exists() and tmp.stat().st_size > 0:
+            tmp.replace(out)
+            return True
+        error = r.stderr.strip()
+        tmp.unlink(missing_ok=True)
+    log(f"couldn't take a still from {video}: {error}")
+    return False
+
+
+def link(target: Path, at: Path) -> None:
+    if at.is_symlink() and os.readlink(at) == str(target):
+        return
+    at.parent.mkdir(parents=True, exist_ok=True)
+    tmp = at.with_name(at.name + ".part")
+    tmp.unlink(missing_ok=True)
+    tmp.symlink_to(target)
+    tmp.replace(at)
+
+
+def add_media(video: Path) -> None:
+    """One recording's art: the still as its screenshot and its cover, and
+    the recording itself (a link to it) as its video."""
+    m = media_dir()
+    stem = video.stem
+    shot = m / "screenshots" / (stem + ".jpg")
+    shot.parent.mkdir(parents=True, exist_ok=True)
+    if not shot.exists() and not still(video, shot):
+        return
+    for kind in STILL_KINDS[1:]:
+        link(Path("..") / "screenshots" / shot.name, m / kind / shot.name)
+    link(video, m / "videos" / video.name)
+
+
+def has_media(video: Path) -> bool:
+    m = media_dir()
+    return (all((m / kind / (video.stem + ".jpg")).exists() for kind in STILL_KINDS)
+            and (m / "videos" / video.name).exists())
+
+
+def sync_media() -> None:
+    """Art for each recording that has none (made before this, or a copy
+    put in by hand), and none for a recording that's gone. The one being
+    recorded right now is left until it's saved."""
+    folder = recordings_dir()
+    state = current()
+    live = Path(state["path"]) if state else None
+    videos = {v.stem: v for v in folder.glob("*.mp4") if v != live} if folder.is_dir() else {}
+    for v in sorted(videos.values()):
+        if not has_media(v):
+            add_media(v)
+    m = media_dir()
+    for kind in (*STILL_KINDS, "videos"):
+        for f in (m / kind).glob("*") if (m / kind).is_dir() else ():
+            if f.name.endswith(".part") or Path(f.name).stem not in videos:
+                f.unlink(missing_ok=True)
+
+
 def start() -> int:
     if current():
         log("already recording")
@@ -333,6 +430,7 @@ def stop() -> int:
         while alive(pid) and time.monotonic() < deadline:
             time.sleep(0.1)
     if path.exists() and path.stat().st_size > 0:
+        add_media(path)
         # ES-DE reads its game lists once, at start, and nothing outside it
         # can make it read them again: its own Utilities menu can (2.1.2+).
         # Found on the first box 2026-10-16: a new recording wasn't in
@@ -355,7 +453,10 @@ def main() -> None:
         if state:
             print(state["path"])
         sys.exit(0 if state else 1)
-    print("usage: famidrive-record start|stop|status", file=sys.stderr)
+    if cmd == "media":
+        sync_media()
+        sys.exit(0)
+    print("usage: famidrive-record start|stop|status|media", file=sys.stderr)
     sys.exit(64)
 
 

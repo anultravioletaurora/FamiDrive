@@ -8,6 +8,10 @@
 # fallback is Controllers' too, so the two looked alike (first box,
 # 2026-10-16): FamiDrive adds a logo, light red art and colors to it
 # (pkgs/art-book-next-recordings).
+#
+# Each recording also gets a still and its own video as its art in ES-DE
+# (famidrive-record media), and the folder is in the player's Kodi too,
+# under Videos > Files (famidrive.media.kodi.homeFolders).
 { config, lib, pkgs, ... }:
 
 let
@@ -32,6 +36,16 @@ in
     # By name from PATH (the Guide menu and the session's end run it), so
     # a fix to it doesn't restart the TV (box-testing.md).
     environment.systemPackages = [ pkgs.famidrive-record ];
+
+    # Art for recordings made before this, or while ES-DE wasn't looking,
+    # and none left for ones the player deleted. In the background: it
+    # only reads a frame from each new recording, but the TV shouldn't
+    # wait on it.
+    famidrive.sessionSetup = ''
+      famidrive-record media || echo "famidrive-session: couldn't update the recordings' art" >&2 &
+    '';
+
+    famidrive.media.kodi.homeFolders.Recordings = { path = "Recordings"; type = "videos"; };
 
     # Only for Art Book Next: another theme has its own art, or its own
     # fallback.

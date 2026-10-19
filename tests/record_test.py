@@ -109,6 +109,7 @@ class State(unittest.TestCase):
         self.env = dict(os.environ)
         os.environ["XDG_RUNTIME_DIR"] = str(self.dir)
         os.environ["FAMIDRIVE_RECORDINGS"] = str(self.dir / "Recordings")
+        os.environ["FAMIDRIVE_RECORDINGS_MEDIA"] = str(self.dir / "media")
 
     def tearDown(self):
         os.environ.clear()
@@ -179,6 +180,94 @@ class State(unittest.TestCase):
         self.assertEqual(r.stop(), 0)
         self.assertEqual(p.returncode, 0)
         self.assertFalse(r.state_file().exists())
+
+
+
+class Media(unittest.TestCase):
+    """Each recording's art in ES-DE, with a stand-in ffmpeg that writes
+    "frame at <seconds>" as the still, or nothing past a recording's end
+    (its file's content, in seconds)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.env = dict(os.environ)
+        os.environ["XDG_RUNTIME_DIR"] = str(self.dir)
+        os.environ["FAMIDRIVE_RECORDINGS"] = str(self.dir / "Recordings")
+        os.environ["FAMIDRIVE_RECORDINGS_MEDIA"] = str(self.dir / "media")
+        self.recordings = self.dir / "Recordings"
+        self.recordings.mkdir()
+        self.media = self.dir / "media"
+        fake = self.dir / "ffmpeg"
+        fake.write_text(
+            "#!/bin/sh\n"
+            "at=; video=; for a; do case \"$prev\" in -ss) at=$a ;; -i) video=$a ;; esac; prev=$a; out=$a; done\n"
+            "[ \"$at\" -lt \"$(cat \"$video\")\" ] || [ \"$at\" = 0 ] || exit 0\n"
+            "echo \"frame at $at\" > \"$out\"\n"
+            f"echo \"$at\" >> {self.dir}/calls\n")
+        fake.chmod(0o755)
+        self.old, r.FFMPEG = r.FFMPEG, str(fake)
+
+    def tearDown(self):
+        r.FFMPEG = self.old
+        os.environ.clear()
+        os.environ.update(self.env)
+        self.tmp.cleanup()
+
+    def recording(self, name, seconds=60):
+        p = self.recordings / name
+        p.write_text(str(seconds))
+        return p
+
+    def test_a_still_as_screenshot_and_cover_and_the_recording_as_video(self):
+        v = self.recording("2026-10-16 21.04.33.mp4")
+        r.add_media(v)
+        shot = self.media / "screenshots/2026-10-16 21.04.33.jpg"
+        self.assertEqual(shot.read_text(), f"frame at {r.STILL_AT}\n")
+        self.assertEqual((self.media / "covers/2026-10-16 21.04.33.jpg").read_text(), shot.read_text())
+        self.assertEqual((self.media / "videos/2026-10-16 21.04.33.mp4").resolve(), v.resolve())
+        self.assertEqual(list(self.media.rglob("*.part")), [])
+
+    def test_a_short_recording_gets_its_first_frame(self):
+        r.add_media(self.recording("a.mp4", seconds=1))
+        self.assertEqual((self.media / "screenshots/a.jpg").read_text(), "frame at 0\n")
+
+    def test_no_still_no_art(self):
+        r.FFMPEG = str(self.dir / "missing")
+        r.add_media(self.recording("a.mp4"))
+        self.assertFalse((self.media / "videos/a.mp4").exists())
+        self.assertFalse((self.media / "covers/a.jpg").exists())
+
+    def test_sync_adds_whats_missing_once_and_clears_whats_gone(self):
+        self.recording("old.mp4")
+        gone = self.recording("gone.mp4")
+        r.sync_media()
+        gone.unlink()
+        self.recording("new.mp4")
+        r.sync_media()
+        r.sync_media()   # nothing left to do
+        names = sorted(str(p.relative_to(self.media)) for p in self.media.rglob("*") if not p.is_dir())
+        self.assertEqual(names, ["covers/new.jpg", "covers/old.jpg", "screenshots/new.jpg",
+                                 "screenshots/old.jpg", "videos/new.mp4", "videos/old.mp4"])
+        self.assertEqual(len((self.dir / "calls").read_text().split()), 3)   # old, gone, new: each once
+
+    def test_sync_leaves_the_one_being_recorded(self):
+        live = self.recording("live.mp4")
+        r.state_file().write_text(json.dumps({"pid": os.getpid(), "path": str(live)}))
+        r.sync_media()
+        self.assertFalse((self.media / "screenshots/live.jpg").exists())
+
+    def test_stop_adds_the_art(self):
+        p = subprocess.Popen([sys.executable, "-c",
+                              "import signal, sys, time\n"
+                              "signal.signal(signal.SIGINT, lambda *_: sys.exit(0))\n"
+                              "time.sleep(30)\n"])
+        threading.Thread(target=p.wait, daemon=True).start()
+        time.sleep(0.3)
+        v = self.recording("a.mp4")
+        r.state_file().write_text(json.dumps({"pid": p.pid, "path": str(v)}))
+        self.assertEqual(r.stop(), 0)
+        self.assertTrue((self.media / "videos/a.mp4").exists())
 
 
 if __name__ == "__main__":

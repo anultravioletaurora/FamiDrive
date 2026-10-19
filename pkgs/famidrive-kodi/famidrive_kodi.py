@@ -3,7 +3,8 @@
 Kodi on a FamiDrive box (modules/famidrive/media.nix), as each player.
 
 prepare: before Kodi starts. The box's media folders (famidrive.media.kodi
-  .sources) go into Kodi's sources.xml next to any the player added, and
+  .sources), and folders in the player's own home (.homeFolders: their
+  Recordings), go into Kodi's sources.xml next to any the player added, and
   FamiDrive's add-ons are switched on in Kodi's add-on database. Add-on
   settings FamiDrive knows (JellyCon's server) go into each add-on's
   settings.xml; the rest of each file stays the player's.
@@ -15,8 +16,9 @@ library: while Kodi runs (started in the background by the Media entry).
   folder's content and scraper (what "Set content" does by hand), and
   asks Kodi to scan, so new files on the drive turn up on their own.
 
-Spec: {"sources": {name: {"path", "content"}}, "addons": [ids],
-       "addonSettings": {addon id: {setting id: value}}}.
+Spec: {"sources": {name: {"path", "content"}},
+       "homeFolders": {name: {"path" (under $HOME), "type": "videos"|"pictures"}},
+       "addons": [ids], "addonSettings": {addon id: {setting id: value}}}.
 """
 
 import json
@@ -30,6 +32,7 @@ from pathlib import Path
 from typing import Literal, NotRequired, TypedDict
 
 type Content = Literal["movies", "tvshows"]
+type HomeKind = Literal["videos", "pictures"]
 type SettingValue = str | int | bool
 
 
@@ -38,9 +41,15 @@ class Source(TypedDict):
     content: Content
 
 
+class HomeFolder(TypedDict):
+    path: str
+    type: HomeKind
+
+
 class Spec(TypedDict):
     """What media.nix passes: see the docstring above."""
     sources: dict[str, Source]
+    homeFolders: NotRequired[dict[str, HomeFolder]]
     addons: NotRequired[list[str]]
     addonSettings: NotRequired[dict[str, dict[str, SettingValue]]]
 
@@ -70,28 +79,58 @@ def folder(path: str) -> str:
     return path if path.endswith("/") else path + "/"
 
 
-def write_sources(sources: dict[str, Source]) -> None:
-    """Merges the box's folders into sources.xml's <video> section. A
-    player's own sources stay; one with a box folder's name or path is
-    replaced by the box's."""
+# sources.xml's section for each kind of home folder.
+SECTION: dict[HomeKind, str] = {"videos": "video", "pictures": "pictures"}
+
+
+def home_sources(folders: dict[str, HomeFolder] | None, kind: HomeKind) -> dict[str, str]:
+    """The player's home folders of one kind, as {name: path}. One that
+    isn't there yet (no screenshots taken) is left out until it is: Kodi
+    would show it as a source it can't open."""
+    found: dict[str, str] = {}
+    for name, f in (folders or {}).items():
+        path = Path.home() / f["path"]
+        if f["type"] == kind and path.is_dir():
+            found[name] = str(path)
+    return found
+
+
+def merge_section(root: ET.Element, section: str, sources: dict[str, str]) -> None:
+    """Puts these {name: path} sources in one section of sources.xml. A
+    player's own sources stay; one with the same name or path as one of
+    these is replaced by it."""
+    el = root.find(section)
+    if el is None:
+        el = ET.SubElement(root, section)
+        ET.SubElement(el, "default", pathversion="1")
+    ours = {folder(p) for p in sources.values()}
+    for src in list(el.findall("source")):
+        if src.findtext("name") in sources or folder(src.findtext("path") or "") in ours:
+            el.remove(src)
+    for name, p in sorted(sources.items()):
+        src = ET.SubElement(el, "source")
+        ET.SubElement(src, "name").text = name
+        ET.SubElement(src, "path", pathversion="1").text = folder(p)
+        ET.SubElement(src, "allowsharing").text = "true"
+
+
+def write_sources(sources: dict[str, Source], home_folders: dict[str, HomeFolder] | None = None) -> None:
+    """The box's folders and the player's home folders into sources.xml.
+    Videos: the box's (scanned into the library, cmd_library) and the
+    player's (Recordings: no content set, so Kodi lists their files under
+    Videos > Files rather than looking them up as films). Pictures: the
+    player's, in Kodi's Pictures."""
     path = USERDATA / "sources.xml"
     try:
         root = ET.parse(path).getroot()
     except (OSError, ET.ParseError):
         root = ET.Element("sources")
-    video = root.find("video")
-    if video is None:
-        video = ET.SubElement(root, "video")
-        ET.SubElement(video, "default", pathversion="1")
-    ours = {folder(s["path"]) for s in sources.values()}
-    for src in list(video.findall("source")):
-        if src.findtext("name") in sources or folder(src.findtext("path") or "") in ours:
-            video.remove(src)
-    for name, s in sorted(sources.items()):
-        src = ET.SubElement(video, "source")
-        ET.SubElement(src, "name").text = name
-        ET.SubElement(src, "path", pathversion="1").text = folder(s["path"])
-        ET.SubElement(src, "allowsharing").text = "true"
+    for kind, section in SECTION.items():
+        wanted = home_sources(home_folders, kind)
+        if kind == "videos":
+            wanted.update({name: s["path"] for name, s in sources.items()})
+        if wanted:
+            merge_section(root, section, wanted)
     before = path.read_bytes() if path.exists() else None
     ET.indent(root)
     after = ET.tostring(root, encoding="utf-8", xml_declaration=True) + b"\n"
@@ -164,8 +203,8 @@ def set_addon_settings(addon: str, values: dict[str, SettingValue]) -> None:
 
 
 def cmd_prepare(spec: Spec) -> None:
-    if spec["sources"]:
-        write_sources(spec["sources"])
+    if spec["sources"] or spec.get("homeFolders"):
+        write_sources(spec["sources"], spec.get("homeFolders"))
     enable_addons(spec.get("addons", []))
     for addon, values in (spec.get("addonSettings") or {}).items():
         set_addon_settings(addon, values)

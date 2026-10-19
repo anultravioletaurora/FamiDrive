@@ -580,6 +580,9 @@ in
         && lib.hasInfix "/home/alice/.local/share/famidrive/roms/recordings"
           c.home-manager.users.alice.home.activation.famidriveRecordings.data
         && lib.elem "famidriveRoms" c.home-manager.users.alice.home.activation.famidriveRecordings.after))
+    (check "each recording gets its art in ES-DE at session start, and ~/Recordings is in each player's Kodi"
+      (lib.hasInfix "famidrive-record media" c.famidrive.sessionSetup
+        && c.famidrive.media.kodi.homeFolders.Recordings == { path = "Recordings"; type = "videos"; }))
     (check "Art Book Next gets the Recordings system's logo and art, which it has none of"
       (c.famidrive.systems.recordings.theme == "recordings"
         && lib.length c.famidrive.esde.themeExtras == 1
@@ -621,6 +624,7 @@ in
   } (c: [
     (check "no Recordings system" (!(c.famidrive.systems ? recordings)))
     (check "no recorder" (!(lib.any (p: lib.getName p == "famidrive-record") c.environment.systemPackages)))
+    (check "no Recordings in Kodi" (!(c.famidrive.media.kodi.homeFolders ? Recordings)))
     (check "no link to ~/Recordings" (!(c.home-manager.users.alice.home.activation ? famidriveRecordings)))
     (check "Art Book Next as it comes" (c.famidrive.esde.themeExtras == [ ]))
   ]);
@@ -750,6 +754,9 @@ in
           && lib.hasInfix "Kodi.kodi" c.home-manager.users.bob.home.activation.famidriveMedia.data
           && lib.hasInfix "Jellyfin.jellyfin" c.home-manager.users.guest.home.activation.famidriveMedia.data
           && lib.hasInfix "/media/movies" c.famidrive.systems.media.command))
+      (check "Kodi gets each player's ~/Recordings, under Videos"
+        (lib.hasInfix ''"homeFolders":{"Recordings":{"path":"Recordings","type":"videos"}}''
+          c.famidrive.systems.media.command))
       (check "Kodi has JellyCon on the box's Jellyfin, Up Next, and the box's own add-ons"
         (lib.hasInfix "plugin.video.jellycon" c.famidrive.systems.media.command
           && lib.hasInfix "https://jellyfin.example.org" c.famidrive.systems.media.command

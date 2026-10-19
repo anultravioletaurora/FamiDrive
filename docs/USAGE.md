@@ -1488,6 +1488,43 @@ Whether to enable Kodi as a Media entry in ES-DE, with Jellyfin through JellyCon
 - **Default:** `false`
 - **Example:** `true`
 
+### `famidrive.media.kodi.homeFolders`
+
+Folders in each player's own home, in that player's Kodi, so each
+player sees only their own. The Recordings system adds its
+`~/Recordings` here (`famidrive.recordings`). A folder that isn't
+there yet is added the first time Kodi starts after it is.
+
+- **Type:** attribute set of (submodule)
+- **Default:** `{ }`
+- **Example:** 
+
+  ```nix
+  {
+    Clips = {
+      path = "Videos/Clips";
+      type = "videos";
+    };
+  }
+  ```
+
+### `famidrive.media.kodi.homeFolders.<name>.path`
+
+A folder in each player's home, relative to it.
+
+- **Type:** string
+- **Default:** none; required when used
+- **Example:** `"Recordings"`
+
+### `famidrive.media.kodi.homeFolders.<name>.type`
+
+Where it goes in Kodi: `"videos"` under Videos > Files, played
+as they are, with no lookup as films or shows; `"pictures"`
+under Pictures.
+
+- **Type:** one of "videos", "pictures"
+- **Default:** none; required when used
+
 ### `famidrive.media.kodi.sources`
 
 This box's own media folders, in every player's Kodi library:
