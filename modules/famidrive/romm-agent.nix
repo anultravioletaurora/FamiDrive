@@ -4,6 +4,8 @@
 #     run each emulator's firmware install where one exists
 #   - save sync: called by famidrive-launch before/after each game, plus a
 #     timer reconcile for the crash/power-cut cases
+#   - favorites: each player's, both ways with their RomM favorites, at
+#     session start; the reconcile timer pushes ES-DE's in between
 # No NFS mount anywhere (roms.md "Library sync: pulling ROMs from RomM").
 #
 # Two roles. The library (ROMs, cover art, firmware) is the box's, shared
@@ -111,12 +113,18 @@ in
     # power cut, killed session), one per player. Conflicts are flagged by
     # RomM, never resolved silently here.
     systemd.services = lib.mapAttrs' (name: p: lib.nameValuePair "romm-save-reconcile-${name}" {
-      description = "Reconcile ${p.displayName}'s console saves with RomM";
+      description = "Reconcile ${p.displayName}'s console saves and favorites with RomM";
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
       serviceConfig = background // {
         User = p.user;
-        ExecStart = "${pkgs.romm-agent}/bin/romm-agent reconcile";
+        ExecStart = [
+          "${pkgs.romm-agent}/bin/romm-agent reconcile"
+          # Favorites starred on the TV since the session began, to RomM.
+          # Only that way: ES-DE may be open, and would write over its
+          # game lists. RomM's changes come in at the next session start.
+          "-${pkgs.romm-agent}/bin/romm-agent favorites --push"
+        ];
       };
     }) rommPlayers;
     systemd.timers = lib.mapAttrs' (name: _: lib.nameValuePair "romm-save-reconcile-${name}" {

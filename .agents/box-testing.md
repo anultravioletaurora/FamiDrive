@@ -58,10 +58,14 @@ still restarts the TV. Warn the maintainer before they rebuild.
 - Library services are system units: `romm-library-pull`,
   `famidrive-clonehero-songs`.
 - Each player's RomM agent state is in `~/.local/state/romm-agent/`:
-  `saves.json`, `save-snapshot.json`, `device.json`.
+  `saves.json`, `save-snapshot.json`, `device.json`, and
+  `favorites.json` (the RomM ids both sides last agreed were favorites).
 - Run one sync by hand as the player: `romm-agent reconcile`. Or wait:
   each player has a `romm-save-reconcile-<user>` timer, every 15 minutes,
-  and its log is that unit's journal.
+  and its log is that unit's journal. The timer also runs
+  `romm-agent favorites --push`. The full favorites sync, both ways, runs
+  at session start. Don't run it by hand while ES-DE is open: ES-DE
+  writes its own game lists back over the ones the sync changed.
 - **There's no `python3` on a box's PATH.** Borrow a FamiDrive tool's
   Python environment, which has its libraries: famidrive-quit's has
   `evdev`, famidrive-toast's has `pygame` and `Xlib`. Find the path in
