@@ -67,6 +67,13 @@ DATA = Path(CFG["dataDir"])
 # its downloaded_media/<system> to MEDIA/<system>).
 MEDIA = DATA / "media"
 MEDIA_STATE = DATA / "media.json"   # rom id -> RomM's updated_at when fetched
+# Manuals, in the same layout (<system>/manuals/<game>.pdf), for ES-DE's
+# PDF viewer: X on a game opens its media, then up shows the manual.
+MANUALS_STATE = DATA / "manuals.json"   # rom id -> RomM's updated_at, and the file the pull wrote
+# Where RomM serves what it keeps beside the library (an uploaded manual),
+# FRONTEND_RESOURCES_PATH in RomM 5.3.1. Cover paths come with it in
+# front already; path_manual doesn't.
+RESOURCES = "/assets/romm/resources"
 # Dolphin HD texture packs: zips in a game's mod/ folder in RomM, unpacked
 # once here (<system>/<game ID>/<pack>/), linked into each player's Dolphin.
 TEXTURES = DATA / "textures"
@@ -558,6 +565,57 @@ def fetch_media(s, rom, system, rel):
         MEDIA_STATE.write_text(json.dumps(state, indent=2))
 
 
+def manual_file(s, rom):
+    """The PDF in a game's manual/ folder in RomM (RomM's "manual" file
+    category), or None. Only a game kept in a folder can have one, so
+    only those cost a request. Found on the first box 2026-10-20: Mario
+    Party 4's manual/ also held a leftover .nfs file, filed as a manual
+    too, so only PDFs count. More than one (a manual per language): the
+    first by name."""
+    if rom.get("fs_extension"):
+        return None
+    files = get(s, EP_ROM.format(id=rom["id"])).json().get("files") or []
+    pdfs = [f for f in files if f.get("category") == "manual"
+            and f["file_name"].lower().endswith(".pdf") and not f["file_name"].startswith(".")]
+    return min(pdfs, key=lambda f: f["file_name"]) if pdfs else None
+
+
+def fetch_manual(s, rom, system, rel):
+    """A game's manual, where ES-DE's PDF viewer looks for it:
+    MEDIA/<system>/manuals/<game>.pdf. The PDF in its manual/ folder
+    first, then the one uploaded on its page or scraped (path_manual,
+    one per game). Looked for again only when RomM's entry changed. A
+    manual this pull wrote that RomM has dropped (or that moved with
+    the game's file) goes; one ES-DE's scraper put there stays."""
+    state = json.loads(MANUALS_STATE.read_text()) if MANUALS_STATE.exists() else {}
+    key = str(rom["id"])
+    stem = Path(rel).with_suffix("")
+    have = state.get(key, {})
+    if have.get("updated_at") == rom.get("updated_at") and have.get("stem") == str(stem):
+        return
+    dest = MEDIA / system / "manuals" / f"{stem}.pdf"
+    wrote = None
+    f = manual_file(s, rom)
+    if f:
+        download(s, EP_ROM_CONTENT.format(id=rom["id"], file_name=f["file_name"]), dest,
+                 f.get("sha1_hash") or None, f.get("file_size_bytes"), params={"file_ids": f["id"]})
+        wrote = dest
+    elif (rom.get("path_manual") or "").split("?")[0].lower().endswith(".pdf"):
+        r = s.get(BASE + RESOURCES + "/" + rom["path_manual"].split("?")[0].lstrip("/"), timeout=60)
+        r.raise_for_status()
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        part = dest.with_name(dest.name + ".part")
+        part.write_bytes(r.content)
+        part.replace(dest)
+        wrote = dest
+    if have.get("file") and Path(have["file"]) != wrote:
+        Path(have["file"]).unlink(missing_ok=True)
+    state[key] = {"updated_at": rom.get("updated_at"), "stem": str(stem)}
+    if wrote:
+        state[key]["file"] = str(wrote)
+    MANUALS_STATE.write_text(json.dumps(state, indent=2))
+
+
 def dolphin_systems():
     return [n for n, d in CFG["systems"].items() if d.get("emulator") == "dolphin"]
 
@@ -864,6 +922,10 @@ def cmd_pull():
         except (requests.RequestException, RuntimeError, OSError, zipfile.BadZipFile) as e:
             print(f"texture packs for {rom['fs_name']} skipped: {e}", file=sys.stderr)
         fetch_media(s, rom, system, rel)
+        try:
+            fetch_manual(s, rom, system, rel)
+        except (requests.RequestException, RuntimeError, OSError) as e:
+            print(f"manual for {rom['fs_name']} skipped: {e}", file=sys.stderr)
         by_system.setdefault(system, []).append((rel, rom))
         save_index(index)  # a 800 GB first pull survives being interrupted
 

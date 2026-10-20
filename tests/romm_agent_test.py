@@ -502,6 +502,70 @@ class Test(unittest.TestCase):
         a["fetch_media"](Session(), rom, "gc", Path("Super Smash Bros. Melee.iso"))
         self.assertEqual(asked, [])                 # unchanged in RomM: not fetched again
 
+    def test_manuals_where_esdes_pdf_viewer_looks(self):
+        box = Box(self.base, "library", tokenFile=None)
+        a = box.agent()
+        g = a["fetch_manual"].__globals__
+        files = [
+            {"id": 1, "category": "game", "file_name": "Mario Party 4.iso"},
+            {"id": 2, "category": "manual", "file_name": ".nfs.200553e1.8003"},   # seen on the first box
+            {"id": 3, "category": "manual", "file_name": "Mario Party 4.pdf",
+             "sha1_hash": "8a57", "file_size_bytes": 3},
+        ]
+        asked, got = [], []
+
+        class Resp:
+            content = b"up"
+
+            def json(self):
+                return {"files": files}
+
+            def raise_for_status(self):
+                pass
+
+        def fake_get(s, path, **kw):
+            asked.append(path)
+            return Resp()
+
+        def fake_download(s, path, dest, sha1=None, size=None, params=None):
+            got.append((path, sha1, params))
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(b"pdf")
+
+        class Session:
+            def get(self, url, timeout=None):
+                asked.append(url)
+                return Resp()
+        g["get"], g["download"] = fake_get, fake_download
+        manuals = box.data / "media/gc/manuals"
+        rom = {"id": 216, "updated_at": "t1", "fs_name": "Mario Party 4", "fs_extension": ""}
+        a["fetch_manual"](Session(), rom, "gc", Path("Mario Party 4.iso"))
+        self.assertEqual((manuals / "Mario Party 4.pdf").read_bytes(), b"pdf")
+        self.assertEqual(got, [("/roms/216/content/Mario Party 4.pdf", "8a57", {"file_ids": 3})])
+        # Unchanged in RomM: not asked again.
+        asked.clear()
+        a["fetch_manual"](Session(), rom, "gc", Path("Mario Party 4.iso"))
+        self.assertEqual(asked, [])
+        # The manual/ folder's PDF gone, one uploaded on the game's page
+        # instead: that one, from RomM's resources.
+        files[:] = files[:2]
+        rom = dict(rom, updated_at="t2", path_manual="roms/19/216/manual/216.pdf")
+        a["fetch_manual"](Session(), rom, "gc", Path("Mario Party 4.iso"))
+        self.assertEqual(asked[-1], "https://romm.example.org/assets/romm/resources/roms/19/216/manual/216.pdf")
+        self.assertEqual((manuals / "Mario Party 4.pdf").read_bytes(), b"up")
+        # No manual left in RomM: the one the pull wrote goes...
+        a["fetch_manual"](Session(), dict(rom, updated_at="t3", path_manual=None), "gc", Path("Mario Party 4.iso"))
+        self.assertFalse((manuals / "Mario Party 4.pdf").exists())
+        # ...but not one ES-DE's scraper put there.
+        (manuals / "Mario Party 4.pdf").write_bytes(b"scraped")
+        a["fetch_manual"](Session(), dict(rom, updated_at="t4", path_manual=None), "gc", Path("Mario Party 4.iso"))
+        self.assertEqual((manuals / "Mario Party 4.pdf").read_bytes(), b"scraped")
+        # A single-file game can't have a manual/ folder: no request for its files.
+        asked.clear()
+        a["fetch_manual"](Session(), {"id": 254, "updated_at": "t1", "fs_name": "Melee.iso",
+                                      "fs_extension": "iso"}, "gc", Path("Melee.iso"))
+        self.assertEqual(asked, [])
+
     def test_gamecube_saves_found_by_id(self):
         box = Box(self.base, "alice")
         a = box.agent()
