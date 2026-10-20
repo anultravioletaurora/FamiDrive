@@ -64,6 +64,55 @@ class Box:
         return g
 
 
+class FakeRomm:
+    """RomM's collection endpoints, for one user (id 1), in memory."""
+
+    class Resp:
+        def __init__(self, data):
+            self.data = data
+
+        def json(self):
+            return self.data
+
+        def raise_for_status(self):
+            pass
+
+    def __init__(self, collections, read_only=False):
+        self.collections = collections
+        self.read_only = read_only   # a token without collections.write
+        self.writes = []
+
+    def mine(self):
+        return next(c for c in self.collections if c["is_favorite"] and c["user_id"] == 1)
+
+    def get(self, url, **kw):
+        if url.endswith("/api/users/me"):
+            return self.Resp({"id": 1})
+        assert url.endswith("/api/collections"), url
+        return self.Resp(self.collections)
+
+    def post(self, url, params, data, **kw):
+        assert url.endswith("/api/collections"), url
+        self.writes.append(("create", data["name"]))
+        col = {"id": 9, "name": data["name"], "user_id": 1, "rom_ids": [],
+               "is_favorite": params["is_favorite"] == "true", "is_public": params["is_public"] == "true"}
+        self.collections.append(col)
+        return self.Resp(col)
+
+    def request(self, method, url, json, **kw):
+        if self.read_only:
+            import requests
+            raise requests.HTTPError("403 Forbidden")
+        col = next(c for c in self.collections if url.endswith(f"/api/collections/{c['id']}/roms"))
+        assert col["user_id"] == 1
+        self.writes.append((method, json["rom_ids"]))
+        if method == "POST":
+            col["rom_ids"] += [i for i in json["rom_ids"] if i not in col["rom_ids"]]
+        else:
+            col["rom_ids"] = [i for i in col["rom_ids"] if i not in json["rom_ids"]]
+        return self.Resp(col)
+
+
 class Test(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -616,6 +665,109 @@ class Test(unittest.TestCase):
         a["cmd_gamelists"]()
         self.assertIn("<name>v2</name>", dest.read_text())
         self.assertIn("<favorite>true</favorite>", dest.read_text())
+
+    # ------------------------------------------------------------ favorites
+
+    def favorites_box(self, favorites, collections, read_only=False):
+        """A player with four GameCube games (ids 1-4), their ES-DE game
+        list with `favorites` marked, and a RomM holding `collections`."""
+        box = Box(self.base, "alice")
+        a = box.agent()
+        names = {1: "Melee.iso", 2: "Mario Party 4.iso", 3: "Pikmin.rvz", 4: "Wind Waker.iso"}
+        a["save_index"]({str(box.data / "roms/gc" / n): {"id": i, "system": "gc"} for i, n in names.items()})
+        mine = box.home / "ES-DE/gamelists/gc/gamelist.xml"
+        mine.parent.mkdir(parents=True)
+        mine.write_text("<gameList>" + "".join(
+            f"<game><path>./{n}</path><name>{n}</name><playcount>{i}</playcount>"
+            + ("<favorite>true</favorite>" if i in favorites else "") + "</game>"
+            for i, n in names.items()) + "</gameList>")
+        romm = FakeRomm(collections, read_only)
+        a["cmd_favorites"].__globals__["session"] = lambda: romm
+        return a, romm, mine, names
+
+    def local_favorites(self, mine, names):
+        import xml.etree.ElementTree as ET
+        root = ET.parse(mine).getroot()
+        by_name = {v: k for k, v in names.items()}
+        return {by_name[g.findtext("path")[2:]] for g in root.findall("game") if g.findtext("favorite") == "true"}
+
+    def test_first_favorites_sync_keeps_both_sides_and_makes_the_collection(self):
+        # Another player's public favorites are listed too, and aren't hers.
+        theirs = {"id": 8, "name": "Favorites", "is_favorite": True, "user_id": 2, "rom_ids": [3]}
+        a, romm, mine, names = self.favorites_box({1}, [theirs])
+        a["cmd_favorites"]()
+        made = romm.mine()
+        self.assertEqual((made["name"], made["is_favorite"], made["is_public"]), ("Favorites", True, False))
+        self.assertEqual(made["rom_ids"], [1])
+        self.assertEqual(theirs["rom_ids"], [3])
+        self.assertEqual(self.local_favorites(mine, names), {1})
+        # RomM's web page stars one: it comes to the TV, play counts kept.
+        made["rom_ids"].append(4)
+        a["cmd_favorites"]()
+        self.assertEqual(self.local_favorites(mine, names), {1, 4})
+        self.assertIn("<playcount>4</playcount>", mine.read_text())
+
+    def test_favorites_changed_on_both_sides_both_stick(self):
+        col = {"id": 5, "name": "Favorites", "is_favorite": True, "user_id": 1, "rom_ids": [1, 2, 999]}
+        a, romm, mine, names = self.favorites_box({1, 2}, [col])
+        a["cmd_favorites"]()   # agreed: 1 and 2
+        # On the TV: 1 unstarred, 3 starred. On RomM: 2 unstarred, 4 starred.
+        mine.write_text(mine.read_text().replace("<favorite>true</favorite></game><game><path>./Mario",
+                                                 "</game><game><path>./Mario")
+                        .replace("<playcount>3</playcount>", "<playcount>3</playcount><favorite>true</favorite>"))
+        col["rom_ids"] = [1, 4, 999]
+        a["cmd_favorites"]()
+        self.assertEqual(sorted(col["rom_ids"]), [3, 4, 999])   # 999: a game this box doesn't have
+        self.assertEqual(self.local_favorites(mine, names), {3, 4})
+
+    def test_favorites_push_leaves_the_game_lists_to_es_de(self):
+        col = {"id": 5, "name": "Favorites", "is_favorite": True, "user_id": 1, "rom_ids": [1]}
+        a, romm, mine, names = self.favorites_box({1}, [col])
+        a["cmd_favorites"]()
+        col["rom_ids"] = [4]   # RomM: 1 unstarred, 4 starred
+        mine.write_text(mine.read_text().replace("<playcount>2</playcount>",
+                                                 "<playcount>2</playcount><favorite>true</favorite>"))
+        before = mine.read_text()
+        a["cmd_favorites"]("--push")
+        self.assertEqual(mine.read_text(), before)
+        self.assertEqual(sorted(col["rom_ids"]), [2, 4])
+        # The next session start brings RomM's changes in, and keeps 2.
+        a["cmd_favorites"]()
+        self.assertEqual(self.local_favorites(mine, names), {2, 4})
+        self.assertEqual(sorted(col["rom_ids"]), [2, 4])
+
+    def test_without_collections_write_romms_favorites_still_come_in(self):
+        col = {"id": 5, "name": "Favorites", "is_favorite": True, "user_id": 1, "rom_ids": [1, 2]}
+        a, romm, mine, names = self.favorites_box({1, 2}, [col])
+        a["cmd_favorites"]()
+        romm.read_only = True
+        col["rom_ids"] = [2, 4]   # RomM: 1 unstarred, 4 starred; the TV: 3 starred
+        mine.write_text(mine.read_text().replace("<playcount>3</playcount>",
+                                                 "<playcount>3</playcount><favorite>true</favorite>"))
+        with self.assertRaises(Exception):
+            a["cmd_favorites"]()
+        self.assertEqual(self.local_favorites(mine, names), {2, 3, 4})
+        # Starred again on the TV, 1 stays starred, session after session.
+        mine.write_text(mine.read_text().replace("<playcount>1</playcount>",
+                                                 "<playcount>1</playcount><favorite>true</favorite>"))
+        for _ in range(2):
+            with self.assertRaises(Exception):
+                a["cmd_favorites"]()
+            self.assertEqual(self.local_favorites(mine, names), {1, 2, 3, 4})
+        # Once the token can write, both stars go up.
+        romm.read_only = False
+        a["cmd_favorites"]()
+        self.assertEqual(sorted(col["rom_ids"]), [1, 2, 3, 4])
+
+    def test_a_missing_game_list_unstars_nothing_in_romm(self):
+        col = {"id": 5, "name": "Favorites", "is_favorite": True, "user_id": 1, "rom_ids": [1, 2]}
+        a, romm, mine, names = self.favorites_box({1, 2}, [col])
+        a["cmd_favorites"]()
+        mine.unlink()
+        a["cmd_favorites"]("--push")
+        a["cmd_favorites"]()
+        self.assertEqual(col["rom_ids"], [1, 2])
+        self.assertEqual(romm.writes, [])
 
     def texture_zip(self, path, names):
         import zipfile

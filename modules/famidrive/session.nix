@@ -141,6 +141,9 @@ let
       # TV for it. Found on the first box 2026-10-06.
       if [ -e "/etc/famidrive/romm/$(id -un).json" ]; then
         romm-agent gamelists || echo "famidrive-session: couldn't copy game lists" >&2
+        # Their favorites, both ways with RomM's, while ES-DE isn't up to
+        # write its own game lists over them.
+        romm-agent favorites || echo "famidrive-session: couldn't sync favorites with RomM" >&2
         ${lib.optionalString picker ''
           # Their RomM picture for "Who's playing?", next time it shows.
           romm-agent avatar ${avatarDir} || echo "famidrive-session: couldn't fetch the RomM picture" >&2

@@ -428,8 +428,11 @@ bob:
   issued by that player's RomM user. The primary player's
   ([`famidrive.primaryPlayer`](USAGE.md#famidriveprimaryplayer)) also
   pulls the shared library. Scopes the agent uses: `roms.read`,
-  `platforms.read`, `firmware.read`, `collections.read`, `assets.read`,
-  `assets.write`, `devices.read`, `devices.write`. Add `roms.write` to
+  `platforms.read`, `firmware.read`, `collections.read`,
+  `collections.write` (the player's favorites, both ways with ES-DE's),
+  `assets.read`, `assets.write`, `devices.read`, `devices.write`. A token
+  made before 2026-10-19 may lack `collections.write`: favorites from
+  RomM still come in, but stars added on the TV don't go up. Add `roms.write` to
   let a box write game IDs it worked out back to RomM (optional; skipped
   quietly without it).
 - `retroachievements`: the player's RetroAchievements password, for

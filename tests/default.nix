@@ -746,6 +746,9 @@ in
       (check "save reconcile for each RomM player, not the guest"
         (c.systemd.timers ? romm-save-reconcile-alice && c.systemd.timers ? romm-save-reconcile-bob
           && !(c.systemd.timers ? romm-save-reconcile-guest)))
+      (check "the reconcile timer pushes favorites to RomM, and never writes ES-DE's game lists"
+        (lib.any (lib.hasSuffix "romm-agent favorites --push")
+          c.systemd.services.romm-save-reconcile-bob.serviceConfig.ExecStart))
       (check "a Steam menu generator per player"
         (lib.all (p: c.systemd.services ? "famidrive-gen-steam-${p}") [ "alice" "bob" "guest" ]))
       (check "Heroic gets the GE-Proton Steam has, as its default when it has none"

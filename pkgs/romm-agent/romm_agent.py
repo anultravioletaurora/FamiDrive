@@ -6,6 +6,7 @@ The library, shared by every player (run as famidrive-library):
 
 Each player's own (run as that player):
     romm-agent gamelists               copy the library's newest gamelists into ES-DE
+    romm-agent favorites [--push]      this player's favorites, both ways with RomM's (--push: to RomM only)
     romm-agent firmware-install        run emulator firmware installs (keys, PS3 firmware)
     romm-agent eden-profile            give a new Eden this player's profile, before it first runs
     romm-agent textures                link the library's Dolphin texture packs and Switch mods into this player's emulators
@@ -130,7 +131,7 @@ EP_ROMS = "/roms"                                      # paginated, ?collection_
 EP_ROM = "/roms/{id}"
 EP_ROM_CONTENT = "/roms/{id}/content/{file_name}"      # multi-file ROMs come back as a zip
 EP_ROM_IDENTITY = "/roms/{id}/identity"                # PUT title_id back (needs roms.write)
-EP_COLLECTIONS = "/collections"
+EP_COLLECTIONS = "/collections"                        # + /{id}/roms: POST/DELETE {"rom_ids": [...]}
 EP_PLATFORMS = "/platforms"
 EP_FIRMWARE = "/firmware"                              # ?platform_id=
 EP_FIRMWARE_CONTENT = "/firmware/{id}/content/{file_name}"
@@ -1247,6 +1248,143 @@ def cmd_gamelists():
     copied_file.write_text(json.dumps(copied, indent=2))
 
 
+# ---------------------------------------------------------------- favorites
+#
+# A player's favorites are their RomM favorites collection, the one RomM's
+# web page fills when they star a game: found by is_favorite, not by name
+# (#97). Matched to ES-DE by RomM id -> the index's path -> the game list's
+# <path> in that system's folder. Checked on the first box 2026-10-07.
+
+FAVORITES = STATE / "favorites.json"   # RomM ids both sides last agreed on
+# Short: the full sync runs at session start, before ES-DE comes up.
+FAVORITES_TIMEOUT = 10
+
+
+def favorites_collection(s):
+    """This player's favorites collection, or None until they have one.
+    RomM lists other users' public collections too, so it's the one that's
+    theirs."""
+    def fetch(path):
+        r = s.get(API + path, timeout=FAVORITES_TIMEOUT)
+        r.raise_for_status()
+        return r.json()
+    me = fetch("/users/me")["id"]
+    return next((c for c in fetch(EP_COLLECTIONS) if c.get("is_favorite") and c.get("user_id") == me), None)
+
+
+def my_favorites():
+    """{rom id: (system, game list <path>)} for every game in this player's
+    game lists that the library has, and the ids of those marked favorite.
+    Only games their game lists actually list count: one that's missing (or
+    a game list ES-DE left unreadable) can't have been unfavorited here."""
+    index = load_index()
+    games, favorite = {}, set()
+    by_path = {}
+    for key, entry in index.items():
+        try:
+            rel = Path(key).relative_to(DATA / "roms" / entry["system"])
+        except ValueError:
+            rel = Path(Path(key).name)
+        by_path[(entry["system"], f"./{rel}")] = entry["id"]
+    for system in {e["system"] for e in index.values()}:
+        try:
+            root = ET.parse(Path(CFG["gamelistDir"]) / system / "gamelist.xml").getroot()
+        except (OSError, ET.ParseError):
+            continue
+        for game in root.findall("game"):
+            rom_id = by_path.get((system, game.findtext("path")))
+            if rom_id is None:
+                continue
+            games[rom_id] = (system, game.findtext("path"))
+            if (game.findtext("favorite") or "").strip() == "true":
+                favorite.add(rom_id)
+    return games, favorite
+
+
+def set_favorites(games, on, off):
+    """Mark `on` favorite and `off` not, in this player's game lists. Run
+    only while ES-DE isn't, or it writes its own copy back over them."""
+    changes = {}
+    for rom_id, value in [(i, True) for i in on] + [(i, False) for i in off]:
+        system, path = games[rom_id]
+        changes.setdefault(system, {})[path] = value
+    for system, paths in changes.items():
+        dest = Path(CFG["gamelistDir"]) / system / "gamelist.xml"
+        root = ET.parse(dest).getroot()
+        for game in root.findall("game"):
+            value = paths.get(game.findtext("path"))
+            if value is None:
+                continue
+            for old in game.findall("favorite"):
+                game.remove(old)
+            if value:   # ES-DE leaves the tag out for a game that isn't one
+                ET.SubElement(game, "favorite").text = "true"
+        ET.indent(root)
+        tmp = dest.with_name(dest.name + f".{os.getpid()}.tmp")
+        tmp.write_bytes(b'<?xml version="1.0"?>\n' + ET.tostring(root, encoding="utf-8") + b"\n")
+        tmp.replace(dest)
+
+
+def cmd_favorites(*flags):
+    """This player's favorites, both ways between RomM and ES-DE.
+
+    Each side's changes since the last sync are applied to the other, so a
+    game starred on RomM's web page and another unstarred on the TV both
+    stick, and the first sync keeps every favorite from either side.
+    `--push` sends ES-DE's changes to RomM and leaves the game lists alone:
+    the reconcile timer runs it while ES-DE may be open. The full sync runs
+    at session start, after `gamelists`, before ES-DE reads them.
+
+    Games RomM has that this box doesn't (another box's platforms, a
+    collection this one doesn't mirror) are left as they are in RomM."""
+    push_only = "--push" in flags
+    games, local = my_favorites()
+    if not games:
+        return   # no library pulled yet, or no game lists: nothing to compare
+    try:
+        base = set(json.loads(FAVORITES.read_text())) & set(games)
+    except (OSError, ValueError):
+        base = set()
+    s = session()
+    col = favorites_collection(s)
+    remote = set(col["rom_ids"]) & set(games) if col else set()
+
+    if push_only:
+        # What's still to come from RomM shows next time as a change on
+        # its side: a game it added isn't in here, one it dropped still is.
+        on, off, agreed = set(), set(), local
+    else:
+        # The game lists first: with a token that can't write collections,
+        # RomM's favorites still come in, before the push below fails.
+        on, off = (remote - base) - local, (base - remote) & local
+        set_favorites(games, on, off)
+        agreed = (local | on) - off
+        # Settled from RomM's side, while the TV's changes stay to push. A
+        # failed push otherwise left the old state, and a game RomM had
+        # unstarred, starred again here, was unstarred at every session.
+        STATE.mkdir(parents=True, exist_ok=True)
+        FAVORITES.write_text(json.dumps(sorted((base | on) - off)))
+    add, drop = (local - base) - remote, (base - local) & remote
+    if add and col is None:
+        # Made as RomM's web page makes it: "Favorites", private.
+        r = s.post(API + EP_COLLECTIONS, timeout=FAVORITES_TIMEOUT,
+                   params={"is_favorite": "true", "is_public": "false"},
+                   data={"name": "Favorites"})
+        r.raise_for_status()
+        col = r.json()
+    for method, ids in (("POST", add), ("DELETE", drop)):
+        if ids:
+            r = s.request(method, API + f"{EP_COLLECTIONS}/{col['id']}/roms",
+                          json={"rom_ids": sorted(ids)}, timeout=FAVORITES_TIMEOUT)
+            r.raise_for_status()
+    STATE.mkdir(parents=True, exist_ok=True)
+    FAVORITES.write_text(json.dumps(sorted(agreed)))
+    if add or drop:
+        print(f"favorites to RomM: {len(add)} added, {len(drop)} removed", file=sys.stderr)
+    if on or off:
+        print(f"favorites from RomM: {len(on)} added, {len(off)} removed", file=sys.stderr)
+
+
 # ---------------------------------------------------------------- game IDs
 #
 # roms.md "Mapping saves to games". IDs are only needed to pick which
@@ -2075,7 +2213,7 @@ def cmd_reconcile():
             print(f"push failed for {name}: {e}", file=sys.stderr)
 
 
-SAVE_COMMANDS = {"reconcile", "save-pull", "save-push"}
+SAVE_COMMANDS = {"reconcile", "save-pull", "save-push", "favorites"}
 
 
 def main():
@@ -2083,7 +2221,8 @@ def main():
     commands = {
         "pull": cmd_pull, "firmware": cmd_firmware, "reconcile": cmd_reconcile,
         "save-pull": cmd_save_pull, "save-push": cmd_save_push,
-        "gamelists": cmd_gamelists, "firmware-install": cmd_firmware_install,
+        "gamelists": cmd_gamelists, "favorites": cmd_favorites,
+        "firmware-install": cmd_firmware_install,
         "eden-profile": cmd_eden_profile, "textures": cmd_textures,
         "eden-gamedir": cmd_eden_gamedir, "eden-save": cmd_eden_save,
         "switch-dlc": cmd_switch_dlc, "avatar": cmd_avatar,
@@ -2095,7 +2234,8 @@ def main():
         # One save sync at a time per player: the 15-minute reconcile and
         # the push after a game can start in the same second. Found on the
         # first box 2026-10-06: both uploaded the same save, and one read
-        # saves.json while the other was writing it.
+        # saves.json while the other was writing it. Favorites too: the
+        # timer's push and the session's sync share favorites.json.
         STATE.mkdir(parents=True, exist_ok=True)
         with open(STATE / "lock", "w") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
