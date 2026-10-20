@@ -358,7 +358,7 @@ famidrive = {
 };
 ```
 
-- **What's shared:** ROMs, cover art and firmware live in `dataDir`,
+- **What's shared:** ROMs, cover art, manuals and firmware live in `dataDir`,
   readable by every player (group `famidrive`) and written only by the
   library pull. ROM folders from `localRoms` need the same: readable by
   group `famidrive` or by everyone.
