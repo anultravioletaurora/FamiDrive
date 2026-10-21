@@ -61,10 +61,14 @@ let
           # may replace it.
           menu_hint="''${XDG_RUNTIME_DIR:-/tmp/famidrive-$(id -u)}/famidrive-game.menu"
           echo ${s.guideMenu} > "$menu_hint"
+          # Which game it is, for the Guide menu's Manual (its manual is
+          # in ES-DE's media, found by the game's path).
+          game_hint="''${XDG_RUNTIME_DIR:-/tmp/famidrive-$(id -u)}/famidrive-game.rom"
+          printf '%s\n%s\n' "$system" "$ROM" > "$game_hint"
           ${s.before}
           rc=0
           gamescope-fg bash -c ${lib.escapeShellArg s.command} || rc=$?
-          rm -f "$menu_hint"
+          rm -f "$menu_hint" "$game_hint"
           ${s.after}
           ${lib.optionalString (s.saveSync && cfg.romm.enable) ''[ -z "$sync" ] || romm-agent save-push ${name} "$ROM" || { echo "famidrive-launch: save push failed, timer reconcile will retry" >&2; famidrive-toast --kind alert "Save not uploaded" "It stays on this box, and FamiDrive tries RomM again within 15 minutes."; }''}
           exit "$rc"

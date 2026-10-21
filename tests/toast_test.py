@@ -315,6 +315,99 @@ class GuideMenu(unittest.TestCase):
         menu.command("back", True)
         self.assertEqual(menu.items[menu.sel], "Quit game")
 
+    def test_manual(self):
+        menu = t.Menu(recordings=True)
+        # Only for a game with one, below Resume.
+        menu.command("open", True)
+        self.assertNotIn("Manual", menu.items)
+        menu.command("open", False, manual="/m.pdf")
+        self.assertEqual(menu.items, ["Start recording", "Close"])
+        menu.command("open", True, mode="freeze", manual="/m.pdf")
+        self.assertEqual(menu.items, ["Start recording", "Resume", "Manual", "Quit game"])
+        menu.command("down", True)
+        self.assertEqual(menu.command("select", True), {"open": True})   # the game stays paused
+        self.assertEqual((menu.view, menu.reader.path, menu.reader.page), ("manual", "/m.pdf", 0))
+        menu.reader.pages = 3
+        for _ in range(4):
+            menu.command("right", True)
+        self.assertEqual(menu.reader.page, 2)                 # not past the last
+        # B goes back to the menu, on Manual; it opens again at the start.
+        menu.command("back", True)
+        self.assertEqual((menu.open, menu.view, menu.items[menu.sel]), (True, "main", "Manual"))
+        menu.command("select", True)
+        self.assertEqual(menu.reader.page, 0)
+        # Guide closes it all, from the manual too.
+        self.assertEqual(menu.command("close", True), {"open": False})
+        # Quit game is still one down from Manual.
+        menu.command("open", True, manual="/m.pdf")
+        menu.command("down", True)
+        menu.command("down", True)
+        self.assertEqual(menu.items[menu.sel], "Quit game")
+
+    def test_reading_a_manual_like_esdes_viewer(self):
+        r = t.Reader("/m.pdf")
+        r.command("right")                     # before the page count is known: one on
+        self.assertEqual(r.page, 1)
+        r.pages = 10
+        r.command("left")
+        r.command("left")
+        self.assertEqual(r.page, 0)
+        r.command("rt")
+        self.assertEqual(r.page, 9)
+        # The shoulders zoom; zoomed in, the d-pad moves around the page.
+        r.command("rb")
+        r.command("rb")
+        self.assertEqual(t.Reader.ZOOMS[r.zoom], 2.0)
+        r.command("right")
+        r.command("down")
+        self.assertEqual((r.page, r.x, r.y), (9, 0.75, 0.25))
+        for _ in range(9):
+            r.command("rb")
+            r.command("up")
+        self.assertEqual((t.Reader.ZOOMS[r.zoom], r.y), (2.5, 0.0))
+        # A trigger goes to the first or last page, zoomed back out.
+        r.command("lt")
+        self.assertEqual((r.page, r.zoom, r.x, r.y), (0, 0, 0.5, 0.0))
+        r.command("rb")
+        r.command("lb")
+        r.command("right")
+        self.assertEqual(r.page, 1)            # zoomed out: the page again
+
+    def test_the_running_games_manual_where_esde_keeps_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            home, run = Path(d) / "home", Path(d) / "run"
+            run.mkdir()
+            self.assertIsNone(t.manual_for(home, run))    # no game
+            roms = home / "ROMs"
+            (roms / "gc").mkdir(parents=True)
+            manuals = home / "ES-DE/downloaded_media/gc/manuals"
+            manuals.mkdir(parents=True)
+            (run / "famidrive-game.rom").write_text(f"gc\n{roms}/gc/Mario Party 4.iso\n")
+            self.assertIsNone(t.manual_for(home, run))    # no manual
+            (manuals / "Mario Party 4.pdf").write_bytes(b"%PDF")
+            self.assertEqual(t.manual_for(home, run), manuals / "Mario Party 4.pdf")
+            # A game in a subfolder; and folders the player moved in ES-DE.
+            settings = home / "ES-DE/settings/es_settings.xml"
+            settings.parent.mkdir(parents=True)
+            settings.write_text('<string name="ROMDirectory" value="~/Games" />\n'
+                                '<string name="MediaDirectory" value="/media/es" />\n')
+            (run / "famidrive-game.rom").write_text(f"gc\n{home}/Games/gc/Hacks/Melee 20XX.iso\n")
+            self.assertIsNone(t.manual_for(home, run))    # nothing in /media/es
+            settings.write_text(f'<string name="ROMDirectory" value="~/Games" />\n'
+                                f'<string name="MediaDirectory" value="{d}/media" />\n')
+            pdf = Path(d) / "media/gc/manuals/Hacks/Melee 20XX.pdf"
+            pdf.parent.mkdir(parents=True)
+            pdf.write_bytes(b"%PDF")
+            self.assertEqual(t.manual_for(home, run), pdf)
+            # A game outside the system's folder isn't one ES-DE has media for.
+            (run / "famidrive-game.rom").write_text("gc\n/elsewhere/Melee 20XX.iso\n")
+            self.assertIsNone(t.manual_for(home, run))
+
+    def test_a_page_from_pdftoppm(self):
+        self.assertEqual(t.ppm(b"P6\n2 1\n255\n" + bytes(range(6))), (2, 1, bytes(range(6))))
+        self.assertIsNone(t.ppm(b"P6\n2 1\n255\n" + bytes(5)))     # cut short
+        self.assertIsNone(t.ppm(b""))                                 # pdftoppm failed
+
     def test_no_recording_without_recordings(self):
         menu = t.Menu()
         menu.command("open", True, recording=True)
