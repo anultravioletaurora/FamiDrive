@@ -242,7 +242,9 @@ planning doc for now and will move into this repo.
   and a short save history. Each
   game's details and box art come from RomM, with each player's
   favorites and play counts kept. A box can mirror some platforms only
-  (`romm.platforms`). Dolphin HD texture packs kept in RomM (a zip in the
+  (`romm.platforms`). Game manuals kept in RomM (a PDF in the game's
+  `manual/` folder) open in ES-DE's PDF viewer (2026-10-21, Super Smash
+  Bros. Melee). Dolphin HD texture packs kept in RomM (a zip in the
   game's `mod/` folder) are unpacked once and loaded for every player.
   Switch games come with their newest update and every DLC from RomM,
   one copy for the whole box that Eden reads in place, and a game's
