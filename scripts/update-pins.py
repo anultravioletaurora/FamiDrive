@@ -31,43 +31,120 @@ import re
 import subprocess
 import sys
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
+from typing import TypedDict
 
 ROOT = Path(__file__).resolve().parent.parent
-summary = []
+summary: list[str] = []
 
 
-def get(url):
+# What each upstream's API answers, the parts read here.
+class GitLabLink(TypedDict):
+    name: str
+    url: str
+
+
+class GitLabAssets(TypedDict):
+    links: list[GitLabLink]
+
+
+class GitLabRelease(TypedDict):
+    tag_name: str
+    released_at: str
+    assets: GitLabAssets
+
+
+class GitHubAsset(TypedDict):
+    name: str
+    browser_download_url: str
+
+
+class GitHubRelease(TypedDict):
+    tag_name: str
+    assets: list[GitHubAsset]
+
+
+class GitHubRepo(TypedDict):
+    default_branch: str
+
+
+class GitHubCommitter(TypedDict):
+    date: str
+
+
+class GitHubCommitInfo(TypedDict):
+    committer: GitHubCommitter
+
+
+class GitHubCommit(TypedDict):
+    sha: str
+    commit: GitHubCommitInfo
+
+
+class ThunderstoreVersion(TypedDict):
+    version_number: str
+
+
+class ThunderstorePackage(TypedDict):
+    latest: ThunderstoreVersion
+
+
+class NixPrefetch(TypedDict):
+    hash: str
+
+
+def get(url: str) -> bytes:
     headers = {"User-Agent": "FamiDrive-updates"}
     if "api.github.com" in url and os.environ.get("GH_TOKEN"):
         headers["Authorization"] = f"Bearer {os.environ['GH_TOKEN']}"
     with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as r:
-        return json.load(r)
+        body: bytes = r.read()
+        return body
 
 
-def nix_json(*args):
+def gitlab_latest(project: str) -> GitLabRelease:
+    """A GitLab project's newest release (project: "group%2Fname")."""
+    releases: list[GitLabRelease] = json.loads(get(f"https://gitlab.com/api/v4/projects/{project}/releases?per_page=1"))
+    return releases[0]
+
+
+def github_latest(owner: str, repo: str) -> GitHubRelease:
+    release: GitHubRelease = json.loads(get(f"https://api.github.com/repos/{owner}/{repo}/releases/latest"))
+    return release
+
+
+def thunderstore_latest(author: str, name: str) -> str:
+    """A Thunderstore package's newest version number."""
+    package: ThunderstorePackage = json.loads(
+        get(f"https://thunderstore.io/api/experimental/package/{author}/{name}/"))
+    return package["latest"]["version_number"]
+
+
+def nix_hash(*args: str) -> str:
     out = subprocess.run(["nix", "--extra-experimental-features", "nix-command flakes", *args, "--json"],
                          check=True, capture_output=True, text=True).stdout
-    return json.loads(out)
+    prefetched: NixPrefetch = json.loads(out)
+    return prefetched["hash"]
 
 
-def url_hash(url):
-    return nix_json("store", "prefetch-file", url)["hash"]
+def url_hash(url: str) -> str:
+    return nix_hash("store", "prefetch-file", url)
 
 
-def tree_hash(flakeref):
+def tree_hash(flakeref: str) -> str:
     """The hash fetchFromGitHub has for a commit (its unpacked tree)."""
-    return nix_json("flake", "prefetch", flakeref)["hash"]
+    return nix_hash("flake", "prefetch", flakeref)
 
 
-def head(owner, repo):
+def head(owner: str, repo: str) -> tuple[str, str]:
     """(commit, its date) at the tip of a GitHub repo's default branch."""
-    info = get(f"https://api.github.com/repos/{owner}/{repo}")
-    c = get(f"https://api.github.com/repos/{owner}/{repo}/commits/{info['default_branch']}")
+    info: GitHubRepo = json.loads(get(f"https://api.github.com/repos/{owner}/{repo}"))
+    c: GitHubCommit = json.loads(get(f"https://api.github.com/repos/{owner}/{repo}/commits/{info['default_branch']}"))
     return c["sha"], c["commit"]["committer"]["date"][:10]
 
 
-def edit(path, changes):
+def edit(path: str, changes: list[tuple[str, str]]) -> None:
     """Replace each (old, new) in a file, exactly once each."""
     p = ROOT / path
     text = p.read_text()
@@ -78,7 +155,7 @@ def edit(path, changes):
     p.write_text(text)
 
 
-def one(pattern, path):
+def one(pattern: str, path: str) -> re.Match[str]:
     m = re.search(pattern, (ROOT / path).read_text())
     if not m:
         raise RuntimeError(f"{path}: no match for {pattern}")
@@ -87,10 +164,10 @@ def one(pattern, path):
 
 # ---------------------------------------------------------------- the pins
 
-def es_de():
+def es_de() -> None:
     path = "pkgs/es-de/default.nix"
     m = one(r'version = "([^"]+)";', path)
-    release = get("https://gitlab.com/api/v4/projects/es-de%2Femulationstation-de/releases?per_page=1")[0]
+    release = gitlab_latest("es-de%2Femulationstation-de")
     new = release["tag_name"].lstrip("v")
     if new == m.group(1):
         return
@@ -105,10 +182,10 @@ def es_de():
     summary.append(f"- **ES-DE** {m.group(1)} → {new}")
 
 
-def xnvse():
+def xnvse() -> None:
     path = "modules/famidrive/nexusmods.nix"
     m = one(r'url = "https://github\.com/xNVSE/NVSE/releases/download/([^/]+)/([^"]+)";\s*hash = "([^"]+)";', path)
-    release = get("https://api.github.com/repos/xNVSE/NVSE/releases/latest")
+    release = github_latest("xNVSE", "NVSE")
     if release["tag_name"] == m.group(1):
         return
     asset = next(a for a in release["assets"] if re.fullmatch(r"nvse_[\d_]+\.7z", a["name"]))
@@ -118,7 +195,7 @@ def xnvse():
     summary.append(f"- **xNVSE** {m.group(1)} → {release['tag_name']}")
 
 
-def art_book():
+def art_book() -> None:
     path = "modules/famidrive/frontend.nix"
     m = one(r'rev = "([0-9a-f]{40})";   # (\S+)\n\s*hash = "([^"]+)";', path)
     rev, date = head("anthonycaccese", "art-book-next-es-de")
@@ -129,7 +206,7 @@ def art_book():
     summary.append(f"- **Art Book Next** {m.group(1)[:7]} → {rev[:7]} ({date})")
 
 
-def supertux_advance():
+def supertux_advance() -> None:
     path = "pkgs/supertux-advance/default.nix"
     for repo, submodules in (("brux-gdk", True), ("supertux-advance", False)):
         text = (ROOT / path).read_text()
@@ -148,10 +225,10 @@ def supertux_advance():
         summary.append(f"- **{'Brux' if repo == 'brux-gdk' else 'SuperTux Advance'}** {block.group(2)[:7]} → {rev[:7]} ({date})")
 
 
-def supertux_party():
+def supertux_party() -> None:
     path = "pkgs/supertuxparty/default.nix"
     m = one(r'version = "([^"]+)";', path)
-    new = get("https://gitlab.com/api/v4/projects/SuperTuxParty%2FSuperTuxParty/releases?per_page=1")[0]["tag_name"].lstrip("v")
+    new = gitlab_latest("SuperTuxParty%2FSuperTuxParty")["tag_name"].lstrip("v")
     if new == m.group(1):
         return
     old_hash = one(r'hash = "(sha256-[^"]+)";', path).group(1)
@@ -160,11 +237,11 @@ def supertux_party():
     summary.append(f"- **SuperTux Party** {m.group(1)} → {new}")
 
 
-def bepinex():
+def bepinex() -> None:
     path = "modules/famidrive/thunderstore.nix"
     for m in re.finditer(r'package = "(([\w]+)-([\w]+))-([\d.]+)";\s*hash = "([^"]+)";', (ROOT / path).read_text()):
         full, author, name, version, old_hash = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
-        new = get(f"https://thunderstore.io/api/experimental/package/{author}/{name}/")["latest"]["version_number"]
+        new = thunderstore_latest(author, name)
         if new == version:
             continue
         url = f"https://thunderstore.io/package/download/{author}/{name}/{new}/"
@@ -173,9 +250,10 @@ def bepinex():
         summary.append(f"- **{full}** {version} → {new}")
 
 
-def main():
-    failed = []
-    for update in (es_de, xnvse, art_book, supertux_advance, supertux_party, bepinex):
+def main() -> None:
+    failed: list[str] = []
+    updates: tuple[Callable[[], None], ...] = (es_de, xnvse, art_book, supertux_advance, supertux_party, bepinex)
+    for update in updates:
         try:
             update()
         except Exception as e:   # one upstream down shouldn't stop the others
