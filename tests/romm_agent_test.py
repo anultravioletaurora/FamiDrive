@@ -319,6 +319,22 @@ class Test(unittest.TestCase):
             a["fetch_rom"](None, rom, "gc")
         self.assertEqual(got, [])
 
+    def test_names_from_romm_stay_in_the_library(self):
+        # RomM's names become paths: one that climbs out is skipped.
+        box = Box(self.base, "library", tokenFile=None)
+        a = box.agent()
+        got = []
+        a["fetch_rom"].__globals__["download"] = lambda s, path, dest, *rest, **kw: got.append(dest)
+        for name in ("../../.bashrc", "a/b.sfc", "..", ""):
+            rom = {"id": 1, "fs_name": name, "fs_extension": "sfc", "has_multiple_files": False}
+            with self.assertRaisesRegex(RuntimeError, "isn't a file name"):
+                a["fetch_rom"](None, rom, "snes")
+        files = [{"id": 1, "file_name": "../Game.iso", "sha1_hash": "aaa", "file_size_bytes": 9}]
+        rom = {"id": 2, "fs_name": "Game", "fs_extension": "", "has_multiple_files": False, "files": files}
+        with self.assertRaisesRegex(RuntimeError, "isn't a file name"):
+            a["fetch_rom"](None, rom, "gc")
+        self.assertEqual(got, [])
+
     def test_hex_id_kept_from_an_earlier_pull_is_fixed(self):
         a = Box(self.base, "alice").agent()
         a["title_id"].__globals__["derive_id"] = lambda system, path: "GP7E01"

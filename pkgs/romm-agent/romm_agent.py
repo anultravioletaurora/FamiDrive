@@ -219,6 +219,15 @@ def pull_toast(progress=None):
     toast(*args, "Downloading games", detail)
 
 
+def one_name(name):
+    """A file or folder name from RomM, as one name in the library. RomM's
+    names become paths here, so "../" or a "/" in one would put a file
+    outside the system's folder: a RuntimeError, and that game is skipped."""
+    if not name or name in (".", "..") or "/" in name or "\\" in name or "\0" in name:
+        raise RuntimeError(f"{name!r} isn't a file name FamiDrive will write")
+    return name
+
+
 def download(s, path, dest, expected_sha1=None, expected_size=None, params=None):
     """Resumable download: a 40 GB ISO must not restart from zero."""
     if dest.suffix.lower() in ARCHIVES:
@@ -353,10 +362,10 @@ def fetch_with_content(s, rom, system, categories):
     for cat in categories:
         found = [f for f in files if f.get("category") == cat and Path(f["file_name"]).suffix.lower() in exts]
         wanted += [(f, Path(cat)) for f in (newest(found) if cat == "update" else found)]
-    folder = DATA / "roms" / system / rom["fs_name"]
+    folder = DATA / "roms" / system / one_name(rom["fs_name"])
     keep = set()
     for f, sub in wanted:
-        dest = folder / sub / f["file_name"]
+        dest = folder / sub / one_name(f["file_name"])
         keep.add(dest)
         download(s, EP_ROM_CONTENT.format(id=rom["id"], file_name=f["file_name"]), dest,
                  f.get("sha1_hash") or None, f.get("file_size_bytes"), params={"file_ids": f["id"]})
@@ -384,7 +393,7 @@ def fetch_rom(s, rom, system):
         if folder is None:
             raise RuntimeError("RomM has no game file for it (only updates or DLC)")
         return folder
-    dest = DATA / "roms" / system / rom["fs_name"]
+    dest = DATA / "roms" / system / one_name(rom["fs_name"])
     path = EP_ROM_CONTENT.format(id=rom["id"], file_name=rom["fs_name"])
     if not rom.get("has_multiple_files"):
         # A single file kept in a folder of its own: RomM's fs_name is the
@@ -410,7 +419,7 @@ def fetch_rom(s, rom, system):
         params = None
         size = rom.get("fs_size_bytes")
         if main:
-            named = dest.with_name(main["file_name"])
+            named = dest.with_name(one_name(main["file_name"]))
             if dest.is_file() and not named.exists():
                 dest.rename(named)   # pulled before under the folder's name
             dest = named
@@ -527,7 +536,9 @@ def fetch_one(s, urls, dest_stem):
         if not url:
             continue
         try:
-            r = (s if url.startswith(BASE) else requests).get(url, timeout=60)
+            # BASE + "/": with a RomM at https://romm.example.org, a link to
+            # https://romm.example.org.other.net must not get the token.
+            r = (s if url.startswith(BASE + "/") else requests).get(url, timeout=60)
             r.raise_for_status()
         except requests.RequestException:
             continue
@@ -1197,6 +1208,11 @@ def cmd_firmware():
             continue
         target = firmware_dir(system, sysdef)
         for fw in get(s, EP_FIRMWARE, params={"platform_id": platforms[slug]}).json():
+            try:
+                one_name(fw["file_name"])
+            except RuntimeError as e:
+                print(f"firmware skipped: {e}", file=sys.stderr)
+                continue
             download(s, EP_FIRMWARE_CONTENT.format(id=fw["id"], file_name=fw["file_name"]),
                      target / fw["file_name"], fw.get("sha1_hash"), fw.get("file_size_bytes"))
 
