@@ -251,6 +251,19 @@ class Install(unittest.TestCase):
         (root / "r6/scripts").mkdir(parents=True)
         self.assertEqual(m.resolve(root, "R6/Scripts/a.reds"), root / "r6/scripts/a.reds")
 
+    def test_never_outside_the_game(self):
+        root = self.base / "game"
+        root.mkdir()
+        for rel in ("../../.config/autostart/x.desktop", "Data\\..\\..\\x", "/etc/x"):
+            with self.assertRaises(ValueError):
+                m.resolve(root, rel)
+        a = self.archive("a.zip", {"x.desktop": "[Desktop Entry]", "ok.txt": "ok"})
+        plan = {"mods": [{"name": "A", "archive": a, "files": [
+            {"from": "x.desktop", "to": "../.config/autostart/x.desktop"}, {"from": "ok.txt", "to": "ok.txt"}]}]}
+        m.install(plan, root, "1091500", {"collections": [], "choices": {}})
+        self.assertFalse((self.base / ".config").exists())
+        self.assertEqual((root / "ok.txt").read_text(), "ok")
+
     def test_install_then_uninstall(self):
         root = self.base / "game"
         (root / "r6/config").mkdir(parents=True)

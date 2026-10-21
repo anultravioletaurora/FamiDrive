@@ -66,8 +66,11 @@ def load_state():
 def store_state(state):
     STATE.parent.mkdir(parents=True, exist_ok=True)
     tmp = STATE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(state))
-    os.chmod(tmp, 0o600)
+    tmp.unlink(missing_ok=True)
+    # 0600 from the start: the token is never readable by others, even
+    # for the moment between writing it and a chmod.
+    with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as f:
+        f.write(json.dumps(state))
     tmp.replace(STATE)
 
 

@@ -1066,7 +1066,13 @@ def game_running(appid, root=None):
 def resolve(root, rel, listings=None):
     """rel under root, following the case of folders already there: Linux
     is case-sensitive, a game under Proton isn't, so "R6/Scripts" from one
-    mod and "r6/scripts" from another must be the same folder."""
+    mod and "r6/scripts" from another must be the same folder.
+
+    A ValueError for a path that leaves root: a collection's file list
+    and a FOMOD's destinations are written by whoever made them, and
+    "../../.config/autostart/x.desktop" would land outside the game."""
+    if rel.startswith("/") or ".." in rel.replace("\\", "/").split("/"):
+        raise ValueError(f"{rel}: outside the game's folder")
     cur = Path(root)
     for part in rel.split("/"):
         nxt = cur / part
@@ -1189,7 +1195,11 @@ def install(plan, root, appid, want, progress=None):
                 if src is None or not src.exists():
                     log(f"{m['name']}: {f['from']} isn't in its archive")
                     continue
-                dst = resolve(root, f["to"], listings)
+                try:
+                    dst = resolve(root, f["to"], listings)
+                except ValueError as e:
+                    log(f"{m['name']}: {e}; not placed")
+                    continue
                 rel = str(dst.relative_to(root))
                 if dst.exists() and rel not in ours:
                     bk = backup / rel
