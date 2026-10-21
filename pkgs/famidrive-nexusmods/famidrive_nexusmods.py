@@ -67,11 +67,228 @@ import sys
 import tempfile
 import time
 import xml.etree.ElementTree as ET
+from collections.abc import Callable, Iterable
+from functools import partial
 from pathlib import Path
+from typing import NotRequired, TypedDict
 
 import requests
 import xxhash
 import yaml
+
+
+# ---------------------------------------------------------------- types
+#
+# The spec (nexusmods.nix), what Nexus Mods, a collection's curator and a
+# Wabbajack list say (the parts read here), and this tool's own plans
+# and install records.
+
+class CollectionRef(TypedDict):
+    slug: str
+    revision: int
+    skip: NotRequired[list[int]]   # Nexus mod ids the player leaves out
+
+
+class Game(TypedDict, total=False):
+    collections: list[CollectionRef]
+    collection: CollectionRef        # one, as older specs give it
+    choices: dict[str, list[str]]    # a FOMOD mod's name -> the player's plugin picks
+
+
+class Spec(TypedDict):
+    """SPEC, above."""
+    cache: str
+    apiKeyFile: NotRequired[str | None]
+    gog: NotRequired[str | None]
+    games: NotRequired[dict[str, Game]]
+    extras: NotRequired[dict[str, str]]   # pinned downloads by name (xnvse)
+
+
+class Want(TypedDict):
+    """What a game's mods should be: compared with what's installed."""
+    collections: list[CollectionRef]
+    choices: dict[str, list[str]]
+
+
+# A collection's collection.json, written by its curator.
+class NexusSource(TypedDict, total=False):
+    type: str
+    modId: int
+    fileId: int
+    md5: str
+    logicalFilename: str
+
+
+class ModHash(TypedDict):
+    path: str
+
+
+class FomodChoice(TypedDict, total=False):
+    name: str
+
+
+class FomodGroup(TypedDict, total=False):
+    name: str
+    choices: list[FomodChoice]
+
+
+class FomodStep(TypedDict, total=False):
+    name: str
+    groups: list[FomodGroup]
+
+
+class ModChoices(TypedDict, total=False):
+    options: list[FomodStep]
+
+
+class CollectionMod(TypedDict, total=False):
+    name: str
+    domainName: str
+    source: NexusSource
+    hashes: list[ModHash]
+    choices: ModChoices
+    phase: int
+
+
+class RuleEnd(TypedDict, total=False):
+    logicalFileName: str
+
+
+class ModRule(TypedDict, total=False):
+    type: str
+    source: RuleEnd
+    reference: RuleEnd
+
+
+class CollectionInfo(TypedDict, total=False):
+    name: str
+
+
+class Collection(TypedDict, total=False):
+    info: CollectionInfo
+    mods: list[CollectionMod]
+    modRules: list[ModRule]
+
+
+# Nexus Mods' API.
+class GqlGame(TypedDict):
+    domainName: str
+
+
+class GqlCollection(TypedDict):
+    name: str
+    game: GqlGame
+
+
+class GqlUri(TypedDict):
+    uri: str
+
+
+class GqlModFile(TypedDict):
+    fileId: int
+    file: GqlUri | None
+
+
+class GqlRevision(TypedDict):
+    revisionNumber: int
+    downloadLink: str
+    collection: GqlCollection
+    modFiles: list[GqlModFile]
+
+
+class GqlData(TypedDict, total=False):
+    collectionRevision: GqlRevision
+
+
+class GqlError(TypedDict, total=False):
+    message: str
+
+
+class GqlReply(TypedDict, total=False):
+    data: GqlData
+    errors: list[GqlError]
+
+
+class DownloadLink(TypedDict):
+    URI: str
+
+
+class Revision(TypedDict):
+    """A collection revision, as Nexus.revision() gives it."""
+    domain: str
+    name: str
+    link: str               # its archive's API path
+    files: dict[str, str]   # file id -> download name
+
+
+# A Wabbajack list's modlist. "$type" is .NET's name for each kind.
+WjState = TypedDict("WjState", {
+    "$type": str, "GameName": str, "ModID": int, "FileID": int, "Url": str, "Name": str}, total=False)
+WjArchive = TypedDict("WjArchive", {"Hash": str, "Name": str, "State": WjState})
+WjDirective = TypedDict("WjDirective", {
+    "$type": str, "To": str, "Hash": str, "Size": int, "SourceDataID": str, "PatchID": str,
+    "ArchiveHashPath": list[str]}, total=False)
+
+
+class WjModlist(TypedDict, total=False):
+    Name: str
+    GameType: str
+    Archives: list[WjArchive]
+    Directives: list[WjDirective]
+
+
+# A plan (plan_game): each mod's files and where they go.
+PlanFile = TypedDict("PlanFile", {"from": str, "to": str})
+
+
+class PlanMod(TypedDict, total=False):
+    name: str
+    collection: str
+    status: str   # exact, installer, rules, fallback, unknown, missing, not-on-nexus
+    files: list[PlanFile]
+    modId: int
+    fileId: int
+    archive: str   # the download, unpacked at install
+    dir: str       # or a built folder (a Wabbajack list's mod)
+
+
+class WabbajackRef(TypedDict):
+    slug: str
+    revision: int
+
+
+class Plan(TypedDict):
+    appid: str
+    collections: list[CollectionRef]
+    choices: dict[str, list[str]]
+    mods: list[PlanMod]
+    wabbajack: NotRequired[WabbajackRef]
+
+
+class Outside(TypedDict):
+    """A file put outside the game's folder (in its prefix)."""
+    path: str
+    backup: str | None
+
+
+class Record(TypedDict, total=False):
+    """What's installed for a game (installed/<app id>.json)."""
+    appid: str
+    root: str
+    want: Want
+    backup: str
+    files: list[str]       # relative to root
+    replaced: list[str]    # backed up first
+    outside: list[Outside]
+    complete: bool
+    _path: str             # the record's own file, not saved in it
+    collection: str        # the first box's one-off record (2026-10-10)
+    revision: int
+
+
+# [(archive member, destination in the game's folder)]
+type Placement = list[tuple[str, str]]
+type Progress = Callable[[int, int, str], None]
 
 API = "https://api.nexusmods.com"
 GRAPHQL = API + "/v2/graphql"
@@ -86,18 +303,18 @@ STEAM = Path.home() / ".local/share/Steam"
 APP = {"Application-Name": "FamiDrive", "Application-Version": "1", "User-Agent": "FamiDrive (famidrive-nexusmods)"}
 
 
-def log(msg):
+def log(msg: str) -> None:
     print(f"famidrive-nexusmods: {msg}", flush=True)
 
 
-def toast(*args):
+def toast(*args: str) -> None:
     try:
         subprocess.run([TOAST, *args], timeout=5, capture_output=True)
     except (OSError, subprocess.SubprocessError):
         pass
 
 
-def md5_of(path):
+def md5_of(path: Path) -> str:
     h = hashlib.md5()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):
@@ -108,20 +325,21 @@ def md5_of(path):
 # --- Nexus Mods ------------------------------------------------------------------
 
 class Nexus:
-    def __init__(self, key):
+    def __init__(self, key: str) -> None:
         self.s = requests.Session()
         self.s.headers.update(APP)
         self.s.headers["apikey"] = key
 
-    def graphql(self, query, **variables):
+    def graphql(self, query: str, **variables: str | int) -> GqlData:
         r = self.s.post(GRAPHQL, json={"query": query, "variables": variables}, timeout=60)
         r.raise_for_status()
-        out = r.json()
-        if out.get("errors"):
-            raise RuntimeError(out["errors"][0].get("message", "GraphQL error"))
+        out: GqlReply = r.json()
+        errors = out.get("errors")
+        if errors:
+            raise RuntimeError(errors[0].get("message", "GraphQL error"))
         return out["data"]
 
-    def revision(self, slug, revision):
+    def revision(self, slug: str, revision: int) -> Revision:
         """The revision's game, name, the API path of its archive, and each
         file's download name by file id."""
         d = self.graphql("""query($slug: String!, $revision: Int) {
@@ -131,22 +349,23 @@ class Nexus:
                          slug=slug, revision=revision)["collectionRevision"]
         return {"domain": d["collection"]["game"]["domainName"], "name": d["collection"]["name"],
                 "link": d["downloadLink"],
-                "files": {str(f["fileId"]): f["file"]["uri"] for f in d["modFiles"] if f.get("file")}}
+                "files": {str(f["fileId"]): file["uri"] for f in d["modFiles"] if (file := f["file"])}}
 
-    def link(self, path):
+    def link(self, path: str) -> str:
         """The first CDN address from a download_link answer."""
         r = self.s.get(API + path, timeout=60)
         if r.status_code == 403:
             raise PermissionError("Nexus Mods refused the download: direct downloads need a premium account")
         r.raise_for_status()
-        out = r.json()
-        links = out.get("download_links", out) if isinstance(out, dict) else out
+        # A list of links, or (a collection's archive) {"download_links": [...]}.
+        out: list[DownloadLink] | dict[str, list[DownloadLink]] = r.json()
+        links = out.get("download_links", []) if isinstance(out, dict) else out
         return links[0]["URI"]
 
-    def file_link(self, domain, mod, file):
+    def file_link(self, domain: str, mod: int, file: int) -> str:
         return self.link(f"/v1/games/{domain}/mods/{mod}/files/{file}/download_link.json")
 
-    def download(self, url, dest, md5=None):
+    def download(self, url: str, dest: Path, md5: str | None = None) -> None:
         """To dest, through a .part file; checked against md5 when given."""
         dest.parent.mkdir(parents=True, exist_ok=True)
         part = dest.with_name(dest.name + ".part")
@@ -163,25 +382,25 @@ class Nexus:
 
 # --- The cache ---------------------------------------------------------------------
 
-def collection_file(cache, slug, revision):
+def collection_file(cache: Path, slug: str, revision: int) -> Path:
     return Path(cache) / "collections" / f"{slug}-{revision}.json"
 
 
-def wabbajack_file(cache, slug, revision):
+def wabbajack_file(cache: Path, slug: str, revision: int) -> Path:
     return Path(cache) / "collections" / f"{slug}-{revision}.wabbajack"
 
 
-def names_file(cache, slug, revision):
+def names_file(cache: Path, slug: str, revision: int) -> Path:
     return Path(cache) / "collections" / f"{slug}-{revision}.names.json"
 
 
-def mod_file(cache, domain, source):
+def mod_file(cache: Path, domain: str, source: NexusSource) -> Path:
     """Where a mod's archive is kept: by file id and MD5, so a changed file
     under the same id is fetched again."""
     return Path(cache) / "files" / domain / f"{source['fileId']}-{source.get('md5') or 'nomd5'}"
 
 
-def nexus_mods(collection, skip=()):
+def nexus_mods(collection: Collection, skip: Iterable[int] = ()) -> tuple[list[CollectionMod], list[CollectionMod]]:
     """The collection's mods that come from Nexus, and the others (a
     website or a file the player supplies), which can't be fetched.
     Mods whose Nexus mod id is in skip (the player's `skip` for the
@@ -191,19 +410,19 @@ def nexus_mods(collection, skip=()):
             [m for m in mods if m.get("source", {}).get("type") != "nexus"])
 
 
-def collections_of(game):
+def collections_of(game: Game) -> list[CollectionRef]:
     """A game's collections, in install order."""
     return list(game.get("collections") or ([game["collection"]] if game.get("collection") else []))
 
 
-def fetch_game(nx, cache, appid, game):
+def fetch_game(nx: Nexus, cache: Path, appid: str, game: Game) -> int:
     status = 0
     for c in collections_of(game):
         status |= fetch_collection(nx, cache, appid, c["slug"], c["revision"], c.get("skip") or ())
     return status
 
 
-def fetch_collection(nx, cache, appid, slug, revision, skip=()):
+def fetch_collection(nx: Nexus, cache: Path, appid: str, slug: str, revision: int, skip: Iterable[int] = ()) -> int:
     cfile = collection_file(cache, slug, revision)
     wfile = wabbajack_file(cache, slug, revision)
     if not cfile.exists() and not wfile.exists():
@@ -221,12 +440,12 @@ def fetch_collection(nx, cache, appid, slug, revision, skip=()):
             archive.unlink()
     if wfile.exists():
         return fetch_wabbajack(nx, cache, appid, slug, revision)
-    collection = json.loads(cfile.read_text())
+    collection: Collection = json.loads(cfile.read_text())
     name = collection.get("info", {}).get("name", slug)
     mods, other = nexus_mods(collection, skip)
     missing = [m for m in mods if not mod_file(cache, m["domainName"], m["source"]).exists()]
     log(f"{name} (revision {revision}): {len(mods) - len(missing)} of {len(mods)} files here")
-    failed = []
+    failed: list[str] = []
     for i, m in enumerate(missing, 1):
         src = m["source"]
         toast("--kind", "progress", "--id", f"nexusmods-{appid}", "--progress", f"{i / len(missing):.3f}",
@@ -251,8 +470,15 @@ def fetch_collection(nx, cache, appid, slug, revision, skip=()):
     return 1 if failed else 0
 
 
-def cmd_fetch(spec):
-    key = Path(spec["apiKeyFile"]).read_text().strip()
+def api_key(spec: Spec) -> str:
+    key_file = spec.get("apiKeyFile")
+    if not key_file:
+        raise RuntimeError("no Nexus Mods API key set (nexusmods.apiKeyFile)")
+    return Path(key_file).read_text().strip()
+
+
+def cmd_fetch(spec: Spec) -> int:
+    key = api_key(spec)
     nx = Nexus(key)
     cache = Path(os.path.expanduser(spec["cache"]))
     status = 0
@@ -267,12 +493,12 @@ def cmd_fetch(spec):
 
 # --- Where files go ----------------------------------------------------------------
 
-def norm(path):
+def norm(path: str) -> str:
     """An archive member or Vortex path as a relative POSIX path."""
     return posixpath.normpath(path.replace("\\", "/")).lstrip("/")
 
 
-def files_only(members):
+def files_only(members: Iterable[str]) -> list[str]:
     """The files among an archive's members: some ZIPs list their folders
     without a trailing slash, so a member that's another's parent is one."""
     paths = [norm(m) for m in members if m and not m.endswith("/")]
@@ -286,7 +512,7 @@ def files_only(members):
     return [p for p in paths if p not in parents]
 
 
-def mod_name(download, fallback):
+def mod_name(download: str | None, fallback: str) -> str:
     """A mod's name the way Vortex makes it from the file's download name:
     without its extension and the version and upload time after it (up to
     five numbers, so a long version leaves the mod id on: "reset
@@ -304,7 +530,7 @@ CP_TWEAK = (".yaml", ".yml", ".tweak")
 CET = "bin/x64/plugins/cyber_engine_tweaks/mods"
 
 
-def cyberpunk_layout(members, mod_name):
+def cyberpunk_layout(members: list[str], mod_name: str) -> Placement:
     """[(member, destination)] for a Cyberpunk 2077 mod's archive, the way
     Vortex's Cyberpunk extension places the common kinds:
 
@@ -322,7 +548,7 @@ def cyberpunk_layout(members, mod_name):
     files = files_only(members)
     # Laid out from the game's folder: the deepest common folder above the
     # first root folder each file has.
-    prefixes = set()
+    prefixes: set[tuple[str, ...]] = set()
     for f in files:
         parts = f.split("/")
         for i, p in enumerate(parts[:-1]):
@@ -332,7 +558,7 @@ def cyberpunk_layout(members, mod_name):
     if len(prefixes) == 1:
         prefix = list(prefixes)[0]
         n = len(prefix)
-        out = []
+        out: Placement = []
         for f in files:
             if tuple(f.split("/")[:n]) != prefix:
                 continue
@@ -343,14 +569,15 @@ def cyberpunk_layout(members, mod_name):
             out.append((f, dest))
         return out
 
-    out, taken = [], set()
+    out = []
+    taken: set[str] = set()
 
-    def take(f, dest):
+    def take(f: str, dest: str) -> None:
         if f not in taken:
             taken.add(f)
             out.append((f, dest))
 
-    def folder_of(marker):
+    def folder_of(marker: str) -> set[str]:
         return {posixpath.dirname(f) for f in files if posixpath.basename(f).lower() == marker}
 
     for folder in sorted(folder_of("info.json")):
@@ -386,7 +613,7 @@ def cyberpunk_layout(members, mod_name):
     return out
 
 
-def fallen_order_layout(members, mod_name):
+def fallen_order_layout(members: list[str], mod_name: str) -> Placement:
     """Star Wars Jedi: Fallen Order's mods are Unreal .pak files (some with
     .utoc, .ucas or .sig beside them), which go in SwGame/Content/Paks,
     as their authors say ("Put it into SwGame-Content-Paks folder"); the
@@ -397,7 +624,8 @@ def fallen_order_layout(members, mod_name):
             if posixpath.splitext(f)[1].lower() in (".pak", ".utoc", ".ucas", ".sig")]
 
 
-LAYOUTS = {"cyberpunk2077": cyberpunk_layout, "starwarsjedifallenorder": fallen_order_layout}
+LAYOUTS: dict[str, Callable[[list[str], str], Placement]] = {
+    "cyberpunk2077": cyberpunk_layout, "starwarsjedifallenorder": fallen_order_layout}
 # Games whose Vortex extension installs an archive it doesn't recognise as
 # it is, into the game's folder, after a warning.
 FALLBACK = {"cyberpunk2077"}
@@ -405,21 +633,21 @@ FALLBACK = {"cyberpunk2077"}
 
 # --- FOMOD installers --------------------------------------------------------------
 
-def fomod_config(files):
+def fomod_config(files: list[str]) -> str | None:
     """The member that's the archive's FOMOD installer, if it has one."""
     found = [f for f in files if f.lower().endswith("fomod/moduleconfig.xml")]
     return min(found, key=len) if found else None
 
 
-def local(tag):
+def local(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
 
-def kids(node, name):
+def kids(node: ET.Element, name: str) -> list[ET.Element]:
     return [c for c in node if local(c.tag) == name]
 
 
-def fomod_pick(group, wanted):
+def fomod_pick(group: ET.Element, wanted: Iterable[str] | None) -> list[ET.Element]:
     """The plugins chosen in one group: the names wanted, if any of them are
     here; otherwise what the installer marks Required or Recommended, and
     for a group that must have one, its first plugin."""
@@ -433,7 +661,7 @@ def fomod_pick(group, wanted):
     if kind == "SelectAll":
         return plugins
 
-    def marked(p):
+    def marked(p: ET.Element) -> bool:
         types = [t.get("name") for td in kids(p, "typeDescriptor") for t in kids(td, "type")]
         return any(t in ("Required", "Recommended") for t in types)
     chosen = [p for p in plugins if marked(p)]
@@ -444,7 +672,8 @@ def fomod_pick(group, wanted):
     return chosen
 
 
-def fomod_layout(files, config_member, xml_bytes, choices=None):
+def fomod_layout(files: list[str], config_member: str, xml_bytes: bytes,
+                 choices: list[FomodStep] | set[str] | None = None) -> Placement:
     """[(member, destination)] from a FOMOD installer.
 
     choices: the curator's, from the collection ([{"name": step, "groups":
@@ -455,9 +684,10 @@ def fomod_layout(files, config_member, xml_bytes, choices=None):
     root = ET.fromstring(xml_bytes)
     base = posixpath.dirname(posixpath.dirname(config_member))   # the folder fomod/ is in
     by_lower = {f.lower(): f for f in files}
-    out, flags = [], {}
+    out: Placement = []
+    flags: dict[str | None, str] = {}
 
-    def add(node):
+    def add(node: ET.Element) -> None:
         for item in node:
             kind = local(item.tag)
             src = norm(item.get("source", ""))
@@ -474,7 +704,7 @@ def fomod_layout(files, config_member, xml_bytes, choices=None):
                         rel = f[len(pre):]
                         out.append((f, posixpath.join(dest, rel) if dest not in (None, ".", "") else rel))
 
-    def wanted_for(step, group):
+    def wanted_for(step: str, group: str) -> Iterable[str] | None:
         if isinstance(choices, (set, frozenset)):
             return choices
         if not choices:
@@ -515,11 +745,11 @@ def fomod_layout(files, config_member, xml_bytes, choices=None):
     return out
 
 
-def from_hashes(members, hashes):
+def from_hashes(members: list[str], hashes: list[ModHash]) -> Placement:
     """[(member, destination)] from a collection's exact list: each place
     gets the member with the same name and the most of the path in common."""
     files = files_only(members)
-    out = []
+    out: Placement = []
     for h in hashes:
         dest = norm(h["path"])
         name = posixpath.basename(dest).lower()
@@ -527,7 +757,7 @@ def from_hashes(members, hashes):
         if not same:
             continue
 
-        def common(f):
+        def common(f: str) -> int:
             a, b = f.lower().split("/")[::-1], dest.lower().split("/")[::-1]
             n = 0
             while n < min(len(a), len(b)) and a[n] == b[n]:
@@ -537,22 +767,24 @@ def from_hashes(members, hashes):
     return out
 
 
-def place(mod, members, download=None, read=None, picks=None):
+def place(mod: CollectionMod, members: list[str], download: str | None = None,
+          read: Callable[[str], bytes] | None = None, picks: list[str] | None = None) -> tuple[str, Placement]:
     """(status, [(member, destination)]) for one mod's archive, its
     download name (for the folder some kinds go in) if known. read(member)
     gives a member's bytes, for a FOMOD installer; picks, the player's
     choices for it (plugin names)."""
-    if mod.get("hashes"):
-        return "exact", from_hashes(members, mod["hashes"])
+    hashes = mod.get("hashes")
+    if hashes:
+        return "exact", from_hashes(members, hashes)
     files = files_only(members)
     config = fomod_config(files)
     if config and read is not None:
-        choices = mod.get("choices", {}).get("options") if mod.get("choices") else None
+        choices: list[FomodStep] | set[str] | None = (mod.get("choices") or {}).get("options")
         if picks:
             choices = set(picks)
         placed = fomod_layout(files, config, read(config), choices)
         return ("installer" if placed else "unknown"), placed
-    layout = LAYOUTS.get(mod.get("domainName"))
+    layout = LAYOUTS.get(mod.get("domainName", ""))
     if layout is None:
         return "unknown", []
     placed = layout(members, mod_name(download, mod.get("name", "mod")))
@@ -565,14 +797,14 @@ def place(mod, members, download=None, read=None, picks=None):
     return ("rules" if placed else "unknown"), placed
 
 
-def read_member(archive, member):
+def read_member(archive: Path, member: str) -> bytes:
     r = subprocess.run([BSDTAR, "-xOf", str(archive), member], capture_output=True)
     if r.returncode == 0:
         return r.stdout
     return subprocess.run([UNAR, "-q", "-o", "-", str(archive), member], check=True, capture_output=True).stdout
 
 
-def members_of(archive):
+def members_of(archive: Path) -> list[str] | None:
     r = subprocess.run([BSDTAR, "-tf", str(archive)], capture_output=True, text=True)
     if r.returncode == 0:
         return r.stdout.splitlines()
@@ -580,18 +812,18 @@ def members_of(archive):
     return r.stdout.splitlines()[1:] if r.returncode == 0 else None   # lsar's first line names the archive
 
 
-def install_order(collection, mods):
+def install_order(collection: Collection, mods: list[CollectionMod]) -> list[CollectionMod]:
     """A collection's mods in the order they go in: by install phase, then
     each moved after the mods its "after" rules name."""
-    by_logical = {}
+    by_logical: dict[str, str] = {}
     for m in mods:
         by_logical[m["source"].get("logicalFilename") or m["name"]] = m["name"]
         by_logical[m["name"]] = m["name"]
-    after = {}
+    after: dict[str, set[str]] = {}
     for r in collection.get("modRules", []):
         if r.get("type") == "after":
-            a = by_logical.get(r.get("source", {}).get("logicalFileName"))
-            b = by_logical.get(r.get("reference", {}).get("logicalFileName"))
+            a = by_logical.get(r.get("source", {}).get("logicalFileName", ""))
+            b = by_logical.get(r.get("reference", {}).get("logicalFileName", ""))
             if a and b and a != b:
                 after.setdefault(a, set()).add(b)
     names = [m["name"] for m in mods]
@@ -610,8 +842,8 @@ def install_order(collection, mods):
     return sorted(mods, key=lambda m: rank[m["name"]])
 
 
-def plan_game(cache, appid, game):
-    plan = {"appid": appid, "collections": collections_of(game), "choices": game.get("choices", {}), "mods": []}
+def plan_game(cache: Path, appid: str, game: Game) -> Plan:
+    plan: Plan = {"appid": appid, "collections": collections_of(game), "choices": game.get("choices", {}), "mods": []}
     for c in collections_of(game):
         if wabbajack_file(cache, c["slug"], c["revision"]).exists():
             plan["mods"] += plan_wabbajack(cache, c["slug"], c["revision"])
@@ -621,30 +853,31 @@ def plan_game(cache, appid, game):
     return plan
 
 
-def plan_collection(cache, slug, revision, game, skip=()):
-    collection = json.loads(collection_file(cache, slug, revision).read_text())
+def plan_collection(cache: Path, slug: str, revision: int, game: Game, skip: Iterable[int] = ()) -> list[PlanMod]:
+    collection: Collection = json.loads(collection_file(cache, slug, revision).read_text())
     mods, other = nexus_mods(collection, skip)
+    names: dict[str, str]
     try:
         names = json.loads(names_file(cache, slug, revision).read_text())
     except (OSError, ValueError):
         names = {}
-    plan = {"mods": []}
+    planned: list[PlanMod] = []
     for m in install_order(collection, mods):
         archive = mod_file(cache, m["domainName"], m["source"])
-        entry = {"name": m["name"], "collection": slug, "modId": m["source"]["modId"],
-                 "fileId": m["source"]["fileId"], "archive": str(archive)}
+        entry: PlanMod = {"name": m["name"], "collection": slug, "modId": m["source"]["modId"],
+                          "fileId": m["source"]["fileId"], "archive": str(archive)}
         members = members_of(archive) if archive.exists() else None
         if members is None:
-            entry.update(status="missing", files=[])
+            entry["status"], entry["files"] = "missing", []
         else:
             status, placed = place(m, members, names.get(str(m["source"]["fileId"])),
-                                   lambda member, a=archive: read_member(a, member),
+                                   partial(read_member, archive),
                                    game.get("choices", {}).get(m["name"]))
-            entry.update(status=status, files=[{"from": a, "to": b} for a, b in placed])
-        plan["mods"].append(entry)
+            entry["status"], entry["files"] = status, [{"from": a, "to": b} for a, b in placed]
+        planned.append(entry)
     for m in other:
-        plan["mods"].append({"name": m["name"], "collection": slug, "status": "not-on-nexus", "files": []})
-    return plan["mods"]
+        planned.append({"name": m["name"], "collection": slug, "status": "not-on-nexus", "files": []})
+    return planned
 
 
 # --- Wabbajack lists ---------------------------------------------------------------
@@ -664,7 +897,7 @@ def plan_collection(cache, slug, revision, game, skip=()):
 # a list using them says so and isn't installed.
 
 # Wabbajack's game names -> Nexus Mods' domains.
-WJ_GAMES = {
+WJ_GAMES: dict[str, str] = {
     "FalloutNewVegas": "newvegas", "Fallout3": "fallout3", "Fallout4": "fallout4",
     "SkyrimSpecialEdition": "skyrimspecialedition", "Skyrim": "skyrim", "Oblivion": "oblivion",
     "Morrowind": "morrowind", "Enderal": "enderal", "EnderalSpecialEdition": "enderalspecialedition",
@@ -673,11 +906,11 @@ WJ_GAMES = {
 WJ_DONE = {"FromArchive", "InlineFile", "PatchedFromArchive", "RemappedInlineFile"}
 
 
-def wj_type(x):
+def wj_type(x: WjState | WjDirective) -> str:
     return x["$type"].split(",")[0]
 
 
-def wj_hash(path):
+def wj_hash(path: Path) -> str:
     """Wabbajack's file hash: xxHash64, little-endian, in base64."""
     h = xxhash.xxh64()
     with open(path, "rb") as f:
@@ -686,22 +919,23 @@ def wj_hash(path):
     return base64.b64encode(struct.pack("<Q", h.intdigest())).decode()
 
 
-def wj_hash_bytes(data):
+def wj_hash_bytes(data: bytes) -> str:
     return base64.b64encode(struct.pack("<Q", xxhash.xxh64(data).intdigest())).decode()
 
 
-def wj_modlist(cache, slug, revision):
+def wj_modlist(cache: Path, slug: str, revision: int) -> WjModlist:
     data = subprocess.run([BSDTAR, "-xOf", str(wabbajack_file(cache, slug, revision)), "modlist"],
                           check=True, capture_output=True).stdout
-    return json.loads(data)
+    modlist: WjModlist = json.loads(data)
+    return modlist
 
 
-def wj_inline(cache, slug, revision, source_id):
+def wj_inline(cache: Path, slug: str, revision: int, source_id: str) -> bytes:
     return subprocess.run([BSDTAR, "-xOf", str(wabbajack_file(cache, slug, revision)), source_id],
                           check=True, capture_output=True).stdout
 
 
-def wj_archive_file(cache, archive):
+def wj_archive_file(cache: Path, archive: WjArchive) -> Path:
     """Where one of the list's downloads is kept, by its hash."""
     key = base64.b64decode(archive["Hash"]).hex()
     st = archive["State"]
@@ -710,7 +944,7 @@ def wj_archive_file(cache, archive):
     return Path(cache) / "files" / "http" / f"{key}-{archive['Name']}"
 
 
-def fetch_wabbajack(nx, cache, appid, slug, revision):
+def fetch_wabbajack(nx: Nexus, cache: Path, appid: str, slug: str, revision: int) -> int:
     ml = wj_modlist(cache, slug, revision)
     name = ml.get("Name", slug)
     unknown = {wj_type(d) for d in ml["Directives"]} - WJ_DONE
@@ -719,7 +953,7 @@ def fetch_wabbajack(nx, cache, appid, slug, revision):
         return 1
     missing = [a for a in ml["Archives"] if not wj_archive_file(cache, a).exists()]
     log(f"{name} (revision {revision}, Wabbajack): {len(ml['Archives']) - len(missing)} of {len(ml['Archives'])} files here")
-    failed = []
+    failed: list[str] = []
     for i, a in enumerate(missing, 1):
         st, dest = a["State"], wj_archive_file(cache, a)
         toast("--kind", "progress", "--id", f"nexusmods-{appid}", "--progress", f"{i / len(missing):.3f}",
@@ -749,7 +983,7 @@ def fetch_wabbajack(nx, cache, appid, slug, revision):
     return 1 if failed else 0
 
 
-def octodiff(base, delta):
+def octodiff(base: bytes, delta: bytes) -> bytes:
     """A file from an OctoDiff delta (Wabbajack's patches) and the file it
     was made from: a header, then copy-from-base and new-data commands."""
     if delta[:9] != b"OCTODELTA":
@@ -764,7 +998,8 @@ def octodiff(base, delta):
         if not b & 0x80:
             break
     i += n
-    i += 4 + struct.unpack_from("<i", delta, i)[0]   # the base's hash
+    hash_size: int = struct.unpack_from("<i", delta, i)[0]
+    i += 4 + hash_size   # the base's hash
     if delta[i:i + 3] != b">>>":
         raise ValueError("OctoDiff delta: no end of header")
     i += 3
@@ -772,6 +1007,8 @@ def octodiff(base, delta):
     while i < len(delta):
         cmd = delta[i]
         i += 1
+        start: int
+        length: int
         if cmd == 0x60:
             start, length = struct.unpack_from("<qq", delta, i)
             i += 16
@@ -786,11 +1023,11 @@ def octodiff(base, delta):
     return bytes(out)
 
 
-def wj_tree(cache, slug, revision):
+def wj_tree(cache: Path, slug: str, revision: int) -> Path:
     return STATE / "wabbajack" / f"{slug}-{revision}"
 
 
-def link_or_copy(src, dst):
+def link_or_copy(src: Path, dst: Path) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
     if dst.exists():
         dst.unlink()
@@ -800,7 +1037,7 @@ def link_or_copy(src, dst):
         shutil.copyfile(src, dst)
 
 
-def build_wabbajack(cache, slug, revision, progress=None):
+def build_wabbajack(cache: Path, slug: str, revision: int, progress: Progress | None = None) -> Path:
     """The list's mods/ and profiles/ folders, built once into the player's
     data (~/.local/share/famidrive/nexusmods/wabbajack/<slug>-<revision>)."""
     tree = wj_tree(cache, slug, revision)
@@ -814,14 +1051,14 @@ def build_wabbajack(cache, slug, revision, progress=None):
             dst = tree / norm(d["To"])
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_bytes(wj_inline(cache, slug, revision, d["SourceDataID"]))
-    groups = {}
+    groups: dict[str, list[WjDirective]] = {}
     for d in wanted:
         if wj_type(d) in ("FromArchive", "PatchedFromArchive"):
             groups.setdefault(d["ArchiveHashPath"][0], []).append(d)
     work = STATE / "tmp"
     work.mkdir(parents=True, exist_ok=True)
 
-    def done(d):   # built before, by a run that stopped partway
+    def done(d: WjDirective) -> bool:   # built before, by a run that stopped partway
         f = tree / norm(d["To"])
         return f.exists() and f.stat().st_size == d.get("Size", -1)
     for n, (h, ds) in enumerate(groups.items(), 1):
@@ -833,7 +1070,7 @@ def build_wabbajack(cache, slug, revision, progress=None):
             continue
         with tempfile.TemporaryDirectory(dir=work) as tmp:
             files = {k.lower(): v for k, v in extracted(archive, tmp).items()}
-            nested = {}
+            nested: dict[str, dict[str, Path]] = {}
             for d in ds:
                 hp = d["ArchiveHashPath"]
                 if len(hp) == 3:   # a file in an archive inside the download
@@ -860,12 +1097,12 @@ def build_wabbajack(cache, slug, revision, progress=None):
     return tree
 
 
-def mo2_profile(tree):
+def mo2_profile(tree: Path) -> Path:
     profiles = sorted(p for p in (tree / "profiles").iterdir() if p.is_dir())
     return next((p for p in profiles if p.name == "Default"), profiles[0])
 
 
-def mo2_order(profile):
+def mo2_order(profile: Path) -> list[str]:
     """The profile's enabled mods, lowest priority first (MO2's modlist.txt
     lists the highest first; separators and the game's own DLC, `*`, aren't
     mods)."""
@@ -873,13 +1110,13 @@ def mo2_order(profile):
     return [ln[1:] for ln in reversed(lines) if ln.startswith("+") and not ln.endswith("_separator")]
 
 
-def plan_wabbajack(cache, slug, revision):
+def plan_wabbajack(cache: Path, slug: str, revision: int) -> list[PlanMod]:
     """Each enabled mod's files into the game's Data folder, in the
     profile's order (a later mod's file wins), from the built folders."""
     tree = wj_tree(cache, slug, revision)
     if not (tree / ".complete").exists():
         return [{"name": f"{slug} (Wabbajack, not built yet)", "status": "missing", "files": []}]
-    mods = []
+    mods: list[PlanMod] = []
     for name in mo2_order(mo2_profile(tree)):
         folder = tree / "mods" / name
         files = [p for p in folder.rglob("*") if p.is_file()] if folder.is_dir() else []
@@ -891,12 +1128,12 @@ def plan_wabbajack(cache, slug, revision):
 
 # --- The game's folder -----------------------------------------------------------
 
-def steam_libraries(steam=None):
+def steam_libraries(steam: Path | str | None = None) -> list[Path]:
     """Every Steam library folder (libraryfolders.vdf), the default first."""
-    steam = Path(steam or STEAM)
-    libs = [steam]
+    default = Path(steam or STEAM)
+    libs = [default]
     try:
-        text = (steam / "steamapps/libraryfolders.vdf").read_text(errors="replace")
+        text = (default / "steamapps/libraryfolders.vdf").read_text(errors="replace")
     except OSError:
         return libs
     for path in re.findall(r'"path"\s+"([^"]+)"', text):
@@ -909,35 +1146,54 @@ def steam_libraries(steam=None):
 HEROIC = Path.home() / ".config/heroic"
 
 
-def heroic_game(key, heroic=None):
+class HeroicInstalled(TypedDict, total=False):
+    """A game in Heroic's gog_store/installed.json."""
+    appName: str
+    install_path: str
+
+
+class HeroicInstalledFile(TypedDict, total=False):
+    installed: list[HeroicInstalled]
+
+
+class HeroicGameConfig(TypedDict, total=False):
+    """A game's settings in Heroic's GamesConfig/<id>.json, under its id."""
+    winePrefix: str
+
+
+def heroic_game(key: str, heroic: Path | None = None) -> HeroicInstalled | None:
     """A GOG game Heroic installed ("gog:<GOG id>"): its entry in Heroic's
     gog_store/installed.json, or None."""
-    heroic = Path(heroic or HEROIC)
+    folder = Path(heroic or HEROIC)
     try:
-        installed = json.loads((heroic / "gog_store/installed.json").read_text()).get("installed", [])
+        found: HeroicInstalledFile = json.loads((folder / "gog_store/installed.json").read_text())
     except (OSError, ValueError):
         return None
-    return next((g for g in installed if str(g.get("appName")) == key.split(":", 1)[1]), None)
+    return next((g for g in found.get("installed", []) if str(g.get("appName")) == key.split(":", 1)[1]), None)
 
 
-def heroic_gog(key, heroic=None):
+def heroic_gog(key: str, heroic: Path | None = None) -> tuple[Path, Path | None] | None:
     """A GOG game Heroic installed: (its folder, its prefix or None), or
     None. The prefix is the one Heroic's settings for the game name."""
     g = heroic_game(key, heroic)
-    if not g or not g.get("install_path"):
+    folder = g.get("install_path") if g else None
+    if not folder:
         return None
     name = key.split(":", 1)[1]
+    conf: HeroicGameConfig
     try:
-        conf = json.loads((Path(heroic or HEROIC) / "GamesConfig" / f"{name}.json").read_text()).get(name, {})
+        configs: dict[str, HeroicGameConfig] = json.loads(
+            (Path(heroic or HEROIC) / "GamesConfig" / f"{name}.json").read_text())
+        conf = configs.get(name, {})
     except (OSError, ValueError):
         conf = {}
-    return Path(g["install_path"]), wine_prefix(conf.get("winePrefix"))
+    return Path(folder), wine_prefix(conf.get("winePrefix"))
 
 
 LUTRIS = Path.home() / ".local/share/lutris"
 
 
-def lutris_gog(key, lutris=None):
+def lutris_gog(key: str, lutris: Path | None = None) -> tuple[Path, Path] | None:
     """A GOG game Lutris installed: (its folder, its prefix), or None.
     Read from Lutris 0.5.22's source on 2026-10-15: its GOG installer
     (services/gog.py, autosetup_gog_game) runs GOG's own setup in a
@@ -945,13 +1201,14 @@ def lutris_gog(key, lutris=None):
     its game config), and records the GOG id as the game's service_id.
     The setup puts the game in its default folder in that prefix's C:,
     which is the one with GOG's goggame-<id>.info in it."""
-    lutris = Path(lutris or LUTRIS)
+    data = Path(lutris or LUTRIS)
     gog_id = key.split(":", 1)[1]
     try:
-        con = sqlite3.connect(f"{(lutris / 'pga.db').as_uri()}?mode=ro", uri=True, timeout=10)
+        con = sqlite3.connect(f"{(data / 'pga.db').as_uri()}?mode=ro", uri=True, timeout=10)
         try:
-            row = con.execute("SELECT directory, configpath FROM games WHERE service = 'gog' AND service_id = ?"
-                              " AND installed = 1", (gog_id,)).fetchone()
+            row: tuple[str | None, str | None] | None = con.execute(
+                "SELECT directory, configpath FROM games WHERE service = 'gog' AND service_id = ?"
+                " AND installed = 1", (gog_id,)).fetchone()
         finally:
             con.close()
     except sqlite3.Error:   # Lutris never opened, or writing it right now
@@ -961,12 +1218,16 @@ def lutris_gog(key, lutris=None):
     # In ~/.config/lutris when an older Lutris made that, otherwise
     # beside the database (lutris/settings.py, CONFIG_DIR).
     old = Path.home() / ".config/lutris"
-    configs = (old if old.is_dir() else lutris) / "games"
+    configs = (old if old.is_dir() else data) / "games"
+    # Lutris's own game config: its "game" section names the prefix.
+    config: object
     try:
-        game = (yaml.safe_load((configs / f"{row[1]}.yml").read_text()) or {}).get("game") or {}
-    except (OSError, yaml.YAMLError, AttributeError):
-        game = {}
-    prefix = wine_prefix(game.get("prefix") or row[0])
+        config = yaml.safe_load((configs / f"{row[1]}.yml").read_text())
+    except (OSError, yaml.YAMLError):
+        config = None
+    game = config.get("game") if isinstance(config, dict) else None
+    set_prefix = game.get("prefix") if isinstance(game, dict) else None
+    prefix = wine_prefix(set_prefix if isinstance(set_prefix, str) and set_prefix else row[0])
     if prefix is None:
         return None
     marker = f"goggame-{gog_id}.info"
@@ -987,7 +1248,7 @@ def lutris_gog(key, lutris=None):
 GOG_LAUNCHERS = ["heroic", "lutris"]
 
 
-def gog_game(key, heroic=None, lutris=None):
+def gog_game(key: str, heroic: Path | None = None, lutris: Path | None = None) -> tuple[Path, Path | None] | None:
     """A GOG game ("gog:<id>"): (its folder, its prefix or None), from the
     first launcher in GOG_LAUNCHERS that has it installed, or None."""
     for launcher in GOG_LAUNCHERS:
@@ -997,16 +1258,17 @@ def gog_game(key, heroic=None, lutris=None):
     return None
 
 
-def wine_prefix(p):
+def wine_prefix(folder: str | Path | None) -> Path | None:
     """The Wine prefix itself (drive_c's parent), or None: a Proton one
     keeps it in pfx/."""
-    if not p:
+    if not folder:
         return None
-    p = Path(p)
+    p = Path(folder)
     return p / "pfx" if (p / "pfx").is_dir() else p
 
 
-def game_dir(appid, steam=None, heroic=None, lutris=None):
+def game_dir(appid: str, steam: Path | None = None, heroic: Path | None = None,
+             lutris: Path | None = None) -> Path | None:
     """The installed game's folder, or None. A Steam game (by app id): its
     appmanifest says where, and StateFlags 4 is fully installed (not
     mid-download or update). A GOG game ("gog:<id>"): Heroic's or
@@ -1027,7 +1289,8 @@ def game_dir(appid, steam=None, heroic=None, lutris=None):
     return None
 
 
-def prefix_of(appid, root, steam=None, heroic=None, lutris=None):
+def prefix_of(appid: str, root: Path, steam: Path | None = None, heroic: Path | None = None,
+              lutris: Path | None = None) -> Path | None:
     """The game's Windows prefix (drive_c's parent), or None: Steam's
     compatdata beside its library, or Heroic's or Lutris's for a GOG
     game."""
@@ -1037,7 +1300,7 @@ def prefix_of(appid, root, steam=None, heroic=None, lutris=None):
     return wine_prefix(Path(root).parents[1] / "compatdata" / str(appid))   # <library>/steamapps/compatdata/<id>
 
 
-def game_running(appid, root=None):
+def game_running(appid: str, root: str | Path | None = None) -> bool:
     """Whether the game is running: for Steam, its launcher (`reaper
     SteamLaunch AppId=N`); for a GOG game, a program from its folder."""
     if str(appid).startswith("gog:"):
@@ -1063,7 +1326,7 @@ def game_running(appid, root=None):
     return False
 
 
-def resolve(root, rel, listings=None):
+def resolve(root: Path, rel: str, listings: dict[Path, set[str]] | None = None) -> Path:
     """rel under root, following the case of folders already there: Linux
     is case-sensitive, a game under Proton isn't, so "R6/Scripts" from one
     mod and "r6/scripts" from another must be the same folder.
@@ -1091,20 +1354,21 @@ def resolve(root, rel, listings=None):
 
 # --- Installing ----------------------------------------------------------------------
 
-def installed_file(appid):
+def installed_file(appid: str) -> Path:
     return STATE / "installed" / f"{str(appid).replace(':', '-')}.json"
 
 
-def read_installed(appid, cache=None):
+def read_installed(appid: str, cache: Path | None = None) -> Record | None:
     """What's installed for a game, or None. Also the first box's one-off
     install (2026-10-10), recorded in the cache before this existed."""
     for f in [installed_file(appid)] + ([Path(cache) / "installed" / f"{appid}.json"] if cache else []):
+        m: Record
         try:
             m = json.loads(f.read_text())
         except (OSError, ValueError):
             continue
         if "want" not in m and "collection" in m:   # the one-off's record
-            m["want"] = {"collections": [{"slug": m["collection"], "revision": m["revision"]}], "choices": {}}
+            m["want"] = {"collections": [{"slug": m["collection"], "revision": m.get("revision", 0)}], "choices": {}}
             m["complete"] = True
         if "root" not in m:   # the one-off's record doesn't say where the game is: Steam does
             root = game_dir(appid)
@@ -1116,7 +1380,7 @@ def read_installed(appid, cache=None):
     return None
 
 
-def save_installed(appid, record):
+def save_installed(appid: str, record: Record) -> None:
     out = installed_file(appid)
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".part")
@@ -1124,26 +1388,30 @@ def save_installed(appid, record):
     tmp.replace(out)
 
 
-def want_of(game):
+def want_of(game: Game) -> Want:
     """What a game's mods should be, to compare with what's installed."""
     # skip only when there is one, so installs from before it existed
     # still count as what's wanted.
-    return {"collections": [{"slug": c["slug"], "revision": c["revision"],
-                             **({"skip": sorted(c["skip"])} if c.get("skip") else {})}
-                            for c in collections_of(game)],
-            "choices": game.get("choices", {})}
+    refs: list[CollectionRef] = []
+    for c in collections_of(game):
+        ref: CollectionRef = {"slug": c["slug"], "revision": c["revision"]}
+        skip = c.get("skip")
+        if skip:
+            ref["skip"] = sorted(skip)
+        refs.append(ref)
+    return {"collections": refs, "choices": game.get("choices", {})}
 
 
-def winners(plan):
+def winners(plan: Plan) -> dict[str, int]:
     """dest (lower case) -> index of the last mod in the plan writing it."""
     wins = {}
     for i, m in enumerate(plan["mods"]):
-        for f in m["files"]:
+        for f in m.get("files", []):
             wins[f["to"].lower()] = i
     return wins
 
 
-def extracted(archive, into):
+def extracted(archive: str | Path, into: str | Path) -> dict[str, Path]:
     """Unpack an archive; {normalised member path: file} (a ZIP made on
     Windows can unpack with backslashes in its names)."""
     r = subprocess.run([BSDTAR, "-xf", str(archive), "-C", str(into)], capture_output=True)
@@ -1157,28 +1425,30 @@ def extracted(archive, into):
     for d, dirs, files in os.walk(into):
         os.chmod(d, os.stat(d).st_mode | 0o700)
         for f in files:
-            p = os.path.join(d, f)
-            if not os.path.islink(p):
-                os.chmod(p, os.stat(p).st_mode | 0o600)
-    out = {}
+            file = os.path.join(d, f)
+            if not os.path.islink(file):
+                os.chmod(file, os.stat(file).st_mode | 0o600)
+    out: dict[str, Path] = {}
     for p in Path(into).rglob("*"):
         if p.is_file():
             out[norm(str(p.relative_to(into)))] = p
     return out
 
 
-def install(plan, root, appid, want, progress=None):
+def install(plan: Plan, root: Path, appid: str, want: Want, progress: Progress | None = None) -> Record:
     """The plan's files into root, recorded as it goes."""
     backup = STATE / "backup" / str(appid)
-    record = {"appid": appid, "root": str(root), "want": want, "backup": str(backup),
-              "files": [], "replaced": [], "outside": [], "complete": False}
+    files_in: list[str] = []
+    replaced: list[str] = []
+    record: Record = {"appid": appid, "root": str(root), "want": want, "backup": str(backup),
+                      "files": files_in, "replaced": replaced, "outside": [], "complete": False}
     save_installed(appid, record)
     wins = winners(plan)
     work = STATE / "tmp"
     work.mkdir(parents=True, exist_ok=True)
-    mods = [m for m in plan["mods"] if m["files"]]
-    listings = {}   # folder -> its names, so 60000 files don't each list their folders
-    ours = set()
+    mods = [m for m in plan["mods"] if m.get("files")]
+    listings: dict[Path, set[str]] = {}   # folder -> its names, so 60000 files don't each list their folders
+    ours: set[str] = set()
     for n, m in enumerate(mods, 1):
         i = plan["mods"].index(m)
         if progress:
@@ -1186,7 +1456,8 @@ def install(plan, root, appid, want, progress=None):
         with tempfile.TemporaryDirectory(dir=work) as tmp:
             # A built folder (a Wabbajack list's mod) is linked from, and
             # stays; an archive is unpacked and its files moved.
-            from_dir = Path(m["dir"]) if m.get("dir") else None
+            built = m.get("dir")
+            from_dir = Path(built) if built else None
             files = {} if from_dir else extracted(m["archive"], tmp)
             for f in m["files"]:
                 if wins[f["to"].lower()] != i:
@@ -1205,7 +1476,7 @@ def install(plan, root, appid, want, progress=None):
                     bk = backup / rel
                     bk.parent.mkdir(parents=True, exist_ok=True)
                     os.replace(dst, bk)
-                    record["replaced"].append(rel)
+                    replaced.append(rel)
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 if from_dir:
                     link_or_copy(src, dst)
@@ -1213,19 +1484,19 @@ def install(plan, root, appid, want, progress=None):
                     shutil.move(str(src), str(dst))
                 if rel not in ours:
                     ours.add(rel)
-                    record["files"].append(rel)
+                    files_in.append(rel)
         save_installed(appid, record)
     record["complete"] = True
     save_installed(appid, record)
     return record
 
 
-def uninstall(record):
+def uninstall(record: Record) -> None:
     """Take an install out: its files removed, what they replaced put
     back, and folders they left empty removed."""
     root = Path(record["root"])
     backup = Path(record.get("backup") or "")
-    folders = set()
+    folders: set[Path] = set()
     for rel in record.get("files", []):
         p = root / rel
         try:
@@ -1243,8 +1514,9 @@ def uninstall(record):
             os.replace(bk, root / rel)
     for o in record.get("outside", []):   # files outside the game's folder (its prefix's INIs)
         Path(o["path"]).unlink(missing_ok=True)
-        if o.get("backup") and Path(o["backup"]).exists() and Path(o["path"]).parent.is_dir():
-            os.replace(o["backup"], o["path"])
+        saved = o.get("backup")
+        if saved and Path(saved).exists() and Path(o["path"]).parent.is_dir():
+            os.replace(saved, o["path"])
     for folder in sorted(folders, key=lambda p: -len(p.parts)):
         while folder != root and root in folder.parents:
             try:
@@ -1257,10 +1529,11 @@ def uninstall(record):
 
 # --- After installing: what a game needs beyond its mods --------------------------
 
-def place_root_file(record, root, rel, data=None, src=None):
+def place_root_file(record: Record, root: Path, name: str, data: bytes | None = None,
+                    src: Path | None = None) -> Path:
     """One file into the game's folder, recorded like a mod's (what was
     there backed up first)."""
-    dst = resolve(root, rel)
+    dst = resolve(root, name)
     rel = str(dst.relative_to(root))
     if dst.exists() and rel not in record["files"]:
         bk = Path(record["backup"]) / rel
@@ -1271,17 +1544,17 @@ def place_root_file(record, root, rel, data=None, src=None):
     if src is not None:
         shutil.copyfile(src, dst)
     else:
-        dst.write_bytes(data)
+        dst.write_bytes(data or b"")
     if rel not in record["files"]:
         record["files"].append(rel)
     return dst
 
 
-def place_outside(record, path, data):
+def place_outside(record: Record, file: Path | str, data: bytes) -> None:
     """A file outside the game's folder (in its prefix), recorded with a
     backup of what was there."""
-    path = Path(path)
-    entry = {"path": str(path), "backup": None}
+    path = Path(file)
+    entry: Outside = {"path": str(path), "backup": None}
     if path.exists() and not any(o["path"] == str(path) for o in record["outside"]):
         bk = Path(record["backup"]) / "outside" / str(path).lstrip("/")
         bk.parent.mkdir(parents=True, exist_ok=True)
@@ -1293,7 +1566,7 @@ def place_outside(record, path, data):
         record["outside"].append(entry)
 
 
-def windows_user(prefix):
+def windows_user(prefix: Path) -> Path:
     """The prefix's user folder: Proton's steamuser, or Wine's (the Linux
     user's name)."""
     users = Path(prefix) / "drive_c/users"
@@ -1302,12 +1575,12 @@ def windows_user(prefix):
     return next((u for u in sorted(users.iterdir()) if u.is_dir() and u.name != "Public"), users / "steamuser")
 
 
-def ini_merge(base, tweaks):
+def ini_merge(base: str, tweaks: str) -> str:
     """INI text with another's keys set over it, section by section, keeping
     the rest as it was (MO2's INI tweaks)."""
     lines = base.splitlines()
-    section = None
-    pending = {}
+    section: str | None = None
+    pending: dict[str, dict[str, tuple[str, str]]] = {}   # section -> key, lower case -> (key, value)
     names = {}   # section, lower case -> as the tweaks spell it
     for ln in tweaks.splitlines():
         t = ln.strip()
@@ -1317,7 +1590,8 @@ def ini_merge(base, tweaks):
         elif "=" in t and section is not None and not t.startswith(";"):
             k, v = t.split("=", 1)
             pending.setdefault(section, {})[k.strip().lower()] = (k.strip(), v.strip())
-    out, section = [], None
+    out: list[str] = []
+    section = None
     for ln in lines:
         t = ln.strip()
         if t.startswith("[") and t.endswith("]"):
@@ -1336,7 +1610,7 @@ def ini_merge(base, tweaks):
     return "\n".join(out) + "\n"
 
 
-def screen_size():
+def screen_size() -> tuple[int, int]:
     """The TV's preferred mode, from the kernel: the first mode of the
     first connected output (no display server needed). 1920x1080 when
     there's none."""
@@ -1358,7 +1632,7 @@ GPU_ORDER = ("PHYSICAL_DEVICE_TYPE_DISCRETE_GPU", "PHYSICAL_DEVICE_TYPE_INTEGRAT
              "PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU")
 
 
-def gpu_name(summary=None):
+def gpu_name(summary: str | None = None) -> str | None:
     """The graphics card's name as DXVK gives it to a Direct3D 9 game: the
     Vulkan device name of the first device DXVK lists, from `vulkaninfo
     --summary`. None when Vulkan has no GPU to name. A player's service
@@ -1368,7 +1642,7 @@ def gpu_name(summary=None):
             summary = subprocess.run([VULKANINFO, "--summary"], capture_output=True, text=True, timeout=60).stdout
         except (OSError, subprocess.SubprocessError):
             return None
-    devices = []
+    devices: list[dict[str, str]] = []
     for line in summary.splitlines():
         if re.match(r"GPU\d+:", line.strip()):
             devices.append({})
@@ -1380,7 +1654,7 @@ def gpu_name(summary=None):
     return gpus[0]["deviceName"] if gpus else None
 
 
-def nv_inis(root, profile, screen, device=None):
+def nv_inis(root: Path | None, profile: Path, screen: tuple[int, int], device: str | None = None) -> dict[str, str]:
     """{name: text} of New Vegas's INIs (My Games/FalloutNV): the profile's,
     with what the game needs to start on a TV through gamescope.
 
@@ -1401,7 +1675,7 @@ def nv_inis(root, profile, screen, device=None):
     Over every INI: windowed at the screen's size (gamescope shows it full
     screen), no MSAA (New Vegas Reloaded wants it off), and the controller
     on (the profile turns it off, for a mouse and keyboard)."""
-    def text(path):
+    def text(path: str) -> str:
         f = resolve(root, path) if root else None
         return f.read_text(errors="replace") if f and f.exists() else ""
     w, h = screen
@@ -1427,7 +1701,7 @@ def nv_inis(root, profile, screen, device=None):
 NV_REG_KEY = "[Software\\\\Wow6432Node\\\\Bethesda Softworks\\\\FalloutNV]"
 
 
-def nv_registry(prefix, root):
+def nv_registry(prefix: Path, root: Path) -> bool:
     """The one registry value GOG's install script sets
     (HKLM\\Software\\Bethesda Softworks\\FalloutNV, Installed Path: the game's
     folder), when the prefix doesn't have it. Heroic hadn't set it on the
@@ -1454,11 +1728,19 @@ EMPTY_BSA = b"BSA\0" + struct.pack("<8I", 104, 36, 3, 0, 0, 0, 0, 0)
 # The 4GB Patcher's Python version (Nexus Mods, newvegas mod 62552, file
 # 1000080719, "4GB Python Patcher" 1.5): makes FalloutNV.exe use 4 GB and
 # load xNVSE (nvse_steam_loader.dll) itself. Only this exact script runs.
-NV_PATCHER = {"mod": 62552, "file": 1000080719, "name": "PyNVPatch.py",
-              "sha256": "dbb841ba2ab5dd9979282b8029b87e703475b5264441b4ee18243c2e91b39849"}
+class Patcher(TypedDict):
+    mod: int
+    file: int
+    name: str
+    sha256: str
 
 
-def newvegas(record, root, prefix, profile, extras, nx, cache):
+NV_PATCHER: Patcher = {"mod": 62552, "file": 1000080719, "name": "PyNVPatch.py",
+                       "sha256": "dbb841ba2ab5dd9979282b8029b87e703475b5264441b4ee18243c2e91b39849"}
+
+
+def newvegas(record: Record, root: Path, prefix: Path | None, profile: Path, extras: dict[str, str],
+             nx: Nexus, cache: Path) -> None:
     """New Vegas beyond its mods: xNVSE, the 4GB patch, the launcher out
     of the way, the profile's INIs and plugins in the prefix, and the
     plugins' order (New Vegas orders them by file date)."""
@@ -1515,10 +1797,12 @@ def newvegas(record, root, prefix, profile, extras, nx, cache):
             os.utime(f, (start + 60 * i, start + 60 * i))
 
 
-GAME_SETUP = {"newvegas": newvegas}
+GAME_SETUP: dict[str, Callable[[Record, Path, Path | None, Path, dict[str, str], Nexus, Path], None]] = {
+    "newvegas": newvegas}
 
 
-def sync_game(nx, cache, appid, game, wait=60, extras=None):
+def sync_game(nx: Nexus, cache: Path, appid: str, game: Game, wait: float = 60,
+              extras: dict[str, str] | None = None) -> int:
     want = want_of(game)
     have = read_installed(appid, cache)
     if have and have.get("want") == want and have.get("complete"):
@@ -1535,12 +1819,12 @@ def sync_game(nx, cache, appid, game, wait=60, extras=None):
         return 1
     for c in collections_of(game):   # Wabbajack lists: their mods built from the downloads first
         if wabbajack_file(cache, c["slug"], c["revision"]).exists():
-            def building(n, total, name):
+            def building(n: int, total: int, name: str) -> None:
                 toast("--kind", "progress", "--id", f"nexusmods-{appid}", "--progress", f"{n / total:.3f}",
                       "Building mods", f"{name} ({n} of {total})")
             build_wabbajack(cache, c["slug"], c["revision"], building)
     plan = plan_game(cache, appid, game)
-    if status or any(m["status"] == "missing" for m in plan["mods"]):
+    if status or any(m.get("status") == "missing" for m in plan["mods"]):
         log(f"{appid}: not every file is here yet; installing once they are")
         return 1
     root = game_dir(appid)
@@ -1560,13 +1844,13 @@ def sync_game(nx, cache, appid, game, wait=60, extras=None):
         uninstall(have)
     names = ", ".join(c["slug"] for c in want["collections"])
 
-    def progress(n, total, name):
+    def progress(n: int, total: int, name: str) -> None:
         toast("--kind", "progress", "--id", f"nexusmods-{appid}", "--progress", f"{n / total:.3f}",
               "Installing mods", f"{name} ({n} of {total})")
     record = install(plan, root, appid, want, progress)
-    if plan.get("wabbajack"):
-        wj = plan["wabbajack"]
-        domain = WJ_GAMES.get(wj_modlist(cache, wj["slug"], wj["revision"]).get("GameType"), "")
+    wj = plan.get("wabbajack")
+    if wj:
+        domain = WJ_GAMES.get(wj_modlist(cache, wj["slug"], wj["revision"]).get("GameType", ""), "")
         setup = GAME_SETUP.get(domain)
         if setup:
             record["complete"] = False
@@ -1580,7 +1864,7 @@ def sync_game(nx, cache, appid, game, wait=60, extras=None):
     return 0
 
 
-def cmd_sync(spec):
+def cmd_sync(spec: Spec) -> int:
     cache = Path(os.path.expanduser(spec["cache"]))
     games = spec.get("games", {})
     status = 0
@@ -1599,7 +1883,7 @@ def cmd_sync(spec):
         toast("--kind", "notice", "--id", f"nexusmods-{appid}", "Mods removed", f"{len(have.get('files', []))} files")
     if not games:
         return status
-    nx = Nexus(Path(spec["apiKeyFile"]).read_text().strip())
+    nx = Nexus(api_key(spec))
     for appid, game in games.items():
         try:
             status |= sync_game(nx, cache, appid, game, extras=spec.get("extras", {}))
@@ -1611,7 +1895,7 @@ def cmd_sync(spec):
     return status
 
 
-def cmd_uninstall(spec, appid):
+def cmd_uninstall(spec: Spec, appid: str) -> int:
     have = read_installed(appid, Path(os.path.expanduser(spec["cache"])))
     if not have:
         log(f"{appid}: no mods installed by FamiDrive")
@@ -1621,23 +1905,38 @@ def cmd_uninstall(spec, appid):
     return 0
 
 
-def compare(plan, deployment):
+class Deployed(TypedDict):
+    relPath: str
+
+
+class Deployment(TypedDict, total=False):
+    """Vortex's vortex.deployment.json, the part read here."""
+    files: list[Deployed]
+
+
+class Comparison(TypedDict):
+    both: int
+    onlyPlan: list[str]
+    onlyVortex: list[str]
+
+
+def compare(plan: Plan, deployment: Deployment) -> Comparison:
     """Files the plan and a Vortex deployment both put in the same place,
     and those only one of them has (case-insensitive, as on Windows)."""
-    ours = {f["to"].lower() for m in plan["mods"] for f in m["files"]}
+    ours = {f["to"].lower() for m in plan["mods"] for f in m.get("files", [])}
     theirs = {norm(f["relPath"]).lower() for f in deployment.get("files", [])}
     return {"both": len(ours & theirs), "onlyPlan": sorted(ours - theirs), "onlyVortex": sorted(theirs - ours)}
 
 
-def summary(plan):
-    counts = {}
+def summary(plan: Plan) -> str:
+    counts: dict[str, int] = {}
     for m in plan["mods"]:
-        counts[m["status"]] = counts.get(m["status"], 0) + 1
-    files = sum(len(m["files"]) for m in plan["mods"])
+        counts[m.get("status", "")] = counts.get(m.get("status", ""), 0) + 1
+    files = sum(len(m.get("files", [])) for m in plan["mods"])
     return f"{len(plan['mods'])} mods, {files} files placed; " + ", ".join(f"{v} {k}" for k, v in sorted(counts.items()))
 
 
-def cmd_plan(spec, compare_with=None):
+def cmd_plan(spec: Spec, compare_with: str | None = None) -> int:
     cache = Path(os.path.expanduser(spec["cache"]))
     for appid, game in spec.get("games", {}).items():
         plan = plan_game(cache, appid, game)
@@ -1655,13 +1954,14 @@ def cmd_plan(spec, compare_with=None):
     return 0
 
 
-def main():
+def main() -> None:
     args = sys.argv[1:]
     if len(args) < 2 or args[0] not in ("sync", "fetch", "plan", "uninstall"):
-        raise SystemExit(__doc__.split("\n\n")[1])
-    spec = json.loads(Path(args[1]).read_text())
-    if spec.get("gog") in GOG_LAUNCHERS:
-        GOG_LAUNCHERS.sort(key=lambda launcher: launcher != spec["gog"])
+        raise SystemExit((__doc__ or "").split("\n\n")[1])
+    spec: Spec = json.loads(Path(args[1]).read_text())
+    first = spec.get("gog")
+    if first in GOG_LAUNCHERS:
+        GOG_LAUNCHERS.sort(key=lambda launcher: launcher != first)
     if args[0] == "sync":
         sys.exit(cmd_sync(spec))
     if args[0] == "fetch":
