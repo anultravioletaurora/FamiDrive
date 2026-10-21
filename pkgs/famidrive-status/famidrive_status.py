@@ -35,6 +35,7 @@ os.environ.setdefault("SDL_VIDEODRIVER", "x11")   # gamescope's Xwayland
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 import pygame  # noqa: E402
 
+
 class Status(TypedDict, total=False):
     """STATUS_FILE, as gamescope-fg writes it."""
     state: str

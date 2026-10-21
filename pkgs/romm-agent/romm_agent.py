@@ -1428,6 +1428,7 @@ def install_ps3_disc_keys(d: Path) -> None:
 # tidied (2026-10-07).
 INSTALLERS_VERSION = 2
 
+
 def install_switch_keys(d: Path) -> None:
     """Eden reads prod.keys/title.keys from its keys dir (seen on Eden
     0.2.1). Firmware goes into nand/system; installing it

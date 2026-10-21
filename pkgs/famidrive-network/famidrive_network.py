@@ -60,14 +60,18 @@ type Network = tuple[str, str, str, str]
 # The D-Bus interfaces join() calls. dbus_next makes their methods when it
 # reads NetworkManager's introspection, so they're described here.
 class NetworkManagerIface(Protocol):
-    async def call_get_device_by_ip_iface(self, iface: str) -> str: ...
+    async def call_get_device_by_ip_iface(self, iface: str) -> str:
+        ...
 
     async def call_add_and_activate_connection(
-            self, connection: "dict[str, dict[str, Variant]]", device: str, specific_object: str) -> list[str]: ...
+        self, connection: "dict[str, dict[str, Variant]]", device: str, specific_object: str
+    ) -> list[str]:
+        ...
 
 
 class DeviceIface(Protocol):
-    async def get_state(self) -> int: ...
+    async def get_state(self) -> int:
+        ...
 
 
 def log(msg: str) -> None:

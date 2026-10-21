@@ -41,7 +41,62 @@ import re
 import socket
 import sys
 import time
+from collections.abc import Iterable
 from pathlib import Path
+from typing import TYPE_CHECKING, Literal, NotRequired, Protocol, TypedDict, cast
+
+if TYPE_CHECKING:
+    import pygame
+
+type RGBA = tuple[int, int, int, int]
+# An X rectangle, or a pixmap's or window's: x, y, width, height.
+type Rect = tuple[int, int, int, int]
+
+
+class Toast(TypedDict, total=False):
+    """A toast, as famidrive-toast sends it (parse_send) and the queue keeps it."""
+    kind: str
+    title: str
+    detail: str
+    id: str
+    icon: str        # one of ICONS, or an image's path
+    progress: float  # 0..1; none: a bar that slides back and forth
+    done: bool
+    seconds: float
+    updated: float   # set by the queue
+
+
+class Shown(TypedDict):
+    toast: Toast
+    shown_at: float
+    ends_at: float | None   # None: a progress toast, until it's done
+
+
+class Colors(TypedDict):
+    panel: RGBA
+    text: RGBA
+    dim: RGBA
+
+
+class Prefs(TypedDict, total=False):
+    """A player's toast settings (players.<name>.toasts)."""
+    position: str
+    hide: list[str]
+
+
+class Spec(TypedDict, total=False):
+    """SPEC, above."""
+    theme: str | None
+    recordings: bool
+    players: dict[str, Prefs]
+    default: Prefs
+
+
+class MenuReply(TypedDict):
+    """The menu's answer to a command, sent back to famidrive-quit."""
+    open: bool
+    do: NotRequired[str]   # "quit", or for the daemon itself "record", "stop-recording"
+
 
 KINDS = ("notice", "alert", "progress", "achievement", "success")
 POSITIONS = ("top-left", "top-center", "top-right", "middle-left", "middle-right",
@@ -80,7 +135,7 @@ URGENT = ("alert", "achievement")   # a progress toast nobody updates is let go
 FADE = 0.25
 
 # ES-DE's own dark look, for a theme that names no colors.
-DEFAULT_COLORS = {
+DEFAULT_COLORS: Colors = {
     "panel": (17, 17, 17, 238),
     "text": (255, 255, 255, 255),
     "dim": (153, 153, 153, 255),
@@ -93,7 +148,7 @@ DEFAULT_COLORS = {
 SHARED = Path("/run/famidrive-toast")
 
 
-def sock_path():
+def sock_path() -> Path:
     """This session's socket: in its runtime folder, or for an account
     without one (the greeter, which runs "Who's playing?"), in /tmp."""
     run = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
@@ -102,7 +157,7 @@ def sock_path():
     return Path(run) / "famidrive-toast.sock"
 
 
-def read(path):
+def read(path: str | Path) -> str:
     try:
         return Path(path).read_text(errors="replace")
     except OSError:
@@ -111,49 +166,50 @@ def read(path):
 
 # --- The player's theme ---------------------------------------------------
 
-def opaque(color):
+def opaque(color: RGBA) -> RGBA:
     """A theme's panel color half again as opaque: a see-through theme
     color (Art Book Next's) let a busy game show through the text. Found
     on the first box 2026-10-12."""
     return (*color[:3], min(255, int(color[3] * 1.5)))
 
 
-def ease_out(p):
+def ease_out(p: float) -> float:
     """How far along a slide is (0..1) at fraction p of its time: a cubic
     ease-out."""
     p = max(0.0, min(1.0, p))
     return 1 - (1 - p) ** 3
 
 
-def hex_color(value):
+def hex_color(value: str | None) -> RGBA | None:
     """ES-DE's RRGGBB or RRGGBBAA, as an RGBA tuple; None if it isn't one."""
     v = (value or "").strip().lstrip("#")
     if not re.fullmatch(r"[0-9a-fA-F]{6}([0-9a-fA-F]{2})?", v):
         return None
     if len(v) == 6:
         v += "ff"
-    return tuple(int(v[i:i + 2], 16) for i in (0, 2, 4, 6))
+    r, g, b, a = (int(v[i:i + 2], 16) for i in (0, 2, 4, 6))
+    return r, g, b, a
 
 
-def es_setting(home, name):
+def es_setting(home: str | Path, name: str) -> str | None:
     """A string setting from the player's es_settings.xml, or None."""
     m = re.search(rf'<string name="{name}" value="([^"]*)"',
                   read(Path(home) / "ES-DE/settings/es_settings.xml"))
     return m.group(1) if m else None
 
 
-def color_scheme(home):
+def color_scheme(home: str | Path) -> str | None:
     """The color scheme the player picked in ES-DE, or None."""
     return es_setting(home, "ThemeColorScheme")
 
 
-def theme_colors(theme, scheme):
+def theme_colors(theme: str | None, scheme: str | None) -> Colors:
     """Panel, text and dim colors from the theme's colors.xml, for the
     picked scheme (or the file's first), falling back to ES-DE's dark look.
     A scheme can be named in several blocks (Art Book Next has one for
     its colors and another for its art variants); later ones add to and
     override earlier ones, as in ES-DE."""
-    colors = dict(DEFAULT_COLORS)
+    colors = DEFAULT_COLORS.copy()
     if not theme:
         return colors
     text = read(Path(theme) / "colors.xml")
@@ -162,18 +218,21 @@ def theme_colors(theme, scheme):
               if scheme and scheme in [n.strip() for n in names.split(",")]]
     if not chosen and blocks:
         chosen = [blocks[0][1]]
-    found = {}
+    found: dict[str, str] = {}
     for body in chosen:
         found.update(re.findall(r"<(\w+)>([^<]*)</\1>", body))
-    for key, var in (("panel", "statusBackgroundColor"), ("text", "statusColor"),
-                     ("dim", "helpTextColor")):
-        c = hex_color(found.get(var))
-        if c:
-            colors[key] = c
+    panel, text_color, dim = (hex_color(found.get(var))
+                              for var in ("statusBackgroundColor", "statusColor", "helpTextColor"))
+    if panel:
+        colors["panel"] = panel
+    if text_color:
+        colors["text"] = text_color
+    if dim:
+        colors["dim"] = dim
     return colors
 
 
-def theme_fonts(theme):
+def theme_fonts(theme: str | None) -> tuple[Path | None, Path | None]:
     """(regular, light) font files the theme uses for names and for
     descriptions; None where it names none (ES-DE's default font then)."""
     if not theme:
@@ -184,9 +243,8 @@ def theme_fonts(theme):
     return (Path(theme) / regular if regular else None), (Path(theme) / light if light else None)
 
 
-def player_spec(spec, player):
-    s = dict(spec.get("default") or {})
-    s.update((spec.get("players") or {}).get(player) or {})
+def player_spec(spec: Spec, player: str) -> Prefs:
+    s: Prefs = {**(spec.get("default") or {}), **((spec.get("players") or {}).get(player) or {})}
     if s.get("position") not in POSITIONS:
         s["position"] = "bottom-right"
     s["hide"] = [k for k in s.get("hide") or [] if k in KINDS]
@@ -195,7 +253,7 @@ def player_spec(spec, player):
 
 # --- Where a toast goes -----------------------------------------------------
 
-def place(position, screen, size, margin):
+def place(position: str, screen: tuple[int, int], size: tuple[int, int], margin: int) -> tuple[int, int]:
     """Top-left corner for a toast of `size` at `position` on `screen`.
     The bottom margin is larger: ES-DE themes keep their help bar there."""
     (sw, sh), (w, h) = screen, size
@@ -205,7 +263,8 @@ def place(position, screen, size, margin):
     return x, y
 
 
-def layout(position, screen, sizes, margin, gap):
+def layout(position: str, screen: tuple[int, int], sizes: list[tuple[int, int]], margin: int,
+           gap: int) -> list[tuple[int, int]]:
     """Top-left corners for a stack of toasts (`sizes`, oldest first): the
     oldest at `position`, the rest stacked away from the screen's edge,
     upward from the bottom, downward from the top or middle."""
@@ -221,7 +280,7 @@ def layout(position, screen, sizes, margin, gap):
     return out
 
 
-def icon_name(toast):
+def icon_name(toast: Toast) -> str:
     """One of ICONS, or an image's path. A progress toast turned into a
     success in place keeps the icon it was sent with, so a success's is
     decided here, not taken from it."""
@@ -245,13 +304,13 @@ class Queue:
     it (one at a time, before: a long library pull held every other toast
     back until it finished)."""
 
-    def __init__(self, hide=(), slots=MAX_SHOWN):
+    def __init__(self, hide: Iterable[str] = (), slots: int = MAX_SHOWN) -> None:
         self.hide = set(hide)
         self.slots = slots
-        self.waiting = []
-        self.showing = []   # {"toast", "shown_at", "ends_at"}, oldest first
+        self.waiting: list[Toast] = []
+        self.showing: list[Shown] = []   # oldest first
 
-    def add(self, toast, now):
+    def add(self, toast: Toast, now: float) -> bool:
         kind = toast.get("kind", "notice")
         if kind not in KINDS:
             kind = toast["kind"] = "notice"
@@ -272,23 +331,24 @@ class Queue:
                     self.waiting[i] = toast
                     return True
         if kind in URGENT:
-            at = next((i for i, t in enumerate(self.waiting) if t["kind"] not in URGENT), len(self.waiting))
+            at = next((i for i, t in enumerate(self.waiting) if t.get("kind") not in URGENT), len(self.waiting))
             self.waiting.insert(at, toast)
         else:
             self.waiting.append(toast)
         return True
 
-    def _end(self, toast, now):
+    def _end(self, toast: Toast, now: float) -> float | None:
         if toast.get("kind") == "progress" and not toast.get("done"):
             return None   # until it's done
-        return now + float(toast.get("seconds") or SECONDS[toast["kind"]])
+        return now + float(toast.get("seconds") or SECONDS[toast.get("kind", "notice")])
 
-    def tick(self, now):
+    def tick(self, now: float) -> list[tuple[Toast, float, float | None]]:
         """Advance; returns [(toast, its age, seconds left or None)], oldest first."""
-        def gone(shown):
-            if shown["ends_at"] is None:
-                return now - shown["toast"]["updated"] > STALE_PROGRESS
-            return now >= shown["ends_at"]
+        def gone(shown: Shown) -> bool:
+            ends = shown["ends_at"]
+            if ends is None:
+                return now - shown["toast"].get("updated", now) > STALE_PROGRESS
+            return now >= ends
         self.showing = [x for x in self.showing if not gone(x)]
         while self.waiting and len(self.showing) < self.slots:
             t = self.waiting.pop(0)
@@ -299,8 +359,9 @@ class Queue:
 
 # --- Sending --------------------------------------------------------------
 
-def parse_send(argv):
-    toast, words = {"kind": "notice"}, []
+def parse_send(argv: list[str]) -> Toast:
+    toast: Toast = {"kind": "notice"}
+    words: list[str] = []
     it = iter(argv)
     for a in it:
         if a == "--kind":
@@ -325,14 +386,14 @@ def parse_send(argv):
     return toast
 
 
-def send_to(path, toast):
+def send_to(path: Path, toast: Toast) -> None:
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
         s.settimeout(2)
         s.connect(str(path))
         s.sendall(json.dumps(toast).encode() + b"\n")
 
 
-def send(toast):
+def send(toast: Toast) -> None:
     """To this session's daemon; from outside a session (a system service),
     to every player's session on the TV through the shared folder."""
     try:
@@ -358,7 +419,7 @@ def send(toast):
 # whatever owns org.freedesktop.Notifications. In the TV session that's
 # the toast daemon, so they show as toasts too.
 
-def strip_markup(text):
+def strip_markup(text: str | None) -> str:
     """The spec's body markup (<b>, <i>, <a href>...) and entities, gone."""
     text = re.sub(r"<[^>]+>", "", text or "")
     for a, b in (("&lt;", "<"), ("&gt;", ">"), ("&quot;", '"'), ("&apos;", "'"), ("&amp;", "&")):
@@ -366,22 +427,24 @@ def strip_markup(text):
     return text.strip()
 
 
-def from_notification(app, replaces, icon, summary, body, hints, nid):
+def from_notification(app: str, replaces: int, icon: str, summary: str, body: str,
+                      hints: dict[str, tuple[str, object] | object] | None, nid: int) -> Toast:
     """A toast from a Notify call. Hints are {name: (signature, value)}.
     Critical urgency is an alert; a "value" hint (0-100) is progress,
     updated in place under the same notification id."""
     hint = {k: v[1] if isinstance(v, tuple) else v for k, v in (hints or {}).items()}
-    toast = {"kind": "notice", "title": strip_markup(summary) or app or "Notification"}
+    toast: Toast = {"kind": "notice", "title": strip_markup(summary) or app or "Notification"}
     detail = strip_markup(body)
     if detail:
         toast["detail"] = detail
     if hint.get("urgency") == 2:
         toast["kind"] = "alert"
-    if isinstance(hint.get("value"), int):
+    value = hint.get("value")
+    if isinstance(value, int):
         toast["kind"] = "progress"
-        toast["progress"] = max(0, min(100, hint["value"])) / 100
-        toast["done"] = hint["value"] >= 100
-    image = hint.get("image-path") or hint.get("image_path") or icon or ""
+        toast["progress"] = max(0, min(100, value)) / 100
+        toast["done"] = value >= 100
+    image = next((v for v in (hint.get("image-path"), hint.get("image_path"), icon) if isinstance(v, str) and v), "")
     if image.startswith("file://"):
         image = image[7:]
     if image.startswith("/") and Path(image).exists():
@@ -390,7 +453,7 @@ def from_notification(app, replaces, icon, summary, body, hints, nid):
     return toast
 
 
-def serve_notifications():
+def serve_notifications() -> None:
     """Own org.freedesktop.Notifications on the session bus and hand each
     notification to the daemon as a toast. Returns quietly when there's no
     bus, jeepney, or another notification daemon already."""
@@ -439,13 +502,13 @@ SYS = Path("/sys/class")
 LOW = 20   # percent: warn once at or below, again after charging past LOW + 10
 
 
-def connected_pads(sys_class=SYS):
+def connected_pads(sys_class: Path = SYS) -> dict[str, str]:
     """{device path: name} for each controller the kernel has a joystick
     (jsN) for. A controller with more than one joystick counts once, by
     its first: a DualSense's motion sensors are a joystick of their own,
     and got a "Controller disconnected" toast of their own (first box,
     2026-10-09)."""
-    pads = {}
+    pads: dict[str, list[tuple[int, str]]] = {}
     for js in sorted((sys_class / "input").glob("js*")):
         try:
             dev = Path(os.path.realpath(js / "device"))
@@ -457,7 +520,7 @@ def connected_pads(sys_class=SYS):
     return {parent: min(found)[1] for parent, found in pads.items()}
 
 
-def pad_batteries(sys_class=SYS):
+def pad_batteries(sys_class: Path = SYS) -> dict[str, tuple[str, int]]:
     """{power supply: (pad name, percent)} for batteries that belong to a
     device (scope Device) with a joystick-like input under it."""
     out = {}
@@ -474,7 +537,7 @@ def pad_batteries(sys_class=SYS):
     return out
 
 
-def pad_status(sys_class=SYS):
+def pad_status(sys_class: Path = SYS) -> list[tuple[str, int | None]]:
     """[(name, battery percent or None)] for each connected controller,
     for the menu. A battery is matched to its pad by the device both hang
     off; a pad that reports none (the 8BitDo's 2.4 GHz dongle under xpad,
@@ -492,12 +555,12 @@ def pad_status(sys_class=SYS):
     return [(name, levels.get(str(Path(dev).parent))) for dev, name in connected_pads(sys_class).items()]
 
 
-def in_game():
+def in_game() -> bool:
     """Whether a game is running in this session (gamescope-fg's marker)."""
     return (sock_path().parent / "famidrive-game.pgid").exists()
 
 
-def game_mode():
+def game_mode() -> str:
     """What the Guide menu does with the running game (a system's
     guideMenu, written by the launch): "freeze" or "block". "block" when
     the launch said nothing."""
@@ -508,7 +571,7 @@ def game_mode():
     return words[0] if words and words[0] in ("freeze", "block") else "block"
 
 
-def manual_for(home, run):
+def manual_for(home: Path, run: Path) -> Path | None:
     """The PDF manual of the game running in this session, where ES-DE's
     own viewer finds it, or None. famidrive-launch writes the game's
     system and ES-DE's path to it (famidrive-game.rom); ES-DE keeps a
@@ -520,15 +583,15 @@ def manual_for(home, run):
     except (OSError, ValueError):
         return None
 
-    def folder(setting, default):
+    def folder(setting: str, default: str) -> Path:
         value = es_setting(home, setting) or default
         return Path(str(home) + value[1:]) if value.startswith("~") else Path(value)
     roms = folder("ROMDirectory", "~/ROMs")
     media = folder("MediaDirectory", "~/ES-DE/downloaded_media")
-    rom = Path(rom)
+    entry = Path(rom)
     rel = None
     for base in (roms / system, (roms / system).resolve()):
-        for path in (rom, rom.resolve()):
+        for path in (entry, entry.resolve()):
             try:
                 rel = path.relative_to(base)
                 break
@@ -546,7 +609,7 @@ def manual_for(home, run):
     return None
 
 
-def pdf_pages(path):
+def pdf_pages(path: Path) -> int | None:
     """How many pages a PDF has (pdfinfo), or None if it can't be read."""
     import subprocess
     try:
@@ -557,7 +620,11 @@ def pdf_pages(path):
     return int(m.group(1)) if m and int(m.group(1)) > 0 else None
 
 
-def render_page(path, page, height):
+# A drawn page: width, height and its RGB bytes.
+type Page = tuple[int, int, bytes]
+
+
+def render_page(path: Path, page: int, height: int) -> Page | None:
     """One page (from 0) of a PDF, height pixels tall, as (width, height,
     RGB bytes), or None. Raw PPM, not PNG: found on the first box
     2026-10-21, a 4K-tall page took pdftoppm 6 s as a PNG (compressing it)
@@ -572,7 +639,7 @@ def render_page(path, page, height):
     return ppm(out)
 
 
-def ppm(data):
+def ppm(data: bytes) -> Page | None:
     """A binary PPM (P6, 8 bits) as (width, height, RGB bytes), or None."""
     m = re.match(rb"P6\s+(?:#[^\n]*\s+)*(\d+)\s+(\d+)\s+(\d+)\s", data)
     if not m or int(m.group(3)) != 255:
@@ -582,45 +649,51 @@ def ppm(data):
     return (w, h, pixels) if len(pixels) == w * h * 3 else None
 
 
-def recording_since():
+class RecordState(TypedDict, total=False):
+    """famidrive-record's state file, the parts read here."""
+    pid: int
+    started: float
+
+
+def recording_since() -> float | None:
     """When famidrive-record's recording in this session started (as
     time.time()), or None if it isn't recording: its state file, with a
     recorder that's still there. A state file from before it said when is
     taken as written at the start."""
     path = sock_path().parent / "famidrive-record.json"
     try:
-        state = json.loads(path.read_text())
+        state: RecordState = json.loads(path.read_text())
         os.kill(int(state["pid"]), 0)
         return float(state.get("started") or path.stat().st_mtime)
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return None
 
 
-def recording():
+def recording() -> bool:
     return recording_since() is not None
 
 
-def elapsed(seconds):
+def elapsed(seconds: float) -> str:
     """A recording's length so far, as 0:42 or 1:02:03."""
     m, s = divmod(max(0, int(seconds)), 60)
     h, m = divmod(m, 60)
     return f"{h}:{m:02}:{s:02}" if h else f"{m}:{s:02}"
 
 
-def pulse(seconds):
+def pulse(seconds: float) -> float:
     """How bright the dot beside Stop is: full and dull by turns, half a
     second each, so a whole pulse a second."""
     return 1.0 if int(max(0, seconds) * 2) % 2 == 0 else 0.35
 
 
-def record(cmd):
+def record(cmd: str) -> None:
     """famidrive-record start or stop, by name from PATH (a fix to it then
     doesn't restart the TV), in the background: stopping waits for the
     file to be finished, and the daemon has the screen to draw meanwhile."""
     import subprocess
     import threading
 
-    def run():
+    def run() -> None:
         try:
             subprocess.run(["famidrive-record", cmd], stdin=subprocess.DEVNULL)
         except OSError as e:
@@ -628,7 +701,7 @@ def record(cmd):
     threading.Thread(target=run, daemon=True).start()
 
 
-def pausable():
+def pausable() -> bool:
     """Whether the running thing is a game, to pause: not Steam's Big
     Picture or the voice client, which leave a polite way to close them
     instead (famidrive-game.close)."""
@@ -638,13 +711,13 @@ def pausable():
         return True
 
 
-def pad_changes(before, after):
+def pad_changes(before: dict[str, str], after: dict[str, str]) -> list[Toast]:
     """The toasts for pads that came and went between two scans: short and
     plain, in a game too. Before 2026-10-13 a pad lost in a game was an
     alert that said to quit with Select + Start to play on with another;
     a pad that went to sleep is far more likely, and the player picks it
     up again and carries on."""
-    toasts = []
+    toasts: list[Toast] = []
     for dev, name in sorted(after.items()):
         if dev not in before:
             toasts.append({"kind": "notice", "icon": "controller", "title": "Controller connected",
@@ -656,9 +729,9 @@ def pad_changes(before, after):
     return toasts
 
 
-def battery_changes(warned, now):
+def battery_changes(warned: set[str], now: dict[str, tuple[str, int]]) -> list[Toast]:
     """Low-battery toasts, once per pad until it's charged again."""
-    toasts = []
+    toasts: list[Toast] = []
     for ps, (name, cap) in now.items():
         if cap <= LOW and ps not in warned:
             warned.add(ps)
@@ -669,10 +742,11 @@ def battery_changes(warned, now):
     return toasts
 
 
-def watch_controllers(interval=1.5):
+def watch_controllers(interval: float = 1.5) -> None:
     """Scan for pads every so often and toast what changed. Pads already
     connected when the session starts aren't announced."""
-    before, warned = connected_pads(), set()
+    before = connected_pads()
+    warned: set[str] = set()
     while True:
         time.sleep(interval)
         after = connected_pads()
@@ -722,12 +796,13 @@ class Reader:
     ZOOMS = (1.0, 1.5, 2.0, 2.5)
     STEP = 0.25   # of what doesn't fit, per press
 
-    def __init__(self, path):
-        self.path, self.pages = path, None
+    def __init__(self, path: Path) -> None:
+        self.path: Path = path
+        self.pages: int | None = None   # known once it's been read
         self.page, self.zoom = 0, 0
         self.x, self.y = 0.5, 0.0
 
-    def command(self, cmd):
+    def command(self, cmd: str) -> None:
         last = (self.pages or 1) - 1
         if cmd == "rb":
             self.zoom = min(len(self.ZOOMS) - 1, self.zoom + 1)
@@ -760,25 +835,26 @@ class Menu:
     button above them, drawn as Record (or Stop); the menu still opens on
     Resume or Close."""
 
-    def __init__(self, recordings=False):
+    def __init__(self, recordings: bool = False) -> None:
         self.recordings = recordings
         self.recording = False
         self.open = False
         self.view = "main"   # or "confirm": Quit game's "are you sure?"; or "manual"
-        self.items = []
+        self.items: list[str] = []
         self.sel = 0
         self.playing = False
         self.mode, self.note = "block", ""
-        self.manual = None   # the running game's manual, if it has one
-        self.reader = None   # a Reader, while it's open
+        self.manual: Path | None = None   # the running game's manual, if it has one
+        self.reader: Reader | None = None   # while it's open
 
-    def _main(self):
+    def _main(self) -> None:
         self.view = "main"
         record = ["Stop recording" if self.recording else "Start recording"] if self.recordings else []
         manual = ["Manual"] if self.manual else []
         self.items = [*record, "Resume", *manual, "Quit game"] if self.playing else [*record, "Close"]
 
-    def command(self, cmd, playing, pausable=True, mode="block", recording=False, manual=None):
+    def command(self, cmd: str, playing: bool, pausable: bool = True, mode: str = "block",
+                recording: bool = False, manual: Path | None = None) -> MenuReply:
         if cmd == "open":
             self.open, self.sel, self.playing, self.recording = True, 0, playing, recording
             self.manual, self.reader = manual if playing else None, None
@@ -796,7 +872,7 @@ class Menu:
             elif cmd == "back":
                 self._main()
                 self.sel = self.items.index("Manual")
-            else:
+            elif self.reader:
                 self.reader.command(cmd)
             return self.state()
         item = self.items[self.sel]
@@ -809,7 +885,7 @@ class Menu:
             self.sel = max(0, self.sel - 1)
         elif cmd == "down":
             self.sel = min(len(self.items) - 1, self.sel + 1)
-        elif cmd == "select" and item == "Manual":
+        elif cmd == "select" and item == "Manual" and self.manual:
             self.view, self.reader = "manual", Reader(self.manual)
         elif cmd == "select" and item == "Quit game":
             self.view, self.items, self.sel = "confirm", ["Cancel", "Quit"], 0
@@ -824,13 +900,73 @@ class Menu:
             self.open = False
         return self.state()
 
-    def state(self):
+    def state(self) -> MenuReply:
         return {"open": self.open}
 
 
 # --- The daemon -------------------------------------------------------------
+#
+# python-xlib has no types: what the daemon draws into (the window, and
+# pixmaps on the X server) is described by what's called on it.
 
-def live(path):
+class Drawable(Protocol):
+    def put_image(self, gc: object, x: int, y: int, width: int, height: int, format: int, depth: int,
+                  left_pad: int, data: bytes) -> None:
+        ...
+
+    def fill_rectangle(self, gc: object, x: int, y: int, width: int, height: int) -> None:
+        ...
+
+    def copy_area(self, gc: object, src: "Drawable", src_x: int, src_y: int, width: int, height: int,
+                  dst_x: int, dst_y: int) -> None:
+        ...
+
+
+class Pixmap(Drawable, Protocol):
+    def free(self) -> None:
+        ...
+
+
+class Swap(TypedDict):
+    """The menu's buttons sliding over to the quit question, or back."""
+    pix: Pixmap   # the old buttons and the new, side by side
+    t0: float
+    top: int
+    h: int
+    forward: bool
+
+
+# What the menu showed when it was drawn: its view, selection, note,
+# items, controllers, clock, and the recording's half seconds.
+type MenuKey = tuple[str, int, str, tuple[str, ...], tuple[tuple[str, int | None], ...], str, int | None]
+
+
+class Sheet(TypedDict):
+    """The menu's panel, on the X server, and its slide in and out."""
+    t0: float
+    pw: int
+    pix: Pixmap
+    phase: str   # in, still, out
+    view: str
+    surf: "pygame.Surface"
+    band: tuple[int, int]   # the rows the buttons are in
+    swap: Swap | None
+    key: MenuKey
+    data: bytes   # what was last sent to pix
+
+
+# A manual's page, drawn: its file, page and zoom.
+type PageKey = tuple[str, int, int]
+type ManualShown = tuple[PageKey, float, float, str | bool, int | None]
+
+
+class Reading(TypedDict):
+    """A manual on screen: its pixmap, and what's drawn in it."""
+    pix: Pixmap
+    drawn: ManualShown | None
+
+
+def live(path: Path) -> bool:
     """Whether a daemon answers on this socket."""
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
@@ -841,7 +977,7 @@ def live(path):
         return False
 
 
-def listen(path, mode):
+def listen(path: Path, mode: int) -> socket.socket | None:
     """A listening socket at path, unless a live daemon already has it
     (None then): only a dead one left behind is replaced. Found on the
     first box 2026-10-07: a second daemon took the player's shared socket
@@ -858,7 +994,7 @@ def listen(path, mode):
     return srv
 
 
-def release(paths):
+def release(paths: list[tuple[Path, int]]) -> None:
     """Remove the sockets this daemon made, if they're still its own."""
     for path, ino in paths:
         try:
@@ -868,18 +1004,19 @@ def release(paths):
             pass
 
 
-def daemon(spec_file, player):
+def daemon(spec_file: str, player: str) -> None:
     import select
+    import threading
 
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")   # pygame only draws; X shows
     import pygame
     from Xlib import X, Xatom, display as xdisplay
 
-    spec = json.loads(read(spec_file) or "{}")
+    spec: Spec = json.loads(read(spec_file) or "{}")
     me = player_spec(spec, player)
     theme = spec.get("theme")
-    queue = Queue(me["hide"])
+    queue = Queue(me.get("hide", []))
     # Not on "Who's playing?": nobody's session to record into yet.
     menu = Menu(recordings=bool(spec.get("recordings")) and player != "greeter")
 
@@ -903,7 +1040,7 @@ def daemon(spec_file, player):
     fill_gc = win.create_gc()   # for solid fills the X server does itself
     d.flush()
 
-    def fnt(path, size):
+    def fnt(path: Path | None, size: int) -> pygame.font.Font:
         try:
             if path:
                 return pygame.font.Font(str(path), size)
@@ -925,7 +1062,7 @@ def daemon(spec_file, player):
     width = int(600 * u)
     margin = int(40 * u)
 
-    def image_icon(path, size):
+    def image_icon(path: str, size: int) -> pygame.Surface | None:
         """An image fitted into size x size, centered, keeping its shape (a
         game's logo is usually wide). Copied onto a 32-bit surface first:
         smoothscale takes no palette images, and there's no display to
@@ -943,7 +1080,7 @@ def daemon(spec_file, player):
         out.blit(fitted, ((size - fitted.get_width()) // 2, (size - fitted.get_height()) // 2))
         return out
 
-    def stroke(c, color, points, w):
+    def stroke(c: pygame.Surface, color: tuple[int, ...], points: list[tuple[float, float]], w: float) -> None:
         """A thick polyline with round ends and joins. pygame's own thick
         lines end in flat, slanted cuts and leave a notch at each join,
         which read as clipped at a toast's size."""
@@ -956,7 +1093,7 @@ def daemon(spec_file, player):
         for x, y in points:
             pygame.draw.circle(c, color, (x, y), r)
 
-    def drawn_icon(name, size, color):
+    def drawn_icon(name: str, size: int, color: tuple[int, ...]) -> pygame.Surface:
         """One of ICONS, drawn at 4x and scaled down, for smooth edges."""
         n = size * 4
         c = pygame.Surface((n, n), pygame.SRCALPHA, 32)
@@ -1014,34 +1151,35 @@ def daemon(spec_file, player):
             pygame.draw.rect(c, clear, (n * .44, n * .42, n * .12, n * .34), border_radius=n // 40)
         return pygame.transform.smoothscale(c, (size, size))
 
-    def icon_for(toast, size, colors):
+    def icon_for(toast: Toast, size: int, colors: Colors) -> pygame.Surface:
         name = icon_name(toast)
         if name not in ICONS:
             img = image_icon(name, size)
             if img:
                 return img
-            name = KIND_ICON.get(toast["kind"], "info")
+            name = KIND_ICON.get(toast.get("kind", "notice"), "info")
         color = {"warning": ALERT, "trophy": GOLD, "check": SUCCESS}.get(name, colors["text"])
         return drawn_icon(name, size, color)
 
-    def render(toast, alpha, colors):
+    def render(toast: Toast, alpha: int, colors: Colors) -> pygame.Surface:
+        kind = toast.get("kind", "notice")
         isz = int(64 * u)
         img = icon_for(toast, isz, colors)
         text_w = width - 2 * pad - isz - gap
-        header = {"achievement": "Achievement unlocked", "alert": None}.get(toast["kind"])
-        lines = []
+        header = {"achievement": "Achievement unlocked", "alert": None}.get(kind)
+        lines: list[tuple[pygame.font.Font, str, tuple[int, ...]]] = []
         if header:
             lines.append((small_f, header.upper(), colors["dim"]))
         lines.append((title_f, toast.get("title", ""), colors["text"]))
         for line in wrap(toast.get("detail", ""), detail_f, text_w)[:3]:
             lines.append((detail_f, line, colors["dim"]))
         text_h = sum(f.get_linesize() for f, _, _ in lines)
-        bar_h = int(8 * u) if toast["kind"] == "progress" else 0
+        bar_h = int(8 * u) if kind == "progress" else 0
         inner = max(isz, text_h + (gap + bar_h if bar_h else 0))
         surf = pygame.Surface((width, inner + 2 * pad), pygame.SRCALPHA, 32)
         pygame.draw.rect(surf, opaque(colors["panel"]), surf.get_rect(), border_radius=radius)
-        if toast["kind"] in ("alert", "achievement", "success"):
-            accent = {"alert": ALERT, "achievement": GOLD, "success": SUCCESS}[toast["kind"]]
+        if kind in ("alert", "achievement", "success"):
+            accent = {"alert": ALERT, "achievement": GOLD, "success": SUCCESS}[kind]
             pygame.draw.rect(surf, accent, (0, radius, int(5 * u), surf.get_height() - 2 * radius))
         surf.blit(img, (pad, pad + (inner - isz) // 2))
         x = pad + isz + gap
@@ -1069,9 +1207,9 @@ def daemon(spec_file, player):
         return surf
 
     spread, drop = int(28 * u), int(8 * u)
-    shadows = {}
+    shadows: dict[tuple[int, int], pygame.Surface] = {}
 
-    def with_shadow(panel):
+    def with_shadow(panel: pygame.Surface) -> pygame.Surface:
         """The panel over a soft shadow, a little below it, so it stands
         off whatever's behind it. The result is `spread` larger on every
         side; place() still lines up the panel itself."""
@@ -1086,13 +1224,14 @@ def daemon(spec_file, player):
         out.blit(panel, (spread, spread))
         return out
 
-    def bgra(color):
+    def bgra(color: tuple[int, ...]) -> bytes:
         """One pixel of color, premultiplied, the way put sends it."""
         px = pygame.Surface((1, 1), pygame.SRCALPHA, 32)
         px.fill(color)
         return pygame.image.tobytes(px.premul_alpha(), "BGRA")
 
-    def put(surf, pos, target=None, skip=None, prev=None):
+    def put(surf: pygame.Surface, pos: tuple[int, int], target: Drawable | None = None,
+            skip: RGBA | None = None, prev: bytes | None = None) -> bytes:
         """Copy an RGBA surface into the window (or a pixmap), premultiplied,
         as BGRA rows in chunks the X server takes in one request each.
         skip: a color the target is already filled with; chunks that are
@@ -1114,18 +1253,18 @@ def daemon(spec_file, player):
             (target or win).put_image(gc, pos[0], pos[1] + top, w, n, X.ZPixmap, 32, 0, chunk)
         return data
 
-    def fill_solid(target, color, rect):
+    def fill_solid(target: Drawable, color: tuple[int, ...], rect: Rect) -> None:
         """Fill a rect with one color on the X server: nothing sent but the
         rect, however big."""
         b, g, r, a = bgra(color)
         fill_gc.change(foreground=(a << 24) | (r << 16) | (g << 8) | b)
         target.fill_rectangle(fill_gc, *rect)
 
-    def clear(rect):
+    def clear(rect: Rect | None) -> None:
         if rect:
             fill_solid(win, (0, 0, 0, 0), rect)
 
-    def fill(surf, color, rect, r=0):
+    def fill(surf: pygame.Surface, color: tuple[int, ...], rect: Rect, r: int = 0) -> None:
         """A filled rounded rect blended onto surf: drawing straight onto a
         32-bit surface replaces its pixels, alpha and all, which would cut a
         see-through hole in the panel for a faint fill."""
@@ -1133,14 +1272,14 @@ def daemon(spec_file, player):
         pygame.draw.rect(tmp, color, tmp.get_rect(), border_radius=r)
         surf.blit(tmp, rect[:2])
 
-    def on_text(text):
+    def on_text(text: tuple[int, ...]) -> tuple[int, int, int]:
         """Text on a highlight the theme's text color: black on a light
         one, white on a dark one. The panel's own color, used before,
         could be a grey nearly as light (first box, 2026-10-13)."""
         r, g, b = text[:3]
         return (17, 17, 17) if 0.299 * r + 0.587 * g + 0.114 * b > 128 else (255, 255, 255)
 
-    def render_menu(pads, colors):
+    def render_menu(pads: list[tuple[str, int | None]], colors: Colors) -> tuple[pygame.Surface, tuple[int, int]]:
         """The menu's panel: the screen's full height, on the right. Also
         returns the rows its buttons (and the quit question) are drawn in,
         which slide when the buttons change."""
@@ -1237,7 +1376,7 @@ def daemon(spec_file, player):
             x += g + int(10 * u) + label.get_width() + int(32 * u)
         return surf, (top, gy - int(24 * u))
 
-    def render_count(n, colors):
+    def render_count(n: int, colors: Colors) -> pygame.Surface:
         """The countdown before a recording: the number in a round panel,
         in the middle of the screen."""
         size = int(240 * u)
@@ -1250,13 +1389,13 @@ def daemon(spec_file, player):
     # --- A manual, full screen --------------------------------------------
 
     bar_h = int(84 * u)   # the hints under the page
-    pages = {}            # (path, page, zoom) -> its drawing, or False if it couldn't be drawn
-    drawing = set()       # the same, for pages pdftoppm is still drawing
+    pages: dict[PageKey, pygame.Surface | Literal[False]] = {}   # its drawing, or False if it couldn't be drawn
+    drawing: set[PageKey] = set()   # pages pdftoppm is still drawing
 
-    def page_height(zoom):
+    def page_height(zoom: int) -> int:
         return int((sh - bar_h) * Reader.ZOOMS[zoom])
 
-    def want_page(path, page, zoom):
+    def want_page(path: Path, page: int, zoom: int) -> None:
         """Have pdftoppm draw a page, in the background, unless it's drawn
         or being drawn. Only the pages near the one being read are kept:
         zoomed in on a 4K TV, one is 100 MB."""
@@ -1267,9 +1406,9 @@ def daemon(spec_file, player):
         for old in [k for k in pages if k[0] != key[0] or abs(k[1] - page) > 1 or k[2] not in (0, zoom)]:
             del pages[old]
 
-        def work():
+        def work() -> None:
             got = render_page(path, page, page_height(zoom))
-            surf = False
+            surf: pygame.Surface | Literal[False] = False
             if got:
                 w, h, px = got
                 flat = pygame.image.frombytes(px, (w, h), "RGB")
@@ -1282,7 +1421,7 @@ def daemon(spec_file, player):
             drawing.discard(key)
         threading.Thread(target=work, daemon=True).start()
 
-    def hint(keys, label, colors):
+    def hint(keys: list[str], label: str, colors: Colors) -> pygame.Surface:
         """One of the hints under a page: the buttons, then what they do."""
         text = colors["text"]
         g, sp = int(40 * u), int(8 * u)
@@ -1313,7 +1452,7 @@ def daemon(spec_file, player):
         out.blit(words, (x + int(2 * u), (out.get_height() - words.get_height()) // 2))
         return out
 
-    def render_manual_bar(r, colors):
+    def render_manual_bar(r: Reader, colors: Colors) -> pygame.Surface:
         """Under the page: which page it is, and the buttons."""
         surf = pygame.Surface((sw, bar_h), pygame.SRCALPHA, 32)
         m = int(40 * u)
@@ -1332,11 +1471,13 @@ def daemon(spec_file, player):
             x += h.get_width() + int(32 * u)
         return surf
 
-    def draw_manual(rd):
+    def draw_manual(rd: Reading) -> None:
         """The page the reader is on, over the whole screen, with the hints
         under it: drawn in a pixmap and copied on at once. The page before
         stays up until the next one's drawn."""
         r = menu.reader
+        if r is None:
+            return
         if r.pages is None:
             r.pages = pdf_pages(r.path) or 0   # 0: it can't be read
         key = (str(r.path), r.page, r.zoom)
@@ -1345,7 +1486,7 @@ def daemon(spec_file, player):
             if r.page + 1 < r.pages:
                 want_page(r.path, r.page + 1, 0)   # turning the page is the likeliest next
         surf = pages.get(key)
-        drawn = (key, r.x, r.y, "waiting" if surf is None else bool(surf), r.pages)
+        drawn: ManualShown = (key, r.x, r.y, "waiting" if surf is None else bool(surf), r.pages)
         if drawn == rd["drawn"] or (surf is None and rd["drawn"] is not None):
             return
         rd["drawn"] = drawn
@@ -1364,17 +1505,17 @@ def daemon(spec_file, player):
         put(render_manual_bar(r, colors), (0, avail), pix)
         win.copy_area(gc, pix, 0, 0, sw, sh, 0, 0)
 
-    def menu_key(pads):
+    def menu_key(pads: list[tuple[str, int | None]]) -> MenuKey:
         since = recording_since() if "Stop recording" in menu.items else None
         live = None if since is None else int((time.time() - since) * 2)   # the dot's pulse and the time so far
         return (menu.view, menu.sel, menu.note, tuple(menu.items), tuple(pads), time.strftime("%-I:%M"), live)
 
-    def dim_at(k):
+    def dim_at(k: float) -> RGBA:
         """The dim at k of its full strength (it fades in and out with the
         panel), as a solid fill."""
         return (*DIM[:3], int(DIM[3] * max(0.0, min(1.0, k))))
 
-    def draw_menu(sheet, before):
+    def draw_menu(sheet: Sheet, before: MenuKey | None) -> MenuKey:
         """Redraw the settled menu if it changed; returns what's drawn now.
         Drawn into the panel's pixmap, then copied onto the screen in one
         go, so it never shows half drawn. When the buttons change to the
@@ -1389,11 +1530,11 @@ def daemon(spec_file, player):
             start_swap(sheet, panel, band, colors, forward=menu.view == "confirm")
         sheet["view"], sheet["surf"], sheet["band"] = menu.view, panel, band
         sheet["data"] = put(panel, (0, 0), sheet["pix"], prev=sheet["data"])
-        if not sheet.get("swap"):
+        if not sheet["swap"]:
             win.copy_area(gc, sheet["pix"], 0, 0, sheet["pw"], sh, sw - sheet["pw"], 0)
         return key
 
-    def start_swap(sheet, new, band, colors, forward):
+    def start_swap(sheet: Sheet, new: pygame.Surface, band: tuple[int, int], colors: Colors, forward: bool) -> None:
         """The old buttons and the new ones side by side in a pixmap, the
         new ones to the right going forward (to the quit question) and to
         the left coming back; each frame shows a window onto it that moves
@@ -1411,8 +1552,10 @@ def daemon(spec_file, player):
         put(second, (pw, 0), pix, skip=color)
         sheet["swap"] = {"pix": pix, "t0": time.monotonic(), "top": top, "h": h, "forward": forward}
 
-    def swap_step(sheet):
+    def swap_step(sheet: Sheet) -> None:
         sw_ = sheet["swap"]
+        if sw_ is None:
+            return
         p = (time.monotonic() - sw_["t0"]) / SWAP_SECONDS
         k = ease_out(p)
         off = int(round(sheet["pw"] * (k if sw_["forward"] else 1 - k)))
@@ -1422,7 +1565,7 @@ def daemon(spec_file, player):
             sheet["swap"] = None
             win.copy_area(gc, sheet["pix"], 0, 0, sheet["pw"], sh, sw - sheet["pw"], 0)
 
-    def open_menu():
+    def open_menu() -> Sheet:
         """Start the panel's slide in. The panel goes to the X server once,
         as a pixmap, and each frame of the slide is a copy from it there,
         with the dim filled in by the X server as it fades in. Only the
@@ -1437,7 +1580,7 @@ def daemon(spec_file, player):
         return {"t0": time.monotonic(), "pw": pw, "pix": pix, "phase": "in", "view": menu.view,
                 "surf": panel, "band": band, "swap": None, "key": menu_key(pads), "data": data}
 
-    def slide_step(sl):
+    def slide_step(sl: Sheet) -> bool:
         """One frame of the panel sliding in (ease-out) or out (ease-in, so
         it leaves the way it came), with the dim fading along; True once
         it's done."""
@@ -1450,17 +1593,17 @@ def daemon(spec_file, player):
             win.copy_area(gc, sl["pix"], 0, 0, sw - x, sh, x, 0)
         return p >= 1
 
-    def end_sheet(sl):
+    def end_sheet(sl: Sheet | None) -> None:
         if sl:
             sl["pix"].free()
-            if sl.get("swap"):
+            if sl["swap"]:
                 sl["swap"]["pix"].free()
 
     root = scr.root
     focus_atom, cardinal = d.intern_atom("STEAM_INPUT_FOCUS"), Xatom.CARDINAL
     blur = {k: d.intern_atom(k) for k in ("GAMESCOPE_BLUR_MODE", "GAMESCOPE_BLUR_RADIUS", "GAMESCOPE_BLUR_FADE_DURATION")}
 
-    def over_game(on):
+    def over_game(on: bool) -> None:
         """While the menu is up, gamescope blurs the game behind it (blur
         mode 2 is always, 0 off). The menu never takes the game's focus
         (STEAM_INPUT_FOCUS, as Steam's overlay does): a fullscreen game
@@ -1495,19 +1638,21 @@ def daemon(spec_file, player):
     import signal
     atexit.register(release, mine)
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))   # the session ending: clean up too
-    import threading
     threading.Thread(target=serve_notifications, daemon=True).start()
     threading.Thread(target=watch_controllers, daemon=True).start()
     xfd = d.fileno()
     snapshots = os.environ.get("FAMIDRIVE_TOAST_SNAPSHOT")
-    drawn = None   # (x, y, w, h) of the stack on screen now
-    menu_drawn = None   # what the menu showed when last drawn, while it's up
-    sheet = None        # the menu's panel on the X server, and its slide in
-    last = None    # what was drawn, to skip redrawing a still stack
-    colors, rendered, ys = {}, {}, {}   # per toast: its scheme, its last render, its animated y
-    countdown = None   # when a recording starts, while the countdown is up
-    count_drawn = None   # (number, rect) of the countdown on screen now
-    reading = None       # while a manual is up: its pixmap, and what's drawn in it
+    drawn: Rect | None = None          # the stack on screen now
+    menu_drawn: MenuKey | None = None  # what the menu showed when last drawn, while it's up
+    sheet: Sheet | None = None         # the menu's panel on the X server, and its slide in
+    last: tuple[tuple[tuple[str, int], ...], tuple[tuple[int, int], ...]] | None = None   # what was drawn, to skip redrawing a still stack
+    # Per toast (by id()): its scheme, its last render (and what it was of), its animated y.
+    colors: dict[int, Colors] = {}
+    rendered: dict[int, tuple[tuple[str, int], pygame.Surface]] = {}
+    ys: dict[int, float] = {}
+    countdown: float | None = None     # when a recording starts, while the countdown is up
+    count_drawn: tuple[int, Rect] | None = None   # (number, rect) of the countdown on screen now
+    reading: Reading | None = None     # while a manual is up
     gap = int(16 * u)
     while True:
         now = time.monotonic()
@@ -1519,8 +1664,9 @@ def daemon(spec_file, player):
         # show once it's closed; the menu redraws for the clock and
         # batteries every second.
         busy = menu.open or sheet is not None or countdown is not None or bool(queue.tick(now)) or drawn is not None
-        moving = (sheet and (sheet["phase"] != "still" or sheet["swap"])) or (reading and drawing)
-        wait = 1 / 60 if moving else 1.0 if menu.open else 1 / 30 if busy else None
+        sliding = (sheet is not None and (sheet["phase"] != "still" or sheet["swap"] is not None)) \
+            or (reading is not None and bool(drawing))
+        wait = 1 / 60 if sliding else 1.0 if menu.open else 1 / 30 if busy else None
         if menu.open and wait == 1.0 and "Stop recording" in menu.items:
             # On the half second, so the dot beside Stop pulses evenly.
             since = recording_since()
@@ -1539,21 +1685,24 @@ def daemon(spec_file, player):
                     pass
                 for line in buf.splitlines():
                     try:
-                        msg = json.loads(line)
+                        msg: object = json.loads(line)
                     except ValueError:
                         continue
                     if not isinstance(msg, dict):
                         continue
-                    if "menu" not in msg:
+                    command = msg.get("menu")
+                    if command is None:
+                        # A toast, as famidrive-toast sends it (parse_send).
+                        toast = cast(Toast, msg)
                         # The menu lists the controllers already: no toast
                         # for one coming or going under it, to show later.
-                        if not (menu.open and msg.get("icon") == "controller"):
-                            queue.add(msg, time.monotonic())
-                    elif server is srv:   # the session's own socket only, not the shared one
-                        if msg["menu"] == "open":
+                        if not (menu.open and toast.get("icon") == "controller"):
+                            queue.add(toast, time.monotonic())
+                    elif server is srv and isinstance(command, str):   # the session's own socket only, not the shared one
+                        if command == "open":
                             countdown = None   # the menu opened over it: the recording isn't started
-                        manual = manual_for(Path.home(), sock_path().parent) if msg["menu"] == "open" else None
-                        reply = menu.command(msg["menu"], in_game(), pausable(), game_mode(), recording(), manual)
+                        manual = manual_for(Path.home(), sock_path().parent) if command == "open" else None
+                        reply = menu.command(command, in_game(), pausable(), game_mode(), recording(), manual)
                         if reply.get("do") == "record":
                             # Once the menu has slid away and the blur faded.
                             countdown = time.monotonic() + SLIDE_SECONDS + COUNTDOWN
@@ -1580,11 +1729,11 @@ def daemon(spec_file, player):
         if reading:   # back from the manual: the menu, as it was
             reading["pix"].free()
             reading = None
-            if menu.open:
+            if menu.open and sheet:
                 fill_solid(win, dim_at(1), (0, 0, sw - sheet["pw"], sh))
                 menu_drawn = None
         if menu.open:
-            if menu_drawn is None and sheet is None:   # just opened
+            if sheet is None:   # just opened
                 over_game(True)
                 sheet = open_menu()
                 menu_drawn = sheet["key"]
@@ -1616,9 +1765,9 @@ def daemon(spec_file, player):
             count_drawn = None
         if countdown is not None:
             # Toasts wait under the countdown, as they do under the menu.
-            left = countdown - time.monotonic()
-            if left > 0:
-                n = min(COUNTDOWN, int(left) + 1)
+            remaining = countdown - time.monotonic()
+            if remaining > 0:
+                n = min(COUNTDOWN, int(remaining) + 1)
                 if not count_drawn or count_drawn[0] != n:
                     clear(drawn)
                     drawn = last = None
@@ -1645,21 +1794,22 @@ def daemon(spec_file, player):
             drawn = last = None
             d.flush()
             continue
-        surfs, moving = [], False
+        surfs: list[tuple[Toast, pygame.Surface]] = []
+        moving = False
         for toast, age, left in shown:
             k = id(toast)
             if k not in colors:   # the player's scheme, read once per toast
                 colors[k] = theme_colors(theme, color_scheme(Path.home()))
             alpha = int(255 * max(0.0, min(age / FADE, 1.0, (left / FADE) if left is not None else 1.0)))
             sig = (json.dumps(toast, sort_keys=True), alpha)
-            indeterminate = toast["kind"] == "progress" and toast.get("progress") is None and not toast.get("done")
+            indeterminate = toast.get("kind") == "progress" and toast.get("progress") is None and not toast.get("done")
             moving = moving or indeterminate
             if indeterminate or rendered.get(k, (None,))[0] != sig:
                 rendered[k] = (sig, render(toast, alpha, colors[k]))
             surfs.append((toast, rendered[k][1]))
         sizes = [(sf.get_width() - 2 * spread, sf.get_height() - 2 * spread) for _, sf in surfs]
         spots = []
-        for (toast, sf), (tx, ty) in zip(surfs, layout(me["position"], (sw, sh), sizes, margin, gap)):
+        for (toast, sf), (tx, ty) in zip(surfs, layout(me.get("position", "bottom-right"), (sw, sh), sizes, margin, gap)):
             y = ys.get(id(toast), ty)
             if abs(ty - y) > 1:   # glide to its new place in the stack
                 y += (ty - y) * 0.3
@@ -1690,8 +1840,9 @@ def daemon(spec_file, player):
         d.flush()
 
 
-def wrap(text, f, width):
-    lines, line = [], ""
+def wrap(text: str | None, f: "pygame.font.Font", width: int) -> list[str]:
+    lines: list[str] = []
+    line = ""
     for word in (text or "").split():
         test = f"{line} {word}".strip()
         if f.size(test)[0] <= width or not line:
@@ -1702,7 +1853,7 @@ def wrap(text, f, width):
     return lines + ([line] if line else [])
 
 
-def ellipsize(text, f, width):
+def ellipsize(text: str, f: "pygame.font.Font", width: int) -> str:
     if f.size(text)[0] <= width:
         return text
     while text and f.size(text + "…")[0] > width:
@@ -1710,7 +1861,7 @@ def ellipsize(text, f, width):
     return text + "…"
 
 
-def main():
+def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "daemon":
         daemon(sys.argv[2], sys.argv[3])
     else:

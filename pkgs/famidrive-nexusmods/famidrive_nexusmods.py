@@ -696,13 +696,13 @@ def fomod_layout(files: list[str], config_member: str, xml_bytes: bytes,
             if kind == "file":
                 f = by_lower.get(full.lower())
                 if f:
-                    out.append((f, dest if dest not in (None, ".", "") else posixpath.basename(src)))
+                    out.append((f, dest if dest and dest != "." else posixpath.basename(src)))
             elif kind == "folder":
                 pre = full.lower().rstrip("/") + "/"
                 for low, f in by_lower.items():
                     if low.startswith(pre):
                         rel = f[len(pre):]
-                        out.append((f, posixpath.join(dest, rel) if dest not in (None, ".", "") else rel))
+                        out.append((f, posixpath.join(dest, rel) if dest and dest != "." else rel))
 
     def wanted_for(step: str, group: str) -> Iterable[str] | None:
         if isinstance(choices, (set, frozenset)):
@@ -1725,9 +1725,7 @@ def nv_registry(prefix: Path, root: Path) -> bool:
 # the game's own archives.
 EMPTY_BSA = b"BSA\0" + struct.pack("<8I", 104, 36, 3, 0, 0, 0, 0, 0)
 
-# The 4GB Patcher's Python version (Nexus Mods, newvegas mod 62552, file
-# 1000080719, "4GB Python Patcher" 1.5): makes FalloutNV.exe use 4 GB and
-# load xNVSE (nvse_steam_loader.dll) itself. Only this exact script runs.
+
 class Patcher(TypedDict):
     mod: int
     file: int
@@ -1735,6 +1733,9 @@ class Patcher(TypedDict):
     sha256: str
 
 
+# The 4GB Patcher's Python version (Nexus Mods, newvegas mod 62552, file
+# 1000080719, "4GB Python Patcher" 1.5): makes FalloutNV.exe use 4 GB and
+# load xNVSE (nvse_steam_loader.dll) itself. Only this exact script runs.
 NV_PATCHER: Patcher = {"mod": 62552, "file": 1000080719, "name": "PyNVPatch.py",
                        "sha256": "dbb841ba2ab5dd9979282b8029b87e703475b5264441b4ee18243c2e91b39849"}
 

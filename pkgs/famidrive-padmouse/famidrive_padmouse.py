@@ -41,9 +41,12 @@ SCROLL_EVERY = 0.09    # seconds between wheel clicks at full tilt
 class AbsRange(Protocol):
     """What an axis' absinfo says about its range."""
     @property
-    def min(self) -> int: ...
+    def min(self) -> int:
+        ...
+
     @property
-    def max(self) -> int: ...
+    def max(self) -> int:
+        ...
 
 
 @dataclass
