@@ -19,7 +19,7 @@ WHITE = (231, 232, 232)   # the doodles' white
 SCALE = 4                 # drawn this much larger, then scaled down, for smooth edges
 
 
-def main(src, out):
+def main(src: str, out: str) -> None:
     im = Image.open(src).convert("RGBA")
     shape = im.getchannel("A")
     art = Image.new("RGBA", im.size, (*RED, 255))
@@ -33,7 +33,7 @@ def main(src, out):
     ring, dot, stroke = 82 * k, 44 * k, 9 * k
     d.ellipse((cx - ring, cy - ring, cx + ring, cy + ring), outline=255, width=stroke)
     d.ellipse((cx - dot, cy - dot, cx + dot, cy + dot), fill=255)
-    mark = mark.resize((w, h), Image.LANCZOS)
+    mark = mark.resize((w, h), Image.Resampling.LANCZOS)
 
     # Only on the band, never past its edges.
     inside = shape.point(lambda a: 255 if a > 0 else 0)
