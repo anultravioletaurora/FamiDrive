@@ -214,6 +214,19 @@ the exact commands.
   `tests/<name>_test.py`. Unit tests run against made-up files in a temp
   directory, with no network. Use an environment variable to point a
   URL at a local file, as `FAMIDRIVE_ENCORE` does.
+- **Python is typed**, and the `types` check runs `mypy --strict`
+  ([mypy.ini](mypy.ini)) over every tool:
+  - Every function is annotated. No `Any`.
+  - JSON, from Nix or from anywhere else, gets a `TypedDict` of the
+    fields the code reads, given where it's parsed
+    (`spec: Spec = json.loads(...)`). Data someone else wrote (a mod's
+    manifest, a launcher's config) is checked with `isinstance` before
+    it's used.
+  - What a library builds at run time (dbus_next's proxy methods) or
+    has no types for (python-xlib) gets a `Protocol` of what's called on
+    it. A `cast` says why.
+  - `writePython3Bin` also runs flake8, with each package's own
+    `flakeIgnore`, so a `Protocol` stub's `...` goes on a line of its own.
 - **New tests:**
   - Register a unit test in `tests/default.nix`.
   - For a module change, add a check to an example box (`box-one-player`,
