@@ -51,15 +51,218 @@ import tarfile
 import time
 import xml.etree.ElementTree as ET
 import zipfile
+from collections.abc import Callable, Iterable, Iterator
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import IO, NotRequired, TypedDict
 from xml.sax.saxutils import escape
 
 import requests
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-CFG = json.loads(Path(os.environ.get("ROMM_AGENT_CONFIG")
-                      or f"/etc/famidrive/romm/{getpass.getuser()}.json").read_text())
+
+# ---------------------------------------------------------------- types
+#
+# The config (romm-agent.nix), what RomM's API sends (the parts read
+# here: RomM 5.3.1), and the files this keeps.
+
+class SaveLayout(TypedDict):
+    """Where an emulator or app keeps saves (emulators.nix saveLayout)."""
+    kind: str
+    root: str
+    card: NotRequired[str]          # pcsx2-folder-memcard
+    paths: NotRequired[list[str]]   # files
+    profile: NotRequired[str | None]   # set here: the player's Eden profile or Xenia XUID
+
+
+class System(TypedDict):
+    rommPlatform: str
+    saveLayout: SaveLayout | None
+    saveSync: NotRequired[bool]
+    extensions: NotRequired[list[str]]
+    emulator: NotRequired[str | None]
+    firmwareDir: NotRequired[str | None]
+    contentCategories: NotRequired[list[str]]
+
+
+class App(TypedDict):
+    """An app whose saves sync under a RomM entry made by hand (romm.apps)."""
+    rom: str
+    saveLayout: SaveLayout | None
+    title: NotRequired[str]   # as ES-DE shows it; else its name
+    emulator: NotRequired[str | None]
+
+
+class Config(TypedDict):
+    """$ROMM_AGENT_CONFIG: the library's or a player's (romm-agent.nix)."""
+    url: str
+    dataDir: str
+    deviceName: str
+    systems: dict[str, System]
+    tokenFile: NotRequired[str | None]
+    owner: NotRequired[str]
+    displayName: NotRequired[str | None]
+    collection: NotRequired[str | None]
+    platforms: NotRequired[list[str] | None]
+    firmwarePlatforms: NotRequired[list[str]]
+    ryujinxGames: NotRequired[list[str] | None]
+    playerRoms: NotRequired[str | None]
+    gamelistDir: NotRequired[str]
+    edenProfileId: NotRequired[str | None]
+    xeniaXuid: NotRequired[str | None]
+    saveHistory: NotRequired[int]
+    apps: NotRequired[dict[str, App]]
+
+
+class RomFile(TypedDict, total=False):
+    id: int
+    file_name: str
+    category: str | None
+    file_size_bytes: int | None
+    sha1_hash: str | None
+
+
+class Metadatum(TypedDict, total=False):
+    average_rating: float | None
+    first_release_date: int | None   # ms since 1970
+    developers: list[str]
+    publishers: list[str]
+    genres: list[str]
+    player_count: str | None
+
+
+class Rom(TypedDict, total=False):
+    id: int
+    name: str | None
+    fs_name: str
+    fs_name_no_ext: str
+    fs_extension: str
+    fs_size_bytes: int | None
+    sha1_hash: str | None
+    has_multiple_files: bool
+    has_nested_single_file: bool
+    files: list[RomFile]
+    title_id: str | None
+    platform_slug: str
+    platform_fs_slug: str
+    is_physical: bool
+    updated_at: str
+    summary: str | None
+    metadatum: Metadatum | None
+    path_cover_large: str | None
+    path_cover_small: str | None
+    url_cover: str | None
+    merged_screenshots: list[str]
+    path_manual: str | None
+
+
+class RomPage(TypedDict, total=False):
+    items: list[Rom]
+    total: int | None
+
+
+class Collection(TypedDict, total=False):
+    id: int
+    name: str
+    user_id: int
+    is_favorite: bool
+    rom_ids: list[int]
+
+
+class Platform(TypedDict, total=False):
+    id: int
+    slug: str
+    fs_slug: str
+
+
+class User(TypedDict, total=False):
+    id: int
+    avatar_path: str | None
+
+
+class ServerSave(TypedDict, total=False):
+    id: int
+    slot: str | None
+    updated_at: str
+
+
+class IndexEntry(TypedDict):
+    """A game in the library's index.json, by its local path."""
+    id: int
+    system: str
+    title_id: NotRequired[str | None]
+    name: NotRequired[str | None]
+
+
+class SaveState(TypedDict, total=False):
+    """A player's save sync for one game (or app:<name>), in saves.json."""
+    id: int
+    title_id: str | None
+    learned: list[str]                # save paths found by learn_by_diff, or from RomM
+    pushed: str | None                # files_hash() of the save RomM has
+    server_updated_at: str | None
+    conflict_pushed: str              # files_hash() of the last conflict copy sent
+
+
+class Entry(TypedDict, total=False):
+    """A game's index entry with the player's save state on top (entry_for)."""
+    id: int
+    system: str
+    title_id: str | None
+    name: str | None
+    learned: list[str]
+    pushed: str | None
+    server_updated_at: str | None
+    conflict_pushed: str
+
+
+class Manifest(TypedDict, total=False):
+    """famidrive-manifest.json, in each save archive."""
+    system: str
+    title_id: str | None
+    paths: list[str]
+    files_sha256: str
+    device: str
+    owner: str
+    packed_at: int
+
+
+class Fetched(TypedDict, total=False):
+    """What the pull fetched for a game last time (media.json, manuals.json)."""
+    updated_at: str | None
+    stem: str
+    file: str   # manuals: the PDF it wrote
+
+
+class Pack(TypedDict):
+    sha1: str | None
+    dir: str
+
+
+class Packs(TypedDict, total=False):
+    """A game's texture packs or mods (textures.json, mods.json)."""
+    updated_at: str | None
+    packs: dict[str, Pack]
+
+
+class PullProgress(TypedDict):
+    label: str | None     # the game being fetched
+    fetched: list[str]    # games downloaded this run
+    shown: float          # when the toast last changed
+
+
+class DlcNca(TypedDict):
+    name: str
+    title_id: str
+
+
+class Dlc(TypedDict):
+    path: str
+    ncas: list[DlcNca]
+
+
+CFG: Config = json.loads(Path(os.environ.get("ROMM_AGENT_CONFIG")
+                              or f"/etc/famidrive/romm/{getpass.getuser()}.json").read_text())
 BASE = CFG["url"].rstrip("/")
 API = BASE + "/api"
 DATA = Path(CFG["dataDir"])
@@ -140,23 +343,30 @@ EP_SAVES = "/saves"                                    # GET ?rom_id=&device_id=
 EP_SAVE_CONTENT = "/saves/{id}/content"
 
 
-def session():
+def session() -> requests.Session:
     s = requests.Session()
     # The library pull gets its token from systemd (LoadCredential).
     creds = os.environ.get("CREDENTIALS_DIRECTORY")
-    token_file = Path(creds) / "romm-token" if creds else Path(CFG["tokenFile"])
+    configured = CFG.get("tokenFile")
+    if not creds and not configured:
+        raise RuntimeError("no RomM token: no tokenFile in the config, and none from systemd")
+    token_file = Path(creds) / "romm-token" if creds else Path(configured or "")
     token = token_file.read_text().strip()
     s.headers["Authorization"] = f"Bearer {token}"
     return s
 
 
-def get(s, path, **kw):
-    r = s.get(API + path, timeout=60, **kw)
+# Query parameters for RomM's API.
+type Params = dict[str, str | int | list[int]]
+
+
+def get(s: requests.Session, path: str, params: Params | None = None) -> requests.Response:
+    r = s.get(API + path, timeout=60, params=params)
     r.raise_for_status()
     return r
 
 
-def system_for(rom):
+def system_for(rom: Rom) -> str | None:
     """RomM platform -> this box's system. RomM has a display slug and a
     folder slug (psx is `ps` vs `psx`, for one); either may match."""
     slugs = {rom.get("platform_fs_slug"), rom.get("platform_slug")}
@@ -166,7 +376,7 @@ def system_for(rom):
     return None
 
 
-def sha1(path):
+def sha1(path: Path) -> str:
     h = hashlib.sha1()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):
@@ -181,8 +391,13 @@ ARCHIVES = {".zip", ".7z", ".rar"}
 HASHES = DATA / "hashes.json"
 
 
-def known_sha1(path):
+# A file's [size, mtime_ns, sha1] in hashes.json, by path.
+type HashCache = dict[str, tuple[int, int, str]]
+
+
+def known_sha1(path: Path) -> str:
     """A file's sha1, read again only if it changed since it was hashed."""
+    cache: HashCache
     try:
         cache = json.loads(HASHES.read_text())
     except (OSError, ValueError):
@@ -192,7 +407,7 @@ def known_sha1(path):
     if have and have[0] == st.st_size and have[1] == st.st_mtime_ns:
         return have[2]
     digest = sha1(path)
-    cache[str(path)] = [st.st_size, st.st_mtime_ns, digest]
+    cache[str(path)] = (st.st_size, st.st_mtime_ns, digest)
     try:
         HASHES.write_text(json.dumps(cache))
     except OSError:
@@ -202,10 +417,10 @@ def known_sha1(path):
 
 # The library pull's progress, for its toast: the game being fetched, and
 # the games actually downloaded this run (not ones already here).
-PULL = {"label": None, "fetched": [], "shown": 0.0}
+PULL: PullProgress = {"label": None, "fetched": [], "shown": 0.0}
 
 
-def pull_toast(progress=None):
+def pull_toast(progress: float | None = None) -> None:
     """The pull's progress toast on the TV, at most every 2 seconds."""
     now = time.monotonic()
     if now - PULL["shown"] < 2:
@@ -215,11 +430,11 @@ def pull_toast(progress=None):
     if progress is not None:
         args += ["--progress", f"{progress:.3f}"]
     n = len(PULL["fetched"])
-    detail = PULL["label"] + (f" ({n} done)" if n else "")
+    detail = (PULL["label"] or "") + (f" ({n} done)" if n else "")
     toast(*args, "Downloading games", detail)
 
 
-def one_name(name):
+def one_name(name: str | None) -> str:
     """A file or folder name from RomM, as one name in the library. RomM's
     names become paths here, so "../" or a "/" in one would put a file
     outside the system's folder: a RuntimeError, and that game is skipped."""
@@ -228,7 +443,8 @@ def one_name(name):
     return name
 
 
-def download(s, path, dest, expected_sha1=None, expected_size=None, params=None):
+def download(s: requests.Session, path: str, dest: Path, expected_sha1: str | None = None,
+             expected_size: int | None = None, params: dict[str, int] | None = None) -> bool:
     """Resumable download: a 40 GB ISO must not restart from zero."""
     if dest.suffix.lower() in ARCHIVES:
         # RomM hashes what's inside an archive (so a zipped ROM matches its
@@ -268,7 +484,7 @@ def download(s, path, dest, expected_sha1=None, expected_size=None, params=None)
         PULL["fetched"].append(PULL["label"])
     if expected_sha1:
         try:   # the hash just checked is the finished file's: keep it
-            cache = json.loads(HASHES.read_text())
+            cache: HashCache = json.loads(HASHES.read_text())
             cache[str(dest)] = cache.pop(str(part))
             HASHES.write_text(json.dumps(cache))
         except (OSError, ValueError, KeyError):
@@ -276,10 +492,16 @@ def download(s, path, dest, expected_sha1=None, expected_size=None, params=None)
     return True
 
 
-def device_id(s):
+class Device(TypedDict):
+    """This box as a RomM device (device.json, as RomM registered it)."""
+    device_id: str
+
+
+def device_id(s: requests.Session) -> str:
     """Register this box as one of the owner's RomM devices, once."""
     if DEVICE.exists():
-        return json.loads(DEVICE.read_text())["device_id"]
+        known: Device = json.loads(DEVICE.read_text())
+        return known["device_id"]
     r = s.post(API + EP_DEVICES, timeout=60, json={
         "name": CFG["deviceName"],
         "hostname": socket.gethostname(),
@@ -289,7 +511,7 @@ def device_id(s):
         "allow_existing": True,   # re-registering after a wipe reuses the device
     })
     r.raise_for_status()
-    dev = r.json()
+    dev: Device = r.json()
     DEVICE.parent.mkdir(parents=True, exist_ok=True)
     DEVICE.write_text(json.dumps(dev, indent=2))
     return dev["device_id"]
@@ -298,52 +520,69 @@ def device_id(s):
 # ---------------------------------------------------------------- library
 
 
-def all_roms(s, params):
+def all_roms(s: requests.Session, params: Params) -> Iterator[Rom]:
     offset = 0
     while True:
-        page = get(s, EP_ROMS, params={
+        page: RomPage = get(s, EP_ROMS, params={
             **params, "limit": PAGE, "offset": offset,
             "with_char_index": "false", "with_filter_values": "false",
             "with_rom_id_index": "false",
         }).json()
-        yield from page["items"]
-        offset += len(page["items"])
-        if not page["items"] or (page.get("total") is not None and offset >= page["total"]):
+        items = page.get("items") or []
+        yield from items
+        offset += len(items)
+        total = page.get("total")
+        if not items or (total is not None and offset >= total):
             return
 
 
-def library(s):
+def library(s: requests.Session) -> Iterator[Rom]:
     """Every ROM, or one collection's when `collection` is set, and only
     the platforms in `platforms` when that's set (both can be)."""
-    params = {}
-    if CFG.get("collection"):
-        cols = get(s, EP_COLLECTIONS).json()
-        col = next(c for c in cols if c["name"] == CFG["collection"])
+    params: Params = {}
+    collection = CFG.get("collection")
+    if collection:
+        cols: list[Collection] = get(s, EP_COLLECTIONS).json()
+        col = next(c for c in cols if c.get("name") == collection)
         params["collection_id"] = col["id"]
-    if CFG.get("platforms"):
-        wanted = set(CFG["platforms"])
-        params["platform_ids"] = [p["id"] for p in get(s, EP_PLATFORMS).json()
-                                  if wanted & {p.get("fs_slug"), p.get("slug")}]
-        if not params["platform_ids"]:
+    platforms = CFG.get("platforms")
+    if platforms:
+        wanted = set(platforms)
+        known: list[Platform] = get(s, EP_PLATFORMS).json()
+        ids = [p["id"] for p in known if wanted & {p.get("fs_slug"), p.get("slug")}]
+        if not ids:
             return iter(())
+        params["platform_ids"] = ids
     return all_roms(s, params)
 
 
 VERSION = re.compile(r"\bv(\d+(?:\.\d+)*)", re.I)
 
 
-def newest(files):
+def newest(files: list[RomFile]) -> list[RomFile]:
     """The highest-versioned of several updates for one game ("… update
     v3.0.5.nsp" over v3.0.4); all of them when versions can't be read."""
-    def version(f):
-        m = VERSION.search(f["file_name"])
+    def version(f: RomFile) -> tuple[int, ...] | None:
+        m = VERSION.search(f.get("file_name", ""))
         return tuple(int(x) for x in m.group(1).split(".")) if m else None
-    if len(files) < 2 or any(version(f) is None for f in files):
+    versions = [version(f) for f in files]
+    if len(files) < 2 or any(v is None for v in versions):
         return files
-    return [max(files, key=version)]
+    return [max(files, key=lambda f: version(f) or ())]
 
 
-def fetch_with_content(s, rom, system, categories):
+def rom_files(s: requests.Session, rom: Rom) -> list[RomFile]:
+    """The files in a game's folder in RomM, from its own page."""
+    page: Rom = get(s, EP_ROM.format(id=rom["id"])).json()
+    return page.get("files") or []
+
+
+def extensions(system: str) -> set[str]:
+    """The file extensions ES-DE lists for a system, lowercase."""
+    return {e.lower() for e in CFG["systems"][system].get("extensions", [])}
+
+
+def fetch_with_content(s: requests.Session, rom: Rom, system: str, categories: list[str]) -> Path | None:
     """A game whose folder in RomM holds more than the game: an update/
     and a dlc/ folder (RomM's file categories), say, for a Switch game.
     Each wanted file is fetched on its own (file_ids), never the folder as
@@ -352,18 +591,18 @@ def fetch_with_content(s, rom, system, categories):
     Eden reads updates and DLC from (ext_content_from_game_dirs), so they
     load for every player without installing anything. Returns the
     folder, or None when RomM has no game file for it (only an update)."""
-    files = get(s, EP_ROM.format(id=rom["id"])).json().get("files") or []
-    exts = {e.lower() for e in CFG["systems"][system].get("extensions", [])}
+    files = rom_files(s, rom)
+    exts = extensions(system)
     games = [f for f in files if f.get("category") == "game"
              and Path(f["file_name"]).suffix.lower() in exts and not f["file_name"].startswith(".")]
     if not games:
         return None
-    wanted = [(max(games, key=lambda f: f.get("file_size_bytes") or 0), Path())]
+    wanted: list[tuple[RomFile, Path]] = [(max(games, key=lambda f: f.get("file_size_bytes") or 0), Path())]
     for cat in categories:
         found = [f for f in files if f.get("category") == cat and Path(f["file_name"]).suffix.lower() in exts]
         wanted += [(f, Path(cat)) for f in (newest(found) if cat == "update" else found)]
     folder = DATA / "roms" / system / one_name(rom["fs_name"])
-    keep = set()
+    keep: set[Path] = set()
     for f, sub in wanted:
         dest = folder / sub / one_name(f["file_name"])
         keep.add(dest)
@@ -382,7 +621,7 @@ def fetch_with_content(s, rom, system, categories):
     return folder
 
 
-def fetch_rom(s, rom, system):
+def fetch_rom(s: requests.Session, rom: Rom, system: str) -> Path:
     """Single-file ROMs land as-is. Multi-file ROMs (Switch updates/DLC,
     PS3 and Wii U folders, multi-disc sets) come back from RomM as a zip and
     are unpacked into a folder of the same name. VERIFY per platform that
@@ -405,8 +644,8 @@ def fetch_rom(s, rom, system):
         if not files and not rom.get("fs_extension") and rom.get("has_nested_single_file"):
             # RomM's ROM list sends `files` empty; the ROM's own page has
             # them. Found on the first box 2026-10-06.
-            files = get(s, EP_ROM.format(id=rom["id"])).json().get("files") or []
-        exts = {e.lower() for e in CFG["systems"][system].get("extensions", [])}
+            files = rom_files(s, rom)
+        exts = extensions(system)
         if not rom.get("fs_extension") and len(files) > 1 and exts \
                 and not any(Path(f.get("file_name") or "").suffix.lower() in exts for f in files):
             # A folder with no game in it: a mod's files on their own. The
@@ -416,7 +655,7 @@ def fetch_rom(s, rom, system):
             # Crossing: City Folk Deluxe, a Riivolution mod for the disc.
             raise RuntimeError("RomM has no game file for it (no file ES-DE lists for this system)")
         main = main_file(rom, files) if not rom.get("fs_extension") else None
-        params = None
+        params: dict[str, int] | None = None
         size = rom.get("fs_size_bytes")
         if main:
             named = dest.with_name(one_name(main["file_name"]))
@@ -445,7 +684,7 @@ def fetch_rom(s, rom, system):
     return dest
 
 
-def main_file(rom, files):
+def main_file(rom: Rom, files: list[RomFile]) -> RomFile | None:
     """The game's own file among a folder's: the one RomM's hash for the
     ROM is of, or the only one."""
     named = [f for f in files if f.get("file_name")]
@@ -454,19 +693,19 @@ def main_file(rom, files):
     return next((f for f in named if f.get("sha1_hash") and f["sha1_hash"] == rom.get("sha1_hash")), None)
 
 
-def launch_file(folder, system):
+def launch_file(folder: Path, system: str) -> Path | None:
     """The file in a multi-file ROM's folder the emulator opens: the
     largest one at its top level with one of the system's extensions.
     Not RomM's .m3u, which lists every file, extras and all. Found on the
     first box 2026-10-06: GameCube folders held the game, a hack/ folder
     with a modded copy, and a stray ._.DS_Store, all in the .m3u."""
-    exts = {e.lower() for e in CFG["systems"][system].get("extensions", [])} - {".m3u"}
+    exts = extensions(system) - {".m3u"}
     files = [p for p in folder.iterdir()
              if p.is_file() and not p.name.startswith(".") and p.suffix.lower() in exts]
     return max(files, key=lambda p: p.stat().st_size) if files else None
 
 
-def launchable(dest, system):
+def launchable(dest: Path, system: str) -> Path:
     """What ES-DE lists and launches for a ROM. A folder becomes a link
     next to it, named after it, to its launch file, and the folder itself
     is hidden from ES-DE (noload.txt), so the menu shows a game, not a
@@ -487,7 +726,7 @@ def launchable(dest, system):
     return link
 
 
-def romm_title_id(system, tid):
+def romm_title_id(system: str, tid: str | None) -> str | None:
     """RomM's title_id, in the form the save layouts use. Found on the
     first box 2026-10-06: RomM gave GameCube IDs as hex ("474D5045" for
     GMPE), and only the first four characters."""
@@ -501,16 +740,16 @@ def romm_title_id(system, tid):
     return tid
 
 
-def switch_game_id(tid):
-    return bool(tid) and re.fullmatch(r"0100[0-9A-Fa-f]{12}", tid) is not None
+def switch_game_id(tid: str | None) -> bool:
+    return tid is not None and re.fullmatch(r"0100[0-9A-Fa-f]{12}", tid) is not None
 
 
-def title_id(system, rom, prev, path):
+def title_id(system: str, rom: Rom, prev: IndexEntry | None, path: Path) -> str | None:
     """RomM's ID (rule 2), else what this box had, else read from the ROM.
     GameCube and Wii saves are named by the full six-character ID (game
     and maker), so a shorter one from RomM is completed from the disc."""
     tid = romm_title_id(system, rom.get("title_id"))
-    had = romm_title_id(system, prev.get("title_id"))
+    had = romm_title_id(system, prev.get("title_id") if prev else None)
     if system == "switch":
         # Only a game's own ID (0100…000-style) names its save folder.
         # Found on the first box 2026-10-06: RomM had 0105661981816000.
@@ -523,12 +762,12 @@ def title_id(system, rom, prev, path):
     return tid or had or derive_id(system, path)
 
 
-def media_url(rel):
+def media_url(rel: str) -> str:
     """A RomM asset path, without its cache-busting ?ts=."""
     return BASE + rel.split("?")[0] if rel.startswith("/") else rel
 
 
-def fetch_one(s, urls, dest_stem):
+def fetch_one(s: requests.Session, urls: list[str | None], dest_stem: Path) -> bool:
     """The first of `urls` that downloads, saved as dest_stem.<ext>, in
     place of any other extension's copy. RomM's own files go through its
     session; outside links (its SteamGridDB cover) without our token."""
@@ -538,7 +777,7 @@ def fetch_one(s, urls, dest_stem):
         try:
             # BASE + "/": with a RomM at https://romm.example.org, a link to
             # https://romm.example.org.other.net must not get the token.
-            r = (s if url.startswith(BASE + "/") else requests).get(url, timeout=60)
+            r = s.get(url, timeout=60) if url.startswith(BASE + "/") else requests.get(url, timeout=60)
             r.raise_for_status()
         except requests.RequestException:
             continue
@@ -554,21 +793,22 @@ def fetch_one(s, urls, dest_stem):
     return False
 
 
-def fetch_media(s, rom, system, rel):
+def fetch_media(s: requests.Session, rom: Rom, system: str, rel: Path) -> None:
     """Cover and screenshot for one game, where ES-DE looks for them:
     MEDIA/<system>/covers/<game>.png, <game> being its file's path in the
     system folder without the extension. Fetched again only when RomM's
     entry changed. Found on the first box 2026-10-06: RomM listed
     covers it had no file for (404), so its cover link is the fallback."""
-    state = json.loads(MEDIA_STATE.read_text()) if MEDIA_STATE.exists() else {}
+    state: dict[str, Fetched] = json.loads(MEDIA_STATE.read_text()) if MEDIA_STATE.exists() else {}
     key = str(rom["id"])
     stem = Path(rel).with_suffix("")
     have = state.get(key)
     if have and have.get("updated_at") == rom.get("updated_at") and have.get("stem") == str(stem):
         return
     root = MEDIA / system
-    got = fetch_one(s, [media_url(rom["path_cover_large"]) if rom.get("path_cover_large") else None,
-                        media_url(rom["path_cover_small"]) if rom.get("path_cover_small") else None,
+    large, small = rom.get("path_cover_large"), rom.get("path_cover_small")
+    got = fetch_one(s, [media_url(large) if large else None,
+                        media_url(small) if small else None,
                         rom.get("url_cover")], root / "covers" / stem)
     shots = rom.get("merged_screenshots") or []
     fetch_one(s, [media_url(shots[0])] if shots else [], root / "screenshots" / stem)
@@ -577,7 +817,7 @@ def fetch_media(s, rom, system, rel):
         MEDIA_STATE.write_text(json.dumps(state, indent=2))
 
 
-def manual_file(s, rom):
+def manual_file(s: requests.Session, rom: Rom) -> RomFile | None:
     """The PDF in a game's manual/ folder in RomM (RomM's "manual" file
     category), or None. Only a game kept in a folder can have one, so
     only those cost a request. Found on the first box 2026-10-20: Mario
@@ -586,20 +826,20 @@ def manual_file(s, rom):
     first by name."""
     if rom.get("fs_extension"):
         return None
-    files = get(s, EP_ROM.format(id=rom["id"])).json().get("files") or []
+    files = rom_files(s, rom)
     pdfs = [f for f in files if f.get("category") == "manual"
             and f["file_name"].lower().endswith(".pdf") and not f["file_name"].startswith(".")]
     return min(pdfs, key=lambda f: f["file_name"]) if pdfs else None
 
 
-def fetch_manual(s, rom, system, rel):
+def fetch_manual(s: requests.Session, rom: Rom, system: str, rel: Path) -> None:
     """A game's manual, where ES-DE's PDF viewer looks for it:
     MEDIA/<system>/manuals/<game>.pdf. The PDF in its manual/ folder
     first, then the one uploaded on its page or scraped (path_manual,
     one per game). Looked for again only when RomM's entry changed. A
     manual this pull wrote that RomM has dropped (or that moved with
     the game's file) goes; one ES-DE's scraper put there stays."""
-    state = json.loads(MANUALS_STATE.read_text()) if MANUALS_STATE.exists() else {}
+    state: dict[str, Fetched] = json.loads(MANUALS_STATE.read_text()) if MANUALS_STATE.exists() else {}
     key = str(rom["id"])
     stem = Path(rel).with_suffix("")
     have = state.get(key, {})
@@ -608,31 +848,33 @@ def fetch_manual(s, rom, system, rel):
     dest = MEDIA / system / "manuals" / f"{stem}.pdf"
     wrote = None
     f = manual_file(s, rom)
+    manual = (rom.get("path_manual") or "").split("?")[0]
     if f:
         download(s, EP_ROM_CONTENT.format(id=rom["id"], file_name=f["file_name"]), dest,
                  f.get("sha1_hash") or None, f.get("file_size_bytes"), params={"file_ids": f["id"]})
         wrote = dest
-    elif (rom.get("path_manual") or "").split("?")[0].lower().endswith(".pdf"):
-        r = s.get(BASE + RESOURCES + "/" + rom["path_manual"].split("?")[0].lstrip("/"), timeout=60)
+    elif manual.lower().endswith(".pdf"):
+        r = s.get(BASE + RESOURCES + "/" + manual.lstrip("/"), timeout=60)
         r.raise_for_status()
         dest.parent.mkdir(parents=True, exist_ok=True)
         part = dest.with_name(dest.name + ".part")
         part.write_bytes(r.content)
         part.replace(dest)
         wrote = dest
-    if have.get("file") and Path(have["file"]) != wrote:
-        Path(have["file"]).unlink(missing_ok=True)
+    old = have.get("file")
+    if old and Path(old) != wrote:
+        Path(old).unlink(missing_ok=True)
     state[key] = {"updated_at": rom.get("updated_at"), "stem": str(stem)}
     if wrote:
         state[key]["file"] = str(wrote)
     MANUALS_STATE.write_text(json.dumps(state, indent=2))
 
 
-def dolphin_systems():
+def dolphin_systems() -> list[str]:
     return [n for n, d in CFG["systems"].items() if d.get("emulator") == "dolphin"]
 
 
-def unpack_textures(archive, dest):
+def unpack_textures(archive: Path, dest: Path) -> bool:
     """A Dolphin texture pack zip into dest. Packs usually hold one folder
     named for the game's ID (GAFE01, or GAF for every region); that folder
     is dropped, since dest is already the game's. False if the zip has no
@@ -660,11 +902,11 @@ def unpack_textures(archive, dest):
     return True
 
 
-def eden_systems():
+def eden_systems() -> list[str]:
     return [n for n, d in CFG["systems"].items() if d.get("emulator") == "eden"]
 
 
-def unpack_switch_mod(archive, dest, tid):
+def unpack_switch_mod(archive: Path, dest: Path, tid: str) -> bool:
     """A Switch mod zip into dest, in an SD card's layout: the game's code
     and files under atmosphere/contents/<title ID>/ (exefs, romfs), and
     anything else as it is (ARCropolis's ultimate/mods/...). A yuzu-style
@@ -679,7 +921,7 @@ def unpack_switch_mod(archive, dest, tid):
         prefix = ""
         if len(tops) == 1 and all("/" in i.filename for i in files) and next(iter(tops)).lower() not in sd_tops:
             prefix = next(iter(tops)) + "/"
-        out = []
+        out: list[tuple[zipfile.ZipInfo, Path]] = []
         for i in files:
             rel = Path(i.filename[len(prefix):])
             if rel.is_absolute() or ".." in rel.parts or len(rel.parts) < 2:
@@ -706,35 +948,36 @@ def unpack_switch_mod(archive, dest, tid):
     return True
 
 
-def sync_textures(s, rom, system, tid):
+def sync_textures(s: requests.Session, rom: Rom, system: str, tid: str | None) -> None:
     """This game's texture packs (Dolphin) or mods (Switch) from RomM: zips
     in its mod/ folder, when the game changed in RomM since the last look.
     A pack whose file changed is unpacked again; one gone from RomM is
     removed."""
+    unpack: Callable[[Path, Path], bool]
     if system in dolphin_systems() and tid and GAME_ID.fullmatch(tid):
         root, state_file = TEXTURES, TEXTURES_STATE
-
-        def unpack(archive, dest):
-            return unpack_textures(archive, dest)
+        unpack = unpack_textures
         kind = "texture pack"
     elif system in eden_systems() and tid and SWITCH_ID.fullmatch(tid):
         root, state_file = MODS, MODS_STATE
+        switch_tid = tid
 
-        def unpack(archive, dest):
-            return unpack_switch_mod(archive, dest, tid)
+        def unpack(archive: Path, dest: Path) -> bool:
+            return unpack_switch_mod(archive, dest, switch_tid)
         kind = "mod"
     else:
         return
-    state = json.loads(state_file.read_text()) if state_file.exists() else {}
+    state: dict[str, Packs] = json.loads(state_file.read_text()) if state_file.exists() else {}
     key = str(rom["id"])
     have = state.get(key, {})
     if have.get("updated_at") == rom.get("updated_at"):
         return
-    files = get(s, EP_ROM.format(id=rom["id"])).json().get("files") or []
+    files = rom_files(s, rom)
     mods = [f for f in files if f.get("category") == "mod"
             and f["file_name"].lower().endswith(".zip") and not f["file_name"].startswith(".")]
     game = root / system / tid
-    packs, keep = have.get("packs", {}), {}
+    packs = have.get("packs", {})
+    keep: dict[str, Pack] = {}
     for f in mods:
         fid, old = str(f["id"]), have.get("packs", {}).get(str(f["id"]))
         if old and old.get("sha1") == f.get("sha1_hash") and (game / old["dir"]).is_dir():
@@ -762,13 +1005,13 @@ def sync_textures(s, rom, system, tid):
     state_file.write_text(json.dumps(state, indent=2))
 
 
-def cmd_textures():
+def cmd_textures() -> None:
     """Each of the library's texture packs, linked into this player's
     Dolphin as Load/Textures/<game ID>. A folder this player had there for
     the same game (by its full or 3-letter ID) is moved to
     Textures-before-romm, so Dolphin doesn't load two copies. Links to
     packs the library no longer has are removed."""
-    shared = {}
+    shared: dict[str, Path] = {}
     for system in dolphin_systems():
         if (TEXTURES / system).is_dir():
             shared.update({d.name: d for d in (TEXTURES / system).iterdir()
@@ -796,7 +1039,7 @@ def cmd_textures():
         link_switch_mods()
 
 
-def link_switch_mods():
+def link_switch_mods() -> None:
     """Each of the library's Switch mods, in this player's emulators.
 
     Eden: the game's part (atmosphere/contents/<title ID>) as
@@ -815,10 +1058,10 @@ def link_switch_mods():
     A file of the player's own in the way is kept as <name>.before-romm.
     Links to what the library no longer has are removed."""
     ryujinx_games = {t.upper() for t in CFG.get("ryujinxGames") or []}
-    targets = [(EDEN_LOAD, EDEN_SD, None)]
+    targets: list[tuple[Path, Path, set[str] | None]] = [(EDEN_LOAD, EDEN_SD, None)]
     if ryujinx_games:
         targets.append((RYUJINX / "mods/contents", RYUJINX / "sdcard", ryujinx_games))
-    want = {}
+    want: dict[Path, Path] = {}
     for system in eden_systems():
         for game in (MODS / system).iterdir() if (MODS / system).is_dir() else []:
             if not (game.is_dir() and SWITCH_ID.fullmatch(game.name)):
@@ -866,7 +1109,7 @@ def link_switch_mods():
 NOT_GAMES = {"media", "settings", "controllers"}
 
 
-def game_running():
+def game_running() -> bool:
     """Whether any player is in a game: a famidrive-launch process for a
     system that isn't Media, Settings or Controllers. Read from /proc,
     since the pull runs as its own account and can't see players' runtime
@@ -883,7 +1126,7 @@ def game_running():
     return False
 
 
-def wait_for_games(poll=60, limit=6 * 3600):
+def wait_for_games(poll: int = 60, limit: int = 6 * 3600) -> None:
     """Hold the pull while someone plays: it writes into the library,
     which emulators watch (Eden rescans its game list on any change), and
     it competes with the game for the disk and the network."""
@@ -895,11 +1138,13 @@ def wait_for_games(poll=60, limit=6 * 3600):
         waited += poll
 
 
-def cmd_pull():
+def cmd_pull() -> None:
     wait_for_games()
     s = session()
     old = load_index()
-    index, by_system, folders = {}, {}, set()
+    index: dict[str, IndexEntry] = {}
+    by_system: dict[str, list[tuple[Path, Rom]]] = {}
+    folders: set[str] = set()
     for rom in library(s):
         system = system_for(rom)
         if system is None:
@@ -908,7 +1153,7 @@ def cmd_pull():
             # Added with RomM's "Add Physical Game": no file to fetch. Such
             # entries hold apps' saves (Clone Hero, the Mii Channel's Miis).
             continue
-        PULL["label"] = rom.get("name") or rom["fs_name"]
+        PULL["label"] = rom.get("name") or rom.get("fs_name")
         try:
             dest = fetch_rom(s, rom, system)
         except (requests.RequestException, RuntimeError, zipfile.BadZipFile) as e:
@@ -919,8 +1164,7 @@ def cmd_pull():
         launch = launchable(dest, system)
         if dest != launch:
             folders.add(str(dest))
-        prev = old.get(str(launch), {})
-        tid = title_id(system, rom, prev, launch)
+        tid = title_id(system, rom, old.get(str(launch)), launch)
         if tid and not rom.get("title_id"):
             teach_romm(s, rom["id"], tid)
         index[str(launch)] = {"id": rom["id"], "system": system, "title_id": tid,
@@ -959,7 +1203,7 @@ def cmd_pull():
         print(f"not in RomM anymore (kept): {orphan}", file=sys.stderr)
 
 
-def teach_romm(s, rom_id, tid):
+def teach_romm(s: requests.Session, rom_id: int, tid: str) -> None:
     """Write an ID this box worked out back to RomM, so no other box has to.
     Needs the token to carry roms.write; quietly skipped without it."""
     try:
@@ -973,24 +1217,27 @@ def teach_romm(s, rom_id, tid):
 FROM_ROMM = ("name", "desc", "rating", "releasedate", "developer", "publisher", "genre", "players")
 
 
-def game_metadata(rom):
+def game_metadata(rom: Rom) -> dict[str, str | None]:
     """ES-DE's gamelist fields from RomM's metadata."""
-    m = rom.get("metadatum") or {}
-    fields = {"name": rom.get("name") or rom.get("fs_name_no_ext"), "desc": rom.get("summary") or ""}
-    if m.get("average_rating"):
-        fields["rating"] = f"{min(m['average_rating'], 100) / 100:.2f}"
-    if m.get("first_release_date"):
-        day = datetime.fromtimestamp(m["first_release_date"] / 1000, tz=timezone.utc)
+    m: Metadatum = rom.get("metadatum") or {}
+    fields: dict[str, str | None] = {"name": rom.get("name") or rom.get("fs_name_no_ext"),
+                                     "desc": rom.get("summary") or ""}
+    rating, released = m.get("average_rating"), m.get("first_release_date")
+    if rating:
+        fields["rating"] = f"{min(rating, 100) / 100:.2f}"
+    if released:
+        day = datetime.fromtimestamp(released / 1000, tz=timezone.utc)
         fields["releasedate"] = day.strftime("%Y%m%dT000000")
-    for field, key in (("developer", "developers"), ("publisher", "publishers"), ("genre", "genres")):
-        if m.get(key):
-            fields[field] = ", ".join(m[key][:2] if field != "genre" else m[key])
+    for field, names in (("developer", m.get("developers")), ("publisher", m.get("publishers")),
+                         ("genre", m.get("genres"))):
+        if names:
+            fields[field] = ", ".join(names[:2] if field != "genre" else names)
     if m.get("player_count"):
-        fields["players"] = m["player_count"]
+        fields["players"] = m.get("player_count")
     return fields
 
 
-def write_gamelist(system, entries):
+def write_gamelist(system: str, entries: list[tuple[Path, Rom]]) -> None:
     out = GAMELISTS / system / "gamelist.xml"
     out.parent.mkdir(parents=True, exist_ok=True)
     games = []
@@ -1002,7 +1249,7 @@ def write_gamelist(system, entries):
                    + "".join(games) + "</gameList>\n")
 
 
-def merge_gamelist(library, mine):
+def merge_gamelist(library: Path, mine: Path) -> bytes:
     """The library's gamelist, with this player's own fields kept: RomM
     has the say on what a game is, the player on how they've played it.
     Games only the player's copy has stay too."""
@@ -1029,12 +1276,18 @@ def merge_gamelist(library, mine):
         if other.tag != "game":   # ES-DE's <folder> entries
             out.append(other)
     ET.indent(out)
-    return b'<?xml version="1.0"?>\n' + ET.tostring(out, encoding="utf-8") + b"\n"
+    return b'<?xml version="1.0"?>\n' + xml_bytes(out) + b"\n"
+
+
+def xml_bytes(root: ET.Element) -> bytes:
+    """An element as UTF-8 XML, without the declaration."""
+    body: bytes = ET.tostring(root, encoding="utf-8")
+    return body
 
 
 # ---------------------------------------------------------------- firmware
 
-def pick_ps2_bios(d):
+def pick_ps2_bios(d: Path) -> Path | None:
     """The BIOS file in the library's PS2 firmware: the 4 MiB main image
     (a console's .rom1/.rom2/.erom/.nvm files sit beside it), preferring
     one named as US (BIOS dumps usually say their region), then by name.
@@ -1045,7 +1298,7 @@ def pick_ps2_bios(d):
     return sorted(bios, key=lambda p: (not re.search(r"(?<![a-z])usa?(?![a-z])", p.name, re.I), p.name))[0]
 
 
-def install_ps2_bios(d):
+def install_ps2_bios(d: Path) -> None:
     """PCSX2 runs nothing until a BIOS is picked, by file name, in
     PCSX2.ini ([Filenames] BIOS); its folder is the library's (Nix sets
     that). Set here, since the name is only known once RomM has one."""
@@ -1055,7 +1308,8 @@ def install_ps2_bios(d):
     ini = Path.home() / ".config/PCSX2/inis/PCSX2.ini"
     ini.parent.mkdir(parents=True, exist_ok=True)
     lines = ini.read_text(errors="replace").splitlines() if ini.exists() else []
-    out, inside, done = [], False, False
+    out: list[str] = []
+    inside, done = False, False
     for line in lines:
         s = line.strip()
         if s.startswith("[") and s.endswith("]"):
@@ -1077,7 +1331,7 @@ def install_ps2_bios(d):
 CEMU_KEY = re.compile(r"^[0-9a-fA-F]{32}(\s|#|$)")
 
 
-def cemu_key_line(line):
+def cemu_key_line(line: str) -> str:
     """A keys.txt line as Cemu takes it: a key (32 hex digits, maybe a
     # comment after), a # comment, or nothing. Any other text, such as a
     title and a row of dashes above the keys, becomes a comment: Cemu
@@ -1089,7 +1343,7 @@ def cemu_key_line(line):
     return "# " + line
 
 
-def install_cemu_keys(d):
+def install_cemu_keys(d: Path) -> None:
     """Wii U disc keys (keys.txt, a firmware file in RomM) merged into
     Cemu's own keys.txt, where it looks for them (its data folder, as
     Cemu 2 lays it out on Linux): .wud and .wux discs are encrypted, and
@@ -1123,7 +1377,7 @@ def install_cemu_keys(d):
 WII_NAND_KEEP_OUT = ("shared2/menu/FaceLib/", "title/00010000/", "tmp/", "import/")
 
 
-def install_wii_nand(d):
+def install_wii_nand(d: Path) -> None:
     """A Wii System Menu for a player's Dolphin, the first time: a zip of a
     Wii NAND (Dolphin's Wii folder, as Tools > Perform Online System Update
     leaves it, or a backup of the owner's own Wii) kept as Wii firmware in
@@ -1157,7 +1411,7 @@ def install_wii_nand(d):
         return
 
 
-def install_ps3_disc_keys(d):
+def install_ps3_disc_keys(d: Path) -> None:
     """Disc keys (.dkey, as hex, or .key, 16 bytes) for encrypted PS3 disc
     images, kept in RomM as PS3 firmware, into RPCS3's key folder. RPCS3
     (since April 2026) tries each key there on an encrypted image, so a
@@ -1174,7 +1428,17 @@ def install_ps3_disc_keys(d):
 # tidied (2026-10-07).
 INSTALLERS_VERSION = 2
 
-INSTALLERS = {
+def install_switch_keys(d: Path) -> None:
+    """Eden reads prod.keys/title.keys from its keys dir (seen on Eden
+    0.2.1). Firmware goes into nand/system; installing it
+    non-interactively: TODO."""
+    keys = Path.home() / ".local/share/eden/keys"
+    keys.mkdir(parents=True, exist_ok=True)
+    for k in d.glob("*.keys"):
+        (keys / k.name).write_bytes(k.read_bytes())
+
+
+INSTALLERS: dict[str, Callable[[Path], None]] = {
     "ps2": install_ps2_bios,
     "wiiu": install_cemu_keys,
     "wii": install_wii_nand,
@@ -1185,29 +1449,32 @@ INSTALLERS = {
     # one every session; offscreen it installed nothing. Until there's a
     # way without the window (#48), install it once from RPCS3 itself.
     "ps3": install_ps3_disc_keys,
-    # Eden reads prod.keys/title.keys from its keys dir (seen on Eden 0.2.1).
-    # Firmware goes into nand/system; installing it non-interactively: TODO.
-    "switch": lambda d: [
-        (Path.home() / ".local/share/eden/keys").mkdir(parents=True, exist_ok=True),
-        *[(Path.home() / ".local/share/eden/keys" / k.name).write_bytes(k.read_bytes())
-          for k in d.glob("*.keys")],
-    ],
+    "switch": install_switch_keys,
 }
 
 
-def cmd_firmware():
+class Firmware(TypedDict, total=False):
+    id: int
+    file_name: str
+    sha1_hash: str | None
+    file_size_bytes: int | None
+
+
+def cmd_firmware() -> None:
     s = session()
-    platforms = {}
-    for p in get(s, EP_PLATFORMS).json():
+    platforms: dict[str, int] = {}
+    known: list[Platform] = get(s, EP_PLATFORMS).json()
+    for p in known:
         platforms[p["fs_slug"]] = p["id"]
         platforms.setdefault(p["slug"], p["id"])
-    wanted = set(CFG["firmwarePlatforms"])
+    wanted = set(CFG.get("firmwarePlatforms", []))
     for system, sysdef in CFG["systems"].items():
         slug = sysdef["rommPlatform"]
         if slug not in wanted or slug not in platforms:
             continue
         target = firmware_dir(system, sysdef)
-        for fw in get(s, EP_FIRMWARE, params={"platform_id": platforms[slug]}).json():
+        found: list[Firmware] = get(s, EP_FIRMWARE, params={"platform_id": platforms[slug]}).json()
+        for fw in found:
             try:
                 one_name(fw["file_name"])
             except RuntimeError as e:
@@ -1217,13 +1484,13 @@ def cmd_firmware():
                      target / fw["file_name"], fw.get("sha1_hash"), fw.get("file_size_bytes"))
 
 
-def firmware_dir(system, sysdef):
+def firmware_dir(system: str, sysdef: System) -> Path:
     # RetroArch cores share one system dir, so their firmware lands flat
     # in firmware/retroarch; everything else gets firmware/<slug>.
     return DATA / "firmware" / (sysdef.get("firmwareDir") or sysdef["rommPlatform"])
 
 
-def cmd_firmware_install():
+def cmd_firmware_install() -> None:
     """Install the library's firmware into this player's emulators, again
     whenever the library's copy changes. Run at the start of each session."""
     for system, install in INSTALLERS.items():
@@ -1245,13 +1512,13 @@ def cmd_firmware_install():
         marker.write_text(stamp)
 
 
-def cmd_gamelists():
+def cmd_gamelists() -> None:
     """Merge each system's gamelist from the library into this player's
     ES-DE, when the library has written a newer one since the last time:
     RomM's metadata in, the player's favorites and play counts kept.
     ES-DE rewrites its own copy (play counts, favorites) in between."""
     copied_file = STATE / "gamelists.json"
-    copied = json.loads(copied_file.read_text()) if copied_file.exists() else {}
+    copied: dict[str, float] = json.loads(copied_file.read_text()) if copied_file.exists() else {}
     for src in sorted(GAMELISTS.glob("*/gamelist.xml")):
         system, mtime = src.parent.name, src.stat().st_mtime
         if copied.get(system) == mtime:
@@ -1276,26 +1543,32 @@ FAVORITES = STATE / "favorites.json"   # RomM ids both sides last agreed on
 FAVORITES_TIMEOUT = 10
 
 
-def favorites_collection(s):
+def favorites_collection(s: requests.Session) -> Collection | None:
     """This player's favorites collection, or None until they have one.
     RomM lists other users' public collections too, so it's the one that's
     theirs."""
-    def fetch(path):
+    def fetch(path: str) -> requests.Response:
         r = s.get(API + path, timeout=FAVORITES_TIMEOUT)
         r.raise_for_status()
-        return r.json()
-    me = fetch("/users/me")["id"]
-    return next((c for c in fetch(EP_COLLECTIONS) if c.get("is_favorite") and c.get("user_id") == me), None)
+        return r
+    me: User = fetch("/users/me").json()
+    cols: list[Collection] = fetch(EP_COLLECTIONS).json()
+    return next((c for c in cols if c.get("is_favorite") and c.get("user_id") == me.get("id")), None)
 
 
-def my_favorites():
+# Each game's place in a player's game lists: (system, its <path> there).
+type ListedAt = tuple[str, str]
+
+
+def my_favorites() -> tuple[dict[int, ListedAt], set[int]]:
     """{rom id: (system, game list <path>)} for every game in this player's
     game lists that the library has, and the ids of those marked favorite.
     Only games their game lists actually list count: one that's missing (or
     a game list ES-DE left unreadable) can't have been unfavorited here."""
     index = load_index()
-    games, favorite = {}, set()
-    by_path = {}
+    games: dict[int, ListedAt] = {}
+    favorite: set[int] = set()
+    by_path: dict[tuple[str, str], int] = {}
     for key, entry in index.items():
         try:
             rel = Path(key).relative_to(DATA / "roms" / entry["system"])
@@ -1308,19 +1581,20 @@ def my_favorites():
         except (OSError, ET.ParseError):
             continue
         for game in root.findall("game"):
-            rom_id = by_path.get((system, game.findtext("path")))
+            path = game.findtext("path") or ""
+            rom_id = by_path.get((system, path))
             if rom_id is None:
                 continue
-            games[rom_id] = (system, game.findtext("path"))
+            games[rom_id] = (system, path)
             if (game.findtext("favorite") or "").strip() == "true":
                 favorite.add(rom_id)
     return games, favorite
 
 
-def set_favorites(games, on, off):
+def set_favorites(games: dict[int, ListedAt], on: set[int], off: set[int]) -> None:
     """Mark `on` favorite and `off` not, in this player's game lists. Run
     only while ES-DE isn't, or it writes its own copy back over them."""
-    changes = {}
+    changes: dict[str, dict[str, bool]] = {}
     for rom_id, value in [(i, True) for i in on] + [(i, False) for i in off]:
         system, path = games[rom_id]
         changes.setdefault(system, {})[path] = value
@@ -1328,20 +1602,20 @@ def set_favorites(games, on, off):
         dest = Path(CFG["gamelistDir"]) / system / "gamelist.xml"
         root = ET.parse(dest).getroot()
         for game in root.findall("game"):
-            value = paths.get(game.findtext("path"))
-            if value is None:
+            want = paths.get(game.findtext("path") or "")
+            if want is None:
                 continue
             for old in game.findall("favorite"):
                 game.remove(old)
-            if value:   # ES-DE leaves the tag out for a game that isn't one
+            if want:   # ES-DE leaves the tag out for a game that isn't one
                 ET.SubElement(game, "favorite").text = "true"
         ET.indent(root)
         tmp = dest.with_name(dest.name + f".{os.getpid()}.tmp")
-        tmp.write_bytes(b'<?xml version="1.0"?>\n' + ET.tostring(root, encoding="utf-8") + b"\n")
+        tmp.write_bytes(b'<?xml version="1.0"?>\n' + xml_bytes(root) + b"\n")
         tmp.replace(dest)
 
 
-def cmd_favorites(*flags):
+def cmd_favorites(*flags: str) -> None:
     """This player's favorites, both ways between RomM and ES-DE.
 
     Each side's changes since the last sync are applied to the other, so a
@@ -1357,18 +1631,22 @@ def cmd_favorites(*flags):
     games, local = my_favorites()
     if not games:
         return   # no library pulled yet, or no game lists: nothing to compare
+    base: set[int]
     try:
-        base = set(json.loads(FAVORITES.read_text())) & set(games)
+        agreed_before: list[int] = json.loads(FAVORITES.read_text())
+        base = set(agreed_before) & set(games)
     except (OSError, ValueError):
         base = set()
     s = session()
     col = favorites_collection(s)
-    remote = set(col["rom_ids"]) & set(games) if col else set()
+    remote = set(col.get("rom_ids") or []) & set(games) if col else set()
 
     if push_only:
         # What's still to come from RomM shows next time as a change on
         # its side: a game it added isn't in here, one it dropped still is.
-        on, off, agreed = set(), set(), local
+        on: set[int] = set()
+        off: set[int] = set()
+        agreed = local
     else:
         # The game lists first: with a token that can't write collections,
         # RomM's favorites still come in, before the push below fails.
@@ -1389,7 +1667,7 @@ def cmd_favorites(*flags):
         r.raise_for_status()
         col = r.json()
     for method, ids in (("POST", add), ("DELETE", drop)):
-        if ids:
+        if ids and col is not None:
             r = s.request(method, API + f"{EP_COLLECTIONS}/{col['id']}/roms",
                           json={"rom_ids": sorted(ids)}, timeout=FAVORITES_TIMEOUT)
             r.raise_for_status()
@@ -1408,7 +1686,7 @@ def cmd_favorites(*flags):
 # one, because the archive carries its own relative paths and manifest.
 
 
-def toast(*args):
+def toast(*args: str) -> None:
     """A toast on the TV (famidrive-toast), when the player's session has
     one to show it. Never fails the caller."""
     exe = shutil.which("famidrive-toast")
@@ -1420,31 +1698,34 @@ def toast(*args):
             pass
 
 
-def game_name(key, entry):
+def game_name(key: str, entry: Entry) -> str:
     """The game's name from RomM, or its file's without the tags. An app's
     is its title: the name ES-DE shows it by ("Mii Channel", "Clone
     Hero"), so a toast calls it what the player sees. Found on the first
     box 2026-10-08: the Miis' toast said app:wii-miis."""
     if key.startswith("app:"):
         name = key[4:]
-        return CFG.get("apps", {}).get(name, {}).get("title") or name
+        app = CFG.get("apps", {}).get(name)
+        return (app.get("title") if app else None) or name
     return entry.get("name") or re.sub(r"\s*[\(\[].*$", "", Path(key).stem) or Path(key).name
 
 
-def load_index():
-    return json.loads(INDEX.read_text()) if INDEX.exists() else {}
+def load_index() -> dict[str, IndexEntry]:
+    index: dict[str, IndexEntry] = json.loads(INDEX.read_text()) if INDEX.exists() else {}
+    return index
 
 
-def save_index(index):
+def save_index(index: dict[str, IndexEntry]) -> None:
     INDEX.parent.mkdir(parents=True, exist_ok=True)
     INDEX.write_text(json.dumps(index, indent=2))
 
 
-def load_saves():
-    return json.loads(SAVES.read_text()) if SAVES.exists() else {}
+def load_saves() -> dict[str, SaveState]:
+    saves: dict[str, SaveState] = json.loads(SAVES.read_text()) if SAVES.exists() else {}
+    return saves
 
 
-def store_saves(saves):
+def store_saves(saves: dict[str, SaveState]) -> None:
     """Written whole and then put in place, so another run never reads a
     half-written file."""
     STATE.mkdir(parents=True, exist_ok=True)
@@ -1453,14 +1734,15 @@ def store_saves(saves):
     tmp.replace(SAVES)
 
 
-def app_id(name):
+def app_id(name: str) -> int:
     """RomM's id for an app's entry (an entry added by hand, so its
     saves have somewhere to live), found by its name once and kept."""
     saves = load_saves()
     key = f"app:{name}"
-    if saves.get(key, {}).get("id"):
-        return saves[key]["id"]
-    want = CFG["apps"][name]["rom"]
+    known = saves.get(key, {}).get("id")
+    if known:
+        return known
+    want = CFG.get("apps", {})[name]["rom"]
     s = session()
     found = [r for r in all_roms(s, {"search_term": want})
              if want in (r.get("name"), r.get("fs_name_no_ext"), r.get("fs_name"))]
@@ -1471,50 +1753,54 @@ def app_id(name):
     return found[0]["id"]
 
 
-def target(system):
+def target(system: str) -> System | App:
     """A system's, or an app's, definition from the config."""
     return CFG["systems"].get(system) or CFG.get("apps", {})[system]
 
 
-def library_path(rom_path):
+def library_path(rom_path: str) -> str:
     """The library's path for a ROM. ES-DE hands over paths in the
     player's own ROM folder, whose systems are links into the library."""
     p = Path(rom_path)
-    if CFG.get("playerRoms"):
+    roms = CFG.get("playerRoms")
+    if roms:
         try:
-            return str(DATA / "roms" / p.relative_to(CFG["playerRoms"]))
+            return str(DATA / "roms" / p.relative_to(roms))
         except ValueError:
             pass
     return str(p)
 
 
-def iso_member(iso, member):
+def iso_member(iso: Path | str, member: str) -> bytes | None:
     """Extract one file from an ISO via 7-Zip, without unpacking 40 GB."""
     r = subprocess.run(["7zz", "e", "-so", str(iso), member],
                        capture_output=True, check=False)
     return r.stdout if r.returncode == 0 else None
 
 
-def sfo_title_id(sfo):
+def sfo_title_id(sfo: bytes) -> str | None:
     """TITLE_ID out of a PS3 PARAM.SFO (fixed little-endian layout)."""
     _, _, key_tab, data_tab, count = struct.unpack_from("<4sIIII", sfo, 0)
     for i in range(count):
         key_off, _, length, _, data_off = struct.unpack_from("<HHIII", sfo, 20 + i * 16)
         key = sfo[key_tab + key_off:].split(b"\0", 1)[0]
         if key == b"TITLE_ID":
-            return sfo[data_tab + data_off:data_tab + data_off + length].rstrip(b"\0").decode()
+            value: bytes = sfo[data_tab + data_off:data_tab + data_off + length]
+            return value.rstrip(b"\0").decode()
     return None
 
 
 SWITCH_TID = re.compile(r"\[(0100[0-9A-Fa-f]{12})\]")
 
 
-def pfs0_names(path):
+def pfs0_names(path: Path) -> list[str]:
     """The file names inside an NSP (a PFS0 archive), from its header."""
     with open(path, "rb") as f:
         head = f.read(16)
         if len(head) < 16 or head[:4] != b"PFS0":
             return []
+        count: int
+        strings: int
         count, strings = struct.unpack_from("<II", head, 4)
         if count > 100000 or strings > 1 << 24:
             return []
@@ -1522,19 +1808,20 @@ def pfs0_names(path):
         table = f.read(strings)
     names = []
     for i in range(count):
+        at: int
         _, _, at, _ = struct.unpack_from("<QQII", entries, i * 0x18)
         end = table.find(b"\0", at)
         names.append(table[at:end if end >= 0 else None].decode("utf-8", "replace"))
     return names
 
 
-def switch_title_id(game):
+def switch_title_id(game: Path) -> str | None:
     """A Switch game's title ID from its NSP: a ticket is named after its
     rights ID, which starts with the title ID. RomM's Switch file names
     don't carry it (found on the first box 2026-10-06). An XCI has no
     tickets; then its update's (update/*.nsp, title ID + 0x800) gives the
     game's."""
-    def from_tickets(path, update=False):
+    def from_tickets(path: Path, update: bool = False) -> str | None:
         for name in pfs0_names(path):
             m = re.fullmatch(r"([0-9A-Fa-f]{16})[0-9A-Fa-f]{16}\.tik", name)
             if m:
@@ -1554,7 +1841,7 @@ def switch_title_id(game):
     return None
 
 
-def eden_header_key():
+def eden_header_key() -> bytes | None:
     """The NCA header key from this player's Eden keys, or None."""
     try:
         text = (EDEN / "keys" / "prod.keys").read_text(errors="replace")
@@ -1564,7 +1851,7 @@ def eden_header_key():
     return bytes.fromhex(m.group(1)) if m else None
 
 
-def nca_header(f, offset, key):
+def nca_header(f: IO[bytes], offset: int, key: bytes) -> tuple[str, int] | None:
     """(title ID, content type) from an NCA's header: its first 0xC00
     bytes are AES-XTS encrypted with the header key, in 0x200-byte
     sectors whose tweak is the sector number, big-endian. After the NCA3
@@ -1580,27 +1867,28 @@ def nca_header(f, offset, key):
         for n in range(2))
     if plain[0x200:0x204] not in (b"NCA3", b"NCA2"):
         return None
-    return "%016X" % struct.unpack_from("<Q", plain, 0x210)[0], plain[0x205]
+    tid: int = struct.unpack_from("<Q", plain, 0x210)[0]
+    return "%016X" % tid, plain[0x205]
 
 
-def nca_program_id(f, offset, key):
+def nca_program_id(f: IO[bytes], offset: int, key: bytes) -> str | None:
     header = nca_header(f, offset, key)
     return header[0] if header else None
 
 
-def cmd_switch_dlc(rom):
+def cmd_switch_dlc(rom: str) -> None:
     """A Switch game's DLC from the library, for an emulator that needs it
     listed (Ryujinx's dlc.json): each NSP in the dlc/ folder beside the
     game, with its content NCAs (public data) and their title IDs, read
     with this player's Eden keys. JSON on stdout."""
     key = eden_header_key()
     folder = Path(rom).resolve().parent / "dlc"
-    out = []
+    out: list[Dlc] = []
     for nsp in sorted(folder.glob("*.nsp")) if key and folder.is_dir() else []:
-        ncas = []
+        ncas: list[DlcNca] = []
         with open(nsp, "rb") as f:
             for name, at in pfs_entries(f, 0, b"PFS0", 0x18):
-                header = nca_header(f, at, key) if name.endswith(".nca") else None
+                header = nca_header(f, at, key) if key and name.endswith(".nca") else None
                 if header and header[1] == 5:
                     ncas.append({"name": name, "title_id": header[0]})
         if ncas:
@@ -1608,12 +1896,14 @@ def cmd_switch_dlc(rom):
     print(json.dumps(out))
 
 
-def pfs_entries(f, offset, magic, entry_size):
+def pfs_entries(f: IO[bytes], offset: int, magic: bytes, entry_size: int) -> list[tuple[str, int]]:
     """(name, data offset) of each file in a PFS0 or HFS0 at offset."""
     f.seek(offset)
     head = f.read(16)
     if head[:4] != magic:
         return []
+    count: int
+    strings: int
     count, strings = struct.unpack_from("<II", head, 4)
     if count > 100000 or strings > 1 << 24:
         return []
@@ -1624,13 +1914,15 @@ def pfs_entries(f, offset, magic, entry_size):
     data_at = table_at + strings
     out = []
     for i in range(count):
+        at: int
+        name_at: int
         at, _size, name_at = struct.unpack_from("<QQI", entries, i * entry_size)
         end = table.find(b"\0", name_at)
         out.append((table[name_at:end if end >= 0 else None].decode("utf-8", "replace"), data_at + at))
     return out
 
 
-def switch_title_id_from_ncas(game, key):
+def switch_title_id_from_ncas(game: Path, key: bytes) -> str | None:
     """A Switch game's title ID from its NCAs' headers, for an NSP or XCI
     without tickets (a cartridge dump). The base game's is the commonest
     one ending in 000. Found on the first box 2026-10-06: 17 of 67 games
@@ -1642,6 +1934,7 @@ def switch_title_id_from_ncas(game, key):
         f.seek(0x100)
         if f.read(4) == b"HEAD":
             f.seek(0x130)
+            root: int
             root, = struct.unpack("<Q", f.read(8))
             secure = dict(pfs_entries(f, root, b"HFS0", 0x40)).get("secure")
             ncas = pfs_entries(f, secure, b"HFS0", 0x40) if secure is not None else []
@@ -1656,7 +1949,7 @@ def switch_title_id_from_ncas(game, key):
     return max(set(base), key=base.count) if base else None
 
 
-def derive_id(system, rom_path):
+def derive_id(system: str, rom_path: Path | str) -> str | None:
     """Local fallback when RomM has no title_id. None means learn by diff."""
     try:
         if system in ("gc", "wii"):
@@ -1666,8 +1959,8 @@ def derive_id(system, rom_path):
             return m.group(1) if m else None
         if system == "ps2":
             cnf = iso_member(rom_path, "SYSTEM.CNF")
-            m = cnf and re.search(rb"BOOT2\s*=\s*cdrom0:\\(\w{4})_(\d{3})\.(\d{2})", cnf)
-            return f"{m[1].decode()}-{m[2].decode()}{m[3].decode()}" if m else None
+            boot = re.search(rb"BOOT2\s*=\s*cdrom0:\\(\w{4})_(\d{3})\.(\d{2})", cnf) if cnf else None
+            return f"{boot[1].decode()}-{boot[2].decode()}{boot[3].decode()}" if boot else None
         if system == "ps3":
             sfo = iso_member(rom_path, "PS3_GAME/PARAM.SFO")
             return sfo_title_id(sfo) if sfo else None
@@ -1697,7 +1990,7 @@ DOLPHIN_REGION = {"E": "USA", "J": "JAP", "K": "JAP",
                   **{c: "EUR" for c in "PDFSIHUXYZLMRVW"}}
 
 
-def gc_region(rom_path, tid):
+def gc_region(rom_path: Path | str, tid: str | None) -> str:
     """The GC/<region> folder Dolphin keeps this disc's saves in."""
     try:
         with open(Path(rom_path).resolve(), "rb") as f:
@@ -1717,12 +2010,12 @@ def gc_region(rom_path, tid):
     return DOLPHIN_REGION.get((tid or "    ")[3], "USA")
 
 
-def eden_folder(uid):
+def eden_folder(uid: bytes) -> str:
     lo, hi = int.from_bytes(uid[:8], "little"), int.from_bytes(uid[8:16], "little")
     return f"{hi:016X}{lo:016X}"
 
 
-def eden_users():
+def eden_users() -> list[str]:
     """Eden's users' save folder names, in profiles.dat's order."""
     try:
         raw = EDEN_PROFILES.read_bytes()
@@ -1736,12 +2029,13 @@ def eden_users():
     return users
 
 
-def eden_profile():
+def eden_profile() -> str | None:
     """The profile this player's Switch games save under: the one set in
     the module (players.<name>.edenProfileId), or else the user Eden runs
     games as."""
-    if CFG.get("edenProfileId"):
-        return CFG["edenProfileId"].upper()
+    set_here = CFG.get("edenProfileId")
+    if set_here:
+        return set_here.upper()
     users = eden_users()
     if not users:
         return None
@@ -1755,7 +2049,7 @@ def eden_profile():
 
 # Where RomM's web page loads a user's avatar_path from (its
 # FRONTEND_RESOURCES_PATH): the uploaded files under RomM's assets.
-def avatar_url(me):
+def avatar_url(me: User) -> str | None:
     """The picture's address on the RomM server, or None for no picture.
     RomM 5 serves it from the API, as its own pages do; the avatar_path
     under /assets/romm/assets/ is a 404 (5.3.1, 2026-10-09)."""
@@ -1764,14 +2058,14 @@ def avatar_url(me):
     return f"{API}/users/{me['id']}/avatar"
 
 
-def cmd_avatar(folder):
+def cmd_avatar(path: str) -> None:
     """This player's RomM profile picture, for "Who's playing?" (it runs
     before anyone logs in, so it reads the copies in a shared folder).
     Fetched at each session start; a picture removed in RomM goes here too.
     RomM accounts made through an OIDC sign-in (Keycloak) have no picture
     until one is uploaded on RomM's profile page: RomM doesn't copy the
     sign-in's picture (both boxes' players, 2026-10-09)."""
-    folder = Path(folder)
+    folder = Path(path)
     user = getpass.getuser()
     s = session()
     url = avatar_url(get(s, "/users/me").json())
@@ -1797,7 +2091,7 @@ def cmd_avatar(folder):
             p.unlink()
 
 
-def cmd_eden_gamedir():
+def cmd_eden_gamedir() -> None:
     """This player's Eden reads the library's Switch folder, deep-scanned,
     for the updates and DLC beside each game (ext_content_from_game_dirs).
     Added to Eden's game folder list (a Qt settings array) if it isn't
@@ -1827,31 +2121,33 @@ def cmd_eden_gamedir():
     EDEN_CONFIG.write_text(text)
 
 
-def cmd_eden_profile():
+def cmd_eden_profile() -> None:
     """Before this player's Eden first starts: give it one user, named
     after the player, with an ID derived from their RomM username, so a
     new box comes up with the same profile ID as the player's others.
     An Eden that already has profiles is left alone."""
     if EDEN_PROFILES.exists():
         return
-    uid = hashlib.sha256(f"famidrive-eden:{CFG['owner']}".encode()).digest()[:16]
+    owner = CFG.get("owner", "")
+    uid = hashlib.sha256(f"famidrive-eden:{owner}".encode()).digest()[:16]
     # The Switch allows 10-character nicknames.
-    name = (CFG.get("displayName") or CFG["owner"])[:10].encode()[:31]
+    name = (CFG.get("displayName") or owner)[:10].encode()[:31]
     user = uid + uid + struct.pack("<Q", int(time.time())) + name.ljust(0x20, b"\0") + bytes(0x80)
     EDEN_PROFILES.parent.mkdir(parents=True, exist_ok=True)
     EDEN_PROFILES.write_bytes(bytes(0x10) + user + bytes(EDEN_USER * 7))
 
 
-def to_archive(lay, rel):
+def to_archive(lay: SaveLayout, rel: str) -> str:
     """A save path as it's stored in RomM: no box-specific profile ID."""
-    if lay["kind"] == "eden-title-id" and lay.get("profile"):
+    profile = lay.get("profile")
+    if lay["kind"] == "eden-title-id" and profile:
         first, sep, rest = rel.partition("/")
-        if first.upper() == lay["profile"].upper():
+        if first.upper() == profile.upper():
             return PROFILE_SLOT + sep + rest
     return rel
 
 
-def from_archive(lay, rel):
+def from_archive(lay: SaveLayout, rel: str) -> str:
     """A save path from RomM, put under this box's own profile. Also
     takes archives that name a profile ID outright."""
     if lay["kind"] == "eden-title-id":
@@ -1859,14 +2155,18 @@ def from_archive(lay, rel):
         if first == EDEN_DEVICE:
             return rel   # the console's, the same on every box
         if first == PROFILE_SLOT or re.fullmatch(r"[0-9A-Fa-f]{32}", first):
-            if not lay.get("profile"):
+            profile = lay.get("profile")
+            if not profile:
                 raise RuntimeError("Eden has no profile here yet")
-            return lay["profile"] + sep + rest
+            return profile + sep + rest
     return rel
 
 
-def layout(system):
-    lay = dict(target(system)["saveLayout"])
+def layout(system: str) -> tuple[str, Path, SaveLayout]:
+    saves_at = target(system)["saveLayout"]
+    if saves_at is None:
+        raise RuntimeError(f"{system} has no save layout")
+    lay = saves_at.copy()
     # Profiles are the player's own (players.<name> in the module).
     if lay["kind"] == "eden-title-id":
         lay["profile"] = eden_profile()
@@ -1875,7 +2175,7 @@ def layout(system):
     return lay["kind"], Path(lay["root"]).expanduser(), lay
 
 
-def cmd_eden_save(tid):
+def cmd_eden_save(tid: str) -> None:
     """Where this player's Eden keeps a game's save (the profile's
     folder for it, existing or not). A Switch game run in Ryujinx instead
     is bridged through it (famidrive-ryujinx), so its save still syncs
@@ -1884,10 +2184,10 @@ def cmd_eden_save(tid):
     if not systems:
         sys.exit("no Eden system on this box")
     _, root, lay = layout(systems[0])
-    print(root / lay["profile"] / tid.upper())
+    print(root / (lay.get("profile") or "") / tid.upper())
 
 
-def save_paths(system, entry, rom_path):
+def save_paths(system: str, entry: Entry, rom_path: str) -> list[str] | None:
     """Files/dirs under the layout root that make up this ROM's save.
 
     Returns paths relative to the root, or None when the ID is unknown
@@ -1895,7 +2195,7 @@ def save_paths(system, entry, rom_path):
     """
     kind, root, lay = layout(system)
     tid = entry.get("title_id")
-    found = []
+    found: list[str] = []
 
     if kind == "retroarch-srm":
         # RetroArch names the save after the file it was given, which is
@@ -1920,18 +2220,18 @@ def save_paths(system, entry, rom_path):
     elif kind == "xenia-content" and tid:
         found = [f"{lay['profile']}/{tid}/00000001"]
     elif kind == "files":
-        found = list(lay["paths"])   # fixed files under the root (apps)
+        found = list(lay.get("paths", []))   # fixed files under the root (apps)
 
     found = [f for f in found if (root / f).exists()]
     return found or entry.get("learned") or None
 
 
-def snapshot(root):
+def snapshot(root: Path) -> dict[str, float]:
     return {str(p.relative_to(root)): p.stat().st_mtime
             for p in root.rglob("*") if p.is_file()} if root.exists() else {}
 
 
-def learn_by_diff(root, before, depth=1):
+def learn_by_diff(root: Path, before: dict[str, float], depth: int = 1) -> list[str]:
     """Rule 3: save entries that changed during the session, `depth`
     levels down: 2 for Eden, whose top level is a whole profile (every
     game's saves), never one game's."""
@@ -1940,7 +2240,7 @@ def learn_by_diff(root, before, depth=1):
     return sorted(changed)
 
 
-def files_hash(root, rels, lay):
+def files_hash(root: Path, rels: Iterable[str], lay: SaveLayout) -> str:
     """Hash of the save's actual contents, so an unchanged save is never
     re-uploaded (a tar.gz's own bytes change with every pack). Paths go
     in as they're archived, so the same save hashes the same on every box."""
@@ -1959,15 +2259,16 @@ def files_hash(root, rels, lay):
 # emulator's save root) + famidrive-manifest.json.
 
 
-def pack(system, entry, root, rels, digest, lay):
+def pack(system: str, entry: Entry, root: Path, rels: list[str], digest: str,
+         lay: SaveLayout) -> tuple[bytes, Manifest]:
     buf = io.BytesIO()
-    manifest = {
+    manifest: Manifest = {
         "system": system,
         "title_id": entry.get("title_id"),
         "paths": [to_archive(lay, r) for r in rels],
         "files_sha256": digest,
         "device": CFG["deviceName"],
-        "owner": CFG["owner"],
+        "owner": CFG.get("owner", ""),
         "packed_at": int(time.time()),
     }
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
@@ -1980,9 +2281,12 @@ def pack(system, entry, root, rels, digest, lay):
     return buf.getvalue(), manifest
 
 
-def unpack(blob, root, lay):
+def unpack(blob: bytes, root: Path, lay: SaveLayout) -> Manifest:
     with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
-        manifest = json.load(tar.extractfile("famidrive-manifest.json"))
+        listed = tar.extractfile("famidrive-manifest.json")
+        if listed is None:
+            raise tarfile.ReadError("famidrive-manifest.json isn't a file")
+        manifest: Manifest = json.load(listed)
         members = [m for m in tar.getmembers() if m.name != "famidrive-manifest.json"]
         for m in members:
             m.name = from_archive(lay, m.name)
@@ -1994,7 +2298,7 @@ def unpack(blob, root, lay):
 # ---------------------------------------------------------------- save commands
 
 
-def same_time(a, b):
+def same_time(a: str | None, b: str | None) -> bool:
     """RomM gives the same moment in UTC after an upload and in the
     server's zone when listing. Found on the first box 2026-10-06:
     compared as text, every push looked like a conflict."""
@@ -2006,14 +2310,16 @@ def same_time(a, b):
         return a == b
 
 
-def unpushed(system, entry, root, lay, key):
+def unpushed(system: str, entry: Entry, root: Path, lay: SaveLayout, key: str) -> bool:
     """Whether this box has a save for the ROM that RomM doesn't: one
     that changed since it was last pushed or pulled."""
     rels = save_paths(system, entry, key)
-    return bool(rels) and files_hash(root, rels, lay) != entry.get("pushed")
+    if not rels:
+        return False
+    return files_hash(root, rels, lay) != entry.get("pushed")
 
 
-def my_state(saves, key, rom_id):
+def my_state(saves: dict[str, SaveState], key: str, rom_id: int) -> SaveState:
     """This player's save state for a ROM, following it across a rename
     of its file: by RomM id, or for state from before ids were kept, by
     the name without the extension added since. Found on the first box
@@ -2030,21 +2336,28 @@ def my_state(saves, key, rom_id):
             continue
         state = saves[old]
         if state.get("id") == rom_id or (state.get("id") is None and Path(old).name == Path(key).stem):
-            for k, v in saves.pop(old).items():
-                mine.setdefault(k, v)
+            # Its keys this state doesn't have yet.
+            mine.update({**saves.pop(old), **mine})
             break
     return mine
 
 
-def entry_for(key):
+def entry_for(key: str) -> Entry:
     """The library's entry for a ROM, with this player's save state on top."""
+    entry: Entry
     if key.startswith("app:"):
         entry = {"id": app_id(key[4:]), "system": key[4:]}
     else:
-        entry = dict(load_index()[key])
-    mine = dict(my_state(load_saves(), key, entry["id"]))
-    entry.update({k: v for k, v in mine.items() if k != "title_id"})
-    entry["title_id"] = entry.get("title_id") or mine.get("title_id")
+        indexed = load_index()[key]
+        entry = {"id": indexed["id"], "system": indexed["system"]}
+        if "title_id" in indexed:
+            entry["title_id"] = indexed["title_id"]
+        if "name" in indexed:
+            entry["name"] = indexed["name"]
+    mine = my_state(load_saves(), key, entry["id"])
+    tid = entry.get("title_id") or mine.get("title_id")
+    entry = {**entry, **mine}
+    entry["title_id"] = tid
     if not entry["title_id"] and entry.get("system") == "switch" and not key.startswith("app:"):
         # The library can't read every Switch game's ID (no keys there);
         # this player's Eden has them. Worked out once, kept with the
@@ -2063,14 +2376,14 @@ def entry_for(key):
     return entry
 
 
-def server_save(s, dev, rom_id):
+def server_save(s: requests.Session, dev: str, rom_id: int) -> ServerSave | None:
     """The newest save in FamiDrive's slot for this ROM, or None."""
-    saves = get(s, EP_SAVES, params={"rom_id": rom_id, "device_id": dev}).json()
+    saves: list[ServerSave] = get(s, EP_SAVES, params={"rom_id": rom_id, "device_id": dev}).json()
     ours = [x for x in saves if x.get("slot") == SLOT]
     return max(ours, key=lambda x: x["updated_at"]) if ours else None
 
 
-def not_in_library(key):
+def not_in_library(key: str) -> bool:
     """A launch with no save of its own to sync: a file that isn't a RomM
     game, or a title in Dolphin's Wii NAND (.nand, such as the Mii Channel).
     The Mii Channel's RomM entry holds the player's Miis as an app's save
@@ -2083,7 +2396,7 @@ def not_in_library(key):
     return True
 
 
-def cmd_save_pull(system, rom_path):
+def cmd_save_pull(system: str, rom_path: str) -> None:
     key = library_path(rom_path)
     if not_in_library(key):
         return
@@ -2132,7 +2445,7 @@ def cmd_save_pull(system, rom_path):
         SNAPSHOT.write_text(json.dumps(snapshot(root)))  # don't count the restore as play
 
 
-def save_is_empty(root, rels):
+def save_is_empty(root: Path, rels: list[str]) -> bool:
     """True when every file of the save has no bytes in it (or there are
     no files at all): something made the files and never wrote them."""
     for rel in rels:
@@ -2143,7 +2456,7 @@ def save_is_empty(root, rels):
     return True
 
 
-def cmd_save_push(system, rom_path, learn=True):
+def cmd_save_push(system: str, rom_path: str, learn: bool = True) -> None:
     key = library_path(rom_path)
     if not_in_library(key):
         return
@@ -2201,8 +2514,9 @@ def cmd_save_push(system, rom_path, learn=True):
                files={"saveFile": (name, blob)})
     r.raise_for_status()
     if slot == SLOT:
+        uploaded: ServerSave = r.json()
         mine["pushed"] = digest
-        mine["server_updated_at"] = r.json().get("updated_at")
+        mine["server_updated_at"] = uploaded.get("updated_at")
         mine.pop("conflict_pushed", None)
         toast("--kind", "notice", "--icon", "save", "Saved to RomM", game_name(key, entry))
     else:
@@ -2212,12 +2526,13 @@ def cmd_save_push(system, rom_path, learn=True):
     store_saves(saves)
 
 
-def cmd_reconcile():
+def cmd_reconcile() -> None:
     # Backstop for pushes a crash skipped, and the one-time import of old
     # saves. Unchanged saves are skipped by content hash. No learn-by-diff:
     # the snapshot belongs to whatever session ran last, not to every ROM.
     for rom_path, entry in load_index().items():
-        if CFG["systems"].get(entry["system"], {}).get("saveSync"):
+        system = CFG["systems"].get(entry["system"])
+        if system and system.get("saveSync"):
             try:
                 cmd_save_push(entry["system"], rom_path, learn=False)
             except requests.RequestException as e:
@@ -2232,9 +2547,9 @@ def cmd_reconcile():
 SAVE_COMMANDS = {"reconcile", "save-pull", "save-push", "favorites"}
 
 
-def main():
+def main() -> None:
     cmd, *args = sys.argv[1:] or ["help"]
-    commands = {
+    commands: dict[str, Callable[..., None]] = {
         "pull": cmd_pull, "firmware": cmd_firmware, "reconcile": cmd_reconcile,
         "save-pull": cmd_save_pull, "save-push": cmd_save_push,
         "gamelists": cmd_gamelists, "favorites": cmd_favorites,
