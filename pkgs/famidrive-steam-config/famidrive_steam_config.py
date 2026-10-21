@@ -33,6 +33,20 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import TypedDict
+
+
+class Settings(TypedDict, total=False):
+    """SETTINGS_JSON: see the docstring above."""
+    compatTools: dict[str, str]
+    steamInput: bool
+    steamInputGames: list[str]
+    launchOptions: dict[str, str]
+    guideFocusesSteam: bool
+
+
+# A block in a VDF file: its key's line and its '}' line.
+type Span = tuple[int, int]
 
 STEAM = Path.home() / ".local/share/Steam"
 STATE = Path.home() / ".local/share/famidrive/steam-launch-options.json"
@@ -56,11 +70,11 @@ GAME_PRIORITY = "250"
 DEFAULT_PRIORITY = "75"
 
 
-def log(msg):
+def log(msg: str) -> None:
     print(f"famidrive-steam-config: {msg}", file=sys.stderr)
 
 
-def installed():
+def installed() -> dict[str, str]:
     """Installed games: lowercased name -> app id, in every library."""
     libraries = [STEAM / "steamapps"]
     try:
@@ -68,7 +82,7 @@ def installed():
         libraries += [Path(p) / "steamapps" for p in re.findall(r'"path"\s+"([^"]+)"', folders)]
     except OSError:
         pass
-    games = {}
+    games: dict[str, str] = {}
     for lib in libraries:
         for acf in lib.glob("appmanifest_*.acf"):
             text = acf.read_text(errors="replace")
@@ -82,12 +96,12 @@ def installed():
 class Vdf:
     """A VDF file as lines, edited in place."""
 
-    def __init__(self, path):
+    def __init__(self, path: Path) -> None:
         self.path = path
         self.lines = path.read_text(errors="replace").split("\n")
         self.original = list(self.lines)
 
-    def block_end(self, i):
+    def block_end(self, i: int) -> int:
         """Index of the '}' closing the block whose '{' is at line i."""
         depth = 0
         for j in range(i, len(self.lines)):
@@ -96,7 +110,7 @@ class Vdf:
                 return j
         raise SystemExit(f"famidrive-steam-config: unbalanced {self.path}")
 
-    def find(self, key, depth=None):
+    def find(self, key: str, depth: int | None = None) -> Span | None:
         """(key line, its '}' line) of the first block named key, or None.
         depth: only at this many tabs of indent (0 = top level)."""
         for i in range(len(self.lines) - 1):
@@ -107,9 +121,10 @@ class Vdf:
                 return i, self.block_end(i + 1)
         return None
 
-    def children(self, head, close):
+    def children(self, head: int, close: int) -> dict[str, Span]:
         """{name: (key line, '}' line)} of the blocks directly inside a block."""
-        out, i = {}, head + 2
+        out: dict[str, Span] = {}
+        i = head + 2
         while i < close:
             if self.lines[i + 1].strip() == "{":
                 end = self.block_end(i + 1)
@@ -119,10 +134,11 @@ class Vdf:
                 i += 1
         return out
 
-    def indent(self, head):
-        return re.match(r"\s*", self.lines[head]).group(0) + "\t"
+    def indent(self, head: int) -> str:
+        line = self.lines[head]
+        return line[:len(line) - len(line.lstrip())] + "\t"
 
-    def save(self):
+    def save(self) -> None:
         if self.lines == self.original:
             return
         backup = self.path.with_name(self.path.name + ".famidrive-backup")
@@ -131,7 +147,7 @@ class Vdf:
         self.path.write_text("\n".join(self.lines))
 
 
-def set_compat_tools(wanted):
+def set_compat_tools(wanted: dict[str, str]) -> None:
     path = STEAM / "config/config.vdf"
     if not path.exists():
         return   # Steam hasn't been set up yet; next session
@@ -146,7 +162,7 @@ def set_compat_tools(wanted):
         if appid in wanted:
             del vdf.lines[i:end + 1]   # bottom up, so earlier indexes stay put
     ind = vdf.indent(head)
-    new = []
+    new: list[str] = []
     for appid, tool in wanted.items():
         new += [f'{ind}"{appid}"', f"{ind}{{",
                 f'{ind}\t"name"\t\t"{tool}"',
@@ -157,11 +173,11 @@ def set_compat_tools(wanted):
     vdf.save()
 
 
-def vdf_string(s):
+def vdf_string(s: str) -> str:
     return s.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def set_app_keys(wanted, depth):
+def set_app_keys(wanted: dict[str, dict[str, str]], depth: int) -> None:
     """wanted: {appid: {key: value}}, set in each game's own settings.
     localconfig.vdf has two per-game "apps" blocks: depth 1
     (UserLocalConfigStore > apps) holds Steam Input's setting, depth 4
@@ -193,7 +209,7 @@ def set_app_keys(wanted, depth):
         vdf.save()
 
 
-def clear_app_keys(stale, depth):
+def clear_app_keys(stale: dict[str, dict[str, str]], depth: int) -> None:
     """stale: {appid: {key: value}}. Each key that still has that value
     is emptied; one changed since (by the player, in Steam) stays."""
     for path in STEAM.glob("userdata/*/config/localconfig.vdf"):
@@ -211,7 +227,7 @@ def clear_app_keys(stale, depth):
         vdf.save()
 
 
-def set_top_key(key, value):
+def set_top_key(key: str, value: str) -> None:
     """A key straight inside UserLocalConfigStore, in each localconfig.vdf.
     Steam writes it at the end of the file once it's changed in Steam."""
     for path in STEAM.glob("userdata/*/config/localconfig.vdf"):
@@ -230,18 +246,20 @@ def set_top_key(key, value):
         vdf.save()
 
 
-def read_state():
+def read_state() -> dict[str, str]:
+    """{app id: the launch options this set last time}."""
     try:
-        return json.loads(STATE.read_text())
+        state: dict[str, str] = json.loads(STATE.read_text())
+        return state
     except (OSError, ValueError):
         return {}
 
 
-def main():
-    settings = json.loads(sys.argv[1])
-    games = None
+def main() -> None:
+    settings: Settings = json.loads(sys.argv[1])
+    games: dict[str, str] | None = None
 
-    def appid(game):
+    def appid(game: str) -> str | None:
         """A game's app id from its name or id; None if not installed."""
         nonlocal games
         if game.isdigit():
@@ -251,7 +269,7 @@ def main():
             log(f"{game!r} isn't installed; skipped")
         return games.get(game.lower())
 
-    wanted = {}
+    wanted: dict[str, str] = {}
     for game, tool in settings.get("compatTools", {}).items():
         a = appid(game)
         if a:
@@ -259,7 +277,7 @@ def main():
     if wanted:
         set_compat_tools(wanted)
 
-    keys = {}   # Steam Input
+    keys: dict[str, dict[str, str]] = {}   # Steam Input
     if settings.get("steamInput") is False:
         # UseSteamControllerConfig "0" is "Disable Steam Input". "2" is what
         # the games Steam Input was working for had before FamiDrive.

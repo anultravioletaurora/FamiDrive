@@ -29,10 +29,17 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import TypedDict
 
 os.environ.setdefault("SDL_VIDEODRIVER", "x11")   # gamescope's Xwayland
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 import pygame  # noqa: E402
+
+class Status(TypedDict, total=False):
+    """STATUS_FILE, as gamescope-fg writes it."""
+    state: str
+    detail: str
+
 
 STEAM = Path.home() / ".local/share/Steam"
 ESDE = Path.home() / "ES-DE"
@@ -67,11 +74,11 @@ TEXT = {
 }
 
 
-def manifest(appid):
+def manifest(appid: str) -> str:
     return manifest_and_library(appid)[0]
 
 
-def manifest_and_library(appid):
+def manifest_and_library(appid: str) -> tuple[str, Path | None]:
     for lib in [STEAM / "steamapps"] + [
             Path(p) / "steamapps" for p in re.findall(
                 r'"path"\s+"([^"]+)"', read(STEAM / "steamapps/libraryfolders.vdf"))]:
@@ -81,7 +88,7 @@ def manifest_and_library(appid):
     return "", None
 
 
-def folder_size(path):
+def folder_size(path: Path) -> int:
     total = 0
     for dirpath, _, names in os.walk(path):
         for n in names:
@@ -92,7 +99,7 @@ def folder_size(path):
     return total
 
 
-def download_progress(appid):
+def download_progress(appid: str) -> tuple[int, int]:
     """Bytes done and to do of the game's download. Steam doesn't keep the
     manifest's BytesDownloaded current while it downloads (it can sit at 0
     the whole time), so this measures what has landed in
@@ -108,24 +115,24 @@ def download_progress(appid):
     return int(field(text, "BytesDownloaded") or 0), int(field(text, "BytesToDownload") or 0)
 
 
-def read(path):
+def read(path: Path) -> str:
     try:
         return path.read_text(errors="replace")
     except OSError:
         return ""
 
 
-def field(text, key):
+def field(text: str, key: str) -> str | None:
     m = re.search(rf'"{key}"\s+"([^"]*)"', text)
     return m.group(1) if m else None
 
 
-def art(name):
+def art(name: str) -> tuple[Path | None, Path | None]:
     """(cover, background) paths from ES-DE's scraped media, by the
     placeholder's file name (famidrive-generators' safe())."""
     stem = re.sub(r'[/\\:*?"<>|]', "_", name).strip()
 
-    def find(*kinds):
+    def find(*kinds: str) -> Path | None:
         for kind in kinds:
             for ext in (".png", ".jpg", ".jpeg", ".webp"):
                 p = MEDIA / kind / (stem + ext)
@@ -135,14 +142,14 @@ def art(name):
     return find("covers", "miximages"), find("fanart", "screenshots", "titlescreens")
 
 
-def load(path):
+def load(path: Path | None) -> pygame.Surface | None:
     try:
         return pygame.image.load(str(path)).convert_alpha() if path else None
     except (pygame.error, FileNotFoundError):
         return None
 
 
-def theme_fonts():
+def theme_fonts() -> tuple[Path | None, Path | None]:
     """(regular, light) font files the theme uses for game names and for
     descriptions. Art Book Next names them in theme.xml's <variables> as
     fontRegular and fontLight; other themes fall back to ES-DE's default."""
@@ -152,7 +159,7 @@ def theme_fonts():
     return (THEME / regular if regular else None), (THEME / light if light else None)
 
 
-def font(path, size):
+def font(path: Path | None, size: int) -> pygame.font.Font:
     try:
         if path:
             return pygame.font.Font(str(path), size)
@@ -161,8 +168,9 @@ def font(path, size):
     return pygame.font.Font(None, int(size * 1.3))
 
 
-def wrap(text, f, width):
-    lines, line = [], ""
+def wrap(text: str, f: pygame.font.Font, width: int) -> list[str]:
+    lines: list[str] = []
+    line = ""
     for word in text.split():
         test = f"{line} {word}".strip()
         if f.size(test)[0] <= width or not line:
@@ -173,20 +181,21 @@ def wrap(text, f, width):
     return lines + ([line] if line else [])
 
 
-def es_name(rom):
+def es_name(rom: str) -> str:
     """The name ES-DE shows for an entry: its game list's, or else the file's."""
-    rom = Path(rom)
+    entry = Path(rom)
     try:
-        root = ET.parse(ESDE / "gamelists" / rom.parent.name / "gamelist.xml").getroot()
+        root = ET.parse(ESDE / "gamelists" / entry.parent.name / "gamelist.xml").getroot()
         for game in root.iter("game"):
-            if game.findtext("path") == f"./{rom.name}" and game.findtext("name"):
-                return game.findtext("name")
+            name = game.findtext("name")
+            if game.findtext("path") == f"./{entry.name}" and name:
+                return name
     except (OSError, ET.ParseError):
         pass
-    return rom.stem
+    return entry.stem
 
 
-def redist_progress(now=None):
+def redist_progress(now: float | None = None) -> tuple[int, int] | None:
     """(bytes done, bytes in all) of Heroic's download of GOG's runtimes,
     from its log ("Progress: 74.58 126045315/169017931"), while it's being
     written to; else None."""
@@ -206,7 +215,7 @@ def redist_progress(now=None):
     return (done, total) if done < total else None
 
 
-def shader_progress(appid):
+def shader_progress(appid: str) -> int | None:
     """Steam's shader-processing percentage for this game, from its shader
     log ("Still replaying <appid> (57%, …)"), or None."""
     try:
@@ -220,11 +229,11 @@ def shader_progress(appid):
     return int(found[-1]) if found else None
 
 
-def gb(n):
+def gb(n: float) -> str:
     return f"{n / 1e9:.1f} GB"
 
 
-def ease_toward(shown, target, dt, tau=EASE):
+def ease_toward(shown: float | None, target: float, dt: float, tau: float = EASE) -> float:
     """A bar's shown fraction moved toward its latest reading: an ease-out,
     quick at first and settling gently, so the bar glides between readings
     instead of jumping to each one. Found on the first box 2026-10-13: the
@@ -234,15 +243,17 @@ def ease_toward(shown, target, dt, tau=EASE):
     return target + (shown - target) * math.exp(-dt / tau)
 
 
-def draw_bar(screen, left, y, width, height, fraction):
+def draw_bar(screen: pygame.Surface, left: int, y: int, width: int, height: int, fraction: float) -> None:
     pygame.draw.rect(screen, BAR_BG, (left, y, width, height), border_radius=height // 2)
     pygame.draw.rect(screen, WHITE, (left, y, max(height, int(width * min(max(fraction, 0), 1))), height),
                      border_radius=height // 2)
 
 
-def main():
+def main() -> None:
+    # appid is Steam's ("" for --rom: its states never read Steam's files).
+    rom: str | None
     if sys.argv[1] == "--rom":
-        appid, rom, status_file = None, sys.argv[2], Path(sys.argv[3])
+        appid, rom, status_file = "", sys.argv[2], Path(sys.argv[3])
     else:
         appid, rom, status_file = sys.argv[1], None, Path(sys.argv[2])
     pygame.init()
@@ -283,17 +294,19 @@ def main():
         shade.fill((0, 0, 0, 200))
         background.blit(shade, (0, 0))
 
-    cover = None
+    cover: pygame.Surface | None = None
     if cover_img:
         s = (560 * u) / cover_img.get_height()
         cover = pygame.transform.smoothscale(cover_img, (int(cover_img.get_width() * s), int(560 * u)))
 
     state, detail, since = ("launching" if rom else "asking"), "", time.monotonic()
-    rate, last_bytes, last_t = None, None, None
+    rate: float | None = None
+    last_bytes: int | None = None
+    last_t = 0.0
     done = total = 0
-    shaders = None
+    shaders: int | None = None
     next_read = 0.0
-    shown = {}   # bar -> the fraction it shows now, easing toward its reading
+    shown: dict[str, float] = {}   # bar -> the fraction it shows now, easing toward its reading
     clock = pygame.time.Clock()
     while True:
         # 30 frames a second: enough for the bars to glide, and light while
@@ -303,7 +316,7 @@ def main():
             if event.type == pygame.QUIT:
                 return
         try:
-            st = json.loads(status_file.read_text())
+            st: Status = json.loads(status_file.read_text())
             if st.get("state") != state:
                 state, since = st.get("state", state), time.monotonic()
             detail = st.get("detail", "")
