@@ -30,6 +30,7 @@ DB = """# a comment
 03000000790000001100000010010000,Retro NES pad,a:b1,b:b2,back:b8,start:b9,platform:Linux,
 03000000790000001100000000000000,Retro NES pad,a:b2,b:b1,back:b4,start:b5,platform:Windows,
 030000005e0400008e02000014010000,Xbox 360,a:b0,back:b6,start:b7,platform:Linux,
+03000000222200003333000000000000,Arcade pad,a:b1,b:b2,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,platform:Windows,
 03000000aaaa0000bbbb000000000000,Axis start,back:b6,start:a2,platform:Linux,
 050000004c69632050726f20436f6e00,Nintendo Switch Controller,a:b0,b:b1,back:b8,start:b9,x:b2,y:b3,platform:Linux,
 """
@@ -91,6 +92,16 @@ class Combo(unittest.TestCase):
                          {"a": 0x131, "b": 0x132})
         self.assertEqual(m.menu_buttons(RAIJU, 0x1234, 0x5678, "hid-generic", self.db), {})
 
+    def test_shoulders_and_triggers_for_a_manual(self):
+        # A pad with its own driver names them; triggers that are only
+        # axes (xpad) have no key code here.
+        xpad = [0x130, 0x131, 0x136, 0x137, 0x13a, 0x13b, 0x13c]
+        self.assertEqual(m.menu_buttons(xpad, 0x45e, 0x28e, "xpad", self.db),
+                         {"guide": 0x13c, "a": 0x130, "b": 0x131, "lb": 0x136, "rb": 0x137})
+        # A hid-generic one, from its database entry, by number.
+        self.assertEqual(m.menu_buttons(RAIJU, 0x2222, 0x3333, "hid-generic", self.db),
+                         {"a": 0x131, "b": 0x132, "lb": 0x134, "rb": 0x135, "lt": 0x136, "rt": 0x137})
+
 
 XPAD = {"guide": 0x13c, "a": 0x130, "b": 0x131}
 STICKS = {m.ABS_X: (-32768, 32767), m.ABS_Y: (-32768, 32767)}
@@ -121,6 +132,20 @@ class Nav(unittest.TestCase):
         # A 0..255 stick (hid-generic) is read from its own range.
         nav = m.PadNav({}, {m.ABS_Y: (0, 255)})
         self.assertEqual(nav.feed(m.EV_ABS, m.ABS_Y, 0), "up")
+
+    def test_shoulders_and_triggers(self):
+        nav = m.PadNav({**XPAD, "lb": 0x136, "rb": 0x137}, {**STICKS, m.ABS_Z: (0, 255), m.ABS_RZ: (0, 255)}, True)
+        self.assertEqual(nav.feed(m.EV_KEY, 0x136, 1), "lb")
+        self.assertEqual(nav.feed(m.EV_KEY, 0x137, 1), "rb")
+        # An analog trigger counts once per pull, like a stick's push.
+        self.assertIsNone(nav.feed(m.EV_ABS, m.ABS_RZ, 100))
+        self.assertEqual(nav.feed(m.EV_ABS, m.ABS_RZ, 200), "rt")
+        self.assertIsNone(nav.feed(m.EV_ABS, m.ABS_RZ, 255))
+        self.assertIsNone(nav.feed(m.EV_ABS, m.ABS_RZ, 10))
+        self.assertEqual(nav.feed(m.EV_ABS, m.ABS_Z, 255), "lt")
+        # On a hid-generic pad, ABS_Z may be a stick: not a trigger.
+        nav = m.PadNav({}, {m.ABS_Z: (0, 255)})
+        self.assertIsNone(nav.feed(m.EV_ABS, m.ABS_Z, 255))
 
 
 class LetGo(unittest.TestCase):

@@ -82,6 +82,10 @@ BTN_MISC, BTN_JOYSTICK, KEY_MAX = 0x100, 0x120, 0x2ff
 # pure parts below need no evdev.
 EV_KEY, EV_ABS = 0x01, 0x03
 BTN_SOUTH, BTN_EAST, BTN_MODE = 0x130, 0x131, 0x13c
+BTN_TL, BTN_TR, BTN_TL2, BTN_TR2 = 0x136, 0x137, 0x138, 0x139
+# SDL_GameControllerDB's names for the shoulders and triggers, and the
+# menu's.
+SHOULDERS = {"leftshoulder": "lb", "rightshoulder": "rb", "lefttrigger": "lt", "righttrigger": "rt"}
 BTN_DPAD = {0x220: "up", 0x221: "down", 0x222: "left", 0x223: "right"}
 ABS_X, ABS_Y, ABS_Z, ABS_RZ, ABS_GAS, ABS_BRAKE = 0x00, 0x01, 0x02, 0x05, 0x09, 0x0a
 ABS_HAT0X, ABS_HAT0Y = 0x10, 0x11
@@ -113,7 +117,8 @@ def name_key(name):
 
 def load_paddb(path):
     """(vendor, product) -> {platform: {role: button number}} from
-    SDL_GameControllerDB (roles: back, start, guide, a, b), or
+    SDL_GameControllerDB (roles: back, start, guide, a, b, and the
+    shoulders and triggers when they're buttons), or
     name_key(name) -> the same for a pad with no USB ids. Only entries
     that give back and start as buttons."""
     db = {}
@@ -134,7 +139,7 @@ def load_paddb(path):
         else:
             key = ("name", guid[8:32])   # no USB ids: the name, as name_key makes it
         m = dict(f.split(":", 1) for f in fields[2:] if ":" in f)
-        roles = {r: int(m[r][1:]) for r in ("back", "start", "guide", "a", "b")
+        roles = {r: int(m[r][1:]) for r in ("back", "start", "guide", "a", "b", *SHOULDERS)
                  if m.get(r, "")[:1] == "b" and m[r][1:].isdigit()}
         if "back" not in roles or "start" not in roles:
             continue
@@ -173,28 +178,34 @@ def generic_roles(keys, vendor, product, db, name=""):
 
 
 def menu_buttons(keys, vendor, product, driver, db, name=""):
-    """{"guide", "a", "b": key code} on this device, as far as it has them.
-    A pad with a driver of its own names them; a hid-generic one is looked
-    up like its Select and Start."""
+    """{"guide", "a", "b", "lb", "rb", "lt", "rt": key code} on this
+    device, as far as it has them. A pad with a driver of its own names
+    them; a hid-generic one is looked up like its Select and Start. The
+    shoulders and triggers are for a manual in the menu (zoom, first and
+    last page)."""
     if driver == "hid-generic":
         found = generic_roles(keys, vendor, product, db, name)
-        return {r: found[r] for r in ("guide", "a", "b") if r in found}
-    named = {"guide": BTN_MODE, "a": BTN_SOUTH, "b": BTN_EAST}
+        return {r: found[s] for s, r in {"guide": "guide", "a": "a", "b": "b", **SHOULDERS}.items() if s in found}
+    named = {"guide": BTN_MODE, "a": BTN_SOUTH, "b": BTN_EAST,
+             "lb": BTN_TL, "rb": BTN_TR, "lt": BTN_TL2, "rt": BTN_TR2}
     return {r: c for r, c in named.items() if c in keys}
 
 
 class PadNav:
     """One pad's events as menu commands: up, down, left, right (d-pad,
-    hat or left stick), select (A), back (B), close (Guide). A stick
-    counts once per push: it has to come back near the middle before it
-    moves the menu again."""
+    hat or left stick), select (A), back (B), close (Guide), and lb, rb,
+    lt, rt (the shoulders and triggers). A stick counts once per push: it
+    has to come back near the middle before it moves the menu again. So
+    does an analog trigger, read only on a pad with a driver of its own
+    (analog_triggers): a hid-generic pad's ABS_Z can be a stick."""
 
     PUSH, BACK = 0.6, 0.3
 
-    def __init__(self, buttons, ranges):
-        self.keys = {c: {"guide": "close", "a": "select", "b": "back"}[r] for r, c in buttons.items()}
+    def __init__(self, buttons, ranges, analog_triggers=False):
+        self.keys = {c: {"guide": "close", "a": "select", "b": "back"}.get(r, r) for r, c in buttons.items()}
         self.ranges = ranges      # {abs code: (min, max)}
         self.pushed = {}          # stick axis -> the direction it's held in
+        self.triggers = {ABS_Z: "lt", ABS_RZ: "rt"} if analog_triggers else {}
 
     def feed(self, etype, code, value):
         if etype == EV_KEY and value == 1:
@@ -216,6 +227,14 @@ class PadNav:
                        (ABS_Y, False): "up", (ABS_Y, True): "down"}[(code, x > 0)]
                 self.pushed[code] = way
                 return way
+        if code in self.triggers and code in self.ranges:
+            lo, hi = self.ranges[code]
+            x = (value - lo) / max(1, hi - lo)
+            if x < self.BACK:
+                self.pushed.pop(code, None)
+            elif x > self.PUSH and code not in self.pushed:
+                self.pushed[code] = self.triggers[code]
+                return self.triggers[code]
         return None
 
 
@@ -536,7 +555,7 @@ def main():
                     buttons = menu_buttons(keys, dev.info.vendor, dev.info.product, driver, db, dev.name)
                     guides[fd] = buttons.get("guide")
                     ranges = {c: (i.min, i.max) for c, i in dev.capabilities().get(e.EV_ABS, [])}
-                    navs[fd] = None if (dev.info.vendor, dev.info.product) == STEAM_VIRTUAL else PadNav(buttons, ranges)
+                    navs[fd] = None if (dev.info.vendor, dev.info.product) == STEAM_VIRTUAL else PadNav(buttons, ranges, driver != "hid-generic")
                     activity[fd], used[fd], warned[fd] = Activity(ranges), now, False
                     addresses[fd] = bluetooth_address(dev)
                     names = "+".join(str(e.BTN.get(c) or e.KEY.get(c) or c) for c in sorted(combo))

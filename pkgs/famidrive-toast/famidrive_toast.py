@@ -70,6 +70,11 @@ COUNTDOWN = 3          # seconds counted down before a recording starts
 RECORD_ITEMS = {"Start recording": "Record", "Stop recording": "Stop"}   # the menu item, and its button's label
 RED = (226, 60, 60, 255)   # the record button's dot, and the one beside Stop while recording
 
+# poppler, for a game's manual in the Guide menu.
+PDFTOPPM = os.environ.get("FAMIDRIVE_TOAST_PDFTOPPM", "@pdftoppm@")
+PDFINFO = os.environ.get("FAMIDRIVE_TOAST_PDFINFO", "@pdfinfo@")
+MANUAL_BG = (12, 12, 12, 245)   # behind a manual's page, over the blurred game
+
 MAX_SHOWN = 3          # toasts on screen at once, stacked from the corner
 URGENT = ("alert", "achievement")   # a progress toast nobody updates is let go
 FADE = 0.25
@@ -130,11 +135,16 @@ def hex_color(value):
     return tuple(int(v[i:i + 2], 16) for i in (0, 2, 4, 6))
 
 
-def color_scheme(home):
-    """The color scheme the player picked in ES-DE, or None."""
-    m = re.search(r'<string name="ThemeColorScheme" value="([^"]*)"',
+def es_setting(home, name):
+    """A string setting from the player's es_settings.xml, or None."""
+    m = re.search(rf'<string name="{name}" value="([^"]*)"',
                   read(Path(home) / "ES-DE/settings/es_settings.xml"))
     return m.group(1) if m else None
+
+
+def color_scheme(home):
+    """The color scheme the player picked in ES-DE, or None."""
+    return es_setting(home, "ThemeColorScheme")
 
 
 def theme_colors(theme, scheme):
@@ -498,6 +508,80 @@ def game_mode():
     return words[0] if words and words[0] in ("freeze", "block") else "block"
 
 
+def manual_for(home, run):
+    """The PDF manual of the game running in this session, where ES-DE's
+    own viewer finds it, or None. famidrive-launch writes the game's
+    system and ES-DE's path to it (famidrive-game.rom); ES-DE keeps a
+    game's media at <media>/<system>/manuals/<its path in the system's
+    folder, without the extension>.pdf. Both folders are the player's
+    ES-DE settings, or ES-DE's defaults."""
+    try:
+        system, rom = (run / "famidrive-game.rom").read_text().splitlines()[:2]
+    except (OSError, ValueError):
+        return None
+
+    def folder(setting, default):
+        value = es_setting(home, setting) or default
+        return Path(str(home) + value[1:]) if value.startswith("~") else Path(value)
+    roms = folder("ROMDirectory", "~/ROMs")
+    media = folder("MediaDirectory", "~/ES-DE/downloaded_media")
+    rom = Path(rom)
+    rel = None
+    for base in (roms / system, (roms / system).resolve()):
+        for path in (rom, rom.resolve()):
+            try:
+                rel = path.relative_to(base)
+                break
+            except ValueError:
+                continue
+        if rel:
+            break
+    if not rel or not system:
+        return None
+    # A game that's a folder (Game.ps3) can be named either way.
+    for name in (str(rel.with_suffix("")), str(rel)):
+        pdf = media / system / "manuals" / f"{name}.pdf"
+        if pdf.is_file():
+            return pdf
+    return None
+
+
+def pdf_pages(path):
+    """How many pages a PDF has (pdfinfo), or None if it can't be read."""
+    import subprocess
+    try:
+        out = subprocess.run([PDFINFO, str(path)], capture_output=True, text=True, timeout=10).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    m = re.search(r"^Pages:\s+(\d+)", out, re.M)
+    return int(m.group(1)) if m and int(m.group(1)) > 0 else None
+
+
+def render_page(path, page, height):
+    """One page (from 0) of a PDF, height pixels tall, as (width, height,
+    RGB bytes), or None. Raw PPM, not PNG: found on the first box
+    2026-10-21, a 4K-tall page took pdftoppm 6 s as a PNG (compressing it)
+    and 0.09 s as a PPM."""
+    import subprocess
+    try:
+        out = subprocess.run([PDFTOPPM, "-f", str(page + 1), "-l", str(page + 1),
+                              "-scale-to-x", "-1", "-scale-to-y", str(int(height)), str(path)],
+                             capture_output=True, timeout=30).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return ppm(out)
+
+
+def ppm(data):
+    """A binary PPM (P6, 8 bits) as (width, height, RGB bytes), or None."""
+    m = re.match(rb"P6\s+(?:#[^\n]*\s+)*(\d+)\s+(\d+)\s+(\d+)\s", data)
+    if not m or int(m.group(3)) != 255:
+        return None
+    w, h = int(m.group(1)), int(m.group(2))
+    pixels = data[m.end():m.end() + w * h * 3]
+    return (w, h, pixels) if len(pixels) == w * h * 3 else None
+
+
 def recording_since():
     """When famidrive-record's recording in this session started (as
     time.time()), or None if it isn't recording: its state file, with a
@@ -620,13 +704,56 @@ def watch_controllers(interval=1.5):
 # gamescope to show, and it then drew the whole picture itself, every
 # frame, instead of handing the game to the TV as it was. The Steam
 # overlay layer, where the toasts are, is in the recording.
+#
+# A game with a manual where ES-DE keeps it (manual_for) gets "Manual",
+# below Resume: its pages full screen, over the blurred game, with the
+# game paused as it is under the menu. The buttons are ES-DE's own PDF
+# viewer's, so a player learns them once: left and right turn the page,
+# the shoulders zoom (up, down, left and right then move around the
+# page), the triggers go to the first and last page and zoom back out,
+# and B goes back to the menu.
+
+class Reader:
+    """Where a player is in a manual: the page (from 0), the zoom (an
+    index into ZOOMS) and, zoomed in, which part of the page shows (x and
+    y, 0..1 across what doesn't fit). Pure: the page count is set once
+    it's known."""
+
+    ZOOMS = (1.0, 1.5, 2.0, 2.5)
+    STEP = 0.25   # of what doesn't fit, per press
+
+    def __init__(self, path):
+        self.path, self.pages = path, None
+        self.page, self.zoom = 0, 0
+        self.x, self.y = 0.5, 0.0
+
+    def command(self, cmd):
+        last = (self.pages or 1) - 1
+        if cmd == "rb":
+            self.zoom = min(len(self.ZOOMS) - 1, self.zoom + 1)
+        elif cmd == "lb":
+            self.zoom = max(0, self.zoom - 1)
+            if not self.zoom:
+                self.x, self.y = 0.5, 0.0
+        elif cmd in ("lt", "rt"):
+            self.page = 0 if cmd == "lt" else last
+            self.zoom, self.x, self.y = 0, 0.5, 0.0
+        elif self.zoom and cmd in ("up", "down"):
+            self.y = min(1.0, max(0.0, self.y + (self.STEP if cmd == "down" else -self.STEP)))
+        elif self.zoom and cmd in ("left", "right"):
+            self.x = min(1.0, max(0.0, self.x + (self.STEP if cmd == "right" else -self.STEP)))
+        elif cmd in ("left", "right"):
+            page = max(0, min(last if self.pages else self.page + 1, self.page + (1 if cmd == "right" else -1)))
+            if page != self.page:
+                self.page, self.y = page, 0.0
+
 
 class Menu:
     """The menu's state. Pure: whether a game is running, whether it's one
     to pause, and its guideMenu are passed in.
 
-    In a game: Resume, and Quit game, which asks first, since anything not
-    saved is lost. Out of one: Close. A "freeze" game (an emulator) is
+    In a game: Resume, Manual when it has one, and Quit game, which asks
+    first, since anything not saved is lost. Out of one: Close. A "freeze" game (an emulator) is
     stopped while the menu is open; a "block" one (an online game) keeps
     running, with the pads taken from it. With recordings on, Start
     recording (or Stop recording, while one is under way) is a half-width
@@ -637,20 +764,24 @@ class Menu:
         self.recordings = recordings
         self.recording = False
         self.open = False
-        self.view = "main"   # or "confirm": Quit game's "are you sure?"
+        self.view = "main"   # or "confirm": Quit game's "are you sure?"; or "manual"
         self.items = []
         self.sel = 0
         self.playing = False
         self.mode, self.note = "block", ""
+        self.manual = None   # the running game's manual, if it has one
+        self.reader = None   # a Reader, while it's open
 
     def _main(self):
         self.view = "main"
         record = ["Stop recording" if self.recording else "Start recording"] if self.recordings else []
-        self.items = [*record, "Resume", "Quit game"] if self.playing else [*record, "Close"]
+        manual = ["Manual"] if self.manual else []
+        self.items = [*record, "Resume", *manual, "Quit game"] if self.playing else [*record, "Close"]
 
-    def command(self, cmd, playing, pausable=True, mode="block", recording=False):
+    def command(self, cmd, playing, pausable=True, mode="block", recording=False, manual=None):
         if cmd == "open":
             self.open, self.sel, self.playing, self.recording = True, 0, playing, recording
+            self.manual, self.reader = manual if playing else None, None
             # Big Picture and the voice client aren't games to pause.
             self.mode = mode if playing and pausable else "none"
             self.note = {"freeze": "Game paused", "block": "The game keeps running"}.get(self.mode, "")
@@ -658,6 +789,15 @@ class Menu:
             self.sel = self.items.index("Resume" if playing else "Close")
             return self.state()
         if not self.open:
+            return self.state()
+        if self.view == "manual":
+            if cmd == "close":
+                self.open = False
+            elif cmd == "back":
+                self._main()
+                self.sel = self.items.index("Manual")
+            else:
+                self.reader.command(cmd)
             return self.state()
         item = self.items[self.sel]
         if cmd == "close" or (cmd == "back" and self.view == "main"):
@@ -669,6 +809,8 @@ class Menu:
             self.sel = max(0, self.sel - 1)
         elif cmd == "down":
             self.sel = min(len(self.items) - 1, self.sel + 1)
+        elif cmd == "select" and item == "Manual":
+            self.view, self.reader = "manual", Reader(self.manual)
         elif cmd == "select" and item == "Quit game":
             self.view, self.items, self.sel = "confirm", ["Cancel", "Quit"], 0
         elif cmd == "select" and item == "Quit":
@@ -1105,6 +1247,123 @@ def daemon(spec_file, player):
         surf.blit(digit, ((size - digit.get_width()) // 2, (size - digit.get_height()) // 2))
         return surf
 
+    # --- A manual, full screen --------------------------------------------
+
+    bar_h = int(84 * u)   # the hints under the page
+    pages = {}            # (path, page, zoom) -> its drawing, or False if it couldn't be drawn
+    drawing = set()       # the same, for pages pdftoppm is still drawing
+
+    def page_height(zoom):
+        return int((sh - bar_h) * Reader.ZOOMS[zoom])
+
+    def want_page(path, page, zoom):
+        """Have pdftoppm draw a page, in the background, unless it's drawn
+        or being drawn. Only the pages near the one being read are kept:
+        zoomed in on a 4K TV, one is 100 MB."""
+        key = (str(path), page, zoom)
+        if key in pages or key in drawing:
+            return
+        drawing.add(key)
+        for old in [k for k in pages if k[0] != key[0] or abs(k[1] - page) > 1 or k[2] not in (0, zoom)]:
+            del pages[old]
+
+        def work():
+            got = render_page(path, page, page_height(zoom))
+            surf = False
+            if got:
+                w, h, px = got
+                flat = pygame.image.frombytes(px, (w, h), "RGB")
+                fit = int((sw - 2 * margin) * Reader.ZOOMS[zoom])
+                if w > fit:   # a two-page spread: fitted to the width instead
+                    flat = pygame.transform.smoothscale(flat, (fit, max(1, h * fit // w)))
+                surf = pygame.Surface(flat.get_size(), pygame.SRCALPHA, 32)   # put() sends 32-bit
+                surf.blit(flat, (0, 0))
+            pages[key] = surf
+            drawing.discard(key)
+        threading.Thread(target=work, daemon=True).start()
+
+    def hint(keys, label, colors):
+        """One of the hints under a page: the buttons, then what they do."""
+        text = colors["text"]
+        g, sp = int(40 * u), int(8 * u)
+        glyphs = []
+        for k in keys:
+            if k in ("left", "right", "up", "down"):
+                s = pygame.Surface((g, g), pygame.SRCALPHA, 32)
+                pygame.draw.circle(s, text, (g // 2, g // 2), g // 2)
+                a, c = g * .22, g / 2
+                tri = {"left": [(c - a, c), (c + a * .7, c - a), (c + a * .7, c + a)],
+                       "right": [(c + a, c), (c - a * .7, c - a), (c - a * .7, c + a)],
+                       "up": [(c, c - a), (c - a, c + a * .7), (c + a, c + a * .7)],
+                       "down": [(c, c + a), (c - a, c - a * .7), (c + a, c - a * .7)]}[k]
+                pygame.draw.polygon(s, on_text(text), tri)
+            else:
+                glyph = m_small.render(k, True, on_text(text))
+                s = pygame.Surface((max(g, glyph.get_width() + g // 2), g), pygame.SRCALPHA, 32)
+                pygame.draw.rect(s, text, s.get_rect(), border_radius=g // 2)
+                s.blit(glyph, ((s.get_width() - glyph.get_width()) // 2, (g - glyph.get_height()) // 2))
+            glyphs.append(s)
+        words = m_body.render(label, True, colors["dim"])
+        w = sum(s.get_width() for s in glyphs) + sp * len(glyphs) + int(2 * u) + words.get_width()
+        out = pygame.Surface((w, max(g, words.get_height())), pygame.SRCALPHA, 32)
+        x = 0
+        for s in glyphs:
+            out.blit(s, (x, (out.get_height() - g) // 2))
+            x += s.get_width() + sp
+        out.blit(words, (x + int(2 * u), (out.get_height() - words.get_height()) // 2))
+        return out
+
+    def render_manual_bar(r, colors):
+        """Under the page: which page it is, and the buttons."""
+        surf = pygame.Surface((sw, bar_h), pygame.SRCALPHA, 32)
+        m = int(40 * u)
+        where = f"Page {r.page + 1} of {r.pages}" if r.pages else ""
+        if r.pages and r.zoom:
+            where += f"  ·  {Reader.ZOOMS[r.zoom]:g}x"
+        label = m_body.render(where, True, colors["text"])
+        surf.blit(label, (m, (bar_h - label.get_height()) // 2))
+        hints = [hint(["left", "right", "up", "down"], "Move", colors) if r.zoom
+                 else hint(["left", "right"], "Page", colors),
+                 hint(["LB", "RB"], "Zoom", colors), hint(["LT", "RT"], "First, last", colors),
+                 hint(["B"], "Back", colors)]
+        x = sw - m - sum(h.get_width() for h in hints) - int(32 * u) * (len(hints) - 1)
+        for h in hints:
+            surf.blit(h, (x, (bar_h - h.get_height()) // 2))
+            x += h.get_width() + int(32 * u)
+        return surf
+
+    def draw_manual(rd):
+        """The page the reader is on, over the whole screen, with the hints
+        under it: drawn in a pixmap and copied on at once. The page before
+        stays up until the next one's drawn."""
+        r = menu.reader
+        if r.pages is None:
+            r.pages = pdf_pages(r.path) or 0   # 0: it can't be read
+        key = (str(r.path), r.page, r.zoom)
+        if r.pages:
+            want_page(r.path, r.page, r.zoom)
+            if r.page + 1 < r.pages:
+                want_page(r.path, r.page + 1, 0)   # turning the page is the likeliest next
+        surf = pages.get(key)
+        drawn = (key, r.x, r.y, "waiting" if surf is None else bool(surf), r.pages)
+        if drawn == rd["drawn"] or (surf is None and rd["drawn"] is not None):
+            return
+        rd["drawn"] = drawn
+        colors = theme_colors(theme, color_scheme(Path.home()))
+        pix, avail = rd["pix"], sh - bar_h
+        fill_solid(pix, MANUAL_BG, (0, 0, sw, sh))
+        if surf:
+            w, h = surf.get_size()
+            vw, vh = min(w, sw), min(h, avail)
+            x, y = int((w - vw) * r.x), int((h - vh) * r.y)
+            put(surf.subsurface((x, y, vw, vh)), ((sw - vw) // 2, (avail - vh) // 2), pix)
+        else:
+            note = m_body.render("Opening the manual…" if surf is None else "This manual can't be opened",
+                                 True, colors["text"])
+            put(note, ((sw - note.get_width()) // 2, (avail - note.get_height()) // 2), pix)
+        put(render_manual_bar(r, colors), (0, avail), pix)
+        win.copy_area(gc, pix, 0, 0, sw, sh, 0, 0)
+
     def menu_key(pads):
         since = recording_since() if "Stop recording" in menu.items else None
         live = None if since is None else int((time.time() - since) * 2)   # the dot's pulse and the time so far
@@ -1248,6 +1507,7 @@ def daemon(spec_file, player):
     colors, rendered, ys = {}, {}, {}   # per toast: its scheme, its last render, its animated y
     countdown = None   # when a recording starts, while the countdown is up
     count_drawn = None   # (number, rect) of the countdown on screen now
+    reading = None       # while a manual is up: its pixmap, and what's drawn in it
     gap = int(16 * u)
     while True:
         now = time.monotonic()
@@ -1259,7 +1519,7 @@ def daemon(spec_file, player):
         # show once it's closed; the menu redraws for the clock and
         # batteries every second.
         busy = menu.open or sheet is not None or countdown is not None or bool(queue.tick(now)) or drawn is not None
-        moving = sheet and (sheet["phase"] != "still" or sheet["swap"])
+        moving = (sheet and (sheet["phase"] != "still" or sheet["swap"])) or (reading and drawing)
         wait = 1 / 60 if moving else 1.0 if menu.open else 1 / 30 if busy else None
         if menu.open and wait == 1.0 and "Stop recording" in menu.items:
             # On the half second, so the dot beside Stop pulses evenly.
@@ -1292,7 +1552,8 @@ def daemon(spec_file, player):
                     elif server is srv:   # the session's own socket only, not the shared one
                         if msg["menu"] == "open":
                             countdown = None   # the menu opened over it: the recording isn't started
-                        reply = menu.command(msg["menu"], in_game(), pausable(), game_mode(), recording())
+                        manual = manual_for(Path.home(), sock_path().parent) if msg["menu"] == "open" else None
+                        reply = menu.command(msg["menu"], in_game(), pausable(), game_mode(), recording(), manual)
                         if reply.get("do") == "record":
                             # Once the menu has slid away and the blur faded.
                             countdown = time.monotonic() + SLIDE_SECONDS + COUNTDOWN
@@ -1309,8 +1570,21 @@ def daemon(spec_file, player):
             end_sheet(sheet)
             sheet = None
             menu_drawn = None
+        if menu.open and menu.view == "manual" and sheet:
+            if reading is None:
+                reading = {"pix": win.create_pixmap(sw, sh, 32), "drawn": None}
+                sheet["phase"] = "still"
+            draw_manual(reading)
+            d.flush()
+            continue
+        if reading:   # back from the manual: the menu, as it was
+            reading["pix"].free()
+            reading = None
+            if menu.open:
+                fill_solid(win, dim_at(1), (0, 0, sw - sheet["pw"], sh))
+                menu_drawn = None
         if menu.open:
-            if menu_drawn is None:   # just opened
+            if menu_drawn is None and sheet is None:   # just opened
                 over_game(True)
                 sheet = open_menu()
                 menu_drawn = sheet["key"]
