@@ -32,12 +32,43 @@ import shutil
 import struct
 import sys
 import time
+from collections.abc import Mapping
 from pathlib import Path
+from typing import NotRequired, TypedDict
 
 MARK = ".famidrive-instance"   # in an instance FamiDrive made
 
 
-def set_keys(path, keys, section="[General]"):
+class Server(TypedDict):
+    name: str
+    address: str
+
+
+class Instance(TypedDict):
+    minecraft: str
+    fabricLoader: str | None
+    servers: list[Server]
+    join: str | None
+    memory: int | None
+    java: str
+    mods: list[str]
+
+
+class Spec(TypedDict):
+    """What minecraft.nix passes."""
+    root: str
+    launcher: dict[str, str]
+    instances: dict[str, Instance]
+    declared: NotRequired[list[str]]
+
+
+class Component(TypedDict):
+    uid: str
+    version: str
+    important: NotRequired[bool]
+
+
+def set_keys(path: Path, keys: Mapping[str, str | int], section: str = "[General]") -> None:
     """Set key=value lines in a Prism .cfg, keeping everything else."""
     lines = path.read_text().split("\n") if path.exists() else [section]
     for key, value in keys.items():
@@ -55,20 +86,27 @@ def set_keys(path, keys, section="[General]"):
 # list of compounds. Only the tag types it uses are written; any others
 # are read past and kept as they were.
 
+# A value as read: a string (8), a list (9: its items' tag and the items),
+# a compound (10: name -> (tag, value)), or any other tag's raw bytes.
+type NbtValue = str | bytes | NbtList | NbtCompound
+type NbtList = tuple[int, list[NbtValue]]
+type NbtCompound = dict[str, tuple[int, NbtValue]]
+
+
 class Nbt:
-    def __init__(self, data):
+    def __init__(self, data: bytes) -> None:
         self.b, self.i = data, 0
 
-    def take(self, n):
+    def take(self, n: int) -> bytes:
         out = self.b[self.i:self.i + n]
         self.i += n
         return out
 
-    def string(self):
-        n = struct.unpack(">H", self.take(2))[0]
+    def string(self) -> str:
+        n: int = struct.unpack(">H", self.take(2))[0]
         return self.take(n).decode("utf-8", "replace")
 
-    def payload(self, tag):
+    def payload(self, tag: int) -> NbtValue:
         """(tag, value): the value as Python data, or raw bytes for tags
         servers.dat doesn't use."""
         start = self.i
@@ -84,7 +122,7 @@ class Nbt:
             count = struct.unpack(">i", self.take(4))[0]
             return (item, [self.payload(item) for _ in range(count)])
         elif tag == 10:
-            out = {}
+            out: NbtCompound = {}
             while True:
                 t = self.take(1)[0]
                 if t == 0:
@@ -100,24 +138,25 @@ class Nbt:
         return self.b[start:self.i]   # raw, written back as is
 
 
-def nbt_string(s):
+def nbt_string(s: str) -> bytes:
     raw = s.encode("utf-8")
     return struct.pack(">H", len(raw)) + raw
 
 
-def nbt_payload(tag, value):
-    if tag == 8:
+def nbt_payload(value: NbtValue) -> bytes:
+    """Each kind of value is the tag it was read as (see NbtValue)."""
+    if isinstance(value, str):
         return nbt_string(value)
-    if tag == 9:
+    if isinstance(value, tuple):
         item, items = value
-        return bytes([item]) + struct.pack(">i", len(items)) + b"".join(nbt_payload(item, v) for v in items)
-    if tag == 10:
-        return b"".join(bytes([t]) + nbt_string(k) + nbt_payload(t, v) for k, (t, v) in value.items()) + b"\0"
+        return bytes([item]) + struct.pack(">i", len(items)) + b"".join(nbt_payload(v) for v in items)
+    if isinstance(value, dict):
+        return b"".join(bytes([t]) + nbt_string(k) + nbt_payload(v) for k, (t, v) in value.items()) + b"\0"
     return value   # raw bytes kept from reading
 
 
-def update_servers(path, wanted):
-    servers = []
+def update_servers(path: Path, wanted: list[Server]) -> None:
+    servers: list[NbtValue] = []
     if path.exists():
         data = path.read_bytes()
         if data[:2] == b"\x1f\x8b":
@@ -126,20 +165,23 @@ def update_servers(path, wanted):
         nbt.take(1)
         nbt.string()
         root = nbt.payload(10)
-        servers = root.get("servers", (9, (10, [])))[1][1]
+        listed = root.get("servers") if isinstance(root, dict) else None
+        if listed and isinstance(listed[1], tuple):
+            servers = listed[1][1]
     for want in wanted:
-        entry = next((s for s in servers if s.get("ip", (8, ""))[1] == want["address"]), None)
-        if entry is None:
+        entry = next((s for s in servers if isinstance(s, dict) and s.get("ip", (8, ""))[1] == want["address"]),
+                     None)
+        if not isinstance(entry, dict):
             entry = {}
             servers.append(entry)
         entry["name"] = (8, want["name"])
         entry["ip"] = (8, want["address"])
-    root = {"servers": (9, (10, servers))}
+    new_root: NbtCompound = {"servers": (9, (10, servers))}
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(bytes([10]) + nbt_string("") + nbt_payload(10, root))
+    path.write_bytes(bytes([10]) + nbt_string("") + nbt_payload(new_root))
 
 
-def set_options(path, options):
+def set_options(path: Path, options: dict[str, str]) -> None:
     """Set key:value lines in Minecraft's options.txt. A new file holding
     only these is fine: Minecraft fills in the rest on its first start."""
     lines = path.read_text().split("\n") if path.exists() else []
@@ -154,24 +196,26 @@ def set_options(path, options):
     path.write_text("\n".join(lines))
 
 
-def update_pack(path, minecraft, fabric):
+def update_pack(path: Path, minecraft: str, fabric: str | None) -> None:
     want = {"net.minecraft": minecraft}
     if fabric:
         want["net.fabricmc.fabric-loader"] = fabric
+    have: dict[str, str | None]
     try:
-        have = {c["uid"]: c.get("version") for c in json.loads(path.read_text())["components"]}
+        pack: list[dict[str, str]] = json.loads(path.read_text())["components"]
+        have = {c["uid"]: c.get("version") for c in pack}
     except (OSError, ValueError, KeyError):
         have = {}
     same = all(have.get(k) == v for k, v in want.items())
     if same and (fabric or "net.fabricmc.fabric-loader" not in have):
         return   # Prism's own resolved file; leave it
-    components = [{"important": True, "uid": "net.minecraft", "version": minecraft}]
+    components: list[Component] = [{"important": True, "uid": "net.minecraft", "version": minecraft}]
     if fabric:
         components.append({"uid": "net.fabricmc.fabric-loader", "version": fabric})
     path.write_text(json.dumps({"components": components, "formatVersion": 1}, indent=4))
 
 
-def update_mods(mods_dir, jars):
+def update_mods(mods_dir: Path, jars: list[str]) -> None:
     mods_dir.mkdir(parents=True, exist_ok=True)
     manifest = mods_dir / ".famidrive-mods"
     old = manifest.read_text().split("\n") if manifest.exists() else []
@@ -187,14 +231,14 @@ def update_mods(mods_dir, jars):
     manifest.write_text("\n".join(sorted(names)))
 
 
-def main():
+def main() -> None:
     if sys.argv[1] == "fullscreen":
         d = Path(sys.argv[2])
         if d.is_dir():
             (d / ".minecraft").mkdir(exist_ok=True)
             set_options(d / ".minecraft/options.txt", {"fullscreen": "true"})
         return
-    spec = json.loads(sys.argv[1])
+    spec: Spec = json.loads(sys.argv[1])
     root = Path(spec["root"]).expanduser()
     root.mkdir(parents=True, exist_ok=True)
     set_keys(root / "prismlauncher.cfg", spec["launcher"])
