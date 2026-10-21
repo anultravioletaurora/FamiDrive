@@ -27,7 +27,7 @@ import signal
 import sys
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 
 if TYPE_CHECKING:
     from evdev import InputDevice
@@ -70,7 +70,15 @@ def norm(value: int, info: AbsRange) -> float:
     return max(-1.0, min(1.0, (value - mid) / half))
 
 
-def is_pad(dev: "InputDevice") -> bool:
+def axes(dev: "InputDevice[str]") -> list[tuple[int, AbsRange]]:
+    """Each axis' code and range. evdev (1.9.3) annotates capabilities()
+    as codes alone, but with absinfo (its default) EV_ABS lists
+    (code, AbsInfo) pairs."""
+    from evdev import ecodes as e
+    return cast(list[tuple[int, AbsRange]], dev.capabilities(absinfo=True).get(e.EV_ABS, []))
+
+
+def is_pad(dev: "InputDevice[str]") -> bool:
     from evdev import ecodes as e
     caps = dev.capabilities()
     return e.BTN_SOUTH in caps.get(e.EV_KEY, []) and e.EV_ABS in caps
@@ -98,7 +106,7 @@ def main() -> None:
                       name="FamiDrive pad pointer")
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
 
-    pads: dict[str, InputDevice] = {}
+    pads: dict[str, InputDevice[str]] = {}
     sticks: dict[str, Stick] = {}
     held: set[int] = set()
     hat_held: dict[tuple[str, int], int] = {}
@@ -118,7 +126,7 @@ def main() -> None:
                 dev.close()
                 continue
             pads[path] = dev
-            sticks[path] = Stick({c: i for c, i in dev.capabilities(absinfo=True).get(e.EV_ABS, [])})
+            sticks[path] = Stick(dict(axes(dev)))
 
     def tap(codes: tuple[int, ...], down: bool) -> None:
         for c in codes if down else reversed(codes):

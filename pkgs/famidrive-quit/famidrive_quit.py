@@ -62,10 +62,13 @@ import threading
 import time
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Literal, TypedDict
+from typing import TYPE_CHECKING, Literal, TypedDict, cast
 
 import evdev
 from evdev import ecodes as e
+
+if TYPE_CHECKING:
+    from evdev import AbsInfo
 
 HOLD = 1.0      # seconds both buttons must stay down
 GRACE = 5.0     # seconds between "please close" and "close now"
@@ -330,7 +333,7 @@ def idle_step(idle: float, timeout: float | None, warned: bool) -> str | None:
     return None
 
 
-def bluetooth_address(dev: "evdev.InputDevice") -> str | None:
+def bluetooth_address(dev: "evdev.InputDevice[str]") -> str | None:
     """A Bluetooth pad's address (its evdev "uniq"), or None."""
     uniq = (dev.uniq or "").strip()
     if dev.info.bustype == BUS_BLUETOOTH and re.fullmatch(r"([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}", uniq):
@@ -366,7 +369,7 @@ def ask_menu(command: str, path: Path | None = None) -> MenuReply:
         return {}
 
 
-def hid_driver(dev: "evdev.InputDevice") -> str | None:
+def hid_driver(dev: "evdev.InputDevice[str]") -> str | None:
     """The kernel driver behind an input device (hid-generic, xpad, ...)."""
     try:
         return Path(f"/sys/class/input/{Path(dev.path).name}/device/device/driver").resolve().name
@@ -494,12 +497,18 @@ def quit_game() -> None:
     threading.Thread(target=force, daemon=True).start()
 
 
-def grab(dev: "evdev.InputDevice", driver: str | None) -> None:
+def abs_axes(dev: "evdev.InputDevice[str]") -> "list[tuple[int, AbsInfo]]":
+    """Each axis' code and range. evdev (1.9.3) annotates capabilities()
+    as codes alone, but with absinfo (its default) EV_ABS lists
+    (code, AbsInfo) pairs."""
+    return cast("list[tuple[int, AbsInfo]]", dev.capabilities().get(e.EV_ABS, []))
+
+
+def grab(dev: "evdev.InputDevice[str]", driver: str | None) -> None:
     """Let go of everything held on dev, for every reader, then take it."""
     try:
-        caps = dev.capabilities()
         axes: dict[int, tuple[int, int, int]] = {}
-        for code, info in caps.get(e.EV_ABS, []):
+        for code, info in abs_axes(dev):
             axes[code] = (dev.absinfo(code).value, info.min, info.max)
         for etype, code, value in let_go(dev.active_keys(), axes, driver):
             dev.write(etype, code, value)
@@ -512,7 +521,7 @@ def grab(dev: "evdev.InputDevice", driver: str | None) -> None:
         log(f"couldn't grab {dev.name}: {err}")
 
 
-def ungrab(dev: "evdev.InputDevice") -> None:
+def ungrab(dev: "evdev.InputDevice[str]") -> None:
     try:
         dev.ungrab()
     except OSError:
@@ -521,7 +530,7 @@ def ungrab(dev: "evdev.InputDevice") -> None:
 
 def main() -> None:
     parent = os.getppid()
-    devices: dict[int, evdev.InputDevice] = {}   # fd -> InputDevice
+    devices: dict[int, evdev.InputDevice[str]] = {}   # fd -> InputDevice
     combos: dict[int, set[int]] = {}             # fd -> its Select and Start key codes
     held: dict[int, set[int]] = {}               # fd -> set of combo buttons currently down
     since: dict[int, float | None] = {}          # fd -> when the full combo went down (None = fired or not held)
@@ -577,7 +586,7 @@ def main() -> None:
                     drivers[fd] = driver
                     buttons = menu_buttons(keys, dev.info.vendor, dev.info.product, driver, db, dev.name)
                     guides[fd] = buttons.get("guide")
-                    ranges = {c: (i.min, i.max) for c, i in dev.capabilities().get(e.EV_ABS, [])}
+                    ranges = {c: (i.min, i.max) for c, i in abs_axes(dev)}
                     navs[fd] = None if (dev.info.vendor, dev.info.product) == STEAM_VIRTUAL else PadNav(buttons, ranges, driver != "hid-generic")
                     activity[fd], used[fd], warned[fd] = Activity(ranges), now, False
                     addresses[fd] = bluetooth_address(dev)
