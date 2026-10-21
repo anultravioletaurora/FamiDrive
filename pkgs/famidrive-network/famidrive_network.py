@@ -40,6 +40,10 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import TYPE_CHECKING, Protocol, cast
+
+if TYPE_CHECKING:
+    from dbus_next import Variant
 
 PREFIX = "network-"   # what entries' files start with; anything else isn't ours
 MAX_NETWORKS = 15
@@ -47,12 +51,30 @@ GAMELIST = Path.home() / "ES-DE/gamelists/settings/gamelist.xml"
 NM = "org.freedesktop.NetworkManager"
 ACTIVATED, FAILED = 100, 120   # NMDeviceState
 
+# nmcli's rows: a device (name, type, state) and a Wi-Fi network (in use,
+# SSID, security, signal).
+type Device = tuple[str, str, str]
+type Network = tuple[str, str, str, str]
 
-def log(msg):
+
+# The D-Bus interfaces join() calls. dbus_next makes their methods when it
+# reads NetworkManager's introspection, so they're described here.
+class NetworkManagerIface(Protocol):
+    async def call_get_device_by_ip_iface(self, iface: str) -> str: ...
+
+    async def call_add_and_activate_connection(
+            self, connection: "dict[str, dict[str, Variant]]", device: str, specific_object: str) -> list[str]: ...
+
+
+class DeviceIface(Protocol):
+    async def get_state(self) -> int: ...
+
+
+def log(msg: str) -> None:
     print(f"famidrive-network: {msg}", file=sys.stderr, flush=True)
 
 
-def toast(*args):
+def toast(*args: str) -> None:
     """A toast on the TV. Never fails the caller."""
     exe = shutil.which("famidrive-toast")
     if exe:
@@ -65,10 +87,11 @@ def toast(*args):
 
 # ---------------------------------------------------------------- nmcli
 
-def split_terse(line):
+def split_terse(line: str) -> list[str]:
     """One line of `nmcli -t`: fields split on ':', with '\\:' and '\\\\'
     inside a field."""
-    fields, cur, i = [], "", 0
+    fields: list[str] = []
+    cur, i = "", 0
     while i < len(line):
         c = line[i]
         if c == "\\" and i + 1 < len(line):
@@ -85,7 +108,7 @@ def split_terse(line):
     return fields
 
 
-def nmcli(*args):
+def nmcli(*args: str) -> list[list[str]] | None:
     exe = shutil.which("nmcli")
     if not exe:
         return None
@@ -96,20 +119,20 @@ def nmcli(*args):
     return [split_terse(line) for line in r.stdout.splitlines() if line]
 
 
-def safe(name):
+def safe(name: str) -> str:
     """A name fit for a file name (ES-DE shows the file's name)."""
     return re.sub(r'[/\\:*?"<>|\n\r\t]', "", name).strip()
 
 
-def plan_entries(devices, networks, saved):
+def plan_entries(devices: list[Device], networks: list[Network], saved: list[str]) -> dict[str, str]:
     """{file name: contents}. devices: [(device, type, state)]; networks:
     [(in_use, ssid, security, signal)] as nmcli lists them; saved: names
     of remembered Wi-Fi connections."""
-    out = {}
+    out: dict[str, str] = {}
     wifi = any(t == "wifi" for _, t, _ in devices)
     if wifi:
         # One entry per network name: several access points can share one.
-        best = {}
+        best: dict[str, tuple[bool, str, int]] = {}
         for in_use, ssid, security, signal in networks:
             if not safe(ssid):
                 continue
@@ -130,8 +153,8 @@ def plan_entries(devices, networks, saved):
     return out
 
 
-def write_entries(folder, planned):
-    folder = Path(folder)
+def write_entries(path: str | Path, planned: dict[str, str]) -> None:
+    folder = Path(path)
     folder.mkdir(parents=True, exist_ok=True)
     for f in folder.glob("*.setting"):
         try:
@@ -148,7 +171,7 @@ def write_entries(folder, planned):
 
 # ---------------------------------------------------------------- passwords in ES-DE's game list
 
-def typed_password(gamelist, entry_name):
+def typed_password(gamelist: Path, entry_name: str) -> str | None:
     """The Sort name typed for an entry in ES-DE's game-info editor, or None."""
     try:
         root = ET.parse(gamelist).getroot()
@@ -161,7 +184,7 @@ def typed_password(gamelist, entry_name):
     return None
 
 
-def wipe_passwords(gamelist):
+def wipe_passwords(gamelist: Path) -> bool:
     """Removes every Sort name typed for a Wi-Fi entry. True if any went."""
     try:
         tree = ET.parse(gamelist)
@@ -183,7 +206,7 @@ def wipe_passwords(gamelist):
 
 # ---------------------------------------------------------------- joining, over D-Bus
 
-def key_mgmt(security):
+def key_mgmt(security: str) -> str | None:
     """NetworkManager's key-mgmt for nmcli's SECURITY column, or None for
     an open network."""
     s = security.upper()
@@ -196,21 +219,21 @@ def key_mgmt(security):
     return "wpa-psk"
 
 
-async def join(device, ssid, security, password):
+async def join(device: str, ssid: str, security: str, password: str) -> str | None:
     """Join a new network with its password, saved for the whole box.
     Returns an error message, or None."""
-    from dbus_next.aio import MessageBus
+    from dbus_next.aio import MessageBus, ProxyInterface
     from dbus_next import BusType, Variant
 
     bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
 
-    async def proxy(path, iface):
+    async def proxy(path: str, iface: str) -> ProxyInterface:
         intro = await bus.introspect(NM, path)
         return bus.get_proxy_object(NM, path, intro).get_interface(iface)
 
-    nm = await proxy("/org/freedesktop/NetworkManager", NM)
+    nm = cast(NetworkManagerIface, await proxy("/org/freedesktop/NetworkManager", NM))
     dev_path = await nm.call_get_device_by_ip_iface(device)
-    settings = {
+    settings: dict[str, dict[str, Variant]] = {
         "connection": {"id": Variant("s", ssid), "type": Variant("s", "802-11-wireless")},
         "802-11-wireless": {"ssid": Variant("ay", ssid.encode())},
     }
@@ -220,7 +243,7 @@ async def join(device, ssid, security, password):
     if mgmt:
         settings["802-11-wireless-security"] = {"key-mgmt": Variant("s", mgmt), "psk": Variant("s", password)}
     await nm.call_add_and_activate_connection(settings, dev_path, "/")
-    dev = await proxy(dev_path, "org.freedesktop.NetworkManager.Device")
+    dev = cast(DeviceIface, await proxy(dev_path, "org.freedesktop.NetworkManager.Device"))
     for _ in range(40):
         state = await dev.get_state()
         if state == ACTIVATED:
@@ -233,24 +256,24 @@ async def join(device, ssid, security, password):
 
 # ---------------------------------------------------------------- launching
 
-def wifi_device():
+def wifi_device() -> str | None:
     for dev, typ, _ in nmcli("-f", "DEVICE,TYPE,STATE", "device", "status") or []:
         if typ == "wifi":
             return dev
     return None
 
 
-def saved_wifi():
+def saved_wifi() -> list[str]:
     return [name for name, typ in (nmcli("-f", "NAME,TYPE", "connection", "show") or [])
             if typ == "802-11-wireless"]
 
 
-def active_wifi():
+def active_wifi() -> list[str]:
     return [name for name, typ in (nmcli("-f", "NAME,TYPE", "connection", "show", "--active") or [])
             if typ == "802-11-wireless"]
 
 
-def launch_wifi(entry_name, ssid, security):
+def launch_wifi(entry_name: str, ssid: str, security: str) -> int:
     if ssid in active_wifi():
         device = wifi_device()
         info = ethernet_status(device) if device else {}
@@ -296,16 +319,16 @@ def launch_wifi(entry_name, ssid, security):
     return 0
 
 
-def launch_forget(name):
+def launch_forget(name: str) -> int:
     ok = nmcli("connection", "delete", "id", name) is not None
     toast("--kind", "notice", "--icon", "info", f"Forgot {name}" if ok else "Already forgotten",
           "Join it again from Settings to use it." if ok else "")
     return 0
 
 
-def ethernet_status(dev):
+def ethernet_status(dev: str) -> dict[str, str]:
     """A port's state, address, speed and hardware address (nmcli device show)."""
-    info = {}
+    info: dict[str, str] = {}
     for row in nmcli("-f", "GENERAL.STATE,GENERAL.HWADDR,WIRED-PROPERTIES.CARRIER,CAPABILITIES.SPEED,IP4.ADDRESS,IP4.GATEWAY",
                      "device", "show", dev) or []:
         if len(row) >= 2:
@@ -313,7 +336,7 @@ def ethernet_status(dev):
     return info
 
 
-def describe_ethernet(info):
+def describe_ethernet(info: dict[str, str]) -> tuple[str, str]:
     mac = info.get("GENERAL.HWADDR", "")
     if info.get("WIRED-PROPERTIES.CARRIER") == "off":
         return "No cable in the Ethernet port", f"Hardware address {mac}".strip()
@@ -326,7 +349,7 @@ def describe_ethernet(info):
     return "Ethernet not connected", f"Hardware address {mac}".strip()
 
 
-def launch_ethernet(dev):
+def launch_ethernet(dev: str) -> int:
     title, detail = describe_ethernet(ethernet_status(dev))
     if title == "Ethernet not connected":
         nmcli("device", "connect", dev)
@@ -335,7 +358,7 @@ def launch_ethernet(dev):
     return 0
 
 
-def launch(path):
+def launch(path: str) -> int:
     lines = Path(path).read_text().split("\n")
     kind = lines[0][len(PREFIX):] if lines[0].startswith(PREFIX) else ""
     if kind == "wifi" and len(lines) >= 2:
@@ -348,22 +371,23 @@ def launch(path):
     return 2
 
 
-def entries(folder):
+def entries(folder: str) -> int:
     wipe_passwords(GAMELIST)
-    devices = nmcli("-f", "DEVICE,TYPE,STATE", "device", "status")
-    if devices is None:   # no NetworkManager: nothing to offer
+    rows = nmcli("-f", "DEVICE,TYPE,STATE", "device", "status")
+    if rows is None:   # no NetworkManager: nothing to offer
         write_entries(folder, {})
         return 0
-    devices = [tuple(d[:3]) for d in devices if len(d) >= 3]
-    networks = []
+    devices = [(d[0], d[1], d[2]) for d in rows if len(d) >= 3]
+    networks: list[Network] = []
     if any(t == "wifi" for _, t, _ in devices):
-        networks = [tuple(n[:4]) for n in (nmcli("-f", "IN-USE,SSID,SECURITY,SIGNAL", "device", "wifi", "list") or [])
+        networks = [(n[0], n[1], n[2], n[3])
+                    for n in (nmcli("-f", "IN-USE,SSID,SECURITY,SIGNAL", "device", "wifi", "list") or [])
                     if len(n) >= 4]
     write_entries(folder, plan_entries(devices, networks, saved_wifi()))
     return 0
 
 
-def main():
+def main() -> int:
     args = sys.argv[1:]
     if args[:1] == ["entries"] and len(args) == 2:
         return entries(args[1])
