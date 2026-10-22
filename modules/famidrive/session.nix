@@ -69,7 +69,18 @@ let
     end)
   '';
 
+  # Xbox pads through the kernel's driver (xpad, xpadneo), not SDL's own
+  # Xbox HID driver, in "Who's playing?" and in everything a session
+  # starts: Steam and its games, the emulators, famidrive-pads. Found on
+  # the first box 2026-10-22: an Elite Series 2 on Bluetooth (xpadneo,
+  # which gives it the Xbox 360 pad's 045e:028e) did nothing in the
+  # picker, Rocket League, Cyberpunk 2077, Black Ops Cold War, Fallout:
+  # New Vegas or Melee, while ES-DE and Minecraft, which run with SDL's
+  # HID drivers off, had it. SDL's PlayStation and Switch drivers stay on.
+  sdlXboxOff = "export SDL_JOYSTICK_HIDAPI_XBOX=0";
+
   famidriveSession = pkgs.writeShellScript "famidrive-session" ''
+    ${sdlXboxOff}
     ${lib.optionalString (perfUsers != [ ]) ''
       # MangoHud (gamescope --mangoapp, for players with the performance
       # overlay on). gamescope hands mangoapp a config that says
@@ -284,6 +295,7 @@ let
   # connecting and going flat show there too. The greeter has no runtime
   # folder; famidrive-toast falls back to /tmp for it.
   pickerSession = pkgs.writeShellScript "famidrive-picker-session" ''
+    ${sdlXboxOff}
     ${pkgs.famidrive-toast}/bin/famidrive-toast daemon ${cfg.overlays.toastSpec} greeter &
     exec ${pkgs.famidrive-picker}/bin/famidrive-picker ${pickerSpec}
   '';
