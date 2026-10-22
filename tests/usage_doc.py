@@ -54,9 +54,9 @@ SECTIONS = [
      "Minecraft through Prism Launcher, in the Desktop system (`lanes` has `\"minecraft\"`)."),
     ("PC saves", ["famidrive.pcSaves"], "Syncing PC games' saves that Steam Cloud doesn't."),
     ("Online play", ["famidrive.online"], "Emulator netplay, through the servers in Servers."),
-    ("File sharing", ["famidrive.smb"],
-     "Each player's home folder on the network (SMB), for changing the menu's music or copying "
-     "recordings off from another computer."),
+    ("File sharing", ["famidrive.smb", "famidrive.nfs"],
+     "The box on the home network (SMB, and NFS for Linux): each player's home folder, the "
+     "library to copy off, and a Drop folder to copy games in from another computer."),
     ("Systems", ["famidrive.systems", "famidrive.dolphin"],
      "The systems in ES-DE's menu. FamiDrive fills these in for every console it supports; most "
      "boxes never set them."),

@@ -1197,8 +1197,10 @@ def cmd_pull() -> None:
               "Library updated", f"{what} fetched from RomM")
 
     # Deletion policy is undecided (roms.md). Report orphans and never delete.
+    # Links are games copied into Drop (smb.nix), never RomM's.
     local = {str(p) for p in (DATA / "roms").glob("*/*")
-             if p.parent.name in CFG["systems"] and not p.name.endswith(".part")}
+             if p.parent.name in CFG["systems"] and not p.name.endswith(".part")
+             and not p.is_symlink()}
     for orphan in sorted(local - set(index) - folders):
         print(f"not in RomM anymore (kept): {orphan}", file=sys.stderr)
 
