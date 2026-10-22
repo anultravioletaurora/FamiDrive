@@ -24,21 +24,34 @@ them; only Nvidia's driver has to be chosen when the box is built.
 
 import os
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import TypedDict
+
+
+class Gpu(TypedDict):
+    """One display controller, as gpus() reads it."""
+    slot: str
+    vendor: str
+    id: str
+    driver: str | None
+    outputs: list[str | None]
+    boot_vga: bool
+
 
 PCI = Path(os.environ.get("FAMIDRIVE_SYSFS", "/sys")) / "bus/pci/devices"
 VENDORS = {"0x1002": "amd", "0x8086": "intel", "0x10de": "nvidia"}
 NAMES = {"amd": "AMD", "intel": "Intel", "nvidia": "Nvidia"}
 
 
-def read(path):
+def read(path: Path) -> str | None:
     try:
         return path.read_text().strip()
     except OSError:
         return None
 
 
-def gpus():
+def gpus() -> list[Gpu]:
     """Display controllers (PCI class 0x03), in bus order.
 
     Each one's vendor, its vendor:device id, the kernel driver bound to
@@ -47,7 +60,7 @@ def gpus():
     (0x0302) with no outputs at all: the Intel or AMD card has the
     screen, and the HDMI port, and shows what the Nvidia card renders.
     """
-    found = []
+    found: list[Gpu] = []
     for dev in sorted(PCI.iterdir()) if PCI.is_dir() else []:
         cls, vendor, device = read(dev / "class"), read(dev / "vendor"), read(dev / "device")
         if not (cls and vendor and cls.startswith("0x03")):
@@ -66,19 +79,21 @@ def gpus():
     return found
 
 
-def display(found):
+def display(found: list[Gpu]) -> Gpu | None:
     """The card the TV is on: one with a screen connected, else one with
     outputs at all (the TV may be off), else the one the firmware booted
     on. gamescope otherwise takes the first card Vulkan lists, which on
     a laptop can be the Nvidia card with nothing to show on."""
-    for pick in (lambda g: "connected" in g["outputs"], lambda g: g["outputs"], lambda g: g["boot_vga"]):
+    picks: tuple[Callable[[Gpu], object], ...] = (
+        lambda g: "connected" in g["outputs"], lambda g: g["outputs"], lambda g: g["boot_vga"])
+    for pick in picks:
         cards = [g for g in found if pick(g)]
         if cards:
             return cards[0]
     return found[0] if found else None
 
 
-def offload(found):
+def offload(found: list[Gpu]) -> Gpu | None:
     """The Nvidia card games should render on, when the TV is on another
     card and Nvidia's own driver drives this one (famidrive.gpu =
     "nvidia"). None otherwise: nouveau, or the TV on the Nvidia card."""
@@ -88,11 +103,11 @@ def offload(found):
     return next((g for g in found if g["vendor"] == "nvidia" and g["driver"] == "nvidia"), None)
 
 
-def suggested(found):
+def suggested(found: list[Gpu]) -> str:
     return "nvidia" if any(g["vendor"] == "nvidia" for g in found) else "auto"
 
 
-def cmd_list():
+def cmd_list() -> None:
     found = gpus()
     if not found:
         print("No graphics card found on the PCI bus.")
@@ -107,7 +122,7 @@ def cmd_list():
     print(f'\nSet in configuration.nix:  famidrive.gpu = "{suggested(found)}";')
 
 
-def cmd_check(configured):
+def cmd_check(configured: str) -> int:
     vendors = {g["vendor"] for g in gpus()}
     if "nvidia" in vendors and configured != "nvidia":
         print('famidrive-hardware: this box has an Nvidia card, but famidrive.gpu is not "nvidia", '
@@ -120,15 +135,16 @@ def cmd_check(configured):
     return 0
 
 
-def cmd_display():
+def cmd_display() -> int:
     found = gpus()
-    if len(found) < 2:
+    shown = display(found)
+    if len(found) < 2 or shown is None:
         return 1
-    print(display(found)["id"])
+    print(shown["id"])
     return 0
 
 
-def cmd_offload():
+def cmd_offload() -> int:
     card = offload(gpus())
     if card is None:
         return 1
@@ -136,7 +152,7 @@ def cmd_offload():
     return 0
 
 
-def main():
+def main() -> None:
     args = sys.argv[1:]
     if not args:
         cmd_list()
