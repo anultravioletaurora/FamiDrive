@@ -170,6 +170,30 @@ in
     touch $out
   '';
 
+  # Static types for every Python tool, strict (mypy.ini), with each
+  # library the tools import, so what comes from one is checked too.
+  types =
+    let
+      src = lib.fileset.toSource {
+        root = ../.;
+        fileset = lib.fileset.unions [
+          ../mypy.ini
+          (lib.fileset.fileFilter (f: f.hasExt "py") ../pkgs)
+          (lib.fileset.fileFilter (f: f.hasExt "py") ../scripts)
+        ];
+      };
+      python = pkgs.python3.withPackages (ps: [
+        ps.mypy ps.types-requests ps.types-pyyaml
+        ps.requests ps.cryptography ps.pyyaml ps.xxhash ps.evdev ps.dbus-next
+        ps.pygame-ce ps.pillow ps.jeepney ps.xlib
+      ]);
+    in
+    pkgs.runCommand "test-types" { nativeBuildInputs = [ python ]; } ''
+      cd ${src}
+      mypy --config-file mypy.ini --no-color-output --cache-dir $TMPDIR/mypy pkgs/*/*.py scripts/*.py
+      touch $out
+    '';
+
   romm-agent = unit "romm_agent" ../pkgs/romm-agent/romm_agent.py
     (pkgs.python3.withPackages (ps: [ ps.requests ps.cryptography ]));
   thunderstore = unit "thunderstore" ../pkgs/famidrive-thunderstore/famidrive_thunderstore.py pkgs.python3;

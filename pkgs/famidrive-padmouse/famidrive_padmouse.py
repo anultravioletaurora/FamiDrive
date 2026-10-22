@@ -26,6 +26,11 @@ import select
 import signal
 import sys
 import time
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Protocol, cast
+
+if TYPE_CHECKING:
+    from evdev import InputDevice
 
 TICK = 1 / 120         # pointer updates per second
 SPEED = 2600.0         # pixels per second at full tilt
@@ -33,7 +38,25 @@ DEADZONE = 0.18
 SCROLL_EVERY = 0.09    # seconds between wheel clicks at full tilt
 
 
-def curve(v, dz=DEADZONE):
+class AbsRange(Protocol):
+    """What an axis' absinfo says about its range."""
+    @property
+    def min(self) -> int:
+        ...
+
+    @property
+    def max(self) -> int:
+        ...
+
+
+@dataclass
+class Stick:
+    """One pad's sticks, each axis -1..1, and the range each axis reports."""
+    info: dict[int, AbsRange]
+    axes: dict[str, float] = field(default_factory=lambda: {"x": 0.0, "y": 0.0, "rx": 0.0, "ry": 0.0})
+
+
+def curve(v: float, dz: float = DEADZONE) -> float:
     """A stick's -1..1 as -1..1 movement: nothing in the dead zone, then
     squared, for fine control near the middle."""
     a = abs(v)
@@ -43,24 +66,33 @@ def curve(v, dz=DEADZONE):
     return m if v > 0 else -m
 
 
-def norm(value, info):
+def norm(value: int, info: AbsRange) -> float:
     """An axis' raw value as -1..1 around its middle."""
     mid = (info.max + info.min) / 2
     half = (info.max - info.min) / 2 or 1
     return max(-1.0, min(1.0, (value - mid) / half))
 
 
-def is_pad(dev, ecodes):
+def axes(dev: "InputDevice[str]") -> list[tuple[int, AbsRange]]:
+    """Each axis' code and range. evdev (1.9.3) annotates capabilities()
+    as codes alone, but with absinfo (its default) EV_ABS lists
+    (code, AbsInfo) pairs."""
+    from evdev import ecodes as e
+    return cast(list[tuple[int, AbsRange]], dev.capabilities(absinfo=True).get(e.EV_ABS, []))
+
+
+def is_pad(dev: "InputDevice[str]") -> bool:
+    from evdev import ecodes as e
     caps = dev.capabilities()
-    return ecodes.BTN_SOUTH in caps.get(ecodes.EV_KEY, []) and ecodes.EV_ABS in caps
+    return e.BTN_SOUTH in caps.get(e.EV_KEY, []) and e.EV_ABS in caps
 
 
-def main():
+def main() -> None:
     import evdev
     from evdev import ecodes as e
 
     # Pad button -> (keys pressed together). Click is BTN_LEFT.
-    buttons = {
+    buttons: dict[int, tuple[int, ...]] = {
         e.BTN_SOUTH: (e.BTN_LEFT,),
         e.BTN_EAST: (e.KEY_ESC,),
         e.BTN_WEST: (e.KEY_TAB,),
@@ -77,12 +109,15 @@ def main():
                       name="FamiDrive pad pointer")
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
 
-    pads, sticks, held, hat_held = {}, {}, set(), {}
+    pads: dict[str, InputDevice[str]] = {}
+    sticks: dict[str, Stick] = {}
+    held: set[int] = set()
+    hat_held: dict[tuple[str, int], int] = {}
     acc = [0.0, 0.0]
     last_scroll = 0.0
     next_scan = 0.0
 
-    def scan():
+    def scan() -> None:
         for path in evdev.list_devices():
             if path in pads:
                 continue
@@ -90,14 +125,13 @@ def main():
                 dev = evdev.InputDevice(path)
             except OSError:
                 continue
-            if dev.name == "FamiDrive pad pointer" or not is_pad(dev, e):
+            if dev.name == "FamiDrive pad pointer" or not is_pad(dev):
                 dev.close()
                 continue
             pads[path] = dev
-            sticks[path] = {"x": 0.0, "y": 0.0, "rx": 0.0, "ry": 0.0,
-                            "info": {c: i for c, i in dev.capabilities(absinfo=True).get(e.EV_ABS, [])}}
+            sticks[path] = Stick(dict(axes(dev)))
 
-    def tap(codes, down):
+    def tap(codes: tuple[int, ...], down: bool) -> None:
         for c in codes if down else reversed(codes):
             ui.write(e.EV_KEY, c, 1 if down else 0)
         ui.syn()
@@ -131,7 +165,7 @@ def main():
                         elif ev.code in buttons and ev.value in (0, 1):
                             tap(buttons[ev.code], ev.value == 1)
                     elif ev.type == e.EV_ABS:
-                        info = st["info"].get(ev.code)
+                        info = st.info.get(ev.code)
                         if ev.code in (e.ABS_HAT0X, e.ABS_HAT0Y):
                             prev = hat_held.pop((dev.path, ev.code), None)
                             if prev:
@@ -143,10 +177,10 @@ def main():
                         elif info is not None:
                             name = {e.ABS_X: "x", e.ABS_Y: "y", e.ABS_RX: "rx", e.ABS_RY: "ry"}.get(ev.code)
                             if name:
-                                st[name] = norm(ev.value, info)
+                                st.axes[name] = norm(ev.value, info)
             dt, last = now - last, now
-            dx = sum(curve(s["x"]) for s in sticks.values())
-            dy = sum(curve(s["y"]) for s in sticks.values())
+            dx = sum(curve(s.axes["x"]) for s in sticks.values())
+            dy = sum(curve(s.axes["y"]) for s in sticks.values())
             acc[0] += dx * SPEED * dt
             acc[1] += dy * SPEED * dt
             mx, my = int(acc[0]), int(acc[1])
@@ -156,7 +190,7 @@ def main():
                 ui.write(e.EV_REL, e.REL_X, mx)
                 ui.write(e.EV_REL, e.REL_Y, my)
                 ui.syn()
-            sy = sum(curve(s["ry"]) for s in sticks.values())
+            sy = sum(curve(s.axes["ry"]) for s in sticks.values())
             if sy and now - last_scroll >= SCROLL_EVERY / max(abs(sy), 0.2):
                 ui.write(e.EV_REL, e.REL_WHEEL, -1 if sy > 0 else 1)
                 ui.syn()

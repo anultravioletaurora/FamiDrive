@@ -50,9 +50,16 @@ import sqlite3
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import yaml
+
+# A Lutris game config (games/<configpath>.yml): Lutris's, read as it is.
+type YAML = dict[str, YAML] | list[YAML] | str | int | float | bool | None
+type Config = dict[str, YAML]
+# A row of Lutris's games table: id, slug, installer_slug, configpath, installed.
+type Row = tuple[int, str | None, str | None, str | None, int | None]
 
 NSENTER = os.environ.get("FAMIDRIVE_NSENTER", "@nsenter@")
 PROC = Path(os.environ.get("FAMIDRIVE_PROC", "/proc"))
@@ -78,7 +85,7 @@ PROCESS_ONLY = ("WINESERVERSOCKET=", "WINELOADERNOEXEC=", "WINEPRELOADRESERVE=")
 # library (BattleNetGames.cs, MIT), 2026-10-15, where they're InternalId
 # and ProductId. A game that's not here: its ID in capitals, the way most
 # codes are, and Battle.net's name.
-GAMES = {
+GAMES: dict[str, tuple[str, str | None]] = {
     "wow": ("WoW", "World of Warcraft"),
     "diablo3": ("D3", "Diablo III"),
     "s2": ("S2", "StarCraft II"),
@@ -119,60 +126,76 @@ MADE_HERE = "famidrive-battlenet"
 BATTLENET_EXE = "drive_c/Program Files (x86)/Battle.net/Battle.net.exe"
 
 
-def game_configs(lutris_dir):
+def game_configs(lutris_dir: Path) -> Path:
     """Where Lutris keeps its game configs: beside the database, unless an
     older Lutris left them in ~/.config/lutris (lutris/settings.py)."""
     games = lutris_dir / "games"
     return games if games.is_dir() else Path.home() / ".config/lutris/games"
 
 
-def load_config(path):
+def load_config(path: Path) -> Config | None:
     try:
-        return yaml.safe_load(path.read_text()) or {}
+        loaded = yaml.safe_load(path.read_text()) or {}
     except (OSError, yaml.YAMLError):
         return None
+    return loaded if isinstance(loaded, dict) else {}
 
 
-def exec_code(args):
+def section(config: Config | None, key: str) -> Config:
+    """config[key] when it's a mapping (Lutris's "game", "wine", ...), else {}."""
+    value = (config or {}).get(key)
+    return value if isinstance(value, dict) else {}
+
+
+def text(config: Config, key: str) -> str:
+    """config[key] as a string, "" when it isn't set."""
+    return str(config.get(key) or "")
+
+
+def configs_by_id(rows: list[Row], configs: Path) -> dict[int, Config]:
+    return {r[0]: ((load_config(configs / f"{r[3]}.yml") or {}) if r[3] else {}) for r in rows}
+
+
+def exec_code(args: str | None) -> str | None:
     m = re.search(r'--exec=("[^"]*"|\S+)', args or "")
     return m.group(1).strip('"') if m else None
 
 
-def battlenet_game(lutris_dir, game_id):
+def battlenet_game(lutris_dir: Path, game_id: str) -> tuple[Path, str] | None:
     """(prefix, the --exec argument) for a Battle.net game, or None."""
     try:
         con = sqlite3.connect(f"{(lutris_dir / 'pga.db').as_uri()}?mode=ro", uri=True, timeout=10)
         try:
-            row = con.execute("SELECT configpath FROM games WHERE id = ?", (int(game_id),)).fetchone()
+            row: tuple[str | None] | None = con.execute("SELECT configpath FROM games WHERE id = ?", (int(game_id),)).fetchone()
         finally:
             con.close()
     except (sqlite3.Error, ValueError):
         return None
     if not row or not row[0]:
         return None
-    game = ((load_config(game_configs(lutris_dir) / f"{row[0]}.yml") or {}).get("game")) or {}
-    exe, prefix = str(game.get("exe") or ""), game.get("prefix")
-    code = exec_code(str(game.get("args") or ""))
+    game = section(load_config(game_configs(lutris_dir) / f"{row[0]}.yml"), "game")
+    exe, prefix = text(game, "exe"), text(game, "prefix")
+    code = exec_code(text(game, "args"))
     if not code or not prefix or Path(exe.replace("\\", "/")).name.lower() != "battle.net.exe":
         return None
     return Path(prefix), "--exec=" + code
 
 
-def newest_log(prefix, since):
+def newest_log(prefix: Path, since: float) -> Path | None:
     """This launch's Battle.net log: the newest one started since."""
     logs = [p for p in prefix.glob("drive_c/users/*/AppData/Local/Battle.net/Logs/battle.net-*.log")
             if p.stat().st_mtime >= since]
     return max(logs, key=lambda p: p.stat().st_mtime, default=None)
 
 
-def read(path):
+def read(path: Path) -> str:
     try:
         return path.read_text(errors="replace")
     except OSError:
         return ""
 
 
-def battlenet_process(prefix):
+def battlenet_process(prefix: Path) -> tuple[int, list[bytes]] | None:
     """The running Battle.net's pid, in this prefix: the main process,
     not one of its Chromium helpers (--type=...)."""
     for d in PROC.iterdir():
@@ -192,7 +215,7 @@ def battlenet_process(prefix):
     return None
 
 
-def send(pid, env, exec_arg):
+def send(pid: int, env: list[bytes], exec_arg: str) -> None:
     """Battle.net.exe exec_arg, beside the running Battle.net."""
     keep = [e.decode(errors="replace") for e in env if e and not e.startswith(tuple(p.encode() for p in PROCESS_ONLY))]
     cmd = [NSENTER, "-t", str(pid), "-U", "-m", "--preserve-credentials", "--",
@@ -203,13 +226,14 @@ def send(pid, env, exec_arg):
         print(f"famidrive-battlenet: couldn't send {exec_arg}: {e}", file=sys.stderr)
 
 
-def play(lutris_dir, game_id, sleep=time.sleep, clock=time.time):
+def play(lutris_dir: Path, game_id: str, sleep: Callable[[float], None] = time.sleep,
+         clock: Callable[[], float] = time.time) -> None:
     game = battlenet_game(lutris_dir, game_id)
     if game is None:
         return
     prefix, exec_arg = game
     started = clock() - 2
-    log = None
+    log: Path | None = None
     while clock() - started < WAIT_FOR_SIGN_IN:
         # Newest each time: Battle.net can restart itself (an update).
         log = newest_log(prefix, started)
@@ -220,6 +244,8 @@ def play(lutris_dir, game_id, sleep=time.sleep, clock=time.time):
             break
         sleep(1)
     else:
+        return
+    if log is None:
         return
     sleep(SETTLE)
     for _ in range(TRIES):
@@ -236,22 +262,25 @@ def play(lutris_dir, game_id, sleep=time.sleep, clock=time.time):
     print(f"famidrive-battlenet: Battle.net didn't start the game after {TRIES} tries", file=sys.stderr)
 
 
-def slugify(name):
+def slugify(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower().replace("'", "")).strip("-")
 
 
-def installed_by_battlenet(prefix):
+def installed_by_battlenet(prefix: Path) -> dict[str, str] | None:
     """{Battle.net's ID: its name} for each game Battle.net has installed
     in this prefix, or None when it can't say (not run yet, or writing)."""
     try:
-        data = json.loads((prefix / "drive_c/ProgramData/Battle.net/Agent/aggregate.json").read_text())
+        data: object = json.loads((prefix / "drive_c/ProgramData/Battle.net/Agent/aggregate.json").read_text())
     except (OSError, ValueError):
         return None
+    listed = data.get("installed") if isinstance(data, dict) else None
+    if not isinstance(listed, list):
+        return {}
     return {str(g["product_id"]).lower(): str(g.get("name") or g["product_id"])
-            for g in data.get("installed") or [] if isinstance(g, dict) and g.get("product_id")}
+            for g in listed if isinstance(g, dict) and g.get("product_id")}
 
 
-def games(lutris_dir, clock=time.time):
+def games(lutris_dir: Path, clock: Callable[[], float] = time.time) -> None:
     """A Lutris entry for each game Battle.net has installed."""
     db = lutris_dir / "pga.db"
     if not db.exists():
@@ -264,21 +293,21 @@ def games(lutris_dir, clock=time.time):
         return
     try:
         with con:
-            rows = con.execute("SELECT id, slug, installer_slug, configpath, installed FROM games").fetchall()
-            config = {r[0]: ((load_config(configs / f"{r[3]}.yml") or {}) if r[3] else {}) for r in rows}
+            rows: list[Row] = con.execute("SELECT id, slug, installer_slug, configpath, installed FROM games").fetchall()
+            config = configs_by_id(rows, configs)
             apps = battlenet_apps(rows, config)
             for prefix, (app_installer, app_config) in apps.items():
                 found = installed_by_battlenet(prefix)
                 if found is None:
                     continue
                 # What already has an entry here: its code, any case.
-                have = {}
+                have: dict[str, tuple[int, str | None, int | None]] = {}
                 for i, slug, installer, path, installed in rows:
-                    game = config[i].get("game") or {}
-                    code = exec_code(str(game.get("args") or ""))
-                    if code and game.get("prefix") and Path(game["prefix"]).resolve() == prefix:
+                    game = section(config[i], "game")
+                    code = exec_code(text(game, "args"))
+                    if code and text(game, "prefix") and Path(text(game, "prefix")).resolve() == prefix:
                         have.setdefault(code.lower(), (i, installer, installed))
-                wanted = {}
+                wanted: dict[str, tuple[str, str]] = {}
                 for product, bnet_name in found.items():
                     code, name = GAMES.get(product, (product.upper(), None))
                     wanted["launch " + code.lower()] = (code, name or bnet_name)
@@ -298,20 +327,20 @@ def games(lutris_dir, clock=time.time):
         con.close()
 
 
-def battlenet_apps(rows, config):
+def battlenet_apps(rows: list[Row], config: dict[int, Config]) -> dict[Path, tuple[str | None, Config]]:
     """{prefix: (installer_slug, config)}: Battle.net itself, in each prefix
     it's installed in, an entry that starts Battle.net and no game."""
-    apps = {}
+    apps: dict[Path, tuple[str | None, Config]] = {}
     for i, slug, installer, path, installed in rows:
-        game = config[i].get("game") or {}
-        exe = Path(str(game.get("exe") or "").replace("\\", "/")).name.lower()
-        if installed and game.get("prefix") and exe in ("battle.net.exe", "battle.net launcher.exe") \
-                and not exec_code(str(game.get("args") or "")):
-            apps.setdefault(Path(game["prefix"]).resolve(), (installer, config[i]))
+        game = section(config[i], "game")
+        exe = Path(text(game, "exe").replace("\\", "/")).name.lower()
+        if installed and text(game, "prefix") and exe in ("battle.net.exe", "battle.net launcher.exe") \
+                and not exec_code(text(game, "args")):
+            apps.setdefault(Path(text(game, "prefix")).resolve(), (installer, config[i]))
     return apps
 
 
-def installed(lutris_dir):
+def installed(lutris_dir: Path) -> bool:
     """Whether Lutris has Battle.net installed (unknown counts as yes, so
     the install entry doesn't come back while Lutris writes its database)."""
     db = lutris_dir / "pga.db"
@@ -321,24 +350,24 @@ def installed(lutris_dir):
     try:
         con = sqlite3.connect(f"{db.as_uri()}?mode=ro", uri=True, timeout=10)
         try:
-            rows = con.execute("SELECT id, slug, installer_slug, configpath, installed FROM games").fetchall()
+            rows: list[Row] = con.execute("SELECT id, slug, installer_slug, configpath, installed FROM games").fetchall()
         finally:
             con.close()
     except sqlite3.Error:
         return True
-    config = {r[0]: ((load_config(configs / f"{r[3]}.yml") or {}) if r[3] else {}) for r in rows}
-    return bool(battlenet_apps(rows, config))
+    return bool(battlenet_apps(rows, configs_by_id(rows, configs)))
 
 
-def add(con, configs, prefix, code, name, app_installer, app_config, clock):
+def add(con: sqlite3.Connection, configs: Path, prefix: Path, code: str, name: str, app_installer: str | None,
+        app_config: Config, clock: Callable[[], float]) -> None:
     """A Lutris entry like the one Lutris's installer for the game makes
     (Black Ops Cold War's, on the first box 2026-10-15): Battle.net's
     prefix and its runner settings, and its Battle.net.exe with the code."""
     slug = slugify(name)
     now = int(clock())
     path = f"{slug}-{MADE_HERE}-{now}"
-    entry = {
-        "game": {"arch": (app_config.get("game") or {}).get("arch", "win64"),
+    entry: Config = {
+        "game": {"arch": section(app_config, "game").get("arch", "win64"),
                  "args": f'--exec="launch {code}"', "exe": BATTLENET_EXE, "prefix": str(prefix)},
         "game_slug": slug,
         "name": name,
@@ -358,7 +387,7 @@ def add(con, configs, prefix, code, name, app_installer, app_config, clock):
                 (name, slug, MADE_HERE, app_installer, str(prefix), now, path))
 
 
-def main():
+def main() -> None:
     usage = "usage: famidrive-battlenet play LUTRIS_DATA_DIR GAME_ID | games|installed LUTRIS_DATA_DIR"
     if len(sys.argv) == 4 and sys.argv[1] == "play":
         play(Path(sys.argv[2]), sys.argv[3])

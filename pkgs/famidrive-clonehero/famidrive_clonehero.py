@@ -33,7 +33,23 @@ import re
 import sys
 import time
 import urllib.request
+from collections.abc import Iterable
 from pathlib import Path
+from typing import NotRequired, TypedDict
+
+
+class SongsSpec(TypedDict):
+    dir: str
+    songs: dict[str, str]
+    onlyListed: NotRequired[bool]
+
+
+class PlayerSpec(TypedDict):
+    """For both player and played."""
+    profiles: list[str]
+    stamps: list[str]
+    bindings: NotRequired[str | None]
+
 
 ENCORE = os.environ.get("FAMIDRIVE_ENCORE", "https://files.enchor.us/{md5}.sng")   # tests point it at files
 MARK = ".famidrive-songs.json"     # name -> md5 of what's in the folder
@@ -56,15 +72,15 @@ PROFILE = {
 }
 
 
-def log(msg):
+def log(msg: str) -> None:
     print(f"famidrive-clonehero: {msg}", file=sys.stderr, flush=True)
 
 
-def safe(name):
+def safe(name: str) -> str:
     return re.sub(r'[/\\:*?"<>|]', "_", name).strip()
 
 
-def download(md5, dest):
+def download(md5: str, dest: Path) -> None:
     part = dest.with_name(dest.name + ".part")
     req = urllib.request.Request(ENCORE.format(md5=md5), headers={"User-Agent": "FamiDrive"})
     with urllib.request.urlopen(req, timeout=120) as r, open(part, "wb") as f:
@@ -77,9 +93,10 @@ def download(md5, dest):
     part.rename(dest)
 
 
-def cmd_songs(spec):
+def cmd_songs(spec: SongsSpec) -> None:
     lib = Path(spec["dir"])
     lib.mkdir(parents=True, exist_ok=True)
+    have: dict[str, str]
     try:
         have = json.loads((lib / MARK).read_text())
     except (OSError, ValueError):
@@ -114,7 +131,7 @@ def cmd_songs(spec):
         (lib / STAMP).write_text(str(time.time()))
 
 
-def seed_profiles(names):
+def seed_profiles(names: list[str]) -> None:
     """Adds a profile for each name that has none. Appends raw sections,
     so Clone Hero's own formatting of the rest of the file is kept."""
     path = HOME / "profiles.ini"
@@ -136,7 +153,7 @@ def seed_profiles(names):
         log(f"profiles added: {', '.join(n for n in names if n not in have)}")
 
 
-def library_stamp(stamps):
+def library_stamp(stamps: list[str]) -> str:
     """What the shared song folders look like now. A stamp file (the
     managed library's) by its contents; a folder (songs added by hand) by
     what's directly in it and when each changed, so a song copied in,
@@ -159,18 +176,18 @@ def library_stamp(stamps):
     return "|".join(parts)
 
 
-def bindings(lines):
+def bindings(lines: Iterable[str]) -> list[str]:
     return [line for line in lines if BINDING.match(line)]
 
 
-def prefs_lines():
+def prefs_lines() -> list[str]:
     try:
         return PREFS.read_text(errors="replace").splitlines(keepends=True)
     except OSError:
         return []
 
 
-def take_box_bindings(path):
+def take_box_bindings(path: str) -> None:
     """The box's bindings into this player's prefs, in place of theirs.
     With none saved yet, the player's own are left alone."""
     try:
@@ -189,7 +206,7 @@ def take_box_bindings(path):
         PREFS.write_text("".join(new))
 
 
-def cmd_played(spec):
+def cmd_played(spec: PlayerSpec) -> None:
     path = spec.get("bindings")
     if not path:
         return
@@ -207,10 +224,11 @@ def cmd_played(spec):
     log("controller bindings saved for everyone on this box")
 
 
-def cmd_player(spec):
+def cmd_player(spec: PlayerSpec) -> None:
     seed_profiles(spec["profiles"])
-    if spec.get("bindings"):
-        take_box_bindings(spec["bindings"])
+    box_bindings = spec.get("bindings")
+    if box_bindings:
+        take_box_bindings(box_bindings)
     # Rescan when the shared library changed since this player last
     # played: Clone Hero only looks for new songs when told to, or when
     # its cache is gone. Found on the first box 2026-10-06: 1.1 keeps the
@@ -227,9 +245,17 @@ def cmd_player(spec):
         seen.write_text(now)
 
 
-def main():
+def main() -> None:
     cmd, spec = sys.argv[1], json.loads(sys.argv[2])
-    {"songs": cmd_songs, "player": cmd_player, "played": cmd_played}[cmd](spec)
+    match cmd:
+        case "songs":
+            cmd_songs(spec)
+        case "player":
+            cmd_player(spec)
+        case "played":
+            cmd_played(spec)
+        case _:
+            raise KeyError(cmd)
 
 
 if __name__ == "__main__":

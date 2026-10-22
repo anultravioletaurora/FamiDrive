@@ -42,7 +42,9 @@ import re
 import subprocess
 import sys
 import time
+from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import NotRequired, TypedDict
 
 import requests
 
@@ -54,16 +56,54 @@ AGENT = {"User-Agent": "FamiDrive/1.0 (famidrive-cheevos)"}
 MEDIA = HOME / "ES-DE/downloaded_media"
 
 
+class Spec(TypedDict):
+    """SPEC, above."""
+    username: str
+    passwordFile: str
+    hardcore: NotRequired[bool]
+    retroarch: NotRequired[bool]
+    dolphin: NotRequired[bool]
+    pcsx2: NotRequired[bool]
+
+
+class State(TypedDict, total=False):
+    """The last sign-in, in STATE."""
+    username: str
+    token: str
+
+
+class LoginReply(TypedDict, total=False):
+    """RetroAchievements' answer to login2."""
+    Success: bool
+    Token: str
+    Error: str
+
+
+class Achievement(TypedDict, total=False):
+    """One of a game's achievements, in RetroAchievements' patch data."""
+    ID: int
+    Title: str
+    Description: str
+    Points: int
+
+
+class CometAchievement(TypedDict):
+    name: str | None
+    description: str | None
+    image: str | None
+
+
 # --- Signing in ----------------------------------------------------------------
 
-def load_state():
+def load_state() -> State:
     try:
-        return json.loads(STATE.read_text())
+        state: State = json.loads(STATE.read_text())
+        return state
     except (OSError, ValueError):
         return {}
 
 
-def store_state(state):
+def store_state(state: State) -> None:
     STATE.parent.mkdir(parents=True, exist_ok=True)
     tmp = STATE.with_suffix(".tmp")
     tmp.unlink(missing_ok=True)
@@ -74,18 +114,18 @@ def store_state(state):
     tmp.replace(STATE)
 
 
-def login(username, password):
+def login(username: str, password: str) -> str | None:
     """The account's token from RetroAchievements (login2), or None."""
     r = requests.post(API, data={"r": "login2", "u": username, "p": password},
                       headers=AGENT, timeout=15)
-    body = r.json() if r.content else {}
+    body: LoginReply = r.json() if r.content else {}
     if not body.get("Success") or not body.get("Token"):
         print(f"famidrive-cheevos: sign-in refused: {body.get('Error') or r.status_code}", file=sys.stderr)
         return None
     return body["Token"]
 
 
-def token_for(spec):
+def token_for(spec: Spec) -> str | None:
     """A fresh token, or the last one when RetroAchievements can't be reached."""
     state = load_state()
     cached = state.get("token") if state.get("username") == spec["username"] else None
@@ -106,12 +146,12 @@ def token_for(spec):
 
 # --- Emulator settings -----------------------------------------------------------
 
-def set_flat(path, keys):
+def set_flat(path: Path, keys: dict[str, str]) -> None:
     """RetroArch's `key = "value"` file: these keys set, the rest kept."""
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = path.read_text().splitlines() if path.exists() else []
     left = dict(keys)
-    out = []
+    out: list[str] = []
     for line in lines:
         k = line.split("=", 1)[0].strip()
         if k in left:
@@ -122,14 +162,15 @@ def set_flat(path, keys):
     path.write_text("\n".join(out) + "\n")
 
 
-def set_ini(path, section, keys):
+def set_ini(path: Path, section: str, keys: dict[str, str]) -> None:
     """An INI file's [section]: these keys set (Key = Value), the rest kept."""
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = path.read_text().splitlines() if path.exists() else []
     left = dict(keys)
-    out, inside, seen = [], False, False
+    out: list[str] = []
+    inside, seen = False, False
 
-    def flush():
+    def flush() -> None:
         out.extend(f"{k} = {v}" for k, v in left.items())
         left.clear()
 
@@ -157,7 +198,7 @@ def set_ini(path, section, keys):
     path.write_text("\n".join(out) + "\n")
 
 
-def configure(spec, token):
+def configure(spec: Spec, token: str) -> None:
     user, hard = spec["username"], bool(spec.get("hardcore"))
     if spec.get("retroarch"):
         set_flat(HOME / ".config/retroarch/retroarch.cfg", {
@@ -192,8 +233,8 @@ def configure(spec, token):
         })
 
 
-def cmd_setup(spec_file):
-    spec = json.loads(Path(spec_file).read_text())
+def cmd_setup(spec_file: str) -> int:
+    spec: Spec = json.loads(Path(spec_file).read_text())
     token = token_for(spec)
     if not token:
         print("famidrive-cheevos: not signed in; emulators keep what they had", file=sys.stderr)
@@ -208,22 +249,22 @@ AWARD = re.compile(r"Awarding achievement (\d+): (.*)")
 GAME = re.compile(r'Identified game: (\d+) "(.*)"')
 
 
-def achievements(game_id):
+def achievements(game_id: str) -> dict[str, Achievement]:
     """{id: {"Title", "Description", "Points"}} for a game, from
     RetroAchievements with the player's token; {} when it can't be had."""
     state = load_state()
     if not state.get("token"):
         return {}
     try:
-        r = requests.post(API, data={"r": "patch", "u": state["username"], "t": state["token"], "g": game_id},
+        r = requests.post(API, data={"r": "patch", "u": state.get("username"), "t": state.get("token"), "g": game_id},
                           headers=AGENT, timeout=15)
-        data = r.json().get("PatchData") or {}
+        listed: list[Achievement] = (r.json().get("PatchData") or {}).get("Achievements") or []
     except (requests.RequestException, ValueError):
         return {}
-    return {str(a["ID"]): a for a in data.get("Achievements") or []}
+    return {str(a.get("ID")): a for a in listed}
 
 
-def logo(system, rom):
+def logo(system: str, rom: str) -> str | None:
     """The game's logo in ES-DE's media (marquees), or None."""
     stem = Path(rom).stem
     for folder in ("marquees", "logos"):
@@ -241,7 +282,7 @@ def logo(system, rom):
 UNSUPPORTED = re.compile(r"^Unsupported Game Version \((.*)\)$")
 
 
-def unsupported_args(title):
+def unsupported_args(title: str | None) -> list[str] | None:
     """The alert for a copy RetroAchievements doesn't recognize, or None."""
     m = UNSUPPORTED.match(title or "")
     if not m:
@@ -251,7 +292,7 @@ def unsupported_args(title):
             "A fresh backup from the disc may match one it knows."]
 
 
-def toast_args(award, info, game, icon):
+def toast_args(award: tuple[str, str], info: Achievement | None, game: str | None, icon: str | None) -> list[str]:
     title = award[1]
     detail = game or ""
     if info:
@@ -265,7 +306,7 @@ def toast_args(award, info, game, icon):
     return args + [title, detail]
 
 
-def follow(path, stop, start=0):
+def follow(path: Path | str, stop: Callable[[], bool], start: int = 0) -> Iterator[str]:
     """Lines of a log as they're written, from `start` (RetroArch makes its
     log anew each launch; Heroic's Comet log goes on), until stop() says
     so. A log that starts over (smaller than where we were) is read from
@@ -287,12 +328,14 @@ def follow(path, stop, start=0):
                 time.sleep(0.3)
 
 
-def cmd_watch(log, system, rom):
+def cmd_watch(log: str, system: str, rom: str) -> int:
     if not load_state().get("token"):
         return 0   # this player has no RetroAchievements
     parent = os.getppid()
     icon = logo(system, rom)
-    game, info, unsupported = None, {}, False
+    game: str | None = None
+    info: dict[str, Achievement] = {}
+    unsupported = False
     for line in follow(log, lambda: os.getppid() != parent):
         m = GAME.search(line)
         if m:
@@ -305,7 +348,7 @@ def cmd_watch(log, system, rom):
             continue
         m = AWARD.search(line)
         if m and not unsupported:
-            subprocess.run(["famidrive-toast", *toast_args(m.groups(), info.get(m.group(1)), game, icon)],
+            subprocess.run(["famidrive-toast", *toast_args((m.group(1), m.group(2)), info.get(m.group(1)), game, icon)],
                            check=False, timeout=5)
     return 0
 
@@ -316,27 +359,28 @@ COMET_UNLOCK = re.compile(r"Unlocking achievement:?\s+(\S+)")
 CACHE = HOME / ".cache/famidrive/achievements"
 
 
-def comet_log():
+def comet_log() -> Path:
     state = Path(os.environ.get("XDG_STATE_HOME") or HOME / ".local/state")
     return state / "Heroic/logs/runners/comet.log"
 
 
-def comet_dbs():
+def comet_dbs() -> list[Path]:
     """Comet's gameplay databases, newest first (one per game and user)."""
     roots = [Path(os.environ.get("XDG_DATA_HOME") or HOME / ".local/share"), HOME / ".config"]
     found = [p for r in roots if r.exists() for p in r.glob("**/comet/**/gameplay.db")]
     return sorted(found, key=lambda p: p.stat().st_mtime, reverse=True)
 
 
-def comet_achievement(key, dbs=None):
+def comet_achievement(key: str, dbs: list[Path] | None = None) -> CometAchievement | None:
     """{"name", "description", "image"} for an achievement from Comet's
     database, by its key (or numeric id); None when it isn't there."""
     import sqlite3
     for db in dbs if dbs is not None else comet_dbs():
-        con = None
+        con: sqlite3.Connection | None = None
+        row: tuple[str | None, ...] | None = None
         try:
             con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
-            cols = {r[1] for r in con.execute("PRAGMA table_info(achievement)")}
+            cols: set[str] = {r[1] for r in con.execute("PRAGMA table_info(achievement)")}
             want = [c for c in ("name", "description", "image_url_unlocked") if c in cols]
             if not want:
                 continue
@@ -355,7 +399,7 @@ def comet_achievement(key, dbs=None):
     return None
 
 
-def cached_image(url):
+def cached_image(url: str | None) -> str | None:
     """A local copy of an achievement's icon, for the toast; None if it
     can't be had."""
     if not url:
@@ -373,7 +417,7 @@ def cached_image(url):
     return str(path)
 
 
-def comet_toast_args(key, info, icon):
+def comet_toast_args(key: str, info: CometAchievement | None, icon: str | None) -> list[str]:
     if not info:
         return ["--kind", "achievement", "Achievement unlocked", key]
     args = ["--kind", "achievement"]
@@ -382,7 +426,7 @@ def comet_toast_args(key, info, icon):
     return args + [info.get("name") or key, info.get("description") or ""]
 
 
-def cmd_watch_comet(rom):
+def cmd_watch_comet(rom: str) -> int:
     log = comet_log()
     start = log.stat().st_size if log.exists() else 0
     parent = os.getppid()
@@ -395,7 +439,7 @@ def cmd_watch_comet(rom):
     return 0
 
 
-def main():
+def main() -> None:
     cmd, args = (sys.argv[1] if len(sys.argv) > 1 else ""), sys.argv[2:]
     if cmd == "setup" and len(args) == 1:
         sys.exit(cmd_setup(*args))

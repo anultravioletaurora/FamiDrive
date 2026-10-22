@@ -26,7 +26,52 @@ import shutil
 import subprocess
 import sys
 import uuid
+from collections.abc import Callable
 from pathlib import Path
+from typing import NotRequired, TypedDict
+
+# Ryujinx's own files (Config.json), kept as they are apart from our keys.
+type JSON = dict[str, JSON] | list[JSON] | str | int | float | bool | None
+type JSONObject = dict[str, JSON]
+
+
+class Spec(TypedDict):
+    """SPEC, above."""
+    library: str
+    faceButtons: str
+    edenKeys: str
+    edenFirmware: str
+    defaults: str
+    ryujinx: NotRequired[str | None]
+    sdl: NotRequired[str | None]
+
+
+class AgentNca(TypedDict):
+    """One content NCA in a DLC, as `romm-agent switch-dlc` lists it."""
+    name: str
+    title_id: str
+
+
+class AgentDlc(TypedDict):
+    path: str
+    ncas: list[AgentNca]
+
+
+class DlcNca(TypedDict):
+    path: str
+    title_id: int
+    is_enabled: bool
+
+
+class Dlc(TypedDict):
+    """One NSP in Ryujinx's dlc.json."""
+    path: str
+    dlc_nca_list: list[DlcNca]
+
+
+class SaveState(TypedDict):
+    existed: bool
+
 
 ROOT = Path.home() / ".config/Ryujinx"
 STATE = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "famidrive-ryujinx.json"
@@ -35,7 +80,7 @@ PLAYERS = 8
 
 # ---------------------------------------------------------------- settings
 
-def locked(spec):
+def locked(spec: Spec) -> JSONObject:
     """The Config.json keys FamiDrive sets. Everything else stays the
     player's (and Ryujinx's)."""
     return {
@@ -54,7 +99,7 @@ def locked(spec):
     }
 
 
-def gamepads(sdl_path):
+def gamepads(sdl_path: str) -> list[tuple[str, str]]:
     """Connected gamepads as Ryujinx names them: "<n>-<SDL GUID as a .NET
     Guid, its first 4 digits (SDL's name checksum) zeroed>", n counting
     up for a second pad of the same model, in SDL's device order
@@ -73,7 +118,8 @@ def gamepads(sdl_path):
     if sdl.SDL_Init(0x200) != 0:        # SDL_INIT_JOYSTICK
         return []
     try:
-        ids, out = [], []
+        ids: list[str] = []
+        out: list[tuple[str, str]] = []
         for i in range(sdl.SDL_NumJoysticks()):
             raw = bytes(sdl.SDL_JoystickGetDeviceGUID(i).data)
             if raw == bytes(16):
@@ -91,7 +137,7 @@ def gamepads(sdl_path):
         sdl.SDL_Quit()
 
 
-def pad_config(pad_id, name, player, face):
+def pad_config(pad_id: str, name: str, player: int, face: str) -> JSONObject:
     """Ryujinx's own default for a gamepad (InputViewModel's
     LoadDefaultConfiguration), with A/B/X/Y by FamiDrive's faceButtons:
     "labels" keeps the pad's printed letters, "positions" the Switch's
@@ -123,8 +169,9 @@ def pad_config(pad_id, name, player, face):
     }
 
 
-def write_config(spec, pads):
+def write_config(spec: Spec, pads: list[tuple[str, str]]) -> None:
     cfg_file = ROOT / "Config.json"
+    cfg: JSONObject
     try:
         cfg = json.loads(cfg_file.read_text())
     except (OSError, ValueError):
@@ -141,7 +188,7 @@ def write_config(spec, pads):
     tmp.replace(cfg_file)
 
 
-def copy_keys(spec):
+def copy_keys(spec: Spec) -> None:
     dest = ROOT / "system"
     dest.mkdir(parents=True, exist_ok=True)
     for name in ("prod.keys", "title.keys"):
@@ -150,7 +197,7 @@ def copy_keys(spec):
             shutil.copyfile(src, dest / name)
 
 
-def link_firmware(spec):
+def link_firmware(spec: Spec) -> None:
     """Eden's installed firmware, in Ryujinx's layout: each NCA as
     registered/<name>.nca/00. Hard links where they can be (the same
     disk), so it costs no space. Any NCA Ryujinx is missing is added,
@@ -176,7 +223,7 @@ def link_firmware(spec):
                 shutil.copyfile(part, out)
 
 
-def ryujinx_sdl(package):
+def ryujinx_sdl(package: str | None) -> str | None:
     """The libSDL2 Ryujinx loads: its own, shipped inside it
     (lib/ryubing/runtimes/linux-x64/native in Ryubing 1.3.3). Found on
     the first box 2026-10-07: the system's SDL (sdl2-compat) sees the
@@ -185,22 +232,22 @@ def ryujinx_sdl(package):
     return str(found[0]) if found else None
 
 
-def cmd_setup(spec_json):
-    spec = json.loads(spec_json)
+def cmd_setup(spec_json: str) -> None:
+    spec: Spec = json.loads(spec_json)
     sdl = spec.get("sdl") or ryujinx_sdl(spec.get("ryujinx"))
     write_config(spec, gamepads(sdl) if sdl else [])
     copy_keys(spec)
     link_firmware(spec)
 
 
-def version_key(path):
+def version_key(path: Path) -> tuple[int, ...]:
     """An update file's version, from the numbers in its name
     ("Game - 13.0.2.nsp", "Game [v1900544].nsp"), for picking the newest."""
     nums = re.findall(r"\d+", re.sub(r"\[[0-9A-Fa-f]{16}\]", "", path.stem))
     return tuple(int(n) for n in nums[-3:]) if nums else ()
 
 
-def cmd_game(tid, rom):
+def cmd_game(tid: str, rom: str) -> None:
     """The update Ryujinx runs the game with: the newest in the update/
     folder beside it in the library (RomM's update/ files), written to
     Ryujinx's games/<title ID>/updates.json. Ryujinx only finds updates
@@ -217,7 +264,7 @@ def cmd_game(tid, rom):
         write_json(ROOT / "games" / tid.lower() / "dlc.json", dlc)
 
 
-def game_dlc(rom):
+def game_dlc(rom: str) -> list[Dlc] | None:
     """The game's DLC (the dlc/ folder beside it in the library) as
     Ryujinx's dlc.json lists it: each NSP, with its content NCAs by their
     path inside it and title ID, all on. The RomM agent reads them, with
@@ -226,7 +273,7 @@ def game_dlc(rom):
     DLC, which Eden finds by itself."""
     try:
         r = subprocess.run(["romm-agent", "switch-dlc", rom], capture_output=True, text=True, check=True)
-        found = json.loads(r.stdout)
+        found: list[AgentDlc] = json.loads(r.stdout)
     except (OSError, subprocess.CalledProcessError, ValueError):
         return None
     return [{"path": c["path"],
@@ -235,7 +282,7 @@ def game_dlc(rom):
             for c in found]
 
 
-def write_json(path, value):
+def write_json(path: Path, value: object) -> None:
     try:
         if json.loads(path.read_text()) == value:
             return
@@ -247,7 +294,7 @@ def write_json(path, value):
 
 # ---------------------------------------------------------------- saves
 
-def ryujinx_save(tid):
+def ryujinx_save(tid: str) -> Path | None:
     """Ryujinx's save folder for a game, or None. Saves are numbered
     folders under bis/user/save/; each one's ExtraData0 starts with the
     title ID (little-endian). VERIFY on the first Ryujinx save."""
@@ -263,7 +310,7 @@ def ryujinx_save(tid):
     return None
 
 
-def eden_save(tid):
+def eden_save(tid: str) -> Path | None:
     """Eden's folder for the game's save, from the RomM agent (which knows
     the player's Eden profile). None for a player without RomM."""
     try:
@@ -273,7 +320,7 @@ def eden_save(tid):
     return Path(r.stdout.strip()) if r.stdout.strip() else None
 
 
-def replace_dir(src, dest):
+def replace_dir(src: Path, dest: Path) -> None:
     tmp = dest.with_name(dest.name + ".part")
     shutil.rmtree(tmp, ignore_errors=True)
     shutil.copytree(src, tmp, symlinks=True)
@@ -281,19 +328,20 @@ def replace_dir(src, dest):
     tmp.rename(dest)
 
 
-def load_state():
+def load_state() -> dict[str, SaveState]:
     try:
-        return json.loads(STATE.read_text())
+        state: dict[str, SaveState] = json.loads(STATE.read_text())
+        return state
     except (OSError, ValueError):
         return {}
 
 
-def save_state(state):
+def save_state(state: dict[str, SaveState]) -> None:
     STATE.parent.mkdir(parents=True, exist_ok=True)
     STATE.write_text(json.dumps(state, indent=2))
 
 
-def cmd_save_in(tid):
+def cmd_save_in(tid: str) -> None:
     tid = tid.upper()
     eden, ryu = eden_save(tid), ryujinx_save(tid)
     state = load_state()
@@ -306,10 +354,11 @@ def cmd_save_in(tid):
     shutil.rmtree(ryu / "1", ignore_errors=True)
 
 
-def cmd_save_out(tid):
+def cmd_save_out(tid: str) -> None:
     tid = tid.upper()
     eden, ryu = eden_save(tid), ryujinx_save(tid)
-    existed = load_state().get(tid, {}).get("existed", True)
+    seen = load_state().get(tid)
+    existed = seen["existed"] if seen else True
     if eden is None or ryu is None or not (ryu / "0").is_dir():
         return
     if not existed and eden.is_dir():
@@ -324,9 +373,9 @@ def cmd_save_out(tid):
     replace_dir(ryu / "0", eden)
 
 
-def main():
+def main() -> None:
     cmd, *args = sys.argv[1:] or ["help"]
-    commands = {"setup": cmd_setup, "game": cmd_game, "save-in": cmd_save_in, "save-out": cmd_save_out}
+    commands: dict[str, Callable[..., None]] = {"setup": cmd_setup, "game": cmd_game, "save-in": cmd_save_in, "save-out": cmd_save_out}
     if cmd not in commands:
         print(__doc__)
         sys.exit(64)

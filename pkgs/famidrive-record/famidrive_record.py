@@ -26,7 +26,27 @@ import signal
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
+from typing import NamedTuple, TypedDict
+
+
+class Encoder(NamedTuple):
+    name: str
+    props: list[str]
+    scale: list[str]   # what scales the picture to fit, before it
+    caps: str          # the frames it takes
+
+
+class State(TypedDict):
+    """The recording under way, in state_file()."""
+    pid: int
+    path: str
+    started: float
+
+
+# gamescope's stream: its node's name, and its size when pw-dump says.
+type Stream = tuple[str, tuple[int, int] | None]
 
 GST_LAUNCH = "@gstLaunch@"
 GST_INSPECT = "@gstInspect@"
@@ -53,10 +73,10 @@ PW_DUMP = "@pwDump@"
 # width of its own, and the picture came out squashed.
 SCALE_CPU = ["videoconvert", "!", "videoscale", "add-borders=true"]
 ENCODERS = (
-    ("vah264enc", ["rate-control=cbr", "bitrate=12000"], ["vapostproc", "add-borders=true"], "video/x-raw(memory:VAMemory),format=NV12"),
-    ("vaapih264enc", ["rate-control=cbr", "bitrate=12000"], ["vaapipostproc", "force-aspect-ratio=true"], "video/x-raw(memory:VASurface),format=NV12"),
-    ("nvh264enc", ["rc-mode=cbr", "bitrate=12000"], SCALE_CPU, "video/x-raw,format=NV12"),
-    ("x264enc", ["speed-preset=veryfast", "tune=zerolatency", "bitrate=8000"], SCALE_CPU, "video/x-raw,format=NV12"),
+    Encoder("vah264enc", ["rate-control=cbr", "bitrate=12000"], ["vapostproc", "add-borders=true"], "video/x-raw(memory:VAMemory),format=NV12"),
+    Encoder("vaapih264enc", ["rate-control=cbr", "bitrate=12000"], ["vaapipostproc", "force-aspect-ratio=true"], "video/x-raw(memory:VASurface),format=NV12"),
+    Encoder("nvh264enc", ["rc-mode=cbr", "bitrate=12000"], SCALE_CPU, "video/x-raw,format=NV12"),
+    Encoder("x264enc", ["speed-preset=veryfast", "tune=zerolatency", "bitrate=8000"], SCALE_CPU, "video/x-raw,format=NV12"),
 )
 FPS = 60
 WIDTH, HEIGHT = 1920, 1080
@@ -69,20 +89,20 @@ STOP_SECONDS = 5.0
 TOAST_ID = "famidrive-record"   # one toast per stop: "Saving recording", then the result in its place
 
 
-def runtime_dir():
+def runtime_dir() -> Path:
     return Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
 
 
-def state_file():
+def state_file() -> Path:
     return runtime_dir() / "famidrive-record.json"
 
 
-def recordings_dir():
+def recordings_dir() -> Path:
     """Where recordings go: FAMIDRIVE_RECORDINGS (for tests), else ~/Recordings."""
     return Path(os.environ.get("FAMIDRIVE_RECORDINGS") or Path.home() / "Recordings")
 
 
-def alive(pid):
+def alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -92,11 +112,11 @@ def alive(pid):
     return True
 
 
-def current():
+def current() -> State | None:
     """{"pid", "path"} of the recording under way, or None. A state file
     left by a recorder that's gone (a crash) is removed."""
     try:
-        state = json.loads(state_file().read_text())
+        state: State = json.loads(state_file().read_text())
         pid = int(state["pid"])
     except (OSError, ValueError, KeyError, TypeError):
         return None
@@ -106,23 +126,23 @@ def current():
     return state
 
 
-def file_name(now=None):
+def file_name(now: float | None = None) -> str:
     """A recording's name: the time it started, as 2026-10-16 21.04.33.mp4,
     which ES-DE then lists oldest first. Dots, not colons: a colon is out
     of place in a file name a player may copy to another computer."""
     return time.strftime("%Y-%m-%d %H.%M.%S", time.localtime(now)) + ".mp4"
 
 
-def pick_encoder(exists):
+def pick_encoder(exists: Callable[[str], bool]) -> Encoder | None:
     """The first of ENCODERS this box's GStreamer has: exists(name) says."""
     for encoder in ENCODERS:
-        elements = [e for e in encoder[2] if e != "!" and "=" not in e]
-        if all(exists(e) for e in (encoder[0], *elements)):
+        elements = [e for e in encoder.scale if e != "!" and "=" not in e]
+        if all(exists(e) for e in (encoder.name, *elements)):
             return encoder
     return None
 
 
-def gamescope_stream():
+def gamescope_stream() -> Stream | None:
     """gamescope's PipeWire stream, as (node name, (width, height)), from
     pw-dump; None when it can't be found. The node is named for
     gamescope's binary, which isn't always "gamescope": under the
@@ -130,28 +150,39 @@ def gamescope_stream():
     2026-10-17)."""
     try:
         out = subprocess.run([PW_DUMP], capture_output=True, text=True, timeout=5).stdout
-        objects = json.loads(out)
+        objects: object = json.loads(out)
     except (OSError, ValueError, subprocess.SubprocessError):
         return None
     return find_stream(objects)
 
 
-def find_stream(objects):
-    for o in objects:
-        info = o.get("info") or {}
-        props = info.get("props") or {}
+def mapping(value: object) -> dict[str, object]:
+    """A JSON object from pw-dump, or {} for anything else."""
+    return value if isinstance(value, dict) else {}
+
+
+def listing(value: object) -> list[object]:
+    """A JSON array from pw-dump, or [] for anything else."""
+    return value if isinstance(value, list) else []
+
+
+def find_stream(objects: object) -> Stream | None:
+    for o in listing(objects):
+        info = mapping(mapping(o).get("info"))
+        props = mapping(info.get("props"))
         name = props.get("node.name") or ""
-        if props.get("media.class") != "Video/Source" or "gamescope" not in name:
+        if props.get("media.class") != "Video/Source" or not isinstance(name, str) or "gamescope" not in name:
             continue
-        for fmt in (info.get("params") or {}).get("EnumFormat") or []:
-            size = fmt.get("size") or {}
-            if isinstance(size.get("width"), int) and isinstance(size.get("height"), int):
-                return name, (size["width"], size["height"])
+        for fmt in listing(mapping(info.get("params")).get("EnumFormat")):
+            size = mapping(mapping(fmt).get("size"))
+            width, height = size.get("width"), size.get("height")
+            if isinstance(width, int) and isinstance(height, int):
+                return name, (width, height)
         return name, None
     return None
 
 
-def fit(size):
+def fit(size: tuple[int, int] | None) -> tuple[int, int]:
     """The largest even size within WIDTH x HEIGHT with size's shape (the
     TV's); the scaler after it adds the borders."""
     if not size or not size[0] or not size[1]:
@@ -161,7 +192,7 @@ def fit(size):
     return max(2, int(w * scale) // 2 * 2), max(2, int(h * scale) // 2 * 2)
 
 
-def pipeline(path, encoder, stream=None):
+def pipeline(path: Path, encoder: Encoder, stream: Stream | None = None) -> list[str]:
     """gst-launch-1.0's arguments for a recording to path, from stream
     (gamescope_stream()). pipewiresrc stamps frames as they come
     (gamescope sends one only when the picture changes) and keeps sending
@@ -212,7 +243,7 @@ def pipeline(path, encoder, stream=None):
     ]
 
 
-def gst_env():
+def gst_env() -> dict[str, str]:
     env = dict(os.environ)
     if not GST_PLUGINS.startswith("@"):
         env["GST_PLUGIN_SYSTEM_PATH_1_0"] = GST_PLUGINS
@@ -222,12 +253,12 @@ def gst_env():
     return env
 
 
-def gst_exists(name):
+def gst_exists(name: str) -> bool:
     return subprocess.run([GST_INSPECT, "--exists", name], env=gst_env(),
                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
 
 
-def toast(*args):
+def toast(*args: str) -> None:
     """A toast through famidrive-toast, by name (it's on the session's
     PATH); never worth failing over."""
     exe = shutil.which("famidrive-toast")
@@ -235,11 +266,11 @@ def toast(*args):
         subprocess.run([exe, *args], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def log(msg):
+def log(msg: str) -> None:
     print(f"famidrive-record: {msg}", file=sys.stderr, flush=True)
 
 
-def start():
+def start() -> int:
     if current():
         log("already recording")
         return 0
@@ -257,8 +288,9 @@ def start():
                                 stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT,
                                 start_new_session=True)
     # When it started, for the time so far in the Guide menu.
-    state_file().write_text(json.dumps({"pid": proc.pid, "path": str(path), "started": time.time()}))
-    log(f"recording to {path} with {encoder[0]} (pid {proc.pid})")
+    state: State = {"pid": proc.pid, "path": str(path), "started": time.time()}
+    state_file().write_text(json.dumps(state))
+    log(f"recording to {path} with {encoder.name} (pid {proc.pid})")
     deadline = time.monotonic() + STARTUP_SECONDS
     while time.monotonic() < deadline:
         if proc.poll() is not None:
@@ -276,7 +308,7 @@ def start():
     return 0
 
 
-def stop():
+def stop() -> int:
     state = current()
     if not state:
         return 0
@@ -312,7 +344,7 @@ def stop():
     return 0
 
 
-def main():
+def main() -> None:
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "start":
         sys.exit(start())

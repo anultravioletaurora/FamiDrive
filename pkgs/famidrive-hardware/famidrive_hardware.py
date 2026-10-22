@@ -21,9 +21,9 @@ VENDORS = {"0x1002": "amd", "0x8086": "intel", "0x10de": "nvidia"}
 NAMES = {"amd": "AMD", "intel": "Intel", "nvidia": "Nvidia"}
 
 
-def gpus():
+def gpus() -> list[tuple[str, str]]:
     """Display controllers (PCI class 0x03), by vendor, in bus order."""
-    found = []
+    found: list[tuple[str, str]] = []
     for dev in sorted(PCI.iterdir()) if PCI.is_dir() else []:
         try:
             cls = (dev / "class").read_text().strip()
@@ -35,11 +35,11 @@ def gpus():
     return found
 
 
-def suggested(found):
+def suggested(found: list[tuple[str, str]]) -> str:
     return "nvidia" if any(v == "nvidia" for _, v in found) else "auto"
 
 
-def cmd_list():
+def cmd_list() -> None:
     found = gpus()
     if not found:
         print("No graphics card found on the PCI bus.")
@@ -49,7 +49,7 @@ def cmd_list():
     print(f'\nSet in configuration.nix:  famidrive.gpu = "{suggested(found)}";')
 
 
-def cmd_check(configured):
+def cmd_check(configured: str) -> int:
     found = gpus()
     vendors = {v for _, v in found}
     if "nvidia" in vendors and configured != "nvidia":
@@ -63,7 +63,7 @@ def cmd_check(configured):
     return 0
 
 
-def main():
+def main() -> None:
     args = sys.argv[1:]
     if not args:
         cmd_list()

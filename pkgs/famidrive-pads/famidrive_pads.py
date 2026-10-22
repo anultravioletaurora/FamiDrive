@@ -65,21 +65,62 @@ import ctypes
 import json
 import os
 import sys
+from collections.abc import Mapping
 from pathlib import Path
+from typing import NotRequired, TypedDict
+
+
+class SdlSpec(TypedDict):
+    """SPEC for eden and cemu (and dolphin, with ports and adapter)."""
+    sdl: str
+    config: str
+    faceButtons: NotRequired[str]
+
+
+class DolphinSpec(SdlSpec):
+    ports: list[str]
+    adapter: NotRequired[bool]
+
+
+class Pad(TypedDict):
+    """What every emulator's pads have: whether it's on the GameCube adapter."""
+    adapter: bool
+
+
+class DolphinPad(Pad):
+    name: str
+    device: str             # SDL/<n>/<name>
+    labels: dict[str, str]  # "A" -> the place SDL gives it ("S", "E", ...)
+
+
+# An SDL bind: its type (1 button, 2 axis, 3 hat), its number, its hat mask.
+type Bind = tuple[int, int, int]
+
+
+class EdenPad(Pad):
+    guid: str
+    port: int
+    binds: dict[str, Bind]
+
+
+class CemuPad(Pad):
+    uuid: str
+    name: str
 
 
 # --- INI files, edited in place -------------------------------------------------
 
-def set_ini(path, section, keys):
+def set_ini(file: str | Path, section: str, keys: Mapping[str, str]) -> None:
     """These keys set in [section] (Key = Value or Key=Value, as the file
     has them), everything else kept as it is."""
-    path = Path(path)
+    path = Path(file)
     lines = path.read_text(errors="replace").splitlines() if path.exists() else []
     sep = "=" if any("=" in ln and " = " not in ln for ln in lines) else " = "
     left = dict(keys)
-    out, inside, seen = [], False, False
+    out: list[str] = []
+    inside, seen = False, False
 
-    def flush():
+    def flush() -> None:
         out.extend(f"{k}{sep}{v}" for k, v in left.items())
         left.clear()
 
@@ -116,13 +157,13 @@ LABELS = {1: "A", 2: "B", 3: "X", 4: "Y"}
 XBOX_LABELS = {"A": "S", "B": "E", "X": "W", "Y": "N"}
 
 
-def modern_first(pads):
+def modern_first[P: Pad](pads: list[P]) -> list[P]:
     """Pads with the adapter's GameCube controllers moved after the rest,
     each group in SDL's order."""
     return sorted(pads, key=lambda p: p["adapter"])
 
 
-def sdl3_pads(lib, gc_adapter):
+def sdl3_pads(lib: str, gc_adapter: bool) -> list[DolphinPad]:
     """Connected gamepads as Dolphin names them (SDL_GetGamepadName, with
     Dolphin's hints), each with its Dolphin device string: SDL/<n>/<name>,
     n counting pads of that name in SDL's order, the order Dolphin adds
@@ -144,7 +185,7 @@ def sdl3_pads(lib, gc_adapter):
         sdl.SDL_GetGamepadButtonLabelForType.argtypes = [ctypes.c_int, ctypes.c_int]
         count = ctypes.c_int(0)
         ids = sdl.SDL_GetGamepads(ctypes.byref(count))
-        pads = []
+        pads: list[DolphinPad] = []
         for i in range(count.value):
             name = (sdl.SDL_GetGamepadNameForID(ids[i]) or b"Unknown").decode(errors="replace")
             usb = (sdl.SDL_GetGamepadVendorForID(ids[i]), sdl.SDL_GetGamepadProductForID(ids[i]))
@@ -160,14 +201,14 @@ def sdl3_pads(lib, gc_adapter):
         sdl.SDL_Quit()
 
 
-def dolphin_devices(ports, pads):
+def dolphin_devices(ports: list[str], pads: list[DolphinPad]) -> dict[int, str]:
     """{port index: Dolphin device string} for each "gamepad" port: the
     next pad, modern pads first."""
     free = [p["device"] for p in modern_first(pads)]
     return {i: free.pop(0) for i, p in enumerate(ports) if p == "gamepad" and free}
 
 
-def dolphin_face(pad, face):
+def dolphin_face(pad: DolphinPad, face: str) -> dict[str, str]:
     """A pad's GameCube A, B, X and Y in Dolphin, by the labels on it, when
     faceButtons is "labels". A pad whose buttons SDL gives no A/B/X/Y
     labels (a PlayStation pad's are shapes) is taken as Xbox-labelled, as
@@ -180,7 +221,7 @@ def dolphin_face(pad, face):
     return {f"Buttons/{k}": f"`Button {labels[k]}`" for k in ("A", "B", "X", "Y")}
 
 
-def cmd_dolphin(spec):
+def cmd_dolphin(spec: DolphinSpec) -> int:
     pads = sdl3_pads(spec["sdl"], spec.get("adapter", False))
     by_device = {p["device"]: p for p in pads}
     for i, device in dolphin_devices(spec["ports"], pads).items():
@@ -215,7 +256,7 @@ class _Guid(ctypes.Structure):
     _fields_ = [("data", ctypes.c_uint8 * 16)]
 
 
-def switch_buttons(face):
+def switch_buttons(face: str) -> dict[str, str]:
     """Eden's button names -> SDL's, Eden's own default (GetDefaultButtonBinding)
     with the face buttons by label or by position."""
     by_label = face == "labels"
@@ -232,7 +273,7 @@ def switch_buttons(face):
     }
 
 
-def eden_binding(port, guid, bind):
+def eden_binding(port: int, guid: str, bind: Bind) -> str | None:
     """One binding in Eden's own format (BuildParamPackageForBinding), from
     an SDL bind: (type, number, hat mask). None for an unbound button."""
     kind, n, mask = bind
@@ -246,12 +287,12 @@ def eden_binding(port, guid, bind):
     return None
 
 
-def eden_stick(port, guid, x, y):
+def eden_stick(port: int, guid: str, x: int, y: int) -> str:
     return (f"engine:sdl,port:{port},guid:{guid},axis_x:{x},axis_y:{y},"
             "offset_x:-0.000000,offset_y:0.000000,invert_x:+,invert_y:+,deadzone:0.150000")
 
 
-def sdl2_pads(lib):
+def sdl2_pads(lib: str) -> list[EdenPad]:
     """Each connected game controller: its Eden GUID (SDL's, with the name
     CRC zeroed, as Eden's GetGUID does), its Eden port (its place among
     pads with that GUID) and SDL's bind for every button and axis. With
@@ -274,7 +315,7 @@ def sdl2_pads(lib):
     sdl.SDL_GameControllerClose.argtypes = [ctypes.c_void_p]
     sdl.SDL_JoystickGetDeviceVendor.restype = ctypes.c_uint16
     sdl.SDL_JoystickGetDeviceProduct.restype = ctypes.c_uint16
-    pads = []
+    pads: list[EdenPad] = []
     try:
         for i in range(sdl.SDL_NumJoysticks()):
             if not sdl.SDL_IsGameController(i):
@@ -286,8 +327,11 @@ def sdl2_pads(lib):
             if not gc:
                 continue
 
-            def b(x):
-                return (x.bindType, x.value.hat.hat if x.bindType == 3 else x.value.button, x.value.hat.hat_mask)
+            def b(x: _Bind) -> Bind:
+                kind: int = x.bindType
+                n: int = x.value.hat.hat if kind == 3 else x.value.button
+                mask: int = x.value.hat.hat_mask
+                return kind, n, mask
             binds = {k: b(sdl.SDL_GameControllerGetBindForButton(gc, v)) for k, v in BUTTON.items()}
             binds.update({k: b(sdl.SDL_GameControllerGetBindForAxis(gc, v)) for k, v in AXIS.items()})
             sdl.SDL_GameControllerClose(gc)
@@ -299,12 +343,12 @@ def sdl2_pads(lib):
     return modern_first(pads)
 
 
-def eden_keys(pads, face):
+def eden_keys(pads: list[EdenPad], face: str) -> dict[str, str]:
     """qt-config.ini's [Controls] keys for these pads, player 1 first.
     Every key with its \\default=false, without which Eden ignores it."""
-    keys = {}
+    keys: dict[str, str] = {}
 
-    def put(k, v):
+    def put(k: str, v: str) -> None:
         keys[k + "\\default"] = "false"
         keys[k] = v
 
@@ -330,7 +374,7 @@ def eden_keys(pads, face):
     return keys
 
 
-def cmd_eden(spec):
+def cmd_eden(spec: SdlSpec) -> int:
     pads = sdl2_pads(spec["sdl"])
     if not pads:
         return 0   # no pad now: whatever was bound stays
@@ -350,7 +394,7 @@ CEMU = {"AxisXP": 38, "AxisYP": 39, "RotationXP": 40, "RotationYP": 41, "Trigger
         "AxisXN": 44, "AxisYN": 45, "RotationXN": 46, "RotationYN": 47}
 
 
-def cemu_mapping(face):
+def cemu_mapping(face: str) -> dict[int, int]:
     """{GamePad button: Cemu input}, Cemu's default for an SDL controller,
     whose face buttons go by position (A on SDL's B, the right-hand
     button); "labels" puts them on the buttons printed A, B, X, Y."""
@@ -365,7 +409,7 @@ def cemu_mapping(face):
     return {VPAD[k]: v for k, v in m.items()}
 
 
-def cemu_profile(pad, face):
+def cemu_profile(pad: CemuPad, face: str) -> str:
     """A controllerProfiles XML for the GamePad on this pad, as Cemu saves one."""
     from xml.sax.saxutils import escape
     entries = "".join(f"\t\t\t<entry>\n\t\t\t\t<mapping>{k}</mapping>\n\t\t\t\t<button>{v}</button>\n\t\t\t</entry>\n"
@@ -378,7 +422,7 @@ def cemu_profile(pad, face):
             f"\t\t<mappings>\n{entries}\t\t</mappings>\n\t</controller>\n</emulated_controller>\n")
 
 
-def cemu_pads(lib):
+def cemu_pads(lib: str) -> list[CemuPad]:
     """Connected game controllers as Cemu lists them (SDLControllerProvider,
     with its hints): uuid <n>_<SDL GUID>, SDL's game-controller name."""
     sdl = ctypes.CDLL(lib)
@@ -397,7 +441,8 @@ def cemu_pads(lib):
     sdl.SDL_GameControllerClose.argtypes = [ctypes.c_void_p]
     sdl.SDL_JoystickGetDeviceVendor.restype = ctypes.c_uint16
     sdl.SDL_JoystickGetDeviceProduct.restype = ctypes.c_uint16
-    pads, seen = [], {}
+    pads: list[CemuPad] = []
+    seen: dict[str, int] = {}
     try:
         for i in range(sdl.SDL_NumJoysticks()):
             if sdl.SDL_JoystickGetDeviceType(i) != 1:   # SDL_JOYSTICK_TYPE_GAMECONTROLLER
@@ -416,7 +461,7 @@ def cemu_pads(lib):
     return modern_first(pads)
 
 
-def cmd_cemu(spec):
+def cmd_cemu(spec: SdlSpec) -> int:
     pads = cemu_pads(spec["sdl"])
     if not pads:
         return 0
@@ -428,35 +473,38 @@ def cmd_cemu(spec):
 
 # --- SDL mappings for old games ------------------------------------------------
 
-def connected_joysticks(devices_text):
+def connected_joysticks(devices_text: str) -> list[tuple[str, str, str, str]]:
     """(bus, vendor, product, version) of each joystick in
     /proc/bus/input/devices, as hex strings, in order, once each."""
-    found = []
+    found: list[tuple[str, str, str, str]] = []
     for block in devices_text.split("\n\n"):
-        ids = handlers = None
+        ids: dict[str, str] | None = None
+        handlers: list[str] | None = None
         for line in block.splitlines():
             if line.startswith("I:"):
-                ids = dict(kv.split("=", 1) for kv in line[2:].split())
+                ids = {k: v for k, _, v in (kv.partition("=") for kv in line[2:].split())}
             elif line.startswith("H:"):
                 handlers = line.split("=", 1)[1].split()
         if ids and handlers and any(h.startswith("js") for h in handlers):
-            key = tuple(ids.get(k, "0").lower().zfill(4) for k in ("Bus", "Vendor", "Product", "Version"))
+            bus, vendor, product, version = (ids.get(k, "0").lower().zfill(4)
+                                             for k in ("Bus", "Vendor", "Product", "Version"))
+            key = (bus, vendor, product, version)
             if key not in found:
                 found.append(key)
     return found
 
 
-def le16(h):
+def le16(h: str) -> str:
     return h[2:4] + h[0:2]
 
 
-def legacy_guid(bus, vendor, product, version):
+def legacy_guid(bus: str, vendor: str, product: str, version: str) -> str:
     """SDL 2's GUID for an evdev pad before the name CRC was added: bus,
     vendor, product and version, little-endian, each followed by zeroes."""
     return "".join(le16(x) + "0000" for x in (bus, vendor, product, version))
 
 
-def sdl_mappings(db_text, joysticks):
+def sdl_mappings(db_text: str, joysticks: list[tuple[str, str, str, str]]) -> list[str]:
     """The database's Linux line for each joystick, under its GUID here:
     the same version if there's one, else any with that vendor and product."""
     lines = [line.strip() for line in db_text.splitlines()
@@ -471,20 +519,25 @@ def sdl_mappings(db_text, joysticks):
     return out
 
 
-def cmd_sdl_mappings(db, devices="/proc/bus/input/devices"):
+def cmd_sdl_mappings(db: str, devices: str = "/proc/bus/input/devices") -> int:
     print("\n".join(sdl_mappings(Path(db).read_text(errors="replace"),
                                  connected_joysticks(Path(devices).read_text(errors="replace")))))
     return 0
 
 
-def main():
+def main() -> None:
     if len(sys.argv) == 3 and sys.argv[1] == "sdl-mappings":
         sys.exit(cmd_sdl_mappings(sys.argv[2]))
     if len(sys.argv) != 3 or sys.argv[1] not in ("dolphin", "eden", "cemu"):
         sys.exit(__doc__)
-    spec = json.loads(Path(sys.argv[2]).read_text() if os.path.exists(sys.argv[2]) else sys.argv[2])
+    text = Path(sys.argv[2]).read_text() if os.path.exists(sys.argv[2]) else sys.argv[2]
+    if sys.argv[1] == "dolphin":
+        dolphin: DolphinSpec = json.loads(text)
+        dolphin["config"] = os.path.expanduser(dolphin["config"])
+        sys.exit(cmd_dolphin(dolphin))
+    spec: SdlSpec = json.loads(text)
     spec["config"] = os.path.expanduser(spec["config"])
-    sys.exit({"dolphin": cmd_dolphin, "eden": cmd_eden, "cemu": cmd_cemu}[sys.argv[1]](spec))
+    sys.exit(cmd_eden(spec) if sys.argv[1] == "eden" else cmd_cemu(spec))
 
 
 if __name__ == "__main__":

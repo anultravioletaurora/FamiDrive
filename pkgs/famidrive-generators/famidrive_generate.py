@@ -47,8 +47,81 @@ import time
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
+from collections.abc import Callable, Iterable, Iterator
 from datetime import datetime
+from functools import partial
 from pathlib import Path
+from typing import Literal, TypedDict, cast
+
+# A game list entry's fields, by tag ("name", "desc", ...).
+type Fields = dict[str, str]
+
+
+# The Steam store's details for an app (appdetails' "data"), the parts read here.
+class SteamGenre(TypedDict, total=False):
+    description: str
+
+
+class SteamDate(TypedDict, total=False):
+    date: str
+
+
+class SteamScore(TypedDict, total=False):
+    score: int
+
+
+class SteamShot(TypedDict, total=False):
+    path_full: str
+
+
+class StoreDetails(TypedDict, total=False):
+    short_description: str
+    about_the_game: str
+    developers: list[str]
+    publishers: list[str]
+    genres: list[SteamGenre]
+    release_date: SteamDate
+    metacritic: SteamScore
+    screenshots: list[SteamShot]
+
+
+# lutris.net's page for a game (its API), the parts read here.
+class LutrisGenre(TypedDict, total=False):
+    name: str
+
+
+class LutrisDetails(TypedDict, total=False):
+    description: str
+    genres: list[LutrisGenre]
+    year: int
+    steamid: int
+    coverart: str
+
+
+# A game in Heroic's store cache, the parts read here.
+class HeroicAbout(TypedDict, total=False):
+    description: str
+    shortDescription: str
+
+
+class HeroicExtra(TypedDict, total=False):
+    about: HeroicAbout
+    genres: list[str]
+
+
+class HeroicGame(TypedDict, total=False):
+    app_name: str
+    title: str
+    description: str
+    developer: str
+    extra: HeroicExtra
+    art_square: str
+    art_cover: str
+    art_background: str
+    art_logo: str
+
+
+type HeroicArt = Literal["art_square", "art_cover", "art_background", "art_logo"]
 
 
 # Steam installs its own tools as apps too. Found on the first box
@@ -56,7 +129,7 @@ from pathlib import Path
 STEAM_TOOLS = re.compile(r"^(Proton|Steam Linux Runtime|Steamworks Common Redistributables)\b")
 
 
-def steam(src):
+def steam(src: Path) -> Iterator[tuple[str, str]]:
     # steamapps/appmanifest_<appid>.acf: Valve KeyValues, "key" "value" pairs
     for acf in src.glob("appmanifest_*.acf"):
         text = acf.read_text(errors="replace")
@@ -74,7 +147,7 @@ def steam(src):
 # and each store's library, with titles, in store_cache/<store>_library.json
 # (GOG's under "games", Epic's and Amazon's under "library"), entries with
 # "app_name" and "title". VERIFY against a signed-in Heroic.
-HEROIC_STORES = {
+HEROIC_STORES: dict[str, tuple[str, str, str]] = {
     "gog": ("gog_store/installed.json", "gog_library", "games"),
     "epic": ("legendaryConfig/legendary/installed.json", "legendary_library", "library"),
     "amazon": ("nile_config/nile/installed.json", "nile_library", "library"),
@@ -84,18 +157,28 @@ HEROIC_STORES = {
 HEROIC_SYSTEMS = {"gog": "desktop", "epic": "epic", "amazon": "desktop"}
 
 
-def read_json(path):
+def read_json(path: Path) -> object:
     try:
         return json.loads(path.read_text())
     except (OSError, ValueError):
         return None
 
 
-def heroic(src, store):
-    installed_file, cache, key = HEROIC_STORES[store]
+def heroic_library(src: Path, store: str) -> list[HeroicGame]:
+    """The games in a store's library, from Heroic's store cache."""
+    _, cache, key = HEROIC_STORES[store]
+    library = read_json(src / "store_cache" / f"{cache}.json")
+    games = library.get(key) if isinstance(library, dict) else None
+    # Heroic's own cache: each game an object with HeroicGame's fields.
+    return [cast(HeroicGame, g) for g in games if isinstance(g, dict)] if isinstance(games, list) else []
+
+
+def heroic(src: Path, store: str) -> Iterator[tuple[str, str]]:
+    installed_file, _, _ = HEROIC_STORES[store]
     installed = read_json(src / installed_file)
     if isinstance(installed, dict) and "installed" in installed:
         installed = installed["installed"]
+    apps: dict[str | None, str | None]   # app name -> its title, if this file has it
     if isinstance(installed, dict):          # Epic: keyed by app name
         apps = {name: (info or {}).get("title") for name, info in installed.items()
                 if not (info or {}).get("is_dlc")}
@@ -104,8 +187,7 @@ def heroic(src, store):
                 if isinstance(g, dict) and not g.get("is_dlc")}
     else:
         return
-    library = read_json(src / "store_cache" / f"{cache}.json") or {}
-    titles = {g.get("app_name"): g.get("title") for g in library.get(key) or [] if isinstance(g, dict)}
+    titles = {g.get("app_name"): g.get("title") for g in heroic_library(src, store)}
     for app, title in apps.items():
         if app:
             yield title or titles.get(app) or app, app
@@ -121,7 +203,7 @@ LUTRIS_HIDDEN = """
     WHERE gc.game_id = games.id AND c.name = '.hidden'"""
 
 
-def lutris_games(src):
+def lutris_games(src: Path) -> list[tuple[int, str | None, str | None]] | None:
     """(id, name, slug) of each installed game, or None when Lutris's
     database can't be read right now (Lutris writing it): the entries
     then stay as they are, instead of all going."""
@@ -134,10 +216,11 @@ def lutris_games(src):
         try:
             # A Steam game Lutris lists starts through Steam, and it's in
             # the Steam system already.
-            return con.execute(f"""
+            rows: list[tuple[int, str | None, str | None]] = con.execute(f"""
                 SELECT id, name, slug FROM games
                 WHERE installed = 1 AND coalesce(runner, '') != 'steam'
                   AND NOT EXISTS ({LUTRIS_HIDDEN})""").fetchall()
+            return rows
         finally:
             con.close()
     except sqlite3.Error as e:
@@ -145,14 +228,14 @@ def lutris_games(src):
         return None
 
 
-def lutris(src, out):
-    games = lutris_games(src)
-    if games is None:
+def lutris(src: Path, out: Path) -> None:
+    rows = lutris_games(src)
+    if rows is None:
         sys.exit(1)
-    games = [(name or slug or str(i), str(i), slug) for i, name, slug in games]
+    games = [(name or slug or str(i), str(i), slug) for i, name, slug in rows]
     write_placeholders(out, ".lutris", [(name, i) for name, i, _ in games])
     # The real name (a file name can't have a ":"), and Lutris's cover.
-    fields = {}
+    fields: dict[str, Fields] = {}
     for name, _, slug in games:
         stem = safe(name)
         fields[stem + ".lutris"] = {"name": name}
@@ -176,12 +259,17 @@ LUTRIS_CACHE = Path.home() / ".cache/famidrive/lutris"   # one JSON per slug
 FROM_LUTRIS = ("name", "desc", "developer", "publisher", "genre", "releasedate", "rating")
 
 
-def lutris_details(slug, budget):
+def lutris_details(slug: str, budget: list[int]) -> LutrisDetails | None:
     """lutris.net's details for a game, cached for good like Steam's. None
     when lutris.net has no page for it or can't be reached."""
     cached = LUTRIS_CACHE / f"{slug}.json"
+    data: LutrisDetails | None
     if cached.exists():
-        return read_json(cached) or None
+        try:
+            data = json.loads(cached.read_text())
+        except (OSError, ValueError):
+            data = None
+        return data or None
     if budget[0] <= 0:
         return None
     budget[0] -= 1
@@ -198,7 +286,7 @@ def lutris_details(slug, budget):
     return data or None
 
 
-def lutris_fields(details, name):
+def lutris_fields(details: LutrisDetails, name: str) -> Fields:
     fields = {"name": name,
               "desc": cut_description(details.get("description") or ""),
               "genre": ", ".join(g["name"] for g in details.get("genres") or []
@@ -208,7 +296,7 @@ def lutris_fields(details, name):
     return {k: v.strip() for k, v in fields.items() if v and v.strip()}
 
 
-def lutris_media(src, out):
+def lutris_media(src: Path, out: Path) -> None:
     """Details and art for every Lutris entry in out: lutris.net's, and
     Steam's on top for a game that's on Steam (its description, credits
     and art are better: a logo, a hero image, a screenshot)."""
@@ -218,14 +306,15 @@ def lutris_media(src, out):
     by_id = {str(i): (name, slug) for i, name, slug in games}
     steamapps = Path.home() / ".local/share/Steam/steamapps"   # its library cache, when it has the game
     budget = [STORE_BUDGET]
-    fields = {}
+    fields: dict[str, Fields] = {}
     for entry in sorted(out.glob("*.lutris")):
         name, slug = by_id.get(entry.read_text().strip(), (None, None))
         if not slug:
             continue
-        details = lutris_details(slug, budget) or {}
+        details: LutrisDetails = lutris_details(slug, budget) or {}
         f = lutris_fields(details, name or entry.stem)
-        steam = store_details(details["steamid"], budget) if details.get("steamid") else None
+        steamid = str(details["steamid"]) if details.get("steamid") else None
+        steam = store_details(steamid, budget) if steamid else None
         if steam:
             year = f.get("releasedate")
             f.update(steam_fields(steam, f["name"]))
@@ -236,18 +325,19 @@ def lutris_media(src, out):
         if len(f) > 1:
             fields[entry.name] = f
 
-        def missing(kind):
+        def missing(kind: str) -> bool:
             return not any((ESDE / "downloaded_media/lutris" / kind).glob(glob_escape(entry.stem) + ".*"))
 
-        art = {}
-        if steam:
-            art = {kind: lambda files=files: library_image(steamapps, str(details["steamid"]), files)
-                   for kind, files in ART.items()}
+        art: dict[str, Callable[[], bytes | None]] = {}
+        if steam and steamid:
+            art = {kind: partial(library_image, steamapps, steamid, files) for kind, files in ART.items()}
             shots = steam.get("screenshots") or []
-            if shots and shots[0].get("path_full"):
-                art["screenshots"] = lambda url=shots[0]["path_full"]: try_fetch(url)
-        if details.get("coverart") and "covers" not in art:
-            art["covers"] = lambda url=details["coverart"]: try_fetch(url)
+            shot = shots[0].get("path_full") if shots else None
+            if shot:
+                art["screenshots"] = partial(try_fetch, shot)
+        coverart = details.get("coverart")
+        if coverart and "covers" not in art:
+            art["covers"] = partial(try_fetch, coverart)
         for kind, get in art.items():
             # Lutris's own cover (lutris, above) stays: it's what the
             # player sees in Lutris.
@@ -258,24 +348,25 @@ def lutris_media(src, out):
     write_gamelist("lutris", merge_gamelist(ESDE / "gamelists/lutris/gamelist.xml", fields, FROM_LUTRIS))
 
 
-def try_fetch(url):
+def try_fetch(url: str) -> bytes | None:
     try:
         return fetch(url)
     except OSError:
         return None   # next run
 
 
-def minecraft(src):
+def minecraft(src: Path) -> Iterator[tuple[str, str]]:
     # instances/<id>/instance.cfg; the folder name is the ID --launch takes.
     for cfg in src.glob("*/instance.cfg"):
         name = re.search(r"^name=(.+)$", cfg.read_text(errors="replace"), re.M)
         yield (name.group(1) if name else cfg.parent.name), cfg.parent.name
 
 
-LANES = {"steam": (steam, ".steam"), "minecraft": (minecraft, ".prism")}
+LANES: dict[str, tuple[Callable[[Path], Iterable[tuple[str, str]]], str]] = {
+    "steam": (steam, ".steam"), "minecraft": (minecraft, ".prism")}
 
 
-def safe(name):
+def safe(name: str) -> str:
     return re.sub(r'[/\\:*?"<>|]', "_", name).strip()
 
 
@@ -302,17 +393,25 @@ FROM_STEAM = ("name", "desc", "developer", "publisher", "genre", "releasedate", 
 STORE_BUDGET = 150   # store lookups per run; Steam allows about 200 per 5 minutes
 
 
-def fetch(url, timeout=20):
+def fetch(url: str, timeout: float = 20) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": "FamiDrive"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read()
+        body: bytes = r.read()
+        return body
 
 
-def store_details(appid, budget):
+class StoreReply(TypedDict, total=False):
+    """appdetails' answer for one app."""
+    success: bool
+    data: StoreDetails
+
+
+def store_details(appid: str, budget: list[int]) -> StoreDetails | None:
     """The store's details for appid, cached for good: a game's
     description and credits don't change. None when the store has none
     (tools, delisted games) or can't be reached."""
     cached = CACHE / f"{appid}.json"
+    data: StoreDetails | None
     if cached.exists():
         data = json.loads(cached.read_text())
         return data or None
@@ -320,7 +419,8 @@ def store_details(appid, budget):
         return None
     budget[0] -= 1
     try:
-        reply = json.loads(fetch(STORE.format(appid=appid))).get(str(appid), {})
+        replies: dict[str, StoreReply] = json.loads(fetch(STORE.format(appid=appid)))
+        reply = replies.get(str(appid), {})
     except (OSError, ValueError):
         return None   # try again next run
     data = reply.get("data") if reply.get("success") else {}
@@ -329,7 +429,7 @@ def store_details(appid, budget):
     return data or None
 
 
-def release_date(text):
+def release_date(text: str) -> str | None:
     for fmt in ("%b %d, %Y", "%d %b, %Y", "%B %d, %Y", "%d %B, %Y", "%b %Y", "%Y"):
         try:
             return datetime.strptime(text.strip(), fmt).strftime("%Y%m%dT000000")
@@ -338,7 +438,7 @@ def release_date(text):
     return None
 
 
-def description(details):
+def description(details: StoreDetails) -> str:
     """The store's short description, or, when Steam cut that off
     mid-sentence, the start of its "About this game" text, to the end of
     a sentence."""
@@ -353,7 +453,7 @@ def description(details):
     return about if len(about) <= 1200 else (cut[:end + 1] if end > len(short) // 2 else cut + "…")
 
 
-def html_text(text):
+def html_text(text: str) -> str:
     text = re.sub(r"<br\s*/?>|</p>|</h\d>|</li>", " ", text, flags=re.I)
     text = re.sub(r"<[^>]+>", "", text)
     for a, b in (("&amp;", "&"), ("&quot;", '"'), ("&#39;", "'"), ("&lt;", "<"), ("&gt;", ">"), ("&nbsp;", " ")):
@@ -361,23 +461,24 @@ def html_text(text):
     return re.sub(r"\s+", " ", text).strip()
 
 
-def steam_fields(details, name):
+def steam_fields(details: StoreDetails, name: str) -> Fields:
     # The name is Steam's for this app, from its manifest: the store gives
     # some apps their parent game's (Black Ops II's multiplayer app is
     # "Call of Duty: Black Ops II" there), and two entries can't share one.
-    fields = {"name": name,
-              "desc": description(details),
-              "developer": ", ".join(details.get("developers") or []),
-              "publisher": ", ".join(details.get("publishers") or []),
-              "genre": ", ".join(g["description"] for g in details.get("genres") or [] if g.get("description")),
-              "releasedate": release_date((details.get("release_date") or {}).get("date") or "")}
+    fields: dict[str, str | None] = {
+        "name": name,
+        "desc": description(details),
+        "developer": ", ".join(details.get("developers") or []),
+        "publisher": ", ".join(details.get("publishers") or []),
+        "genre": ", ".join(g["description"] for g in details.get("genres") or [] if g.get("description")),
+        "releasedate": release_date((details.get("release_date") or {}).get("date") or "")}
     score = (details.get("metacritic") or {}).get("score")
     if score:
         fields["rating"] = f"{score / 100:g}"
     return {k: v.strip() for k, v in fields.items() if v and v.strip()}
 
 
-def library_image(steamapps, appid, names):
+def library_image(steamapps: Path, appid: str, names: list[str]) -> bytes | None:
     cache = steamapps.parent / "appcache/librarycache"
     for name in names:
         for p in [cache / appid / name, cache / f"{appid}_{name}", *sorted((cache / appid).glob(f"*/{name}"))]:
@@ -392,7 +493,7 @@ def library_image(steamapps, appid, names):
     return None
 
 
-def put_media(kind, stem, data, ext, system="steam"):
+def put_media(kind: str, stem: str, data: bytes, ext: str, system: str = "steam") -> None:
     """One image into ES-DE's media folder for a system (Steam's, or the
     one a Heroic or Lutris game is in). Art already there for the game (scraped
     before) is moved to downloaded_media-before-steam, not deleted."""
@@ -409,18 +510,18 @@ def put_media(kind, stem, data, ext, system="steam"):
     tmp.rename(dest)
 
 
-def glob_escape(s):
+def glob_escape(s: str) -> str:
     return re.sub(r"([*?\[])", r"[\1]", s)
 
 
-def steam_media(steamapps, out):
+def steam_media(steamapps: Path, out: Path) -> None:
     """Steam's art and details for every Steam placeholder in out."""
     games = {p.stem: p.read_text().strip() for p in out.glob("*.steam")}
     manifest_names = {appid: name for name, appid in steam(steamapps)}
     state_file = CACHE / "media.json"   # appid -> media kinds done
-    state = json.loads(state_file.read_text()) if state_file.exists() else {}
+    state: dict[str, list[str]] = json.loads(state_file.read_text()) if state_file.exists() else {}
     budget = [STORE_BUDGET]
-    fields = {}
+    fields: dict[str, Fields] = {}
     for stem, appid in sorted(games.items()):
         details = store_details(appid, budget)
         if details:
@@ -452,7 +553,7 @@ def steam_media(steamapps, out):
         tmp.rename(gamelist)
 
 
-def write_gamelist(system, merged):
+def write_gamelist(system: str, merged: bytes | None) -> None:
     if merged is None:
         return
     gamelist = ESDE / "gamelists" / system / "gamelist.xml"
@@ -462,7 +563,7 @@ def write_gamelist(system, merged):
     tmp.rename(gamelist)
 
 
-def merge_gamelist(gamelist, fields, keys):
+def merge_gamelist(gamelist: Path, fields: dict[str, Fields], keys: tuple[str, ...]) -> bytes | None:
     """A player's game list with the store's fields (keys) set for each
     entry, by file name: the store has the say on what a game is, the
     player on how they've played it. None when nothing changed."""
@@ -491,7 +592,8 @@ def merge_gamelist(gamelist, fields, keys):
     if not changed:
         return None
     ET.indent(root, space="\t")
-    return b'<?xml version="1.0"?>\n' + ET.tostring(root, encoding="utf-8") + b"\n"
+    body: bytes = ET.tostring(root, encoding="utf-8")
+    return b'<?xml version="1.0"?>\n' + body + b"\n"
 
 
 # ---------------------------------------------------------------- Heroic's art
@@ -500,12 +602,12 @@ def merge_gamelist(gamelist, fields, keys):
 # cache: a portrait cover (art_square), the wide one (art_cover), the
 # background. GOG's images server sends any of its images as JPEG when
 # asked for .jpg (some are WebP).
-HEROIC_ART = {"covers": "art_square", "screenshots": "art_cover",
-              "fanart": "art_background", "marquees": "art_logo"}
+HEROIC_ART: dict[str, HeroicArt] = {"covers": "art_square", "screenshots": "art_cover",
+                                    "fanart": "art_background", "marquees": "art_logo"}
 FROM_HEROIC = ("name", "desc", "developer", "genre")
 
 
-def cut_description(text, limit=1200):
+def cut_description(text: str, limit: int = 1200) -> str:
     text = html_text(text)
     if len(text) <= limit:
         return text
@@ -514,7 +616,7 @@ def cut_description(text, limit=1200):
     return cut[:end + 1] if end > limit // 2 else cut + "…"
 
 
-def heroic_fields(game):
+def heroic_fields(game: HeroicGame) -> Fields:
     extra = game.get("extra") or {}
     about = extra.get("about") or {}
     fields = {"name": game.get("title") or "",
@@ -525,21 +627,19 @@ def heroic_fields(game):
     return {k: v.strip() for k, v in fields.items() if v and v.strip()}
 
 
-def image_url(url):
+def image_url(url: str) -> str:
     if "images.gog.com/" in url:
         url = re.sub(r"\.(webp|png)(?=$|\?)", ".jpg", url)
     return url
 
 
-def heroic_media(src, roms, stores):
+def heroic_media(src: Path, roms: Path, stores: list[str]) -> None:
     """Heroic's names, details and art for every entry of these stores,
     in each store's system."""
-    fields = {}
+    fields: dict[str, dict[str, Fields]] = {}
     for store in stores:
-        _, cache, key = HEROIC_STORES[store]
         system = HEROIC_SYSTEMS[store]
-        library = read_json(src / "store_cache" / f"{cache}.json") or {}
-        games = {str(g.get("app_name")): g for g in library.get(key) or [] if isinstance(g, dict)}
+        games = {str(g.get("app_name")): g for g in heroic_library(src, store)}
         for entry in sorted((roms / system).glob(f"*.{store}")):
             game = games.get(entry.read_text().strip())
             if not game:
@@ -558,7 +658,7 @@ def heroic_media(src, roms, stores):
         write_gamelist(system, merge_gamelist(ESDE / "gamelists" / system / "gamelist.xml", f, FROM_HEROIC))
 
 
-def heroic_moved(roms):
+def heroic_moved(roms: Path) -> None:
     """Each store's Heroic games into the system they're in now, from the
     ones they were in before: a system per store until 2026-10-10, then
     all three in Desktop, then Epic's back in an Epic system on
@@ -571,7 +671,7 @@ def heroic_moved(roms):
             move_entries(old, system, f".{store}")
 
 
-def move_entries(old, new, ext):
+def move_entries(old: str, new: str, ext: str) -> None:
     """Game list entries and art for one extension's games, from one
     system to another."""
     old_list = ESDE / "gamelists" / old / "gamelist.xml"
@@ -596,7 +696,7 @@ def move_entries(old, new, ext):
         ET.indent(r, space="\t")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b'<?xml version="1.0"?>\n' + ET.tostring(r, encoding="utf-8") + b"\n")
-    stems = {Path(g.findtext("path")).stem for g in moving}
+    stems = {Path(g.findtext("path") or "").stem for g in moving}
     for kind_dir in (ESDE / "downloaded_media" / old).glob("*"):
         for f in list(kind_dir.glob("*")):
             dest = ESDE / "downloaded_media" / new / kind_dir.name / f.name
@@ -605,7 +705,7 @@ def move_entries(old, new, ext):
                 f.rename(dest)
 
 
-def launcher(folder, name, launch_id):
+def launcher(folder: Path, name: str, launch_id: str) -> None:
     entry = folder / f"{name}.setting"
     folder.mkdir(parents=True, exist_ok=True)
     if not entry.exists() or entry.read_text() != launch_id:
@@ -614,7 +714,7 @@ def launcher(folder, name, launch_id):
     write_gamelist(folder.name, merge_gamelist(gamelist, {entry.name: {"sortname": "0"}}, ("sortname",)))
 
 
-def main():
+def main() -> None:
     if sys.argv[1] == "steam-media":
         started = time.monotonic()
         steam_media(Path(sys.argv[2]), Path(sys.argv[3]))
@@ -647,7 +747,7 @@ def main():
     write_placeholders(out, ext, reader(src))
 
 
-def write_placeholders(out, ext, games):
+def write_placeholders(out: Path, ext: str, games: Iterable[tuple[str, str]]) -> None:
     out.mkdir(parents=True, exist_ok=True)
     wanted = {safe(name) + ext: launch_id for name, launch_id in games}
     for existing in out.glob("*" + ext):

@@ -39,46 +39,55 @@ MULTIPLAYER = {1, 9, 20, 24, 27, 36, 37, 38, 39, 47, 48, 49}
 # token, SHA-1 of the text form, change number, SHA-1 of the binary form.
 RECORD_HEADER = 4 + 4 + 8 + 20 + 4 + 20
 
+# A binary KeyValues tree: each value a string, a number or another tree.
+type KeyValues = dict[str, KeyValue]
+type KeyValue = str | int | KeyValues
 
-def log(msg):
+
+def log(msg: str) -> None:
     print(f"famidrive-steam-offline: {msg}", file=sys.stderr)
 
 
 class Reader:
-    def __init__(self, data):
+    def __init__(self, data: bytes) -> None:
         self.d = data
         magic, = struct.unpack_from("<I", data, 0)
         if magic not in (V28, V29):
             raise ValueError(f"unknown appinfo.vdf version {magic:#x}")
-        self.strings = None
+        self.strings: list[str] | None = None
         self.start = 8
         if magic == V29:
+            offset: int
             offset, = struct.unpack_from("<q", data, 8)
             self.start = 16
+            count: int
             count, = struct.unpack_from("<I", data, offset)
-            p, self.strings = offset + 4, []
+            p, strings = offset + 4, []
             for _ in range(count):
                 s, p = self._cstr(p)
-                self.strings.append(s)
+                strings.append(s)
+            self.strings = strings
 
-    def _cstr(self, p):
+    def _cstr(self, p: int) -> tuple[str, int]:
         end = self.d.index(b"\0", p)
         return self.d[p:end].decode("utf-8", "replace"), end + 1
 
-    def _key(self, p):
+    def _key(self, p: int) -> tuple[str, int]:
         if self.strings is None:
             return self._cstr(p)
+        i: int
         i, = struct.unpack_from("<I", self.d, p)
         return self.strings[i], p + 4
 
-    def _tree(self, p):
-        out = {}
+    def _tree(self, p: int) -> tuple[KeyValues, int]:
+        out: KeyValues = {}
         while True:
             kind = self.d[p]
             p += 1
             if kind == 8:
                 return out, p
             key, p = self._key(p)
+            value: KeyValue
             if kind == 0:
                 value, p = self._tree(p)
             elif kind == 1:
@@ -93,10 +102,12 @@ class Reader:
                 raise ValueError(f"unknown KeyValues type {kind}")
             out[key] = value
 
-    def app(self, appid):
+    def app(self, appid: int) -> KeyValues | None:
         """One app's tree, or None when the cache doesn't have it."""
         p = self.start
         while True:
+            this: int
+            size: int
             this, = struct.unpack_from("<I", self.d, p)
             if this == 0:
                 return None
@@ -106,10 +117,16 @@ class Reader:
             p += 8 + size
 
 
-def categories(info):
-    common = info.get("appinfo", info).get("common", {})
+def subtree(tree: KeyValues, key: str) -> KeyValues | None:
+    """tree[key] when it's a tree of its own."""
+    value = tree.get(key)
+    return value if isinstance(value, dict) else None
+
+
+def categories(info: KeyValues) -> set[int]:
+    common = subtree(subtree(info, "appinfo") or info, "common") or {}
     cats = set()
-    for key in common.get("category", {}):
+    for key in subtree(common, "category") or {}:
         try:
             cats.add(int(key.rsplit("_", 1)[1]))
         except (IndexError, ValueError):
@@ -117,7 +134,7 @@ def categories(info):
     return cats
 
 
-def offline(appid):
+def offline(appid: int) -> bool:
     try:
         info = Reader(APPINFO.read_bytes()).app(appid)
     except (OSError, ValueError, IndexError, struct.error) as e:
@@ -130,9 +147,9 @@ def offline(appid):
     return SINGLE_PLAYER in cats and not cats & MULTIPLAYER
 
 
-def main():
+def main() -> None:
     if len(sys.argv) != 2 or not sys.argv[1].isdigit():
-        print(__doc__.split("\n\n")[0], file=sys.stderr)
+        print((__doc__ or "").split("\n\n")[0], file=sys.stderr)
         sys.exit(2)
     sys.exit(0 if offline(int(sys.argv[1])) else 1)
 

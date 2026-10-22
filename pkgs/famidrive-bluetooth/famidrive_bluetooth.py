@@ -36,7 +36,22 @@ import shutil
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
+from collections.abc import Callable, Iterable
 from pathlib import Path
+from typing import TYPE_CHECKING, Protocol, TypedDict, cast
+
+if TYPE_CHECKING:
+    from dbus_next import Variant
+    from dbus_next.aio import MessageBus, ProxyInterface
+    from dbus_next.service import ServiceInterface
+
+    # The agent's D-Bus signatures, which dbus_next reads from its methods'
+    # annotations ("o", "s"), as the Python types they carry: an object
+    # path (o) and a string (s) are str, a uint32 (u) and uint16 (q) int.
+    type o = str
+    type s = str
+    type u = int
+    type q = int
 
 BLUEZ = "org.bluez"
 AGENT_PATH = "/org/famidrive/bluetooth_agent"
@@ -70,11 +85,78 @@ NAMES = [
 CONTROLLER_NAMES = re.compile(r"RVL-CNT|RVL-WBC|DualSense|Wireless Controller|PLAYSTATION|Xbox|Pro Controller|Joy-Con|8BitDo|Gamepad|Controller", re.I)
 
 
-def log(msg):
+class Device(TypedDict, total=False):
+    """A BlueZ Device1's properties (bluez's org.bluez.Device.rst), as
+    managed_objects() unwraps them."""
+    Address: str
+    Name: str
+    Alias: str
+    Icon: str
+    Class: int
+    Appearance: int
+    Paired: bool
+    Connected: bool
+    RSSI: int
+    Adapter: str   # its adapter's object path
+
+
+# path -> interface -> its properties, from BlueZ's ObjectManager.
+type Objects = dict[str, dict[str, dict[str, object]]]
+
+
+# The BlueZ interfaces called here. dbus_next makes their methods when it
+# reads BlueZ's introspection, so they're described here.
+class ObjectManagerIface(Protocol):
+    async def call_get_managed_objects(self) -> "dict[str, dict[str, dict[str, Variant]]]":
+        ...
+
+
+class AgentManagerIface(Protocol):
+    async def call_register_agent(self, agent: str, capability: str) -> None:
+        ...
+
+    async def call_request_default_agent(self, agent: str) -> None:
+        ...
+
+    async def call_unregister_agent(self, agent: str) -> None:
+        ...
+
+
+class AdapterIface(Protocol):
+    async def call_set_discovery_filter(self, properties: "dict[str, Variant]") -> None:
+        ...
+
+    async def call_start_discovery(self) -> None:
+        ...
+
+    async def call_stop_discovery(self) -> None:
+        ...
+
+    async def call_remove_device(self, device: str) -> None:
+        ...
+
+
+class PropertiesIface(Protocol):
+    async def call_set(self, interface: str, name: str, value: "Variant") -> None:
+        ...
+
+
+class DeviceIface(Protocol):
+    async def call_pair(self) -> None:
+        ...
+
+    async def call_connect(self) -> None:
+        ...
+
+    async def call_disconnect(self) -> None:
+        ...
+
+
+def log(msg: str) -> None:
     print(f"famidrive-bluetooth: {msg}", file=sys.stderr, flush=True)
 
 
-def friendly(name):
+def friendly(name: str | None) -> str:
     """The name a player knows a controller by, from its Bluetooth name."""
     name = (name or "").strip()
     for pattern, nice in NAMES:
@@ -83,7 +165,7 @@ def friendly(name):
     return name or "Controller"
 
 
-def is_controller(props):
+def is_controller(props: Device) -> bool:
     """A Device1's properties look like a game controller: BlueZ's gamepad
     icon, a Bluetooth Classic class of joystick or gamepad, a Bluetooth LE
     appearance of either, or a name that's one."""
@@ -97,12 +179,12 @@ def is_controller(props):
     return bool(CONTROLLER_NAMES.search(props.get("Name") or props.get("Alias") or ""))
 
 
-def safe(name):
+def safe(name: str) -> str:
     """A name fit for a file name (ES-DE shows the file's name)."""
     return re.sub(r'[/\\:*?"<>|]', "", name).strip() or "Controller"
 
 
-def plan_entries(has_adapter, paired):
+def plan_entries(has_adapter: bool, paired: list[tuple[str, str | None]]) -> dict[str, str]:
     """{file name: contents} for the Controllers folder. `paired` is a list
     of (address, name) for paired controllers, in order."""
     if not has_adapter:
@@ -117,8 +199,8 @@ def plan_entries(has_adapter, paired):
     return out
 
 
-def write_entries(folder, planned):
-    folder = Path(folder)
+def write_entries(path: str | Path, planned: dict[str, str]) -> None:
+    folder = Path(path)
     folder.mkdir(parents=True, exist_ok=True)
     for f in folder.glob("*.setting"):
         try:
@@ -133,11 +215,10 @@ def write_entries(folder, planned):
             p.write_text(what)
 
 
-def pair_first(gamelist):
+def pair_first(gamelist: Path) -> None:
     """Gives Pair a Controller the Sort name "0" in ES-DE's game list, so
     it's first whatever's paired. ES-DE keeps the list's other entries
     (play counts) itself; one it can't read is left alone."""
-    gamelist = Path(gamelist)
     path = f"./{PAIR_ENTRY}.setting"
     try:
         tree = ET.parse(gamelist)
@@ -163,7 +244,7 @@ def pair_first(gamelist):
     tmp.replace(gamelist)
 
 
-def toast(*args):
+def toast(*args: str) -> None:
     """A toast on the TV. Never fails the caller."""
     exe = shutil.which("famidrive-toast")
     if exe:
@@ -176,91 +257,97 @@ def toast(*args):
 
 # ---------------------------------------------------------------- BlueZ
 
-def unwrap(props):
+def unwrap(props: "dict[str, Variant]") -> dict[str, object]:
     return {k: getattr(v, "value", v) for k, v in props.items()}
 
 
-async def system_bus():
+async def system_bus() -> "MessageBus":
     from dbus_next.aio import MessageBus
     from dbus_next import BusType
-    return await MessageBus(bus_type=BusType.SYSTEM).connect()
+    bus: MessageBus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+    return bus
 
 
-async def managed_objects(bus):
-    intro = await bus.introspect(BLUEZ, "/")
-    om = bus.get_proxy_object(BLUEZ, "/", intro).get_interface("org.freedesktop.DBus.ObjectManager")
+async def managed_objects(bus: "MessageBus") -> Objects:
+    om = cast(ObjectManagerIface, await iface(bus, "/", "org.freedesktop.DBus.ObjectManager"))
     objs = await om.call_get_managed_objects()
-    return {path: {iface: unwrap(p) for iface, p in ifaces.items()} for path, ifaces in objs.items()}
+    return {path: {name: unwrap(p) for name, p in ifaces.items()} for path, ifaces in objs.items()}
 
 
-async def iface(bus, path, name):
+async def iface(bus: "MessageBus", path: str, name: str) -> "ProxyInterface":
     intro = await bus.introspect(BLUEZ, path)
     return bus.get_proxy_object(BLUEZ, path, intro).get_interface(name)
 
 
-def first_adapter(objs):
+def first_adapter(objs: Objects) -> str | None:
     return next((p for p, i in sorted(objs.items()) if "org.bluez.Adapter1" in i), None)
 
 
-def devices(objs, adapter):
-    return [(p, i["org.bluez.Device1"]) for p, i in sorted(objs.items())
+def devices(objs: Objects, adapter: str | None) -> list[tuple[str, Device]]:
+    # Each Device1's properties have the types BlueZ documents (Device).
+    return [(p, cast(Device, i["org.bluez.Device1"])) for p, i in sorted(objs.items())
             if "org.bluez.Device1" in i and i["org.bluez.Device1"].get("Adapter") == adapter]
 
 
-def paired_controllers(objs, adapter):
-    return [(d["Address"], d.get("Alias") or d.get("Name")) for _, d in devices(objs, adapter)
+def paired_controllers(objs: Objects, adapter: str | None) -> list[tuple[str, str | None]]:
+    return [(d.get("Address", ""), d.get("Alias") or d.get("Name")) for _, d in devices(objs, adapter)
             if d.get("Paired") and is_controller(d)]
 
 
-def make_agent():
+def make_agent() -> "ServiceInterface":
     from dbus_next.service import ServiceInterface, method
+
+    def dbus_method[F: Callable[..., object]](fn: F) -> F:
+        """dbus_next's @method(), which has no types of its own."""
+        exported: F = method()(fn)
+        return exported
 
     class Agent(ServiceInterface):
         """Accepts everything a controller asks: there's no one to type a
         PIN or confirm a number on a TV, and controllers don't need it."""
-        def __init__(self):
+        def __init__(self) -> None:
             super().__init__("org.bluez.Agent1")
 
-        @method()
-        def Release(self):
+        @dbus_method
+        def Release(self) -> None:
             pass
 
-        @method()
+        @dbus_method
         def RequestPinCode(self, device: "o") -> "s":
             return "0000"
 
-        @method()
-        def DisplayPinCode(self, device: "o", pincode: "s"):
+        @dbus_method
+        def DisplayPinCode(self, device: "o", pincode: "s") -> None:
             pass
 
-        @method()
+        @dbus_method
         def RequestPasskey(self, device: "o") -> "u":
             return 0
 
-        @method()
-        def DisplayPasskey(self, device: "o", passkey: "u", entered: "q"):
+        @dbus_method
+        def DisplayPasskey(self, device: "o", passkey: "u", entered: "q") -> None:
             pass
 
-        @method()
-        def RequestConfirmation(self, device: "o", passkey: "u"):
+        @dbus_method
+        def RequestConfirmation(self, device: "o", passkey: "u") -> None:
             pass
 
-        @method()
-        def RequestAuthorization(self, device: "o"):
+        @dbus_method
+        def RequestAuthorization(self, device: "o") -> None:
             pass
 
-        @method()
-        def AuthorizeService(self, device: "o", uuid: "s"):
+        @dbus_method
+        def AuthorizeService(self, device: "o", uuid: "s") -> None:
             pass
 
-        @method()
-        def Cancel(self):
+        @dbus_method
+        def Cancel(self) -> None:
             pass
 
     return Agent()
 
 
-async def pair(seconds):
+async def pair(seconds: int) -> int:
     from dbus_next import Variant
     from dbus_next.errors import DBusError
 
@@ -273,12 +360,12 @@ async def pair(seconds):
         return 1
 
     bus.export(AGENT_PATH, make_agent())
-    manager = await iface(bus, "/org/bluez", "org.bluez.AgentManager1")
+    manager = cast(AgentManagerIface, await iface(bus, "/org/bluez", "org.bluez.AgentManager1"))
     await manager.call_register_agent(AGENT_PATH, "NoInputNoOutput")
     await manager.call_request_default_agent(AGENT_PATH)
 
-    ad = await iface(bus, adapter, "org.bluez.Adapter1")
-    props = await iface(bus, adapter, "org.freedesktop.DBus.Properties")
+    ad = cast(AdapterIface, await iface(bus, adapter, "org.bluez.Adapter1"))
+    props = cast(PropertiesIface, await iface(bus, adapter, "org.freedesktop.DBus.Properties"))
     await props.call_set("org.bluez.Adapter1", "Powered", Variant("b", True))
     try:
         await ad.call_set_discovery_filter({"Transport": Variant("s", "auto")})
@@ -287,7 +374,7 @@ async def pair(seconds):
     await ad.call_start_discovery()
     log("scanning")
 
-    found = None
+    found: tuple[str, Device] | None = None
     loop = asyncio.get_running_loop()
     start = loop.time()
     hint = -1
@@ -326,8 +413,8 @@ async def pair(seconds):
     log(f"pairing {d.get('Address')} ({d.get('Name')})")
     toast("--kind", "progress", "--id", "bluetooth-pair", "--icon", "controller",
           "--progress", "0.95", f"Pairing {name}", "")
-    dev = await iface(bus, path, "org.bluez.Device1")
-    dprops = await iface(bus, path, "org.freedesktop.DBus.Properties")
+    dev = cast(DeviceIface, await iface(bus, path, "org.bluez.Device1"))
+    dprops = cast(PropertiesIface, await iface(bus, path, "org.freedesktop.DBus.Properties"))
     try:
         try:
             await dev.call_pair()
@@ -356,7 +443,7 @@ async def pair(seconds):
     return 0
 
 
-async def forget(address):
+async def forget(address: str) -> int:
     bus = await system_bus()
     objs = await managed_objects(bus)
     adapter = first_adapter(objs)
@@ -367,14 +454,16 @@ async def forget(address):
         return 0
     path, d = match[0]
     name = friendly(d.get("Alias") or d.get("Name"))
-    ad = await iface(bus, adapter, "org.bluez.Adapter1")
+    if adapter is None:   # found among its devices, so there is one
+        return 0
+    ad = cast(AdapterIface, await iface(bus, adapter, "org.bluez.Adapter1"))
     await ad.call_remove_device(path)
     toast("--kind", "notice", "--icon", "controller", f"{name} forgotten",
           "Pair it again from Controllers to use it.")
     return 0
 
 
-async def disconnect(address):
+async def disconnect(address: str) -> int:
     """Disconnect a connected controller. Xbox, PlayStation and Switch
     pads switch themselves off when their host lets them go."""
     bus = await system_bus()
@@ -384,13 +473,14 @@ async def disconnect(address):
              if d.get("Address", "").upper() == address.upper() and d.get("Connected")]
     if not match:
         return 0
-    dev = await iface(bus, match[0], "org.bluez.Device1")
+    dev = cast(DeviceIface, await iface(bus, match[0], "org.bluez.Device1"))
     await dev.call_disconnect()
     log(f"disconnected {address}")
     return 0
 
 
-async def entries(folder, old=()):
+async def entries(folder: str, old: Iterable[str] = ()) -> int:
+    objs: Objects
     try:
         bus = await system_bus()
         objs = await managed_objects(bus)
@@ -407,7 +497,7 @@ async def entries(folder, old=()):
     return 0
 
 
-def main():
+def main() -> int:
     args = sys.argv[1:]
     if args[:1] == ["entries"] and len(args) >= 2:
         return asyncio.run(entries(args[1], args[2:]))

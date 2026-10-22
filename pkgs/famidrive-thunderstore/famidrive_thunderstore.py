@@ -37,17 +37,35 @@ import shutil
 import sys
 import zipfile
 from pathlib import Path
+from typing import TypedDict
+
+
+class BepInEx(TypedDict):
+    package: str
+    zip: str
+
+
+class Game(TypedDict):
+    bepinex: BepInEx
+    mods: dict[str, str]
+    onlyListed: bool
+
+
+class Spec(TypedDict):
+    """What Nix passes: see the docstring above."""
+    games: dict[str, Game]
+
 
 STEAM = Path.home() / ".local/share/Steam"
 MARK = ".famidrive-version"
 NOT_FILES = ("manifest.json", "icon.png", "README.md", "CHANGELOG.md", "LICENSE")
 
 
-def log(msg):
+def log(msg: str) -> None:
     print(f"famidrive-thunderstore: {msg}", file=sys.stderr)
 
 
-def game_dir(appid):
+def game_dir(appid: str) -> Path | None:
     libraries = [STEAM / "steamapps"]
     try:
         folders = (STEAM / "steamapps/libraryfolders.vdf").read_text(errors="replace")
@@ -65,14 +83,14 @@ def game_dir(appid):
     return None
 
 
-def read(path):
+def read(path: Path) -> str:
     try:
         return path.read_text().strip()
     except OSError:
         return ""
 
 
-def extract(zf, member, target):
+def extract(zf: zipfile.ZipFile, member: str, target: Path) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     with zf.open(member) as src, open(target, "wb") as dst:
         shutil.copyfileobj(src, dst)
@@ -80,7 +98,7 @@ def extract(zf, member, target):
         target.chmod(0o755)
 
 
-def pack_root(names):
+def pack_root(names: list[str]) -> str | None:
     """The folder in a BepInExPack's zip that holds BepInEx/ ("" for the
     zip's top level), or None."""
     for n in sorted((n.replace("\\", "/") for n in names), key=len):
@@ -92,13 +110,13 @@ def pack_root(names):
     return None
 
 
-def install_bepinex(game, package, zip_path):
+def install_bepinex(game: Path, package: str, zip_path: str) -> set[str]:
     """Returns the names BepInEx itself puts in plugins/."""
     with zipfile.ZipFile(zip_path) as zf:
         prefix = pack_root(zf.namelist())
         if prefix is None:
             raise ValueError(f"{package} has no BepInEx/core")
-        rel = {}
+        rel: dict[str, str] = {}
         for m in zf.namelist():
             path = m.replace("\\", "/")
             if path.startswith(prefix) and not path.endswith("/") and path not in NOT_FILES:
@@ -113,17 +131,21 @@ def install_bepinex(game, package, zip_path):
     return shipped
 
 
-def dependencies(zip_path):
+def dependencies(zip_path: str) -> list[str]:
     """Author-Name of each package a mod's manifest says it needs."""
     try:
         with zipfile.ZipFile(zip_path) as zf:
-            manifest = json.loads(zf.read("manifest.json").decode("utf-8-sig"))
+            manifest: object = json.loads(zf.read("manifest.json").decode("utf-8-sig"))
     except (KeyError, ValueError, OSError, zipfile.BadZipFile):
         return []
-    return [d.rsplit("-", 1)[0] for d in manifest.get("dependencies", []) if d.count("-") >= 2]
+    # The mod's author wrote it: only what has the right shape counts.
+    deps = manifest.get("dependencies") if isinstance(manifest, dict) else None
+    if not isinstance(deps, list):
+        return []
+    return [d.rsplit("-", 1)[0] for d in deps if isinstance(d, str) and d.count("-") >= 2]
 
 
-def install_mod(game, ident, zip_path):
+def install_mod(game: Path, ident: str, zip_path: str) -> str:
     """Returns the plugins/ entry name the mod lives under."""
     author, name, version = ident.rsplit("-", 2)
     folder = f"{author}-{name}"
@@ -153,7 +175,7 @@ def install_mod(game, ident, zip_path):
     return folder
 
 
-def turn_off_unlisted(game, keep):
+def turn_off_unlisted(game: Path, keep: set[str]) -> None:
     for kind in ("plugins", "patchers"):
         here, off = game / "BepInEx" / kind, game / "BepInEx" / f"{kind}-off"
         for entry in sorted(here.iterdir()) if here.is_dir() else []:
@@ -169,7 +191,7 @@ def turn_off_unlisted(game, keep):
             log(f"{game.name}: turned off {kind}/{entry.name} (moved to BepInEx/{kind}-off)")
 
 
-def sync_game(appid, g):
+def sync_game(appid: str, g: Game) -> None:
     game = game_dir(appid)
     if game is None:
         log(f"{appid} isn't installed through Steam; skipped")
@@ -186,8 +208,8 @@ def sync_game(appid, g):
         turn_off_unlisted(game, keep)
 
 
-def main():
-    spec = json.loads(sys.argv[1])
+def main() -> int:
+    spec: Spec = json.loads(sys.argv[1])
     failed = False
     for appid, g in spec["games"].items():
         try:

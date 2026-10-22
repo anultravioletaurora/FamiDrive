@@ -27,6 +27,28 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import Literal, NotRequired, TypedDict
+
+type Content = Literal["movies", "tvshows"]
+type SettingValue = str | int | bool
+
+
+class Source(TypedDict):
+    path: str
+    content: Content
+
+
+class Spec(TypedDict):
+    """What media.nix passes: see the docstring above."""
+    sources: dict[str, Source]
+    addons: NotRequired[list[str]]
+    addonSettings: NotRequired[dict[str, dict[str, SettingValue]]]
+
+
+class Scan(TypedDict):
+    scraper: str
+    recursive: int
+
 
 KODI = Path(os.environ.get("KODI_HOME") or Path.home() / ".kodi")
 USERDATA = KODI / "userdata"
@@ -34,21 +56,21 @@ DATABASE = USERDATA / "Database"
 
 # Kodi's own scrapers (shipped with Kodi), and how it scans each kind of
 # folder: movies anywhere under it, a TV show per folder.
-CONTENT = {
+CONTENT: dict[Content, Scan] = {
     "movies": {"scraper": "metadata.themoviedb.org.python", "recursive": 2147483647},
     "tvshows": {"scraper": "metadata.tvshows.themoviedb.org.python", "recursive": 0},
 }
 
 
-def log(msg):
+def log(msg: str) -> None:
     print(f"famidrive-kodi: {msg}", file=sys.stderr, flush=True)
 
 
-def folder(path):
+def folder(path: str) -> str:
     return path if path.endswith("/") else path + "/"
 
 
-def write_sources(sources):
+def write_sources(sources: dict[str, Source]) -> None:
     """Merges the box's folders into sources.xml's <video> section. A
     player's own sources stay; one with a box folder's name or path is
     replaced by the box's."""
@@ -78,13 +100,13 @@ def write_sources(sources):
         path.write_bytes(after)
 
 
-def newest(pattern):
+def newest(pattern: str) -> Path | None:
     """Kodi's current database of a kind: MyVideos131.db, Addons33.db, …"""
     found = sorted(DATABASE.glob(pattern), key=lambda p: int("".join(c for c in p.stem if c.isdigit()) or 0))
     return found[-1] if found else None
 
 
-def enable_addons(ids):
+def enable_addons(ids: list[str]) -> None:
     """Add-ons come from Nix, outside Kodi's own installer, which can
     leave them switched off. Before Kodi's first run there's no database
     yet: Kodi adds them itself, and the next start switches them on."""
@@ -96,7 +118,7 @@ def enable_addons(ids):
             c.execute("UPDATE installed SET enabled=1, disabledReason=0 WHERE addonID=?", (addon,))
 
 
-def set_content(db, sources):
+def set_content(db: Path, sources: dict[str, Source]) -> None:
     with sqlite3.connect(db, timeout=10) as c:
         for s in sources.values():
             kind = CONTENT[s["content"]]
@@ -112,7 +134,7 @@ def set_content(db, sources):
                       (s["content"], kind["scraper"], kind["recursive"], row[0]))
 
 
-def set_addon_settings(addon, values):
+def set_addon_settings(addon: str, values: dict[str, SettingValue]) -> None:
     """Sets these settings in an add-on's userdata/addon_data/<id>/
     settings.xml, in either of Kodi's formats (version 2's
     <setting id="x">value</setting>, or the older value="..."
@@ -141,7 +163,7 @@ def set_addon_settings(addon, values):
         path.write_bytes(after)
 
 
-def cmd_prepare(spec):
+def cmd_prepare(spec: Spec) -> None:
     if spec["sources"]:
         write_sources(spec["sources"])
     enable_addons(spec.get("addons", []))
@@ -149,7 +171,7 @@ def cmd_prepare(spec):
         set_addon_settings(addon, values)
 
 
-def cmd_library(spec, wait=120):
+def cmd_library(spec: Spec, wait: float = 120) -> None:
     sources = spec["sources"]
     if not sources:
         return
@@ -173,8 +195,9 @@ def cmd_library(spec, wait=120):
                    stdout=subprocess.DEVNULL)
 
 
-def main():
-    cmd, spec = sys.argv[1], json.loads(sys.argv[2])
+def main() -> None:
+    cmd = sys.argv[1]
+    spec: Spec = json.loads(sys.argv[2])
     {"prepare": cmd_prepare, "library": cmd_library}[cmd](spec)
 
 

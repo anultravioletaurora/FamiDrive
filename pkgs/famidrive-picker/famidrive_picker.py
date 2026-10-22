@@ -29,6 +29,7 @@ import struct
 import subprocess
 import sys
 from pathlib import Path
+from typing import NotRequired, TypedDict
 
 os.environ.setdefault("SDL_VIDEODRIVER", "x11")   # gamescope's Xwayland
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
@@ -49,7 +50,32 @@ GUEST = (110, 110, 110)
 STICK = 16000                # how far the stick goes before it counts
 
 
-def log(msg):
+class Player(TypedDict):
+    user: str
+    displayName: str
+    isGuest: bool
+    avatar: NotRequired[str | None]
+
+
+class Spec(TypedDict):
+    """SPEC_JSON, above."""
+    players: list[Player]
+    session: list[str]
+    last: str
+    avatars: NotRequired[str | None]
+    theme: NotRequired[str | None]
+    powerOff: NotRequired[list[str] | None]
+
+
+class Reply(TypedDict, total=False):
+    """A greetd reply (greetd-ipc(7)): "success", "error" or "auth_message"."""
+    type: str
+    description: str
+    auth_message_type: str
+    auth_message: str
+
+
+def log(msg: str) -> None:
     print(f"famidrive-picker: {msg}", file=sys.stderr, flush=True)
 
 
@@ -59,17 +85,18 @@ def log(msg):
 # then that much JSON, over the socket in $GREETD_SOCK.
 
 class Greetd:
-    def __init__(self):
+    def __init__(self) -> None:
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.connect(os.environ["GREETD_SOCK"])
 
-    def ask(self, msg):
+    def ask(self, msg: dict[str, str | list[str]]) -> Reply:
         data = json.dumps(msg).encode()
         self.sock.sendall(struct.pack("=I", len(data)) + data)
-        size = struct.unpack("=I", self._read(4))[0]
-        return json.loads(self._read(size))
+        size: int = struct.unpack("=I", self._read(4))[0]
+        reply: Reply = json.loads(self._read(size))
+        return reply
 
-    def _read(self, n):
+    def _read(self, n: int) -> bytes:
         buf = b""
         while len(buf) < n:
             chunk = self.sock.recv(n - len(buf))
@@ -79,7 +106,7 @@ class Greetd:
         return buf
 
 
-def start(user, session):
+def start(user: str, session: list[str]) -> str | None:
     """Log `user` in and hand greetd their session. Returns an error
     message, or None once greetd has it (then this should exit)."""
     if "GREETD_SOCK" not in os.environ:
@@ -89,18 +116,18 @@ def start(user, session):
     reply = g.ask({"type": "create_session", "username": user})
     # Players need no password (session.nix's PAM rule). Anything that
     # still asks for one can't be answered from a controller.
-    while reply["type"] == "auth_message":
+    while reply.get("type") == "auth_message":
         if reply.get("auth_message_type") in ("info", "error"):
             log(f"PAM: {reply.get('auth_message')}")
             reply = g.ask({"type": "post_auth_message_response"})
         else:
             g.ask({"type": "cancel_session"})
             return "This player needs a password, which can't be typed here."
-    if reply["type"] != "success":
+    if reply.get("type") != "success":
         g.ask({"type": "cancel_session"})
         return reply.get("description") or "greetd couldn't log in."
     reply = g.ask({"type": "start_session", "cmd": session, "env": []})
-    if reply["type"] != "success":
+    if reply.get("type") != "success":
         g.ask({"type": "cancel_session"})
         return reply.get("description") or "greetd couldn't start the session."
     return None
@@ -108,7 +135,7 @@ def start(user, session):
 
 # ---------------------------------------------------------------- drawing
 
-def theme_fonts(theme):
+def theme_fonts(theme: str | None) -> tuple[Path | None, Path | None]:
     """(regular, light) font files the theme uses for game names and for
     descriptions. Art Book Next names them in theme.xml's <variables> as
     fontRegular and fontLight; other themes fall back to ES-DE's default."""
@@ -124,7 +151,7 @@ def theme_fonts(theme):
     return (Path(theme) / regular if regular else None), (Path(theme) / light if light else None)
 
 
-def font(path, size):
+def font(path: Path | None, size: int) -> pygame.font.Font:
     try:
         if path:
             return pygame.font.Font(str(path), size)
@@ -133,10 +160,11 @@ def font(path, size):
     return pygame.font.Font(None, int(size * 1.3))
 
 
-def avatar_file(player, folder):
+def avatar_file(player: Player, folder: str | None) -> Path | None:
     """The picture to show for a player, or None for their initial."""
-    if player.get("avatar") and Path(player["avatar"]).is_file():
-        return Path(player["avatar"])
+    avatar = player.get("avatar")
+    if avatar and Path(avatar).is_file():
+        return Path(avatar)
     if folder:
         for ext in ("png", "jpg", "webp", "gif"):
             p = Path(folder) / f"{player['user']}.{ext}"
@@ -145,7 +173,7 @@ def avatar_file(player, folder):
     return None
 
 
-def circle_image(path, size):
+def circle_image(path: Path, size: int) -> pygame.Surface | None:
     """The image at path, its middle square scaled to size and cut to a
     circle. None if it can't be read."""
     try:
@@ -162,15 +190,15 @@ def circle_image(path, size):
     return face
 
 
-def read(path):
+def read(path: str) -> str:
     try:
         return Path(path).read_text().strip()
     except OSError:
         return ""
 
 
-def main():
-    spec = json.loads(Path(sys.argv[1]).read_text())
+def main() -> None:
+    spec: Spec = json.loads(Path(sys.argv[1]).read_text())
     players = spec["players"]
     last = read(spec["last"])
     selected = next((i for i, p in enumerate(players) if p["user"] == last), 0)
@@ -195,32 +223,33 @@ def main():
     help_f = font(regular, int(24 * u))
 
     pictures = {p["user"]: avatar_file(p, spec.get("avatars")) for p in players}
-    faces = {}   # (user, diameter) -> circle, made once
+    faces: dict[tuple[str, int], pygame.Surface | None] = {}   # (user, diameter) -> circle, made once
 
-    def face(p, diameter):
-        if not pictures[p["user"]]:
+    def face(p: Player, diameter: int) -> pygame.Surface | None:
+        picture = pictures[p["user"]]
+        if not picture:
             return None
         key = (p["user"], diameter)
         if key not in faces:
-            faces[key] = circle_image(pictures[p["user"]], diameter)
+            faces[key] = circle_image(picture, diameter)
         return faces[key]
 
     background = pygame.Surface((w, h), 0, 32)
     background.fill(BLACK)
 
-    pads = {}
+    pads: dict[int, controller.Controller] = {}
     # Which sticks are pushed, per controller and axis. One flag for all
     # of them let the other axis's wobble near the middle count as letting
     # go, so one push went past several players (first box, 2026-10-09).
-    stick_held = set()
+    stick_held: set[tuple[int | None, int]] = set()
     error = ""
     busy = ""            # what's happening, while it happens
     power = spec.get("powerOff")
     on_power = False     # Power Off has the focus, not a player
 
-    def choose():
+    def choose() -> None:
         nonlocal error, busy
-        if on_power:
+        if on_power and power:
             busy, error = "Turning off…", ""
             draw()
             r = subprocess.run(power, capture_output=True, text=True)
@@ -241,18 +270,18 @@ def main():
         log(err)
         busy, error = "", err
 
-    def move(step):
+    def move(step: int) -> None:
         nonlocal selected, error
         if not on_power:
             selected = (selected + step) % len(players)
         error = ""
 
-    def focus_power(down):
+    def focus_power(down: bool) -> None:
         nonlocal on_power, error
         on_power = bool(power) and down
         error = ""
 
-    def draw():
+    def draw() -> None:
         screen.blit(background, (0, 0))
         title = title_f.render("Who's playing?", True, WHITE)
         screen.blit(title, ((w - title.get_width()) // 2, int(h * 0.20)))
@@ -276,7 +305,7 @@ def main():
                 pygame.draw.circle(screen, BLACK, (cx, cy), r + int(4 * u))
             color = GUEST if p["isGuest"] else COLORS[i % len(COLORS)]
             if not on:
-                color = tuple(int(c * 0.6) for c in color)
+                color = (int(color[0] * 0.6), int(color[1] * 0.6), int(color[2] * 0.6))
             picture = face(p, 2 * r)
             if picture:
                 screen.blit(picture, (cx - r, cy - r))
