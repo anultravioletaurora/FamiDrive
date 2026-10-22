@@ -77,6 +77,48 @@ class Test(unittest.TestCase):
         self.run_tool("prepare", self.spec)                 # again: unchanged
         self.assertEqual((userdata / "sources.xml").read_bytes(), before)
 
+    def test_home_folders_in_videos_and_pictures(self):
+        (self.home / "Recordings").mkdir(parents=True)
+        (self.home / "Screenshots").mkdir()
+        spec = {**self.spec, "homeFolders": {
+            "Recordings": {"path": "Recordings", "type": "videos"},
+            "Screenshots": {"path": "Screenshots", "type": "pictures"},
+        }}
+        self.run_tool("prepare", spec)
+        root = ET.parse(self.home / ".kodi/userdata/sources.xml").getroot()
+        video = {s.findtext("name"): s.findtext("path") for s in root.find("video").findall("source")}
+        self.assertEqual(video["Recordings"], f"{self.home}/Recordings/")
+        self.assertIn("Movies", video)
+        pictures = {s.findtext("name"): s.findtext("path") for s in root.find("pictures").findall("source")}
+        self.assertEqual(pictures, {"Screenshots": f"{self.home}/Screenshots/"})
+
+    def test_home_folders_alone_and_one_not_there_yet(self):
+        (self.home / "Recordings").mkdir(parents=True)
+        spec = {"sources": {}, "homeFolders": {
+            "Recordings": {"path": "Recordings", "type": "videos"},
+            "Screenshots": {"path": "Screenshots", "type": "pictures"},
+        }}
+        self.run_tool("prepare", spec)
+        root = ET.parse(self.home / ".kodi/userdata/sources.xml").getroot()
+        self.assertEqual([s.findtext("name") for s in root.find("video").findall("source")], ["Recordings"])
+        self.assertIsNone(root.find("pictures"))
+        # Once there's a folder, the next start adds it.
+        (self.home / "Screenshots").mkdir()
+        self.run_tool("prepare", spec)
+        root = ET.parse(self.home / ".kodi/userdata/sources.xml").getroot()
+        self.assertEqual(root.find("pictures/source/name").text, "Screenshots")
+
+    def test_home_folders_get_no_content_or_scan(self):
+        (self.home / "Recordings").mkdir(parents=True)
+        self.db.mkdir(parents=True)
+        with sqlite3.connect(self.db / "MyVideos131.db") as c:
+            c.execute(PATH_TABLE)
+        spec = {"sources": {}, "homeFolders": {"Recordings": {"path": "Recordings", "type": "videos"}}}
+        self.run_tool("library", spec)
+        with sqlite3.connect(self.db / "MyVideos131.db") as c:
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM path").fetchone()[0], 0)
+        self.assertEqual(self.sent(), "")
+
     def test_addons_switched_on_once_kodi_has_its_database(self):
         self.run_tool("prepare", self.spec)                 # first run: no database yet, fine
         self.db.mkdir(parents=True, exist_ok=True)

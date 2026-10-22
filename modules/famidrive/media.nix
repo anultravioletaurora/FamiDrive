@@ -103,7 +103,7 @@ let
   ];
 
   kodiSpec = builtins.toJSON {
-    inherit (kodi) sources;
+    inherit (kodi) sources homeFolders;
     # To switch on: Kodi can leave add-ons it didn't install itself off.
     # VERIFY on the first box.
     addons = map (a: a.namespace) (lib.filter (a: a ? namespace) (kodiAddons pkgs.kodiPackages));
@@ -154,6 +154,34 @@ in
 
         (exFAT and NTFS drives also need `uid`/`gid`/`umask` options,
         since they have no Linux permissions of their own.)
+      '';
+    };
+
+    homeFolders = mkOption {
+      type = types.attrsOf (types.submodule {
+        options = {
+          path = mkOption {
+            type = types.str;
+            example = "Recordings";
+            description = "A folder in each player's home, relative to it.";
+          };
+          type = mkOption {
+            type = types.enum [ "videos" "pictures" ];
+            description = ''
+              Where it goes in Kodi: `"videos"` under Videos > Files, played
+              as they are, with no lookup as films or shows; `"pictures"`
+              under Pictures.
+            '';
+          };
+        };
+      });
+      default = { };
+      example = { Clips = { path = "Videos/Clips"; type = "videos"; }; };
+      description = ''
+        Folders in each player's own home, in that player's Kodi, so each
+        player sees only their own. The Recordings system adds its
+        `~/Recordings` here (`famidrive.recordings`). A folder that isn't
+        there yet is added the first time Kodi starts after it is.
       '';
     };
 
