@@ -222,6 +222,22 @@ in
     '';
   };
 
+  options.famidrive.controllers.xpadneo = mkOption {
+    type = types.bool;
+    default = true;
+    description = ''
+      Turn on xpadneo, the driver for Xbox One and Series controllers over
+      Bluetooth, the Elite Series 2 included. It gives them the standard
+      Xbox layout, rumble (the triggers' motors too) and the Elite's
+      paddle profiles. Without it the kernel's generic HID driver takes
+      them, with buttons in another order and often no rumble.
+
+      Harmless on a box without Bluetooth, and with the Xbox Wireless
+      Adapter (`xboxWirelessAdapter`): that's a different driver for a
+      different connection.
+    '';
+  };
+
   options.famidrive.controllers.gamecube.ports = mkOption {
     type = types.listOf types.str;
     default = [ "gamepad" ];
@@ -312,6 +328,11 @@ in
     # The Xbox Wireless Adapter: nixpkgs' module brings the driver, the
     # dongle's firmware (unfree, allowed in default.nix) and xpad-noone.
     hardware.xone.enable = cfg.controllers.xboxWirelessAdapter;
+    # Xbox pads over Bluetooth. The first box turned it on in its own host
+    # config before FamiDrive did, and every Xbox result in CONTROLLERS.md
+    # is with it. mkDefault, so a host that still sets
+    # hardware.xpadneo.enable itself wins rather than conflicting.
+    hardware.xpadneo.enable = lib.mkDefault cfg.controllers.xpadneo;
 
     famidrive.playerHome = { lib, ... }: {
       home.activation.famidriveControllers = lib.hm.dag.entryAfter [ "writeBoundary" ] ''

@@ -536,6 +536,8 @@ in
       yarg.enable = true;
     };
   } (c: [
+    (check "xpadneo for Xbox pads over Bluetooth, by default"
+      c.hardware.xpadneo.enable)
     (check "a session reads Xbox pads through the kernel's driver, not SDL's Xbox HID driver"
       (let
         read = f: builtins.unsafeDiscardStringContext (builtins.readFile f);

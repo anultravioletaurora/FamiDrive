@@ -269,9 +269,11 @@ Which of the two the result below was from isn't recorded.
   did no better, so it's the game. This pad's kernel log said
   `045e:0b13`, "Xbox Wireless Controller (modern)".
 
-- **Driver:** xpadneo, which the test box's host config turns on
-  (`hardware.xpadneo.enable`). FamiDrive doesn't add it itself. Under
-  xpadneo the pad reports as `045e:028e`.
+- **Driver:** xpadneo, which FamiDrive turns on
+  ([`famidrive.controllers.xpadneo`](USAGE.md#famidrivecontrollersxpadneo)).
+  The result above was from before that, with the test box's host config
+  turning it on (`hardware.xpadneo.enable`). Under xpadneo the pad
+  reports as `045e:028e`.
 - **Kodi:** ❌ at first. Kodi saw it ("Xbox Wireless Controller", 11
   buttons, 9 axes) but had no button map for it. FamiDrive now gives each
   player's Kodi one: the same buttons and first eight axes as `xpad`, plus

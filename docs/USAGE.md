@@ -1232,6 +1232,21 @@ the dongle uses the same chip.
 - **Type:** boolean
 - **Default:** `false`
 
+### `famidrive.controllers.xpadneo`
+
+Turn on xpadneo, the driver for Xbox One and Series controllers over
+Bluetooth, the Elite Series 2 included. It gives them the standard
+Xbox layout, rumble (the triggers' motors too) and the Elite's
+paddle profiles. Without it the kernel's generic HID driver takes
+them, with buttons in another order and often no rumble.
+
+Harmless on a box without Bluetooth, and with the Xbox Wireless
+Adapter (`xboxWirelessAdapter`): that's a different driver for a
+different connection.
+
+- **Type:** boolean
+- **Default:** `true`
+
 ## Steam
 
 The Steam lane (`lanes` has `"steam"`).
