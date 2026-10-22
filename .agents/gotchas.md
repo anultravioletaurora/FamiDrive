@@ -257,6 +257,12 @@ Found against RomM 5.3:
   the stick clicks. ES-DE and the emulators were fine (SDL knows the pad
   by its USB ID); famidrive-quit, reading evdev, wasn't, until it looked
   pads up in SDL's controller database (#130).
+- **"Works in ES-DE, not in games" means SDL's HID drivers.** ES-DE and
+  Minecraft run with them off (`SDL_JOYSTICK_HIDAPI=0`); the picker,
+  Steam, Wine and the emulators don't. An Elite Series 2 under xpadneo
+  did nothing in any of the latter until SDL's Xbox driver was turned
+  off (`SDL_JOYSTICK_HIDAPI_XBOX=0`, session.nix). Compare the two with
+  the same pad before suspecting the game.
 - **Toasts once stayed on screen, faded,** on the second box after a
   pad was unplugged and plugged back in mid-game, until a reboot. They
   were on a capture card's picture but not in gamescope's screenshot.

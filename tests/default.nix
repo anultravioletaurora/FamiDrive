@@ -536,6 +536,12 @@ in
       yarg.enable = true;
     };
   } (c: [
+    (check "a session reads Xbox pads through the kernel's driver, not SDL's Xbox HID driver"
+      (let
+        read = f: builtins.unsafeDiscardStringContext (builtins.readFile f);
+        session = lib.head (builtins.match ".*(/nix/store/[a-z0-9]{32}-famidrive-session).*"
+          (read c.services.greetd.settings.initial_session.command));
+      in lib.hasInfix "export SDL_JOYSTICK_HIDAPI_XBOX=0" (read session)))
     (check "a boot screen in place of console text"
       (c.boot.plymouth.enable && c.boot.plymouth.theme == "bgrt" && c.boot.initrd.systemd.enable
         && lib.hasInfix "DeviceScale=2" c.boot.plymouth.extraConfig
@@ -626,6 +632,9 @@ in
     in [
       (check "starts on the picker as greeter" (picker.user == "greeter" && lib.hasInfix "famidrive-picker" picker.command))
       (check "no autologin" (!(c.services.greetd.settings ? initial_session)))
+      (check "the picker reads Xbox pads through the kernel's driver, not SDL's Xbox HID driver"
+        (lib.hasInfix "export SDL_JOYSTICK_HIDAPI_XBOX=0"
+          (builtins.unsafeDiscardStringContext (builtins.readFile (lib.last (lib.splitString " " picker.command))))))
       (check "players' RomM pictures go where the picker can read them, each player only their own"
         (lib.elem "d /var/lib/famidrive-picker/avatars 3775 greeter famidrive -" c.systemd.tmpfiles.rules))
       (check "Wi-Fi and Ethernet in Settings: entries each session, launched by famidrive-network, players may join networks"
