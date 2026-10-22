@@ -116,6 +116,7 @@ in the journal when an Nvidia card has no driver.
 | Intel integrated | Mesa (ANV, iris), `i915` | ✅ **Tested** for GameCube. UHD Graphics 630 on the [second box](#test-boxes), at 1080p: ES-DE, and GameCube games played start to finish. Newer consoles and PC games untried; expect it to be too slow for Switch and most Steam games. |
 | Intel Arc | Mesa (ANV), `i915` or `xe`, plus Intel's video decoder | ❔ **Untested, should just work.** The same Mesa path as AMD. Some DirectX 12 games run slower on Arc under Proton than on AMD. |
 | Nvidia | Nvidia's driver (open kernel module), modesetting, the long-term kernel | ❔ **Untested. Help wanted:** #77 lists what to try. Gamescope, HDR and VRR on Nvidia are the least certain parts. |
+| Nvidia in a laptop (hybrid graphics) | The same, plus PRIME render offload: the TV is on the Intel or AMD card, and games render on the Nvidia card | ❔ **Untested.** Each session checks the hardware: gamescope runs on the card the TV is on, and everything it starts renders on the Nvidia card. Handing each frame from one card to the other is the least certain part. |
 
 ## Games
 

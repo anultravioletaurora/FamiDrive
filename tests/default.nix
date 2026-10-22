@@ -206,7 +206,9 @@ in
   ryujinx = unit "ryujinx" ../pkgs/famidrive-ryujinx/famidrive_ryujinx.py pkgs.python3;
   hardware = unit "hardware" ../pkgs/famidrive-hardware/famidrive_hardware.py pkgs.python3;
 
-  # An Nvidia box: the proprietary driver, set up for gamescope.
+  # An Nvidia box: the proprietary driver, set up for gamescope. Whether
+  # games render on it while another card shows them (a laptop) is
+  # decided at session start (famidrive-hardware offload, unit-tested).
   box-nvidia = expect "nvidia" {
     famidrive = {
       enable = true;
@@ -222,8 +224,37 @@ in
       (c.boot.kernelPackages.kernel.version == pkgs.linuxPackages.kernel.version))
     (check "the boot check knows the box is set up for Nvidia"
       (lib.hasInfix "check nvidia" c.systemd.services.famidrive-hardware-check.serviceConfig.ExecStart))
-    (check "no AMD or Intel driver in its initrd"
-      (!(lib.elem "amdgpu" c.boot.initrd.kernelModules) && !(lib.elem "i915" c.boot.initrd.kernelModules)))
+    (check "Intel's driver in its initrd, for a laptop's screen (hybrid graphics), but not AMD's"
+      (!(lib.elem "amdgpu" c.boot.initrd.kernelModules) && lib.elem "i915" c.boot.initrd.kernelModules))
+    (check "the Nvidia card can power off while nothing renders on it, Turing cards too"
+      (lib.hasInfix "NVreg_DynamicPowerManagement=0x02" c.boot.extraModprobeConfig
+        && lib.hasInfix ''ATTR{power/control}="auto"'' c.services.udev.extraRules))
+  ]);
+  # AMD and Intel said outright (the first box is AMD, the second Intel):
+  # Mesa only, as with "auto", and nothing of Nvidia's or of hybrid
+  # graphics' offload, which only "nvidia" turns on.
+  box-amd = expect "amd" {
+    famidrive = { enable = true; players.alice = { }; romm.enable = false; gpu = "amd"; };
+  } (c: [
+    (check "AMD's driver in the initrd, with its firmware, and no Nvidia driver"
+      (lib.elem "amdgpu" c.boot.initrd.kernelModules && c.hardware.amdgpu.initrd.enable
+        && !(lib.elem "nvidia" c.services.xserver.videoDrivers)))
+    (check "the newest kernel and Mesa's own video decoding, not Nvidia's"
+      (c.boot.kernelPackages.kernel.version == pkgs.linuxPackages_latest.kernel.version
+        && !(c.environment.sessionVariables ? LIBVA_DRIVER_NAME)))
+    (check "the boot check knows the box is set up for AMD"
+      (lib.hasInfix "check amd" c.systemd.services.famidrive-hardware-check.serviceConfig.ExecStart))
+  ]);
+  box-intel = expect "intel" {
+    famidrive = { enable = true; players.alice = { }; romm.enable = false; gpu = "intel"; };
+  } (c: [
+    (check "Intel's driver in the initrd, not AMD's, and no Nvidia driver"
+      (lib.elem "i915" c.boot.initrd.kernelModules && !(lib.elem "amdgpu" c.boot.initrd.kernelModules)
+        && !(lib.elem "nvidia" c.services.xserver.videoDrivers)))
+    (check "the newest kernel, and Intel's video decoder for Kodi"
+      (c.boot.kernelPackages.kernel.version == pkgs.linuxPackages_latest.kernel.version
+        && lib.any (p: lib.getName p == "intel-media-driver") c.hardware.graphics.extraPackages
+        && !(c.environment.sessionVariables ? LIBVA_DRIVER_NAME)))
   ]);
   generators = unit "generators" ../pkgs/famidrive-generators/famidrive_generate.py pkgs.python3;
   picker = unit "picker" ../pkgs/famidrive-picker/famidrive_picker.py

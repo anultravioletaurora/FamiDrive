@@ -767,10 +767,15 @@ the box lists its cards and the setting to use.
 - `"amd"`, `"intel"`: the same as `"auto"`, said outright.
   AMD is what FamiDrive is tested on; Intel should just work.
 - `"nvidia"`: Nvidia's own driver (its open kernel module, for RTX
-  20-series cards and newer), with kernel modesetting, which
-  gamescope needs, its video decoder, and the long-term kernel,
-  which Nvidia's driver keeps up with. Untested: results welcome
-  in docs/COMPATIBILITY.md.
+  20-series and GTX 16-series cards and newer), with kernel
+  modesetting, which gamescope needs, its video decoder, and the
+  long-term kernel, which Nvidia's driver keeps up with. On a
+  laptop, where the TV is on the Intel or AMD card and the Nvidia
+  card has no screen of its own (hybrid graphics), games render on
+  the Nvidia card and the other one shows them (PRIME render
+  offload), while ES-DE stays on the other card and the Nvidia one
+  powers off; each session works that out from the hardware.
+  Untested: results welcome in docs/COMPATIBILITY.md.
 
 - **Type:** one of "auto", "amd", "intel", "nvidia"
 - **Default:** `"auto"`
