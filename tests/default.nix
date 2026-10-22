@@ -536,6 +536,8 @@ in
       yarg.enable = true;
     };
   } (c: [
+    (check "xpadneo for Xbox pads over Bluetooth, by default"
+      c.hardware.xpadneo.enable)
     (check "a boot screen in place of console text"
       (c.boot.plymouth.enable && c.boot.plymouth.theme == "bgrt" && c.boot.initrd.systemd.enable
         && lib.hasInfix "DeviceScale=2" c.boot.plymouth.extraConfig
