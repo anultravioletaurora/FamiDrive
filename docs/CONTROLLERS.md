@@ -44,6 +44,7 @@ The Steam results below are with Steam Input off unless they say so.
 | [ATK AXE Pro](#atk-axe-pro) | 2.4 GHz dongle / Bluetooth / USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Logitech gamepads](#logitech-gamepads) | USB (F310) / 2.4 GHz dongle (F710) | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Xbox Wireless Controller](#xbox-wireless-controller) | Bluetooth | ✅ | ❔ | ❔ | ❔ | ❔ | ✅ | ❔ | ❔ |
+| [Xbox Elite Series 2](#xbox-elite-series-2) | Bluetooth | ✅ | ❔ | ❌ | ❔ | ❔ | ❌ | ❔ | ❔ |
 | [Xbox 360 controller, wired](#xbox-360-controller-wired) | USB | ✅ | ❔ | ✅ | ❔ | ❔ | ❔ | ❔ | ✅ |
 | [Xbox One controller, wired](#xbox-one-controller-wired) | USB | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
 | [Original Xbox controller (Duke)](#original-xbox-controller-duke) | Xbox-to-USB cable | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ | ❔ |
@@ -89,6 +90,7 @@ Clone Hero results for the guitars are in their own entries below.
 - [ATK AXE Pro](#atk-axe-pro)
 - [Logitech gamepads](#logitech-gamepads)
 - [Xbox Wireless Controller](#xbox-wireless-controller)
+- [Xbox Elite Series 2](#xbox-elite-series-2)
 - [Xbox 360 controller, wired](#xbox-360-controller-wired)
 - [Xbox One controller, wired](#xbox-one-controller-wired)
 - [Original Xbox controller (Duke)](#original-xbox-controller-duke)
@@ -286,6 +288,28 @@ xpadneo, so test those first.
   driver: turn it on with
   [`famidrive.controllers.xboxWirelessAdapter`](USAGE.md#famidrivecontrollersxboxwirelessadapter).
   Untested.
+
+## Xbox Elite Series 2
+
+Over Bluetooth, under xpadneo, like the [Xbox Wireless
+Controller](#xbox-wireless-controller).
+
+- **2026-10-22, first box:** ❌ in "Who's playing?", where it did
+  nothing, and in Rocket League, Cyberpunk 2077, Call of Duty: Black Ops
+  Cold War (Lutris), Fallout: New Vegas and Super Smash Bros. Melee. ✅
+  in ES-DE and Minecraft. Those two read pads with SDL's own HID drivers
+  off (`SDL_JOYSTICK_HIDAPI=0`); everything else had SDL's Xbox HID
+  driver take the pad's raw HID device. FamiDrive now turns that driver
+  off everywhere (`SDL_JOYSTICK_HIDAPI_XBOX=0`, session.nix), so Xbox
+  pads go through xpadneo or `xpad`. Not yet tried that way.
+
+- **USB ID:** `045e:0b22` over Bluetooth LE (xpadneo: "uses_hogp 1").
+  Under xpadneo the pad reports as `045e:028e`, the Xbox 360 pad's ID,
+  on its input device and its hidraw device alike.
+- **Driver:** xpadneo (`hardware.xpadneo.enable` in the host config). It
+  finds the Elite's paddle profiles ("mapping profiles detected").
+- **SDL name:** "Xbox 360 Controller" in ES-DE's log (GUID
+  `050018dc5e0400008e02000030110000`).
 
 ## Xbox 360 controller, wired
 
