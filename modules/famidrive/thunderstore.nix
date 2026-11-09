@@ -32,8 +32,8 @@ let
   # Other games set both themselves.
   known = {
     "892970".bepinex = {   # Valheim
-      package = "denikson-BepInExPack_Valheim-5.4.2351";
-      hash = "sha256-vOYxSXl2qTl3zrCOFmcS5sMdFSRJVvifF98JKpti4p8=";
+      package = "denikson-BepInExPack_Valheim-5.4.2360";
+      hash = "sha256-a8p3sQFqz+D/rrtlNMhLEq6NEuWparv1nsbkUmIE/G8=";
     };
     "632360".bepinex = {   # Risk of Rain 2
       package = "bbepis-BepInExPack-5.4.2122";
